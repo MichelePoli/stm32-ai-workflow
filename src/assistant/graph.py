@@ -70,10 +70,12 @@ from src.assistant.workflow4_web_search import (
     execute_web_search,
     finalize_search,
 )
-######
+
 # --- Workflow 5: Model Customization ---
 from src.assistant.workflow5_customization import (
     inspect_model_architecture,
+    ask_modification_intent,  
+    decide_after_inspection,  
     retrieve_best_practices_info,
     ask_user_for_custom_modifications,
     parse_user_modifications,
@@ -85,6 +87,7 @@ from src.assistant.workflow5_customization import (
     save_customized_model_final,
     ask_continue_after_customization,
 )
+
 
 # ============================================================================
 # LOGGING
@@ -346,6 +349,7 @@ def continue_after_customization_routing(state: MasterState) -> Literal["run_ana
         return "run_analyze"
     else:
         return "end"
+
 # ============================================================================
 # MASTER GRAPH 
 # ============================================================================
@@ -378,6 +382,7 @@ builder.add_node("download_model", download_model)
 # === WORKFLOW 5: MODEL CUSTOMIZATION (ENHANCED VERSION) ===
 # Architettura
 builder.add_node("inspect_model_architecture", inspect_model_architecture)
+builder.add_node("ask_modification_intent", ask_modification_intent)  # ✅ NUOVO
 builder.add_node("retrieve_best_practices_info", retrieve_best_practices_info)
 
 # User interaction & parsing
@@ -479,7 +484,6 @@ builder.add_conditional_edges(
     "choose_predefined_taskbased_model",
     model_selection_routing,
     {
-        "inspect_model_architecture": "inspect_model_architecture",
         "search_recommendation_model": "search_recommendation_model",
         "download_model": "download_model"
     }
@@ -495,15 +499,27 @@ builder.add_conditional_edges(
     }
 )
 
-# Dopo download, vai a customizzazione
+# Dopo download, vai a ispezionamento architettura
 builder.add_edge("download_model", "inspect_model_architecture")
 
 # ============================================================================
 # === WORKFLOW 5: MODEL CUSTOMIZATION FLOW ===
 # ============================================================================
 
-# Fase 1: Analisi e suggerimenti
-builder.add_edge("inspect_model_architecture", "retrieve_best_practices_info")
+# Fase 0: Ispezionamento e decisione intenzione di modifica
+builder.add_edge("inspect_model_architecture", "ask_modification_intent")  # ✅ NUOVO
+
+# ✅ NUOVO ROUTER CONDIZIONALE: Decide se customizzare o skip diretto ad analyze
+builder.add_conditional_edges(
+    "ask_modification_intent",
+    decide_after_inspection,  # Router function
+    {
+        "retrieve_best_practices_info": "retrieve_best_practices_info",  # Se vuole modifiche
+        "run_analyze": "run_analyze"  # Se skip diretto ad analyze
+    }
+)
+
+# Fase 1: Analisi e suggerimenti (solo se entra qui)
 builder.add_edge("retrieve_best_practices_info", "ask_user_for_custom_modifications")
 
 # Fase 2: Parsing richieste utente
@@ -543,10 +559,10 @@ builder.add_edge("validate_customized_model", "apply_quantization_for_stm32")
 # Fase 7: Quantizzazione INT8 per STM32 (opzionale, gestito internamente)
 builder.add_edge("apply_quantization_for_stm32", "save_customized_model_final")
 
-# Fase 9: Salvataggio definitivo con metadata
+# Fase 8: Salvataggio definitivo con metadata
 builder.add_edge("save_customized_model_final", "ask_continue_after_customization")
 
-# Fase 10: Decisione: proseguire con AI analysis o terminare
+# Fase 9: Decisione: proseguire con AI analysis o terminare
 def continue_after_customization_routing(state: MasterState) -> str:
     """
     Route dopo customization.

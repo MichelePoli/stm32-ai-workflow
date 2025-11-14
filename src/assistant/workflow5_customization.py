@@ -48,6 +48,71 @@ logger = logging.getLogger(__name__)
 
 
 # ============================================================================
+# EXTRACTION SCHEMAS 
+# ============================================================================
+
+class ModificationDecision(BaseModel):
+    """Decisione se applicare modifiche al modello"""
+    wants_modifications: bool = Field(
+        description="L'utente vuole apportare modifiche al modello?"
+    )
+    reasoning: str = Field(
+        description="Breve spiegazione della decisione"
+    )
+    confidence: float = Field(
+        ge=0.0, le=1.0,
+        description="Confidenza della classificazione"
+    )
+
+
+# ============================================================================
+# EXTRACTION INSTRUCTIONS
+# ============================================================================
+
+modification_decision_instructions = """Sei un classificatore di intenzioni per la customizzazione di modelli AI.
+
+Analizza la risposta dell'utente alla domanda: "Vuoi apportare modifiche all'architettura del modello scaricato, oppure procedere direttamente con l'analisi STEdgeAI?"
+
+RISPOSTE AFFERMATIVE (vuole modifiche):
+- "sì", "si", "yes", "certo", "ok", "voglio", "voglio modificare", "voglio cambiare", "regolarizza", "riduci", "compressione", "ottimizza"
+- "meno layer", "più leggero", "efficiente", "dropout", "cambia attivazione"
+- Qualsiasi richiesta esplicita di cambiamento
+
+RISPOSTE NEGATIVE (procede senza modifiche):
+- "no", "nope", "niente", "skip", "avanti", "procedi", "andiamo avanti", "mantieni", "ok così", "va bene così"
+- "no, procedi direttamente", "nessuna modifica", "default"
+
+Rispondi SEMPRE in JSON:
+- "wants_modifications": true/false
+- "reasoning": breve spiegazione (max 50 caratteri)
+- "confidence": 0.0-1.0
+
+Esempi:
+
+Input: "Riduci il numero di layer, è troppo complesso"
+Output: {
+  "wants_modifications": true,
+  "reasoning": "Richiesta esplicita di riduzione layer",
+  "confidence": 0.95
+}
+
+Input: "No, procedi direttamente con l'analisi"
+Output: {
+  "wants_modifications": false,
+  "reasoning": "Rifiuto esplicito, skip modifiche",
+  "confidence": 0.95
+}
+
+Input: "Hmm, non so... che cosa consigli?"
+Output: {
+  "wants_modifications": false,
+  "reasoning": "Indecisione, mantiene default",
+  "confidence": 0.6
+}
+"""
+
+
+# ============================================================================
 # WORKFLOW 5: MODELS CUSTOMIZATION
 # ============================================================================
 
@@ -213,6 +278,88 @@ def inspect_model_architecture(state: MasterState, config: dict) -> MasterState:
             logger.error(f"❌ Impossibile analizzare modello: {str(e)[:100]}")
             
             return state
+
+
+def ask_modification_intent(state, config: dict):
+    """Chiede all'utente se vuole modificare il modello"""
+    
+    logger.info("💬 Richiesta intenzione di modifica...")
+    
+    cfg = Configuration.from_runnable_config(config)
+    
+    # === MOSTRA ARCHITETTURA ATTUALE ===
+    
+    print("\n" + "="*70)
+    print("🏗️  ARCHITETTURA MODELLO ATTUALE")
+    print("="*70)
+    print(f"\nInput shape:  {state.model_architecture.get('input_shape', 'Unknown')}")
+    print(f"Output shape: {state.model_architecture.get('output_shape', 'Unknown')}")
+    print(f"Layer totali: {state.model_architecture.get('n_layers', 0)}")
+    print(f"Parametri: {state.model_architecture.get('total_params', 0):,}")
+    print(f"Dimensione: {state.model_architecture.get('model_size_mb', 0):.2f} MB")
+    print(f"BatchNorm: {'Sì' if state.model_architecture.get('has_batchnorm') else 'No'}")
+    print(f"Dropout: {'Sì' if state.model_architecture.get('has_dropout') else 'No'}")
+    print("="*70 + "\n")
+    
+    # === CHIEDI DECISIONE ===
+    
+    prompt = {
+        "instruction": """Vuoi apportare modifiche all'architettura del modello?
+
+Opzioni:
+- SÌ: Procediamo con la customizzazione (ridurre layer, aggiungere regularizzazione, etc.)
+- NO: Andiamo avanti direttamente con STEdgeAI analyze/validate/generate
+
+Cosa preferisci? (si/no)""",
+    }
+    
+    user_response = interrupt(prompt)
+    
+    if isinstance(user_response, dict):
+        user_text = user_response.get("response", user_response.get("input", str(user_response)))
+    else:
+        user_text = str(user_response)
+    
+    logger.info(f"📝 User response: '{user_text}'")
+    
+    # === CLASSIFICA CON MISTRAL ===
+    
+    llm = ChatOllama(
+        model=cfg.local_llm,  # oppure "mistral" se lo preferisci
+        temperature=0,
+        num_ctx=cfg.llm_context_window
+    )
+    
+    llm_classifier = llm.with_structured_output(ModificationDecision)
+    
+    decision = llm_classifier.invoke([
+        SystemMessage(content=modification_decision_instructions),
+        HumanMessage(content=f"Risposta utente: {user_text}")
+    ])
+    
+    logger.info(f"✓ Decisione classificata:")
+    logger.info(f"  wants_modifications: {decision.wants_modifications}")
+    logger.info(f"  confidence: {decision.confidence:.2f}")
+    
+    # === SALVA NELLO STATE ===
+    
+    state.wants_model_modifications = decision.wants_modifications
+    state.modification_intent_confidence = decision.confidence
+    
+    return state
+
+def decide_after_inspection(state) -> Literal["retrieve_best_practices_info", "run_analyze"]:
+    """Decide se procedere a customizzazione o diretto ad analyze"""
+    
+    logger.info(f"📍 Routing post-inspection:")
+    logger.info(f"   wants_modifications: {state.wants_model_modifications}")
+    
+    if state.wants_model_modifications:
+        logger.info("   → Percorso: CUSTOMIZZAZIONE")
+        return "retrieve_best_practices_info"
+    else:
+        logger.info("   → Percorso: SKIP A ANALYZE")
+        return "run_analyze"
 
 
 def retrieve_best_practices_info(state: MasterState, config: dict) -> MasterState:
@@ -1918,6 +2065,11 @@ def save_customized_model_final(state: MasterState, config: dict) -> MasterState
     
     return state
 
+
+# ============================================================================
+# STEP 12: ASK CONTINUE WITH AI ANALYSIS
+# ============================================================================
+
 def ask_continue_after_customization(state: MasterState, config: dict) -> MasterState:
     """Chiedi se continuare con AI analysis"""
     
@@ -1952,4 +2104,3 @@ Quantized: {state.should_quantize}
     state.continue_after_customization = (user_response == "continue_ai")
     
     return state
-

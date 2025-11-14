@@ -18,8 +18,14 @@ import shutil
 import re
 import json
 import logging
+import requests
+import h5py
+import tensorflow as tf
+
 from typing import Optional, Literal, List
 from datetime import datetime
+
+from tensorflow.keras.models import Model, load_model, model_from_json
 
 from langchain_ollama import ChatOllama
 from langchain_core.messages import SystemMessage, HumanMessage
@@ -218,7 +224,7 @@ Rispondi SEMPRE in formato JSON con esattamente questi campi:
 # Attenzione: search_result_extraction_instructions è diverso da research_prompt. Serve per estrarre i risultati trovati, non per fare la ricerca!!
 
 # ============================================================================
-# MODELLI PREDEFINITI (PREDEFINED_MODELS)
+# PREDEFINED_MODELS - URL REALI (Verificati)
 # ============================================================================
 
 PREDEFINED_MODELS = {
@@ -226,68 +232,92 @@ PREDEFINED_MODELS = {
         "description": "Classificazione immagini",
         "models": [
             {
-                "name": "MobileNetV2 128",
-                "size": "5.7MB",
-                "accuracy": "64%",
-                "inference_time": "40ms (STM32H7)",
-                "url": "https://github.com/STMicroelectronics/stm32ai-modelzoo/raw/main/image_classification/mobilenetv2/mobilenetv2_128.h5",
-                "task": "image_classification"
-            },
-            {
-                "name": "MobileNetV2 224",
-                "size": "13.4MB",
+                "name": "MobileNetV2",
+                "local_filename": "mobilenetv2_224.h5",
+                "size": "8.4MB",
                 "accuracy": "71%",
-                "inference_time": "120ms (STM32H7)",
-                "url": "https://github.com/STMicroelectronics/stm32ai-modelzoo/raw/main/image_classification/mobilenetv2/mobilenetv2_224.h5",
-                "task": "image_classification"
+                "inference_time": "50ms (STM32H7)",
+                "huggingface_repo": "STMicroelectronics/mobilenetv2",
+                "huggingface_filename": "mobilenetv2_224.h5",
+                "url": "https://github.com/STMicroelectronics/stm32ai-modelzoo/raw/main/image_classification/mobilenetv2/Public_pretrainedmodel_public_dataset/ImageNet/mobilenet_v2_1.0_224/mobilenet_v2_1.0_224.h5", # volendo si può aggiungere l'url per huggingface: "huggingface_url": "..."
             },
             {
-                "name": "EfficientNetB0 224",
-                "size": "18.7MB",
-                "accuracy": "77%",
-                "inference_time": "90ms (STM32H7)",
-                "url": "https://github.com/STMicroelectronics/stm32ai-modelzoo/raw/main/image_classification/efficientnet/efficientnetb0_224.h5",
-                "task": "image_classification"
+                "name": "MobileNetV1",
+                "local_filename": "mobilenetv1_128.h5",
+                "size": "3.6MB",
+                "accuracy": "65%",
+                "inference_time": "30ms (STM32F4)",
+                "huggingface_repo": "STMicroelectronics/mobilenetv1",
+                "huggingface_filename": "mobilenetv1_128.h5",
+                "url": "https://github.com/STMicroelectronics/stm32ai-modelzoo/raw/main/image_classification/mobilenetv1/Public_pretrainedmodel_public_dataset/ImageNet/mobilenet_v1_0.25_224/mobilenet_v1_0.25_224.h5",
+            },
+            {
+                "name": "EfficientNetV2B0",
+                "local_filename": "efficientnet_v2B0_224.h5",
+                "size": "7.1MB",
+                "accuracy": "80%",
+                "inference_time": "140ms (STM32H7)",
+                "huggingface_repo": "STMicroelectronics/efficientnetv2",
+                "huggingface_filename": "efficientnet_v2B0_224.h5",
+                "url": "https://github.com/STMicroelectronics/stm32ai-modelzoo/raw/main/image_classification/efficientnetv2/Public_pretrainedmodel_public_dataset/ImageNet/efficientnet_v2B0_224/efficientnet_v2B0_224.h5"
             }
+
         ]
     },
-    
     "object_detection": {
         "description": "Rilevamento oggetti",
         "models": [
             {
-                "name": "YOLO-Lite 320",
-                "size": "8.2MB",
-                "accuracy": "58%",
-                "inference_time": "150ms (STM32H7)",
-                "url": "https://github.com/STMicroelectronics/stm32ai-modelzoo/raw/main/object_detection/yolo/yolo_lite_320.h5",
-                "task": "object_detection"
+                "name": "Tiny YOLOv2",
+                "local_filename": "yolov2_tiny_416.h5",
+                "size": "19.2MB",
+                "accuracy": "35 mAP",
+                "inference_time": "180ms (STM32H7)",
+                "huggingface_repo": "STMicroelectronics/yolov2-tiny",
+                "huggingface_filename": "yolov2_tiny_416.h5",
+                "url": "https://github.com/STMicroelectronics/stm32ai-modelzoo/raw/main/object_detection/tiny_yolo_v2/ST_pretrainedmodel_public_dataset/coco_2017_person/tiny_yolo_v2_416/tiny_yolo_v2_416.h5"
             },
             {
-                "name": "SSD MobileNet 300",
-                "size": "12.4MB",
-                "accuracy": "72%",
-                "inference_time": "200ms (STM32H7)",
-                "url": "https://github.com/STMicroelectronics/stm32ai-modelzoo/raw/main/object_detection/ssd/ssd_mobilenet_300.h5",
-                "task": "object_detection"
+                "name": "ST SSD MobileNet v1",
+                "local_filename": "st_ssd_mobilenet_v1_256.h5",
+                "size": "24.5MB",
+                "accuracy": "35 mAP",
+                "inference_time": "220ms (STM32H7)",
+                "huggingface_repo": "STMicroelectronics/st-ssd-mobilenet-v1",
+                "huggingface_filename": "st_ssd_mobilenet_v1_256.h5",
+                "url": "https://github.com/STMicroelectronics/stm32ai-modelzoo/raw/main/object_detection/st_ssd_mobilenet_v1/ST_pretrainedmodel_public_dataset/coco_2017_person/st_ssd_mobilenet_v1_025_256/st_ssd_mobilenet_v1_025_256.h5"
             }
         ]
     },
-    
-    "human_activity_recognition": {
-        "description": "Riconoscimento attività umane",
+    "Human Activity Recognition": {
+        "description": "Human Activity Recognition",
         "models": [
             {
-                "name": "LSTM HAR 6-class",
+                "name": "GMP_WL (24)",
+                "local_filename": "gmp_wl_24.h5",
                 "size": "2.1MB",
-                "accuracy": "92%",
-                "inference_time": "15ms (STM32H7)",
-                "url": "https://github.com/STMicroelectronics/stm32ai-modelzoo/raw/main/human_activity_recognition/lstm_6class.h5",
-                "task": "human_activity_recognition"
+                "accuracy": "95%",
+                "inference_time": "20ms (STM32F4)",
+                "huggingface_repo": "STMicroelectronics/har-wisdm",
+                "huggingface_filename": "gmp_wl_24.h5",
+                "url": "https://github.com/STMicroelectronics/stm32ai-modelzoo/raw/main/human_activity_recognition/gmp/ST_pretrainedmodel_public_dataset/WISDM/gmp_wl_24/gmp_wl_24.h5"
+            },
+            {
+                "name": "GMP_WL (48)",
+                "local_filename": "gmp_wl_48.h5",
+                "size": "3.8MB",
+                "accuracy": "96%",
+                "inference_time": "25ms (STM32H7)",
+                "huggingface_repo": "STMicroelectronics/har-wisdm",
+                "huggingface_filename": "gmp_wl_48.h5",
+                "url": "https://github.com/STMicroelectronics/stm32ai-modelzoo/raw/main/human_activity_recognition/gmp/ST_pretrainedmodel_public_dataset/WISDM/gmp_wl_48/gmp_wl_48.h5"
             }
         ]
     }
+
+
 }
+# <- con .h5 e non .tflite
 
 
 # ============================================================================
@@ -1329,102 +1359,6 @@ def get_task_based_default_model(task: str) -> Optional[dict]:
 
 
 
-
-# ============================================================================
-# PREDEFINED_MODELS - URL REALI (Verificati)
-# ============================================================================
-PREDEFINED_MODELS = {
-    "image_classification": {
-        "description": "Classificazione immagini",
-        "models": [
-            {
-                "name": "MobileNetV2",
-                "local_filename": "mobilenetv2_224.h5",
-                "size": "8.4MB",
-                "accuracy": "71%",
-                "inference_time": "50ms (STM32H7)",
-                "huggingface_repo": "STMicroelectronics/mobilenetv2",
-                "huggingface_filename": "mobilenetv2_224.h5",
-                "url": "https://github.com/STMicroelectronics/stm32ai-modelzoo/raw/main/image_classification/mobilenetv2/Public_pretrainedmodel_public_dataset/ImageNet/mobilenet_v2_1.0_224/mobilenet_v2_1.0_224.h5", # volendo si può aggiungere l'url per huggingface: "huggingface_url": "..."
-            },
-            {
-                "name": "MobileNetV1",
-                "local_filename": "mobilenetv1_128.h5",
-                "size": "3.6MB",
-                "accuracy": "65%",
-                "inference_time": "30ms (STM32F4)",
-                "huggingface_repo": "STMicroelectronics/mobilenetv1",
-                "huggingface_filename": "mobilenetv1_128.h5",
-                "url": "https://github.com/STMicroelectronics/stm32ai-modelzoo/raw/main/image_classification/mobilenetv1/Public_pretrainedmodel_public_dataset/ImageNet/mobilenet_v1_0.25_224/mobilenet_v1_0.25_224.h5",
-            },
-            {
-                "name": "EfficientNetV2B0",
-                "local_filename": "efficientnet_v2B0_224.h5",
-                "size": "7.1MB",
-                "accuracy": "80%",
-                "inference_time": "140ms (STM32H7)",
-                "huggingface_repo": "STMicroelectronics/efficientnetv2",
-                "huggingface_filename": "efficientnet_v2B0_224.h5",
-                "url": "https://github.com/STMicroelectronics/stm32ai-modelzoo/raw/main/image_classification/efficientnetv2/Public_pretrainedmodel_public_dataset/ImageNet/efficientnet_v2B0_224/efficientnet_v2B0_224.h5"
-            }
-
-        ]
-    },
-    "object_detection": {
-        "description": "Rilevamento oggetti",
-        "models": [
-            {
-                "name": "Tiny YOLOv2",
-                "local_filename": "yolov2_tiny_416.h5",
-                "size": "19.2MB",
-                "accuracy": "35 mAP",
-                "inference_time": "180ms (STM32H7)",
-                "huggingface_repo": "STMicroelectronics/yolov2-tiny",
-                "huggingface_filename": "yolov2_tiny_416.h5",
-                "url": "https://github.com/STMicroelectronics/stm32ai-modelzoo/raw/main/object_detection/tiny_yolo_v2/ST_pretrainedmodel_public_dataset/coco_2017_person/tiny_yolo_v2_416/tiny_yolo_v2_416.h5"
-            },
-            {
-                "name": "ST SSD MobileNet v1",
-                "local_filename": "st_ssd_mobilenet_v1_256.h5",
-                "size": "24.5MB",
-                "accuracy": "35 mAP",
-                "inference_time": "220ms (STM32H7)",
-                "huggingface_repo": "STMicroelectronics/st-ssd-mobilenet-v1",
-                "huggingface_filename": "st_ssd_mobilenet_v1_256.h5",
-                "url": "https://github.com/STMicroelectronics/stm32ai-modelzoo/raw/main/object_detection/st_ssd_mobilenet_v1/ST_pretrainedmodel_public_dataset/coco_2017_person/st_ssd_mobilenet_v1_025_256/st_ssd_mobilenet_v1_025_256.h5"
-            }
-        ]
-    },
-    "Human Activity Recognition": {
-        "description": "Human Activity Recognition",
-        "models": [
-            {
-                "name": "GMP_WL (24)",
-                "local_filename": "gmp_wl_24.h5",
-                "size": "2.1MB",
-                "accuracy": "95%",
-                "inference_time": "20ms (STM32F4)",
-                "huggingface_repo": "STMicroelectronics/har-wisdm",
-                "huggingface_filename": "gmp_wl_24.h5",
-                "url": "https://github.com/STMicroelectronics/stm32ai-modelzoo/raw/main/human_activity_recognition/gmp/ST_pretrainedmodel_public_dataset/WISDM/gmp_wl_24/gmp_wl_24.h5"
-            },
-            {
-                "name": "GMP_WL (48)",
-                "local_filename": "gmp_wl_48.h5",
-                "size": "3.8MB",
-                "accuracy": "96%",
-                "inference_time": "25ms (STM32H7)",
-                "huggingface_repo": "STMicroelectronics/har-wisdm",
-                "huggingface_filename": "gmp_wl_48.h5",
-                "url": "https://github.com/STMicroelectronics/stm32ai-modelzoo/raw/main/human_activity_recognition/gmp/ST_pretrainedmodel_public_dataset/WISDM/gmp_wl_48/gmp_wl_48.h5"
-            }
-        ]
-    }
-
-
-}
-# <- con .h5 e non .tflite
-
 # ============================================================================
 # NODO 3: DOWNLOAD MODELLO
 # ============================================================================
@@ -1697,8 +1631,7 @@ def get_task_based_default_model(task_name: str) -> Optional[dict]:
 def model_selection_routing(state: MasterState) -> Literal[
     "run_analyze", 
     "download_model", 
-    "search_recommendation_model",
-    "inspect_model_architecture" 
+    "search_recommendation_model" 
 ]:
     """
     Router che decide il prossimo step dopo model selection.
@@ -1733,11 +1666,6 @@ def model_selection_routing(state: MasterState) -> Literal[
     # CASE 3: Modello trovato (github, google_search, taskbased_fallback)
     # ============================================================
     else:
-        # Controlla se l'utente vuole customizzare
-        if getattr(state, 'wants_customization', False):
-            logger.info("→ Utente vuole customizzare, vai a inspect_model_architecture")
-            return "inspect_model_architecture"
-        else:
             logger.info("→ Modello trovato, vai a download_model")
             return "download_model"
 
