@@ -1,0 +1,15 @@
+{
+   global:
+      ai_network_create;
+      ai_network_data_params_get;
+      ai_network_data_weights_get;
+      ai_network_destroy;
+      ai_network_forward;
+      ai_network_get_error;
+      ai_network_get_report;
+      ai_network_init;
+      ai_network_data_activations_buffer_get;
+      ai_network_data_weights_buffer_get;
+      ai_network_run;
+   local: *;
+};
