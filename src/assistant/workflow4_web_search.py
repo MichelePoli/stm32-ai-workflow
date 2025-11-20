@@ -16,7 +16,6 @@ import logging
 from typing import Literal, Optional
 
 from langchain_ollama import ChatOllama
-from agno.models.groq import Groq
 from agno.agent import Agent
 from agno.tools.googlesearch import GoogleSearchTools
 from langchain_core.messages import SystemMessage, HumanMessage
@@ -25,6 +24,11 @@ from pydantic import BaseModel, Field
 
 from src.assistant.configuration import Configuration
 from src.assistant.state import MasterState
+
+from agno.tools.googlesearch import GoogleSearchTools
+from agno.models.ollama import Ollama
+
+
 
 logger = logging.getLogger(__name__)
 

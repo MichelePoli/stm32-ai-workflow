@@ -2,7 +2,7 @@
   ******************************************************************************
   * @file    network.h
   * @author  AST Embedded Analytics Research Platform
-  * @date    2025-11-14T17:36:10+0100
+  * @date    2025-11-20T18:22:32+0100
   * @brief   AI Tool Automatic Code Generator for Embedded NN computing
   ******************************************************************************
   * @attention
@@ -23,7 +23,7 @@
 
 /******************************************************************************/
 #define AI_NETWORK_MODEL_NAME          "network"
-#define AI_NETWORK_ORIGIN_MODEL_NAME   "resnet_v1_32_32_tfs"
+#define AI_NETWORK_ORIGIN_MODEL_NAME   "mobilenetv2_224"
 
 /******************************************************************************/
 #define AI_NETWORK_ACTIVATIONS_ALIGNMENT   (4)
@@ -44,11 +44,11 @@ AI_DEPRECATED
   AI_NETWORK_IN_1_SIZE_BYTES, \
 }
 #define AI_NETWORK_IN_1_FORMAT      (AI_BUFFER_FORMAT_FLOAT)
-#define AI_NETWORK_IN_1_HEIGHT      (32)
-#define AI_NETWORK_IN_1_WIDTH       (32)
+#define AI_NETWORK_IN_1_HEIGHT      (224)
+#define AI_NETWORK_IN_1_WIDTH       (224)
 #define AI_NETWORK_IN_1_CHANNEL     (3)
-#define AI_NETWORK_IN_1_SIZE        (3072)
-#define AI_NETWORK_IN_1_SIZE_BYTES  (12288)
+#define AI_NETWORK_IN_1_SIZE        (150528)
+#define AI_NETWORK_IN_1_SIZE_BYTES  (602112)
 
 /******************************************************************************/
 #define AI_NETWORK_OUT_NUM       (1)
@@ -64,12 +64,12 @@ AI_DEPRECATED
   AI_NETWORK_OUT_1_SIZE_BYTES, \
 }
 #define AI_NETWORK_OUT_1_FORMAT      (AI_BUFFER_FORMAT_FLOAT)
-#define AI_NETWORK_OUT_1_CHANNEL     (100)
-#define AI_NETWORK_OUT_1_SIZE        (100)
-#define AI_NETWORK_OUT_1_SIZE_BYTES  (400)
+#define AI_NETWORK_OUT_1_CHANNEL     (1000)
+#define AI_NETWORK_OUT_1_SIZE        (1000)
+#define AI_NETWORK_OUT_1_SIZE_BYTES  (4000)
 
 /******************************************************************************/
-#define AI_NETWORK_N_NODES (82)
+#define AI_NETWORK_N_NODES (100)
 
 
 AI_API_DECLARE_BEGIN

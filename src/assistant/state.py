@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from typing import Optional, List
 from datetime import datetime
 from typing import Tuple, Optional, TypedDict, List, Literal
+from pydantic import BaseModel, Field
 
 @dataclass
 class MasterState:
@@ -87,6 +88,9 @@ class MasterState:
     # Architecture inspection
     model_architecture: dict = field(default_factory=dict)  # Input/output shapes, n_layers, etc.
     model_summary_text: str = ""  # Testo completo del model.summary()
+
+    wants_model_modifications: bool = False  
+    modification_intent_confidence: float = 0.0  
     
     # Best practices
     best_practices_display: str = ""  # Formatted best practices per l'utente
@@ -135,3 +139,4 @@ class MasterState:
 
 class MasterInput(TypedDict, total=False):
     message: str
+

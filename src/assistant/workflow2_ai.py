@@ -35,6 +35,10 @@ from pydantic import BaseModel, Field
 from src.assistant.configuration import Configuration
 from src.assistant.state import MasterState
 
+from agno.tools.googlesearch import GoogleSearchTools
+from agno.models.ollama import Ollama
+
+
 logger = logging.getLogger(__name__)
 
 # ============================================================================
@@ -1671,20 +1675,58 @@ def model_selection_routing(state: MasterState) -> Literal[
 
 
 def run_analyze(state: MasterState, config: dict) -> MasterState:
-    analyze_dir = os.path.join(state.ai_output_dir, "report_resnet")
-    os.makedirs(analyze_dir, exist_ok=True)
-    cmd = [
-        "stedgeai", "analyze",
-        "--model", state.model_path,
-        "--target", state.target,
-        "--output", analyze_dir
-    ]
-    res = subprocess.run(cmd, capture_output=True, text=True)
-    state.analyze_success = (res.returncode == 0)
-    if not state.analyze_success:
-        state.ai_error_message = res.stderr.strip() or f"Return code {res.returncode}"
-    state.analyze_report_dir = analyze_dir
-    logger.info("✓ Analyze completato" if state.analyze_success else f"✗ Analyze fallito: {state.ai_error_message}")
+    """
+    ✨ Analizza il modello (customizzato O originale)
+    
+    Logica:
+    - Se customizzato: final_model_path
+    - Altrimenti: model_path (default)
+    """
+    
+    logger.info("🔍 Eseguendo analisi del modello...")
+    
+    try:
+        # ===== DETERMINA MODELLO =====
+        # Prova finale prima, altrimenti usa originale
+        model_path = state.final_model_path if state.customization_applied else state.model_path
+        model_type = "CUSTOMIZZATO" if state.customization_applied else "ORIGINALE"
+        
+        if not model_path or not os.path.exists(model_path):
+            logger.error(f"❌ Model not found: {model_path}")
+            state.analyze_success = False
+            state.ai_error_message = f"Model not found: {model_path}"
+            return state
+        
+        logger.info(f"  Model ({model_type}): {model_path}")
+        
+        # ===== OUTPUT DIR =====
+        analyze_dir = os.path.join(state.ai_output_dir, "report_analyze")
+        os.makedirs(analyze_dir, exist_ok=True)
+        
+        # ===== ESEGUI =====
+        cmd = [
+            "stedgeai", "analyze",
+            "--model", model_path,
+            "--target", state.target,
+            "--output", analyze_dir
+        ]
+        
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+        
+        state.analyze_success = (result.returncode == 0)
+        
+        if state.analyze_success:
+            logger.info(f"✓ Analyze completato")
+            state.analyze_report_dir = analyze_dir
+        else:
+            state.ai_error_message = result.stderr.strip() or f"Return code {result.returncode}"
+            logger.error(f"✗ Analyze fallito: {state.ai_error_message[:500]}")
+    
+    except Exception as e:
+        logger.error(f"❌ Error: {str(e)}")
+        state.analyze_success = False
+        state.ai_error_message = str(e)
+    
     return state
 
 

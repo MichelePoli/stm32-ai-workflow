@@ -1,5 +1,5 @@
-# file created : 2025-11-14 17:36:15
+# file created : 2025-11-20 18:22:41
 # dtype=float32
 # original model features - 10/10
-# (10, 32, 32, 3)/float32, min/max=[0.000012, 0.999925], mean/std=[0.499706, 0.288050], input_1
-# Note: w/o data, number of item by sample is exceeded: 3072 > 512
+# (10, 224, 224, 3)/float32, min/max=[0.000001, 0.999998], mean/std=[0.499956, 0.288536], input_1
+# Note: w/o data, number of item by sample is exceeded: 150528 > 512

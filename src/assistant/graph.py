@@ -24,7 +24,7 @@ from langchain_core.messages import SystemMessage, HumanMessage
 from pydantic import BaseModel, Field
 
 from src.assistant.configuration import Configuration
-from src.assistant.state import MasterState
+from src.assistant.state import MasterState, MasterInput
 
 # ============================================================================
 # WORKFLOW IMPORTS
@@ -76,9 +76,8 @@ from src.assistant.workflow5_customization import (
     inspect_model_architecture,
     ask_modification_intent,  
     decide_after_inspection,  
-    retrieve_best_practices_info,
-    ask_user_for_custom_modifications,
-    parse_user_modifications,
+    retrieve_best_practices_for_architecture,
+    ask_and_parse_user_modifications,
     collect_modification_confirmation,
     apply_user_customization,
     fine_tune_customized_model,
@@ -117,10 +116,6 @@ class RouteDecision(BaseModel):
     reasoning: str = Field(
         description="Breve spiegazione della scelta"
     )
-
-class MasterInput(BaseModel):
-    """Input per il workflow"""
-    message: str = Field(description="Messaggio utente")
 
 # ============================================================================
 # EXTRACTION INSTRUCTIONS - ROUTING ONLY
@@ -333,13 +328,13 @@ def decision_continue_routing(state: MasterState) -> Literal["collect_analysis_i
         return "end"
 
 
-def modification_confirmation_routing(state: MasterState) -> Literal["apply_user_customization", "ask_user_for_custom_modifications"]:
+def modification_confirmation_routing(state: MasterState) -> Literal["apply_user_customization", "ask_and_parse_user_modifications"]:
     """Router per modifiche customizzazione"""
     
     if state.modification_confirmed:
         return "apply_user_customization"
     else:
-        return "ask_user_for_custom_modifications"
+        return "ask_and_parse_user_modifications"
 
 
 def continue_after_customization_routing(state: MasterState) -> Literal["run_analyze", "end"]:
@@ -383,11 +378,10 @@ builder.add_node("download_model", download_model)
 # Architettura
 builder.add_node("inspect_model_architecture", inspect_model_architecture)
 builder.add_node("ask_modification_intent", ask_modification_intent)  # ✅ NUOVO
-builder.add_node("retrieve_best_practices_info", retrieve_best_practices_info)
+builder.add_node("retrieve_best_practices_for_architecture", retrieve_best_practices_for_architecture)
 
 # User interaction & parsing
-builder.add_node("ask_user_for_custom_modifications", ask_user_for_custom_modifications)
-builder.add_node("parse_user_modifications", parse_user_modifications)
+builder.add_node("ask_and_parse_user_modifications", ask_and_parse_user_modifications)
 builder.add_node("collect_modification_confirmation", collect_modification_confirmation)
 
 # Applicazione modifiche
@@ -514,17 +508,16 @@ builder.add_conditional_edges(
     "ask_modification_intent",
     decide_after_inspection,  # Router function
     {
-        "retrieve_best_practices_info": "retrieve_best_practices_info",  # Se vuole modifiche
+        "retrieve_best_practices_for_architecture": "retrieve_best_practices_for_architecture",  # Se vuole modifiche
         "run_analyze": "run_analyze"  # Se skip diretto ad analyze
     }
 )
 
 # Fase 1: Analisi e suggerimenti (solo se entra qui)
-builder.add_edge("retrieve_best_practices_info", "ask_user_for_custom_modifications")
+builder.add_edge("retrieve_best_practices_for_architecture", "ask_and_parse_user_modifications")
 
 # Fase 2: Parsing richieste utente
-builder.add_edge("ask_user_for_custom_modifications", "parse_user_modifications")
-builder.add_edge("parse_user_modifications", "collect_modification_confirmation")
+builder.add_edge("ask_and_parse_user_modifications", "collect_modification_confirmation")
 
 # Fase 3: Loop - se l'utente non è soddisfatto, ritorna indietro
 def modification_confirmation_routing(state: MasterState) -> str:
@@ -534,7 +527,7 @@ def modification_confirmation_routing(state: MasterState) -> str:
     - Se modification_confirmed=True: l'utente è soddisfatto, procedi
     """
     if not state.modification_confirmed:
-        return "ask_user_for_custom_modifications"
+        return "ask_and_parse_user_modifications"
     else:
         return "apply_user_customization"
 
@@ -542,7 +535,7 @@ builder.add_conditional_edges(
     "collect_modification_confirmation",
     modification_confirmation_routing,
     {
-        "ask_user_for_custom_modifications": "ask_user_for_custom_modifications",
+        "ask_and_parse_user_modifications": "ask_and_parse_user_modifications",
         "apply_user_customization": "apply_user_customization"
     }
 )
