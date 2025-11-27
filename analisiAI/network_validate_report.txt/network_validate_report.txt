@@ -1,5 +1,5 @@
 ST Edge AI Core v2.2.0-20266 2adc00962
-Created date          : 2025-11-20 18:22:41
+Created date          : 2025-11-21 12:21:02
 Parameters            : validate --model /home/mrusso/.stm32_ai_models/mobilenetv2_224.h5 --target stm32f4 --output ./analisiAI/network_validate_report.txt
 
 Exec/report summary (validate)
@@ -1093,7 +1093,7 @@ Running the ST.AI c-model (AI RUNNER)...(name=network, mode=HOST)
   weights             :   13951264                                                
   macc                :   313298016                                               
   hash                :   0x2bfb5392202c7a642f828f2ad7434894                      
-  compile_datetime    :   Nov 20 2025 18:22:34                                    
+  compile_datetime    :   Nov 21 2025 12:20:54                                    
   --------------------------------------------------------------------------------
   protocol            :   DLL Driver v2.0 - Direct Python binding                 
   tools               :   ST.AI (legacy api) v2.2.0                               
@@ -1108,7 +1108,7 @@ Running the ST.AI c-model (AI RUNNER)...(name=network, mode=HOST)
   ST.AI Profiling results v2.0 - "network"
   ------------------------------------------------------------------
   nb sample(s)   :   10                                             
-  duration       :   174.051 ms by sample (173.587/175.178/0.431)   
+  duration       :   174.884 ms by sample (174.340/175.595/0.341)   
   macc           :   313298016                                      
   ------------------------------------------------------------------
   
@@ -1262,7 +1262,7 @@ m_id   name                            c_macc                    c_rom          
 8      expanded_conv_project_BN        |||||              2.0%   |                  0.0%   [4]          1.4%                      
 10     block_1_expand_BN               |||||||||||||||    6.1%   |                  0.0%   [5]          4.4%                      
 11     block_1_expand_relu             ||                 0.8%   |                  0.0%   [6]          0.5%                      
-12     block_1_pad                     |||                0.9%   |                  0.0%   [7]          1.0%                      
+12     block_1_pad                     |||                0.9%   |                  0.0%   [7]          1.1%                      
 15     block_1_depthwise_relu          |                  0.2%   |                  0.0%   [8]          0.0%                      
 17     block_1_project_BN              ||||||             2.3%   |                  0.1%   [9]          2.0%                      
 19     block_2_expand_BN               |||||||||          3.5%   |                  0.1%   [10]         2.6%                      
@@ -1271,7 +1271,7 @@ m_id   name                            c_macc                    c_rom          
 23     block_2_depthwise_relu          |                  0.3%   |                  0.0%   [13]         0.0%                      
 25     block_2_project_BN              |||||||||          3.5%   |                  0.1%   [14]         3.1%                      
 26     block_2_add                     |                  0.0%   |                  0.0%   [15]         0.0%                      
-28     block_3_expand_BN               |||||||||          3.5%   |                  0.1%   [16]         2.7%                      
+28     block_3_expand_BN               |||||||||          3.5%   |                  0.1%   [16]         2.6%                      
 29     block_3_expand_relu             |                  0.3%   |                  0.0%   [17]         0.0%                      
 30     block_3_pad                     |                  0.3%   |                  0.0%   [18]         0.4%                      
 33     block_3_depthwise_relu          |                  0.1%   |                  0.0%   [19]         0.0%                      
@@ -1313,7 +1313,7 @@ m_id   name                            c_macc                    c_rom          
 89     block_9_add                     |                  0.0%   |                  0.0%   [55]         0.0%                      
 91     block_10_expand_BN              ||||               1.5%   |                  0.7%   [56]         1.3%                      
 92     block_10_expand_relu            |                  0.0%   |                  0.0%   [57]         0.0%                      
-94     block_10_depthwise_BN           |                  0.2%   |                  0.1%   [58]         0.3%                      
+94     block_10_depthwise_BN           |                  0.2%   |                  0.1%   [58]         0.2%                      
 95     block_10_depthwise_relu         |                  0.0%   |                  0.0%   [59]         0.0%                      
 97     block_10_project_BN             ||||||             2.3%   |                  1.1%   [60]         2.9%                      
 99     block_11_expand_BN              |||||||||          3.5%   |                  1.6%   [61]         3.1%                      

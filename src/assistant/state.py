@@ -114,6 +114,10 @@ class MasterState:
     
     # Final model
     final_model_path: str = ""  # Path del modello customizzato salvato definitivamente
+
+    # Environment management
+    python_path: str = ""  # Path del Python interpreter (es: /home/mrusso/miniconda3/envs/stm32_legacy/bin/python)
+    conda_env: str = ""    # Nome ambiente conda (es: 'stm32_legacy', 'stm32')
     
     # Decision after customization
     continue_after_customization: bool = False  # Continua con AI analysis?

@@ -983,7 +983,7 @@ def _get_generic_practices() -> str:
 class Modification(BaseModel):
     """Singola modifica strutturata"""
     type: str = Field(
-        description="Modification type: freeze_layers, freeze_almost_all, change_output_layer, add_dropout, change_input_shape, add_resize_preprocessing, change_learning_rate"
+        description="Modification type: freeze_layers, freeze_almost_all, change_output_layer, add_dropout, change_input_shape, change_learning_rate"
     )
     description: str = Field(description="Brief description of what this modification does")
     params: dict[str, Any] = Field(description="Parameters for this modification")
@@ -1096,7 +1096,7 @@ Available Modifications:
   ✓ Change output (e.g., "change output to 100 classes")
   ✓ Add dropout (e.g., "add 0.3 dropout")
   ✓ Change input shape (e.g., "change input to 64x64x3")
-  ✓ Add preprocessing (e.g., "add resize to 224x224")
+  ✓ Add resizing layer after input layer (e.g., "add resizing layer") 
   ✓ Learning rate (e.g., "use learning rate 0.0001")
 
 Examples:
@@ -1150,21 +1150,41 @@ CURRENT MODEL:
 - Input shape: {input_shape}
 - Total parameters: {total_params:,}
 
-AVAILABLE MODIFICATIONS:
-1. freeze_layers - Freeze first N layers (params: num_frozen_layers)
-2. freeze_almost_all - Freeze all except last N (params: num_trainable_layers)
-3. change_output_layer - Change output classes (params: new_classes)
-4. add_dropout - Add dropout before output (params: rate 0.0-1.0)
-5. change_input_shape - Change input dimensions (params: new_shape [h,w,c])
-6. add_resize_preprocessing - Add auto-resizing (params: height, width)
-7. change_learning_rate - Set custom LR (params: learning_rate 1e-6 to 1e-1)
+MODIFICATION TYPES (EXAMPLES):
+1. freeze_layers
+   - Examples: "freeze first 5", "freeze 10 layers"
+   - Parameters: {{"num_frozen_layers": 5}}
+   
+2. freeze_almost_all
+   - Examples: "keep last 3 trainable", "freeze all except 4"
+   - Parameters: {{"num_trainable_layers": 3}}
+   
+3. change_output_layer
+   - Examples: "change to 100 classes", "10 output classes"
+   - Parameters: {{"new_classes": 100}}
+   
+4. add_dropout
+   - Examples: "add 0.3 dropout", "dropout 0.5", "0.3 dropout"
+   - Parameters: {{"rate": 0.3}}
+   - NOTE: rate MUST be between 0.0 and 1.0
+   
+5. change_input_shape
+   - Examples: "change input to 128x128", "192x192x3 input"
+   - Parameters: {{"new_shape": [128, 128, 3]}}
+   
+6. change_learning_rate
+   - Examples: "learning rate 0.001", "lr 1e-3"
+   - Parameters: {{"learning_rate": 0.001}}
 
-RULES:
-- Include ALL modifications mentioned by user
-- Validate parameters are in valid ranges
-- If ambiguous, make reasonable assumptions
-- Always include training recommendations
-- Mark validation issues if any"""
+IMPORTANT RULES:
+1. Extract ALL modifications mentioned (can be multiple)
+2. For dropout: extract rate as decimal (0.0-1.0)
+3. For output: extract class number
+4. For input shape: extract [height, width, channels]
+5. Match patterns like "0.3 dropout", "dropout 0.3", "add dropout 0.3"
+6. If unsure about parameters, use sensible defaults
+
+Return JSON with modifications list."""
         
         # Invoke LLM
         result: ParsedModificationsPlan = structured_llm.invoke([
@@ -1597,9 +1617,12 @@ ARCHITECTURE_ENV_MAP = {
 }
 
 CONDA_PYTHON_PATHS = {
-    'stm32_legacy': '/home/mrusso/miniconda3/envs/stm32_legacy/bin/python',
-    'stm32': '/home/mrusso/miniconda3/envs/stm32/bin/python',
+    'stm32_legacy': '/home/mrusso/miniconda3/envs/stm32_legacy/bin/python', #keras 2.x (per modelli vecchi)
+    'stm32': '/home/mrusso/miniconda3/envs/stm32/bin/python', # keras 3.x
 }
+# ho creato un environment stm32_legacy per usare keras 2.x (per modelli vecchi) in modo da non causare errori.
+# in caso in cui vi è bisogno di creare un nuovo environment con pacchetti diversi si può aggiungere qui il path del python corrispondente.
+# la funzione load_model_with_conda_env si occuperà di usare il python corretto in base all'architettura del modello.
 
 # ============================================================================
 # HELPER: Detecta architettura da model_path
@@ -1635,14 +1658,23 @@ import subprocess
 import json
 import pickle
 
-def execute_in_stm32_legacy(python_code: str, timeout: int = 600) -> dict:
+def execute_in_environment(python_code: str, state: MasterState, timeout: int = 600) -> dict:
     """
-    ✨ Esegui qualsiasi codice Python in stm32_legacy
+    ✨ Esegui codice Python nell'ambiente specificato in state.python_path
+    
+    Funziona per stm32_legacy, stm32, o qualsiasi ambiente conda
     
     Returns: {'success': bool, 'stdout': str, 'stderr': str, 'returncode': int}
     """
     
-    python_path = '/home/mrusso/miniconda3/envs/stm32_legacy/bin/python'
+    python_path = state.python_path
+    conda_env = state.conda_env
+    
+    if not python_path:
+        logger.error("❌ state.python_path not set!")
+        raise Exception("state.python_path is required")
+    
+    logger.info(f"  [Subprocess] Environment: {conda_env}, Python: {python_path}")
     
     result = subprocess.run(
         [python_path, '-c', python_code],
@@ -1659,18 +1691,16 @@ def execute_in_stm32_legacy(python_code: str, timeout: int = 600) -> dict:
         'returncode': result.returncode
     }
 
-
-def load_model_with_conda_env(model_path: str, architecture: str) -> str:
+def load_model_with_conda_env(model_path: str, architecture: str, state: MasterState) -> str:
     """
     ✨ Carica modello IN SUBPROCESS e RITORNA il PATH
     
-    NON ricaricare il modello nel main environment!
-    Ritorna: /tmp/model_loaded_temp.keras (già pronto in Keras 2.13)
+    Mantiene ARCHITECTURE_ENV_MAP logic dentro questa funzione
     """
     
     logger.info(f"🔄 Loading {architecture} model...")
     
-    # ===== DETERMINA AMBIENTE E PYTHON PATH =====
+    # ===== DETERMINA AMBIENTE E PYTHON PATH (LOGICA ORIGINALE) =====
     conda_env = ARCHITECTURE_ENV_MAP.get(architecture, 'stm32_legacy')
     python_path = CONDA_PYTHON_PATHS.get(conda_env)
     
@@ -1680,6 +1710,10 @@ def load_model_with_conda_env(model_path: str, architecture: str) -> str:
     
     logger.info(f"  Environment: {conda_env}")
     logger.info(f"  Python: {python_path}")
+    
+    # ===== AGGIORNA state.python_path e state.conda_env =====
+    state.python_path = python_path
+    state.conda_env = conda_env
     
     # ===== PYTHON SCRIPT DA ESEGUIRE =====
     python_code = f"""
@@ -1694,14 +1728,12 @@ model_path = r'{model_path}'
 temp_output = '/tmp/model_loaded_temp.keras'
 
 try:
-    # Carica modello IN SUBPROCESS (Keras 2.13)
     model = tf.keras.models.load_model(
         model_path,
         compile=False,
         safe_mode=False
     )
     
-    # Estrai info
     info = {{
         'name': model.name,
         'input_shape': str(model.input_shape),
@@ -1709,7 +1741,6 @@ try:
         'total_params': int(model.count_params()),
     }}
     
-    # Salva modello in .keras (Keras 2.13 format)
     model.save(temp_output, save_format='keras')
     
     print(f"SUCCESS: {{temp_output}}|" + json.dumps(info))
@@ -1722,23 +1753,16 @@ except Exception as e:
     sys.exit(1)
 """
     
-    # ===== ESEGUI SUBPROCESS =====
+    # ===== ESEGUI USING NEW FUNCTION =====
     logger.info(f"  [Subprocess] Esecuzione...")
     
     try:
-        result = subprocess.run(
-            [python_path, '-c', python_code],
-            capture_output=True,
-            text=True,
-            timeout=120,
-            env={**os.environ, 'TF_CPP_MIN_LOG_LEVEL': '3'}
-        )
+        result = execute_in_environment(python_code, state, timeout=120)
         
-        # ===== VERIFICA OUTPUT =====
-        output = result.stdout.strip()
+        output = result['stdout']
         
-        if result.returncode != 0:
-            error = result.stderr.strip()
+        if not result['success']:
+            error = result['stderr']
             logger.error(f"  Subprocess failed: {error[:500]}")
             raise Exception(f"Subprocess error: {error}")
         
@@ -1753,7 +1777,6 @@ except Exception as e:
         temp_model_path = parts[0].strip()
         info_json = parts[1].strip()
         
-        import json
         info = json.loads(info_json)
         
         logger.info(f"✓ Model ready: {info['name']}")
@@ -1761,22 +1784,22 @@ except Exception as e:
         logger.info(f"  Output: {info['output_shape']}")
         logger.info(f"  Params: {info['total_params']:,}")
         
-        # ===== RITORNA PATH (NON il modello!) =====
-        return temp_model_path  # ← SOLO il path!
+        return temp_model_path
     
     except Exception as e:
         logger.error(f"❌ Load failed: {str(e)}")
         raise
 
 
-
 # ============================================================================
 # LOAD STM32 MODEL SAFE - VERSIONE SEMPLIFICATA
 # ============================================================================
 
-def load_stm32_model_safe(model_path: str) -> str:
+def load_stm32_model_safe(model_path: str, state: MasterState) -> str:
     """
     ✨ Carica modello e ritorna PATH (NON il modello)
+    
+    Setta state.python_path e state.conda_env per uso successivo
     """
     
     logger.info(f"📥 Loading model: {model_path}")
@@ -1790,8 +1813,12 @@ def load_stm32_model_safe(model_path: str) -> str:
         architecture = detect_architecture_from_model(model_path)
         logger.info(f"  Architecture: {architecture}")
         
-        # Carica e ritorna PATH
-        model_path_ready = load_model_with_conda_env(model_path, architecture)
+        # Carica e ritorna PATH (setta anche state.python_path e state.conda_env)
+        model_path_ready = load_model_with_conda_env(model_path, architecture, state)
+        
+        logger.info(f"✓ Model path: {model_path_ready}")
+        logger.info(f"✓ Python path set: {state.python_path}")
+        logger.info(f"✓ Conda env set: {state.conda_env}")
         
         return model_path_ready  # ← PATH, non Model!
     
@@ -1806,43 +1833,37 @@ def load_stm32_model_safe(model_path: str) -> str:
 
 def apply_user_customization(state: MasterState, config: dict) -> MasterState:
     """
-    ✨ INTERO WORKFLOW IN SUBPROCESS stm32_legacy
+    ✨ Applicazione modifiche CON GESTIONE CORRETTA DI MULTIPLE RECONSTRUCTIONS (applica le ricostruzioni insieme e da in output un solo modello customizzato. Prima per ogni ricostruzione veniva creato un nuovo modello aggiornato versione 1, versione 2, etc)
     """
     
     logger.info("🔧 Applicando customizzazioni al modello STM32...")
     
     if not state.modification_confirmed:
-        logger.error("❌ Modifiche non confermate")
         state.customization_applied = False
         state.error_message = "Modifications not confirmed"
         return state
     
     model_path = state.model_path
     if not model_path or not os.path.exists(model_path):
-        logger.error(f"❌ Model path invalid: {model_path}")
         state.customization_applied = False
         state.error_message = "Invalid model path"
         return state
     
     try:
-        # ===== LOAD MODEL PATH (via subprocess) =====
         logger.info("[STEP 1/3] LOADING MODEL")
-        loaded_model_path = load_stm32_model_safe(model_path)
+        loaded_model_path = load_stm32_model_safe(model_path, state)
         logger.info(f"✓ Model ready at: {loaded_model_path}\n")
         
-        # ===== VALIDAZIONE MODIFICHE =====
         logger.info("[STEP 2/3] VALIDATING MODIFICATIONS")
         parsed_mods = state.parsed_modifications or {}
         
         if not _validate_modifications(parsed_mods):
-            logger.error("❌ Modification validation failed")
             state.customization_applied = False
             state.error_message = "Invalid modification parameters"
             return state
         
         logger.info("✓ All modifications valid\n")
         
-        # ===== APPLICA MODIFICHE + SALVA IN SUBPROCESS =====
         logger.info("[STEP 3/3] APPLYING MODIFICATIONS IN SUBPROCESS")
         
         python_code = f"""
@@ -1850,8 +1871,9 @@ import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 import tensorflow as tf
+from tensorflow.keras.layers import Input, Dropout, Dense, Resizing
+from tensorflow.keras.models import Model
 import json
-from tensorflow.keras.layers import Dropout
 import sys
 
 model_path = r'{loaded_model_path}'
@@ -1859,42 +1881,190 @@ modifications = {json.dumps(parsed_mods.get('modifications', []))}
 output_path = '/tmp/customized_model.keras'
 
 try:
-    # [1] CARICA
-    model = tf.keras.models.load_model(model_path, compile=False)
+    # ===== LOAD MODEL =====
+    model = tf.keras.models.load_model(model_path, compile=False, safe_mode=False)
     print(f"✓ Model loaded: {{model.name}}")
     
-    # [2] APPLICA MODIFICHE
     modifications_log = []
     
-    for i, mod in enumerate(modifications, 1):
+    # ===== FASE 1: MODIFICHE NON-RICOSTRUTTIVE =====
+    print("\\n[Phase 1] Applying non-reconstructive modifications...")
+    for mod in modifications:
+        mod_type = mod.get('type', '').strip()
+        mod_params = mod.get('params', {{}})
+
+        # FREEZE LAYERS
+        if mod_type == "freeze_layers":
+            num_freeze = mod_params.get('num_frozen_layers', 3)
+            for layer in model.layers[1:num_freeze+1]:
+                layer.trainable = False
+            modifications_log.append(f"✓ Froze layers 1-{{num_freeze}}")
+            print(f"  [✓] Froze layers 1-{{num_freeze}}")
+
+        # FREEZE ALMOST ALL
+        elif mod_type == "freeze_almost_all":
+            num_trainable = mod_params.get('num_trainable_layers', 3)
+            total_layers = len(model.layers)
+            num_freeze = total_layers - num_trainable - 1
+            
+            for layer in model.layers[1:num_freeze+1]:
+                layer.trainable = False
+            
+            modifications_log.append(f"✓ Froze {{num_freeze}}/{{total_layers-1}} layers")
+            print(f"  [✓] Froze {{num_freeze}}/{{total_layers-1}} layers")
+
+        # CHANGE LEARNING RATE
+        elif mod_type == "change_learning_rate":
+            lr = float(mod_params.get('learning_rate', 0.0001))
+            modifications_log.append(f"✓ Learning rate: {{lr}}")
+            print(f"  [✓] Learning rate: {{lr}}")
+    
+    # ===== FASE 2: RACCOGLI MODIFICHE RICOSTRUTTIVE =====
+    print("\\n[Phase 2] Collecting reconstructive modifications...")
+    reconstructive_mods = {{}}
+    has_input_shape_change = False
+    
+    for mod in modifications:
         mod_type = mod.get('type', '').strip()
         mod_params = mod.get('params', {{}})
         
-        print(f"  [{{i}}] {{mod_type}}...")
+        if mod_type == "add_dropout":
+            reconstructive_mods['dropout'] = float(mod_params.get('rate', 0.5))
+            print(f"  [queued] add_dropout: rate={{reconstructive_mods['dropout']}}")
         
-        if mod_type == "freeze_layers":
-            num_freeze = mod_params.get('num_frozen_layers', 3)
-            for layer in model.layers[:num_freeze]:
-                layer.trainable = False
-            modifications_log.append(f"Froze first {{num_freeze}} layers")
+        elif mod_type == "change_input_shape":
+            reconstructive_mods['input_shape'] = tuple(mod_params.get('new_shape', (224, 224, 3)))
+            has_input_shape_change = True
+            print(f"  [queued] change_input_shape: {{reconstructive_mods['input_shape']}}")
         
-        elif mod_type == "add_dropout":
-            rate = mod_params.get('rate', 0.5)
-            # Rebuild model with dropout
-            modifications_log.append(f"Added {{rate}} dropout")
-        
-        # ... altre modifiche ...
+        elif mod_type == "change_output_layer":
+            reconstructive_mods['output_classes'] = int(mod_params.get('new_classes', 10))
+            print(f"  [queued] change_output_layer: {{reconstructive_mods['output_classes']}} classes")
     
-    # [3] SALVA
+    # ===== FASE 3: HANDLE INPUT SHAPE CHANGE (NO SKIP LAYERS) =====
+    if has_input_shape_change and 'input_shape' in reconstructive_mods:
+        print("\\n[Phase 3] INPUT SHAPE CHANGE: Reloading model with new input shape...")
+        
+        new_shape = reconstructive_mods['input_shape']  # Es: (64, 64, 3)
+        original_shape = model.input_shape[1:]  # Es: (224, 224, 3)
+        
+        print(f"  Original input: {{original_shape}}")
+        print(f"  New input: {{new_shape}}")
+        
+        # Ricrea modello con nuovo input shape
+        model_config = model.get_config()  # Estrae la configurazione completa del modello (non i pesi, solo la struttura/architettura in formato JSON)
+        
+        # Modifica input layer config  # Accede al primo layer (l'Input layer) e cambia batch_input_shape da (None, 224, 224, 3) → (None, 64, 64, 3)
+        if 'layers' in model_config and len(model_config['layers']) > 0:
+            input_layer_config = model_config['layers'][0]
+            if 'config' in input_layer_config:
+                input_layer_config['config']['batch_input_shape'] = (None, *new_shape)  # !!! Cambia input shape qui
+        
+        # Ricrea modello
+        model_new = tf.keras.Model.from_config(model_config)  # Ricrea il modello intero USANDO la config modificata # IMPORTANTE: questa operazione cambia input shape, preserva architettura (tutti i layer rimangono) e inizializza pesi a random (non copia pesi da modello vecchio).
+
+        # Copia TUTTI i pesi - NON saltare nessun layer. Copia i pesi dal modello vecchio al modello nuovo
+        for new_layer, old_layer in zip(model_new.layers, model.layers):
+            try:
+                new_layer.set_weights(old_layer.get_weights())
+            except Exception as e:
+                print(f"  ⚠️  Layer {{new_layer.name}}: weight shape may need retraining")
+        
+        model = model_new  # sostituisce il modello vecchio con il nuovo
+        print(f"  ✓ Model reloaded with input shape {{new_shape}}")
+        modifications_log.append(f"✓ Changed input shape to {{new_shape}}")
+        # input shape funziona!
+        
+        # Applica altre modifiche con nuovo modello
+        if 'dropout' in reconstructive_mods:
+            penultimate_layer = model.layers[-2]
+            output_layer = model.layers[-1]
+            
+            x = penultimate_layer.output
+            x = Dropout(reconstructive_mods['dropout'])(x)
+            new_output = output_layer(x)
+            
+            model = Model(inputs=model.input, outputs=new_output)
+            modifications_log.append(f"✓ Added Dropout (rate={{reconstructive_mods['dropout']}})")
+            print(f"  [applied] Added Dropout ({{reconstructive_mods['dropout']}})")
+        
+        if 'output_classes' in reconstructive_mods:
+            inputs = model.input
+            x = inputs
+            
+            for layer in model.layers[1:-1]:
+                x = layer(x)
+            
+            x = Dense(reconstructive_mods['output_classes'], activation='softmax', name='predictions')(x)
+            model = Model(inputs=inputs, outputs=x)
+            modifications_log.append(f"✓ Changed output to {{reconstructive_mods['output_classes']}} classes")
+            print(f"  [applied] Changed output to {{reconstructive_mods['output_classes']}} classes")
+
+    
+    # ===== FASE 3C: ALTRE MODIFICHE RICOSTRUTTIVE (senza input shape change) =====
+    elif reconstructive_mods:
+        print("\\n[Phase 3C] Applying reconstructive modifications...")
+        
+        # FAST MODE: solo Dropout
+        if (len(reconstructive_mods) == 1 and 'dropout' in reconstructive_mods):
+            print("  [FAST MODE] Inserting dropout without reconstruction...")
+            
+            penultimate_layer = model.layers[-2]
+            output_layer = model.layers[-1]
+            
+            x = penultimate_layer.output
+            x = Dropout(reconstructive_mods['dropout'])(x)
+            new_output = output_layer(x)
+            
+            model = Model(inputs=model.input, outputs=new_output)
+            
+            modifications_log.append(f"✓ Added Dropout (rate={{reconstructive_mods['dropout']}})")
+            print(f"  [applied] Added Dropout ({{reconstructive_mods['dropout']}}) BEFORE output layer")
+        
+        else:
+            # FULL RECONSTRUCTION MODE
+            print("  [FULL MODE] Reconstructing model...")
+            
+            inputs = model.input
+            x = inputs
+            
+            for layer in model.layers[1:-1]:  # Ricrea il modello layer per layer, escludendo Input (primo) e Output (ultimo).
+                x = layer(x)
+            
+            if 'dropout' in reconstructive_mods:
+                x = Dropout(reconstructive_mods['dropout'])(x)
+                modifications_log.append(f"✓ Added Dropout (rate={{reconstructive_mods['dropout']}})")
+                print(f"  [applied] Added Dropout ({{reconstructive_mods['dropout']}}) BEFORE output layer")
+            
+            if 'output_classes' in reconstructive_mods:
+                x = Dense(reconstructive_mods['output_classes'], activation='softmax', name='predictions')(x)
+                modifications_log.append(f"✓ Changed output to {{reconstructive_mods['output_classes']}} classes")
+                print(f"  [applied] Changed output to {{reconstructive_mods['output_classes']}} classes")
+            else:
+                x = model.layers[-1](x)
+            
+            model = Model(inputs=inputs, outputs=x)
+
+    # ===== SALVA MODELLO =====
+    print(f"\\n[Saving] Model saving...")
     model.save(output_path, save_format='keras')
     print(f"✓ Model saved: {{output_path}}")
     
+    # ===== INFO FINALE =====
     info = {{
         'input_shape': str(model.input_shape),
         'output_shape': str(model.output_shape),
         'total_params': int(model.count_params()),
+        'trainable_params': int(sum([tf.keras.backend.count_params(w) for w in model.trainable_weights])),
+        'frozen_params': int(model.count_params() - sum([tf.keras.backend.count_params(w) for w in model.trainable_weights])),
         'modifications_applied': modifications_log,
     }}
+    
+    print(f"\\n✅ Customization complete!")
+    print(f"  Total params: {{info['total_params']:,}}")
+    print(f"  Trainable: {{info['trainable_params']:,}}")
+    print(f"  Frozen: {{info['frozen_params']:,}}")
+    print(f"  Modifications: {{len(modifications_log)}}")
     
     print(f"SUCCESS: {{output_path}}|" + json.dumps(info))
     sys.exit(0)
@@ -1905,8 +2075,8 @@ except Exception as e:
     traceback.print_exc()
     sys.exit(1)
 """
-        
-        result = execute_in_stm32_legacy(python_code, timeout=600)
+
+        result = execute_in_environment(python_code, state, timeout=600)
         
         if not result['success']:
             logger.error(f"❌ Customization failed: {result['stderr'][:500]}")
@@ -1914,8 +2084,8 @@ except Exception as e:
             state.error_message = result['stderr']
             return state
         
-        # Parse output
         output = result['stdout']
+        logger.info(f"Subprocess output:\n{output}")
         
         if "SUCCESS:" in output:
             parts = output.split("SUCCESS:")[-1].strip().split('|')
@@ -1935,6 +2105,10 @@ except Exception as e:
             logger.info(f"\n✅ CUSTOMIZATION COMPLETE")
             logger.info(f"  Model: {customized_path}")
             logger.info(f"  Total params: {info['total_params']:,}")
+            logger.info(f"  Trainable: {info['trainable_params']:,}")
+            logger.info(f"  Frozen: {info['frozen_params']:,}")
+            for mod_desc in info['modifications_applied']:
+                logger.info(f"    {mod_desc}")
     
     except Exception as e:
         logger.error(f"❌ Error: {str(e)}", exc_info=True)
@@ -1944,18 +2118,6 @@ except Exception as e:
     
     return state
 
-
-# ============================================================================
-#                      MODIFICATION FUNCTIONS USED IN APPLY_USER_MODIFICATIONS
-# Ogni tipo di modifica ora ha la sua funzione dedicata:
-# _freeze_layers() - Congela i primi N layer
-# _freeze_almost_all() - Congela tutti tranne gli ultimi N
-# _change_output_layer() - Modifica il layer di output
-# _add_dropout() - Aggiunge dropout prima dell'output
-# _change_input_shape() - Cambia lo shape di input
-# _add_resize_preprocessing() - Aggiunge preprocessing resize
-# _validate_modifications() - Valida i parametri
-# ============================================================================
 
 def _validate_modifications(modifications: dict) -> bool:
     """
@@ -1967,7 +2129,6 @@ def _validate_modifications(modifications: dict) -> bool:
         'change_output_layer': ['new_classes'],
         'add_dropout': ['rate'],
         'change_input_shape': ['new_shape'],
-        'add_resize_preprocessing': ['height', 'width'],
         'change_learning_rate': ['learning_rate'],
     } #Definisce per ogni tipo di modifica i parametri obbligatori, ad esempio:
         # freeze_layers → 'num_frozen_layers'
@@ -1991,327 +2152,6 @@ def _validate_modifications(modifications: dict) -> bool:
     return True
 
 
-def _change_input_shape(model: Model, new_shape: tuple) -> tuple:
-    """Fixed: avvisa se input shape incompatibile"""
-    
-    try:
-        new_shape = tuple(new_shape)
-        
-        # Detecta se è ResNet
-        is_resnet = any('res' in layer.name.lower() for layer in model.layers)
-        
-        original_shape = model.input_shape[1:]
-        
-        if is_resnet and new_shape[0] < original_shape[0]:
-            logger.warning(f"⚠️  ResNet with smaller input shape might fail!")
-            logger.warning(f"  Original: {original_shape}, New: {new_shape}")
-            logger.warning(f"  Downsampling might create feature maps < 4×4")
-# ResNet assume input (224, 224, 3) per il downsampling
-# Se cambi a (64, 64, 3), le stride e padding non funzionano più
-# ResNet blocks:
-# Conv(stride=2) → 224×224 → 112×112
-# Conv(stride=2) → 112×112 → 56×56
-# Conv(stride=2) → 56×56 → 28×28
-# Con input 64×64: 64→32→16→8 (troppo piccolo!)
-# Aggiungo un warning per l'utente. 
-        
-        new_input = Input(shape=new_shape)
-        x = model(new_input)
-        new_model = Model(inputs=new_input, outputs=x, name=f"{model.name}_reshaped")
-        
-        logger.info(f" ✓ Input shape changed to {new_shape}")
-        return new_model, f"Changed input shape to {new_shape}"
-    
-    except Exception as e:
-        logger.error(f" ❌ Error: {str(e)}")
-        raise
-
-def _add_resize_preprocessing(model: Model, height: int, width: int) -> tuple:
-    """
-    Aggiunge un layer Resizing prima dell'input.
-    
-    Consente al modello di accettare immagini di dimensioni diverse
-    che verranno automaticamente ridimensionate.
-    """
-    try:
-        height = int(height)
-        width = int(width)
-        
-        if height <= 0 or width <= 0:
-            raise ValueError(f"Height e width devono essere > 0")
-        
-        # Crea nuovo input con le stesse dimensioni originali
-        new_input = Input(shape=model.input_shape[1:])
-        
-        # Aggiungi layer di resize
-        resized = Resizing(height, width)(new_input)
-        
-        # Passa il ridimensionato attraverso il modello
-        x = model(resized)
-        
-        # Ricrea il modello
-        new_model = Model(
-            inputs=new_input,
-            outputs=x,
-            name=f"{model.name}_resized"
-        )
-        
-        logger.info(f" ✓ Resizing layer aggiunto: {height}x{width}")
-        return new_model, f"Added Resizing layer: {height}x{width}"
-    
-    except Exception as e:
-        logger.error(f" ❌ Errore add_resize_preprocessing: {str(e)}")
-        raise
-
-
-def _change_output_layer(model: Model, new_classes: int) -> tuple:
-    """
-    Cambia il layer di output del modello, gestendo diversi tipi di architetture.
-    
-    ✨ MIGLIORAMENTI:
-    - Detecta se ultimo layer è Dense o altro tipo
-    - Verifica se ci sono layer di attivazione separati
-    - Avvisa per architetture incompatibili (Vision Transformer, YOLO)
-    - Fallback intelligente
-    """
-    try:
-        new_classes = int(new_classes)
-        
-        if new_classes <= 0:
-            raise ValueError(f"new_classes deve essere > 0, ricevuto {new_classes}")
-        
-        if len(model.layers) < 2:
-            raise ValueError("Modello troppo semplice per modificare output (< 2 layer)")
-        
-# Prima change_output_layer() - NON UNIVERSALE
-# PROBLEMA: Assume che l'ultimo layer sia un Dense:
-# Casi che falliscono:
-# -Vision Transformer: Ultimo layer è LayerNormalization, non Dense
-# -YOLO: Ultimo layer è custom (non Dense)
-# -Modelli con output softmax separato: Ultimo layer è Activation('softmax'), non dense
-# Soluzione: controllare il tipo di layer.
-# Esempio con Vision Transformer:
-# Architettura ViT:
-#   layers[-3]: Dense (projection head) → output shape (768,)
-#   layers[-2]: LayerNormalization      → output shape (768,)  ❌ PROBLEMA!
-#   layers[-1]: Activation('softmax')   → output shape (1000,)
-
-# Codice vecchio faceva:
-#   penultimate_layer = model.layers[-2]  # LayerNormalization
-#   x = penultimate_layer.output          # x.shape = (None, 768)
-  
-#   output = Dense(10, activation='softmax')(x)  # Dense(10) accetta (768,)
-  
-#   ❌ RISULTATO: Output ha shape (None, 10) CORRETTO
-#                 Ma hai RIMOSSO il layer Activation originale
-#                 Il modello che restituisci NON è più ViT originale!
-#                 ❌ SILENZIOSO BUG - non lancia errore ma modifica male
-
-        # ===== DETECTA TIPO ULTIMO LAYER =====
-        last_layer = model.layers[-1]
-        second_last_layer = model.layers[-2]
-        
-        logger.info(f"  Current output layer: {last_layer.name} ({type(last_layer).__name__})")
-        
-        # ===== CASO 1: Ultimo layer è Dense (STANDARD) =====
-        if isinstance(last_layer, Dense):
-            logger.info(f"  → Standard Dense layer detected")
-            
-            x = second_last_layer.output
-            output = Dense(
-                new_classes,
-                activation='softmax',
-                name='output_custom'
-            )(x)
-            
-            new_model = Model(
-                inputs=model.input,
-                outputs=output,
-                name=f"{model.name}_modified_output"
-            )
-            
-            logger.info(f" ✓ Output layer changed to {new_classes} classes")
-            return new_model, f"Changed output layer to {new_classes} classes"
-        
-        # ===== CASO 2: Ultimo layer è Activation (Dense → Activation) =====
-        elif isinstance(last_layer, Activation):
-            logger.info(f"  → Activation layer detected, looking for Dense before...")
-            
-            # Cerca il Dense layer prima dell'Activation
-            dense_layer = None
-            for i in range(len(model.layers) - 2, -1, -1):
-                if isinstance(model.layers[i], Dense):
-                    dense_layer = model.layers[i]
-                    dense_idx = i
-                    break
-            
-            if dense_layer is None:
-                raise ValueError("No Dense layer found before Activation")
-            
-            logger.info(f"  Found Dense layer at index {dense_idx}")
-            
-            # Usa il layer prima del Dense
-            x = model.layers[dense_idx - 1].output
-            output = Dense(new_classes, activation='softmax', name='output_custom')(x)
-            
-            new_model = Model(
-                inputs=model.input,
-                outputs=output,
-                name=f"{model.name}_modified_output"
-            )
-            
-            logger.info(f" ✓ Output layer changed to {new_classes} classes")
-            return new_model, f"Changed output layer to {new_classes} classes"
-        
-        # ===== CASO 3: Ultimo layer è GlobalAveragePooling/GlobalMaxPooling =====
-        elif 'GlobalAveragePooling' in type(last_layer).__name__ or 'GlobalMaxPooling' in type(last_layer).__name__:
-            logger.info(f"  → Global pooling layer detected")
-            
-            x = last_layer.output
-            output = Dense(new_classes, activation='softmax', name='output_custom')(x)
-            
-            new_model = Model(
-                inputs=model.input,
-                outputs=output,
-                name=f"{model.name}_modified_output"
-            )
-            
-            logger.info(f" ✓ Output layer changed to {new_classes} classes")
-            return new_model, f"Changed output layer to {new_classes} classes"
-        
-        # ===== CASO 4: Layer sconosciuto (Vision Transformer, Custom, etc.) =====
-        # Sconosciuto → tentativo generico + WARNING
-        # (Non crasha, ma avvisa)
-        else:
-            layer_type = type(last_layer).__name__
-            logger.warning(f"  ⚠️  Unknown output layer type: {layer_type}")
-            logger.warning(f"  This might be Vision Transformer, YOLO, or custom architecture")
-            
-            # Tentativo generico: aggiungi Dense comunque
-            try:
-                x = last_layer.output
-                output = Dense(new_classes, activation='softmax', name='output_custom')(x)
-                
-                new_model = Model(
-                    inputs=model.input,
-                    outputs=output,
-                    name=f"{model.name}_modified_output"
-                )
-                
-                logger.warning(f"  ⚠️  Attempted generic modification - may not work correctly")
-                return new_model, f"Changed output layer to {new_classes} classes (⚠️ experimental)"
-            
-            except Exception as generic_err:
-                raise ValueError(
-                    f"Cannot modify output for {layer_type} architecture. "
-                    f"This model type may not support output layer changes. "
-                    f"Error: {str(generic_err)}"
-                )
-    
-    except Exception as e:
-        logger.error(f" ❌ Errore change_output_layer: {str(e)}")
-        raise
-
-
-def _add_dropout(model: Model, dropout_rate: float) -> tuple:
-    """Fixed: controlla se Dropout esiste già"""
-    
-    try:
-        dropout_rate = float(dropout_rate)
-        
-        if not (0.0 <= dropout_rate < 1.0):
-            raise ValueError(f"Dropout rate deve essere in [0, 1)")
-        
-        # Controlla se modello ha già Dropout
-        has_dropout = any(isinstance(l, Dropout) for l in model.layers)
-        
-        if has_dropout:
-            logger.warning(f"⚠️  Model already has Dropout layers")
-            logger.warning(f"  Adding more might degrade performance")
-            response = input("Continuare? (s/n): ")
-            if response.lower() != 's':
-                return model, "Dropout addition skipped"
-# I moderni (EfficientNet, ViT) già hanno Dropout:
-# EfficientNet già ha:
-# - Conv + BatchNorm + Dropout(0.2)
-# - Conv + BatchNorm + Dropout(0.2)
-# - ...
-# e Aggiungere altro Dropout = overkill → degradazione performance
-        
-        # Aggiungi Dropout
-        penultimate_layer = model.layers[-2]
-        x = penultimate_layer.output
-        x = Dropout(dropout_rate, name=f'dropout_custom')(x)
-        output = Dense(model.layers[-1].units, activation='softmax')(x)
-        
-        new_model = Model(inputs=model.input, outputs=output)
-        
-        logger.info(f" ✓ Dropout({dropout_rate}) added")
-        return new_model, f"Added Dropout({dropout_rate})"
-    
-    except Exception as e:
-        logger.error(f" ❌ Error: {str(e)}")
-        raise
-
-
-def _freeze_layers(model: Model, num_frozen: int) -> tuple:
-    """
-    Congela i primi N layer del modello (trainable=False).
-    
-    NON ricostruisce il modello, solo modifica la proprietà trainable.
-    """
-    try:
-        num_frozen = int(num_frozen)
-        total_layers = len(model.layers)
-        
-        if num_frozen < 0:
-            raise ValueError(f"num_frozen_layers deve essere >= 0, ricevuto {num_frozen}")
-        
-        if num_frozen > total_layers:
-            logger.warning(f"num_frozen ({num_frozen}) > total_layers ({total_layers}), congelando tutti")
-            num_frozen = total_layers
-        
-        # Congela i layer
-        for layer in model.layers[:num_frozen]:
-            layer.trainable = False
-        
-        num_trainable = sum(1 for l in model.layers if l.trainable)
-        
-        logger.info(f" ✓ Congelati {num_frozen}/{total_layers} layer (trainable: {num_trainable})")
-        return model, f"Froze first {num_frozen}/{total_layers} layers (trainable: {num_trainable})"
-    
-    except Exception as e:
-        logger.error(f" ❌ Errore freeze_layers: {str(e)}")
-        raise
-
-
-def _freeze_almost_all(model: Model, num_trainable: int) -> tuple:
-    """
-    Congela tutti i layer tranne gli ultimi N.
-    """
-    try:
-        num_trainable = int(num_trainable)
-        total_layers = len(model.layers)
-        num_to_freeze = total_layers - num_trainable
-        
-        if num_trainable < 0:
-            raise ValueError(f"num_trainable_layers deve essere >= 0, ricevuto {num_trainable}")
-        
-        if num_trainable >= total_layers:
-            logger.warning(f"num_trainable ({num_trainable}) >= total_layers ({total_layers}), nessun freeze")
-            return model, "No layers frozen (num_trainable >= total_layers)"
-        
-        # Congela i layer tranne gli ultimi
-        for layer in model.layers[:num_to_freeze]:
-            layer.trainable = False
-        
-        logger.info(f" ✓ Congelati tutti tranne ultimi {num_trainable} layer")
-        return model, f"Froze all except last {num_trainable} layers"
-    
-    except Exception as e:
-        logger.error(f" ❌ Errore freeze_almost_all: {str(e)}")
-        raise
-
 
 # ============================================================================
 #                    MAIN CUSTOMIZATION FUNCTION
@@ -2320,7 +2160,7 @@ def _freeze_almost_all(model: Model, num_trainable: int) -> tuple:
 
 def fine_tune_customized_model(state: MasterState, config: dict) -> MasterState:
     """
-    ✨ Fine-tuning con dataset dimensionato correttamente
+    ✨ Fine-tuning usando execute_in_environment (state.python_path)
     """
     
     logger.info("🎓 Iniziando fine-tuning...")
@@ -2342,9 +2182,9 @@ def fine_tune_customized_model(state: MasterState, config: dict) -> MasterState:
         
         logger.info(f"  Training params: LR={learning_rate}, epochs={epochs}, batch_size={batch_size}")
         
-        output_path = model_path.replace('.keras', '_finetuned.keras').replace('.h5', '_finetuned.h5')
+        output_path = model_path.replace('.keras', '_finetuned.keras').replace('.h5', '_finetuned.h5') # da .keras a .h5!!
         
-        # ===== PYTHON SCRIPT CON SHAPE CORRETTO =====
+        # ===== PYTHON SCRIPT =====
         python_code = f"""
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -2359,74 +2199,40 @@ model_path = r"{model_path}"
 output_path = r"{output_path}"
 
 try:
-    # ===== CARICA MODELLO =====
     model = tf.keras.models.load_model(model_path, compile=False)
-    print(f"✓ Model loaded: {{model.name}}")
     
-    # ===== ESTRAI INPUT SHAPE DAL MODELLO =====
-    # input_shape = (None, 224, 224, 3) → (224, 224, 3)
-    input_shape = model.input_shape[1:]  # Rimuovi batch dimension
-    print(f"✓ Input shape from model: {{input_shape}}")
-    
+    input_shape = model.input_shape[1:]
     num_classes = int(model.output_shape[-1])
-    print(f"✓ Output classes: {{num_classes}}")
     
-    # ===== GENERATE DATASET CON SHAPE CORRETTO =====
+    # ===== CREA DATASET =====
     num_samples = 200
+    X = np.random.randn(num_samples, *input_shape).astype('float32') # Prima qui tentava di creare array (200, None, None, 3) e dava errore.
+    X = (X - X.mean()) / (X.std() + 1e-7)
+    y = np.eye(num_classes)[np.random.randint(0, num_classes, num_samples)]
     
-    # Crea dataset con dimensioni CORRETTE
-    X_train = np.random.randn(num_samples, *input_shape).astype('float32')
-    X_train = (X_train - X_train.mean()) / (X_train.std() + 1e-7)
-    y_train = np.eye(num_classes)[np.random.randint(0, num_classes, num_samples)]
-    
-    X_val = np.random.randn(50, *input_shape).astype('float32')
-    X_val = (X_val - X_val.mean()) / (X_val.std() + 1e-7)
-    y_val = np.eye(num_classes)[np.random.randint(0, num_classes, 50)]
+    split_idx = int(num_samples * 0.8)
+    X_train, X_val = X[:split_idx], X[split_idx:]
+    y_train, y_val = y[:split_idx], y[split_idx:]
     
     print(f"✓ Dataset created: train={{X_train.shape}}, val={{X_val.shape}}")
     
-    # ===== COMPILE MODEL =====
     optimizer = Adam(learning_rate={learning_rate})
-    model.compile(
-        optimizer=optimizer,
-        loss='categorical_crossentropy',
-        metrics=['accuracy']
-    )
-    print(f"✓ Model compiled")
-    
-    # ===== CALLBACKS =====
-    early_stop = EarlyStopping(
-        monitor='val_loss',
-        patience=3,
-        restore_best_weights=True,
-        verbose=0
-    )
-    
-    reduce_lr = ReduceLROnPlateau(
-        monitor='val_loss',
-        factor=0.5,
-        patience=2,
-        min_lr=1e-7,
-        verbose=0
-    )
-    
-    # ===== TRAINING (NO data augmentation, numpy puro) =====
-    print(f"✓ Starting training for {epochs} epochs...")
+    model.compile(optimizer=optimizer, loss='categorical_crossentropy', metrics=['accuracy'])
     
     history = model.fit(
         X_train, y_train,
         batch_size={batch_size},
         epochs={epochs},
         validation_data=(X_val, y_val),
-        callbacks=[early_stop, reduce_lr],
+        callbacks=[
+            EarlyStopping(monitor='val_loss', patience=3, restore_best_weights=True, verbose=0),
+            ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=2, min_lr=1e-7, verbose=0)
+        ],
         verbose=1
     )
     
-    # ===== SAVE MODEL =====
-    model.save(output_path, save_format='h5')  # ← Salva in .h5!
-    print(f"✓ Model saved: {{output_path}}")
+    model.save(output_path, save_format='h5')
     
-    # ===== OUTPUT RESULTS =====
     final_acc = float(history.history['accuracy'][-1])
     final_val_acc = float(history.history['val_accuracy'][-1])
     final_loss = float(history.history['loss'][-1])
@@ -2434,34 +2240,23 @@ try:
     epochs_trained = len(history.history['loss'])
     
     print(f"SUCCESS: {{final_acc:.4f}}|{{final_val_acc:.4f}}|{{final_loss:.4f}}|{{final_val_loss:.4f}}|{{epochs_trained}}")
-    sys.exit(0)
     
 except Exception as e:
     print(f"ERROR: {{str(e)}}")
     import traceback
     traceback.print_exc()
-    sys.exit(1)
 """
         
-        logger.info(f"  [Subprocess] Executing fine-tuning in stm32_legacy...")
+        logger.info(f"  [Subprocess] Executing fine-tuning...")
         
-        python_path = '/home/mrusso/miniconda3/envs/stm32_legacy/bin/python'
+        # ===== USA execute_in_environment =====
+        result = execute_in_environment(python_code, state, timeout=600)
         
-        result = subprocess.run(
-            [python_path, '-c', python_code],
-            capture_output=True,
-            text=True,
-            timeout=600,
-            env={**os.environ, 'TF_CPP_MIN_LOG_LEVEL': '3'}
-        )
-        
-        # ===== PARSE OUTPUT =====
-        stdout = result.stdout.strip()
-        stderr = result.stderr.strip()
+        stdout = result['stdout']
+        stderr = result['stderr']
         
         logger.info(f"  [Raw stdout lines: {len(stdout.split(chr(10)))}]")
         
-        # Filtra linee TensorFlow
         stdout_lines = [l for l in stdout.split('\n') if l and not any(x in l for x in [
             'tensorflow/core/util/port.cc',
             'tensorflow/tsl/cuda/cudart_stub.cc',
@@ -2475,26 +2270,22 @@ except Exception as e:
         
         logger.info(f"  Output:\n{stdout_clean[:1500]}")
         
-        if result.returncode != 0:
-            logger.error(f"  Subprocess returncode: {result.returncode}")
+        if not result['success']:
+            logger.error(f"  Subprocess returncode: {result['returncode']}")
             logger.error(f"  Stderr:\n{stderr[:1000]}")
             raise Exception(f"Subprocess failed: {stderr.split(chr(10))[-2]}")
         
-        # ===== PARSE RESULTS =====
         if "SUCCESS:" in stdout_clean:
             parts = stdout_clean.split("SUCCESS:")[-1].strip().split('|')
             
             if len(parts) < 5:
                 raise Exception(f"Invalid output format. Expected 5 parts, got {len(parts)}: {parts}")
             
-            try:
-                final_acc = float(parts[0].strip())
-                final_val_acc = float(parts[1].strip())
-                final_loss = float(parts[2].strip())
-                final_val_loss = float(parts[3].strip())
-                epochs_trained = int(parts[4].strip())
-            except ValueError as e:
-                raise Exception(f"Failed to parse metrics: {e}. Parts: {parts}")
+            final_acc = float(parts[0].strip())
+            final_val_acc = float(parts[1].strip())
+            final_loss = float(parts[2].strip())
+            final_val_loss = float(parts[3].strip())
+            epochs_trained = int(parts[4].strip())
             
             state.training_test_result = {
                 "success": True,
@@ -2524,13 +2315,22 @@ except Exception as e:
     
     return state
 
-def validate_customized_model(state: MasterState, config: dict) -> MasterState: 
-    """Valida il modello customizzato IN SUBPROCESS"""
+import shutil
+
+def validate_customized_model(state: MasterState, config: dict) -> MasterState:
+    """
+    ✨ Valida il modello customizzato IN SUBPROCESS (usa state.python_path)
+    """
     
     logger.info("✅ Validando modello customizzato...")
     
     try:
         model_path = state.customized_model_path
+        
+        if not model_path or not os.path.exists(model_path):
+            logger.error("❌ Model not found")
+            state.error_message = "Model not found"
+            return state
         
         python_code = f"""
 import os
@@ -2542,7 +2342,7 @@ import json
 model_path = r'{model_path}'
 
 try:
-    model = tf.keras.models.load_model(model_path, compile=False)
+    model = tf.keras.models.load_model(model_path, compile=False, safe_mode=False)
     
     # Estrai informazioni
     info = {{
@@ -2564,27 +2364,31 @@ except Exception as e:
     traceback.print_exc()
 """
         
-        result = execute_in_stm32_legacy(python_code)
+        # ===== USA execute_in_environment =====
+        result = execute_in_environment(python_code, state, timeout=120)
         
         if not result['success']:
             logger.error(f"❌ Validation failed: {result['stderr'][:500]}")
             state.error_message = result['stderr']
             return state
         
-        # Parse info
+        # ===== PARSE INFO =====
         stdout = result['stdout']
         
-        # Estrai JSON
         if "SUCCESS: " in stdout:
             json_str = stdout.split("SUCCESS: ")[-1].strip()
             info = json.loads(json_str)
             
             state.customized_model_info.update(info)
+            
             logger.info(f"✓ Model validated")
             logger.info(f"  Input: {info['input_shape']}")
             logger.info(f"  Output: {info['output_shape']}")
             logger.info(f"  Params: {info['total_params']:,}")
-        
+        else:
+            logger.error(f"❌ Invalid output format")
+            state.error_message = "Invalid output format"
+    
     except Exception as e:
         logger.error(f"❌ Validation error: {str(e)}", exc_info=True)
         state.error_message = str(e)
@@ -2592,84 +2396,10 @@ except Exception as e:
     return state
 
 
-def apply_quantization_for_stm32(state: MasterState, config: dict) -> MasterState:
-    """
-    Applica quantizzazione INT8 usando TensorFlow Lite NATIVO.
-    NO tfmot, NO dipendenze problematiche.
-    """
-    
-    if not state.should_quantize:
-        logger.info("⏭️  Quantizzazione skippata (non richiesta)")
-        return state
-    
-    logger.info(f"⚙️  Applicando quantizzazione INT{state.quantization_bit_width} con TFLite...")
-    
-    try:
-        model = tf.keras.models.load_model(state.customized_model_path, compile=False)
-        
-        if state.quantization_bit_width == 8:
-            
-            logger.info("  Convertendo a TFLite INT8 (nativo)...")
-            
-            # Crea representative dataset per quantizzazione
-            def representative_data_gen():
-                X, _ = load_or_create_sample_dataset(50, (32, 32), int(model.output_shape[-1]))
-                for i in range(0, len(X), 32):
-                    yield [X[i:i+32].astype(np.float32)]
-            
-            # Converter con quantizzazione INT8
-            converter = tf.lite.TFLiteConverter.from_keras_model(model)
-            converter.optimizations = [tf.lite.Optimize.DEFAULT]
-            
-            # Specifica target ops per INT8
-            converter.target_spec.supported_ops = [
-                tf.lite.OpsSet.TFLITE_BUILTINS_INT8
-            ]
-            
-            # Imposta representative dataset
-            converter.representative_data = representative_data_gen
-            
-            # Imposta tipi input/output
-            converter.inference_input_type = tf.int8
-            converter.inference_output_type = tf.int8
-            
-            logger.info("  Quantizzando a INT8...")
-            tflite_quant_model = converter.convert()
-            
-            # Salva modello quantizzato
-            output_dir = os.path.expanduser("~/.stm32_ai_models/quantized")
-            os.makedirs(output_dir, exist_ok=True)
-            
-            tflite_path = os.path.join(output_dir, f"model_int8_{datetime.now().strftime('%Y%m%d_%H%M%S')}.tflite")
-            
-            with open(tflite_path, 'wb') as f:
-                f.write(tflite_quant_model)
-            
-            state.quantized_model_path = tflite_path
-            
-            # Compara dimensioni
-            original_size = os.path.getsize(state.customized_model_path) / (1024*1024)
-            quantized_size = os.path.getsize(tflite_path) / (1024*1024)
-            reduction = (1 - quantized_size/original_size) * 100
-            
-            logger.info(f"✓ Quantizzazione completata!")
-            logger.info(f"  Original: {original_size:.2f} MB")
-            logger.info(f"  Quantized: {quantized_size:.2f} MB")
-            logger.info(f"  Reduction: {reduction:.1f}%")
-            logger.info(f"  Saved: {tflite_path}")
-        
-    except Exception as e:
-        logger.error(f"❌ Errore quantizzazione: {str(e)}", exc_info=True)
-        state.should_quantize = False
-    
-    return state
-
-
-import shutil
-
 def save_customized_model_final(state: MasterState, config: dict) -> MasterState:
     """
     ✨ Salva il modello customizzato come .h5 (compatibile con stedgeai)
+    Valida usando state.python_path
     """
     
     logger.info("💾 Salvando modello customizzato definitivamente...")
@@ -2686,13 +2416,17 @@ def save_customized_model_final(state: MasterState, config: dict) -> MasterState
         os.makedirs(output_dir, exist_ok=True)
         
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        final_path = os.path.join(output_dir, f"customized_final_{timestamp}.h5")  # ← .h5! e non .keras !!
+        final_path = os.path.join(output_dir, f"customized_final_{timestamp}.h5")  # ← .h5
+        
+        logger.info(f"  Copying model: {model_path} → {final_path}")
         
         # ===== COPIA FILE =====
         shutil.copy(model_path, final_path)
         logger.info(f"✓ Model copied: {final_path}")
         
         # ===== VALIDATE IN SUBPROCESS =====
+        logger.info(f"  Validating in environment: {state.conda_env}")
+        
         python_code = f"""
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -2703,7 +2437,7 @@ import json
 model_path = r'{final_path}'
 
 try:
-    model = tf.keras.models.load_model(model_path, compile=False)
+    model = tf.keras.models.load_model(model_path, compile=False, safe_mode=False)
     
     info = {{
         'input_shape': str(model.input_shape),
@@ -2716,16 +2450,19 @@ try:
     
 except Exception as e:
     print(f"ERROR: {{str(e)}}")
+    import traceback
+    traceback.print_exc()
 """
         
-        result = execute_in_stm32_legacy(python_code)
+        # ===== USA execute_in_environment =====
+        result = execute_in_environment(python_code, state, timeout=120)
         
         if not result['success']:
-            logger.error(f"❌ Final save validation failed")
+            logger.error(f"❌ Final save validation failed: {result['stderr'][:500]}")
             state.error_message = result['stderr']
             return state
         
-        # Parse info
+        # ===== PARSE INFO =====
         if "SUCCESS: " in result['stdout']:
             json_str = result['stdout'].split("SUCCESS: ")[-1].strip()
             info = json.loads(json_str)
@@ -2734,18 +2471,23 @@ except Exception as e:
             state.customized_model_info.update({
                 **info,
                 "model_size_mb": round(os.path.getsize(final_path) / (1024*1024), 2),
-                "format": "H5"  # ← Aggiungi info formato
+                "format": "H5"  # ← Formato finale
             })
             
             logger.info(f"✓ Model saved: {final_path}")
             logger.info(f"  Format: H5 (stedgeai compatible)")
             logger.info(f"  Size: {state.customized_model_info['model_size_mb']} MB")
-        
+        else:
+            logger.error(f"❌ Validation output missing SUCCESS marker")
+            state.error_message = "Validation failed"
+    
     except Exception as e:
         logger.error(f"❌ Save error: {str(e)}", exc_info=True)
         state.error_message = str(e)
     
     return state
+
+
 
 def ask_continue_after_customization(state: MasterState, config: dict) -> MasterState:
     """Chiedi se continuare con AI analysis"""

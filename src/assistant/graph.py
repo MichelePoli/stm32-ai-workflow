@@ -82,7 +82,6 @@ from src.assistant.workflow5_customization import (
     apply_user_customization,
     fine_tune_customized_model,
     validate_customized_model,
-    apply_quantization_for_stm32,
     save_customized_model_final,
     ask_continue_after_customization,
 )
@@ -391,8 +390,6 @@ builder.add_node("apply_user_customization", apply_user_customization)
 builder.add_node("fine_tune_customized_model", fine_tune_customized_model)
 builder.add_node("validate_customized_model", validate_customized_model)
 
-# Ottimizzazione per STM32
-builder.add_node("apply_quantization_for_stm32", apply_quantization_for_stm32)
 # Salvataggio e decision
 builder.add_node("save_customized_model_final", save_customized_model_final)
 builder.add_node("ask_continue_after_customization", ask_continue_after_customization)
@@ -547,15 +544,12 @@ builder.add_edge("apply_user_customization", "fine_tune_customized_model")
 builder.add_edge("fine_tune_customized_model", "validate_customized_model")
 
 # Fase 6: Validazione modello
-builder.add_edge("validate_customized_model", "apply_quantization_for_stm32")
+builder.add_edge("validate_customized_model", "save_customized_model_final")
 
-# Fase 7: Quantizzazione INT8 per STM32 (opzionale, gestito internamente)
-builder.add_edge("apply_quantization_for_stm32", "save_customized_model_final")
-
-# Fase 8: Salvataggio definitivo con metadata
+# Fase 7: Salvataggio definitivo con metadata
 builder.add_edge("save_customized_model_final", "ask_continue_after_customization")
 
-# Fase 9: Decisione: proseguire con AI analysis o terminare
+# Fase 8: Decisione: proseguire con AI analysis o terminare
 def continue_after_customization_routing(state: MasterState) -> str:
     """
     Route dopo customization.

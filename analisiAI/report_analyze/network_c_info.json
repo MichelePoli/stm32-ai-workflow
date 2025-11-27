@@ -7457,54 +7457,54 @@
   ],
   "environment": {
     "generated_model": {
-      "generated_time": "2025-11-20T18:22:20+0100",
+      "generated_time": "2025-11-21T12:20:39+0100",
       "model_files": [
         {
           "name": "network_data_params.h",
-          "signature": "0x3bb1b65f805cfdc49b7fcf41f1885c06"
+          "signature": "0x70db3cb660582b261a99ca1479a240a4"
         },
         {
           "name": "network_data_params.c",
-          "signature": "0x7a6d06bd30b51adee0c849cb054b9508"
+          "signature": "0x9ddfb2662085d4b58056ceec53d2fa6d"
         },
         {
           "name": "network_data.h",
-          "signature": "0xa28e697de49dc7c6a2ceea85dea905d5"
+          "signature": "0x99ed8bdf454d32db5f39e197fbc660bc"
         },
         {
           "name": "network_data.c",
-          "signature": "0x73b5059f8517836b28b4c9ee393fbee7"
+          "signature": "0x9be98c7dfa6db231696044340452260c"
         },
         {
           "name": "network_config.h",
-          "signature": "0xff69592a5c998f66eb12e0642da0d10b"
+          "signature": "0x58d6b437ddb12f998bc8ec388a3f8a49"
         },
         {
           "name": "network.h",
-          "signature": "0x37bed2e0d836d7f719cfd75da8d7433b"
+          "signature": "0xe254768da44276ca8c1a15876ebbeafd"
         },
         {
           "name": "network.c",
-          "signature": "0x75a9a6f7adab80e54432ac07d5c271b1"
+          "signature": "0xf7f64e6797f1cb559ffbd500d247adc4"
         }
       ],
       "name": "network"
     },
-    "network_signature": "0xb4c852e16ecc4658",
+    "network_signature": "0x7c5e2f266517d6d5",
     "test_name": "",
     "tools": [
       {
-        "arguments": "analyze --model /home/mrusso/.stm32_ai_models/customized/customized_final_20251120_182112.h5 --target stm32f4 --output ./analisiAI/report_analyze",
+        "arguments": "analyze --model /home/mrusso/.stm32_ai_models/customized/customized_final_20251121_121825.h5 --target stm32f4 --output ./analisiAI/report_analyze",
         "environment": [],
         "input_model": {
           "model_files": [
             {
-              "name": "customized_final_20251120_182112.h5",
-              "signature": "0x392209f7c1703ef7f570c9276d1e7495"
+              "name": "customized_final_20251121_121825.h5",
+              "signature": "0xc52f89e5078138bb5cfd89b85c8bf034"
             }
           ],
           "n_params": 3504872,
-          "name": "customized_final_20251120_182112",
+          "name": "customized_final_20251121_121825",
           "size": 14019488,
           "type": "keras"
         },
@@ -9047,7 +9047,7 @@
       "inputs": [
         1360
       ],
-      "name": "customized_final_20251120_182112",
+      "name": "customized_final_20251121_121825",
       "nodes": [
         {
           "attributes": {
