@@ -1043,6 +1043,46 @@ class ParsedModificationsPlan(BaseModel):
         description="Training recommendations based on modifications"
     )
 
+# Lista modelli che NON supportano change_input_shape
+INCOMPATIBLE_INPUT_SHAPE_MODELS = {
+    'yolo': ['tiny_yolo_v2', 'yolov2', 'yolov3', 'yolov4', 'yolov5', 'yolov8'],
+    'ssd': [
+        'ssd_mobilenet', 
+        'ssd_inception', 
+        'ssd_resnet', 
+        'st_ssd_mobilenet_v1',  # ⭐ NUOVO dal catalogo
+    ],
+    'other_detectors': ['faster_rcnn', 'mask_rcnn', 'retinanet'],
+    'time_series_models': [  # ⭐ NUOVO
+        'gmp',
+        'har',
+        'activity_recognition',
+    ]
+}
+# Grid output fissa in detection. Cambiar input → cambia grid → mismatch con label → crash loss function. 
+# YOLO è progettato per 416x416, SSD per 300/512. Cambiarli rompe l'integrità del modello.
+# Bloccato per evitare crash silenzioso. Alternativa: Resizing Layer (nel backlog)
+
+def is_model_compatible_with_input_shape_change(model_name: str) -> bool:
+    """Verifica se il modello supporta change_input_shape"""
+    model_lower = model_name.lower()
+    
+    for category, models in INCOMPATIBLE_INPUT_SHAPE_MODELS.items():
+        for model_pattern in models:
+            if model_pattern.lower() in model_lower:
+                if category == 'time_series_models':
+                    logger.warning(
+                        f"⚠️ {model_name} (detected: time-series) "
+                        f"has temporal input, not spatial"
+                    )
+                else:
+                    logger.warning(
+                        f"⚠️ {model_name} (detected: {category}) "
+                        f"has fixed output structure"
+                    )
+                return False
+    return True
+
 
 def ask_and_parse_user_modifications(state: any, config: dict) -> any:
     """
@@ -1093,10 +1133,9 @@ Current Model Info:
 Available Modifications:
   ✓ Freeze layers (e.g., "freeze first 5 layers")
   ✓ Freeze almost all (e.g., "keep last 3 layers trainable")
+  ✓ Change input shape (e.g., "change input to 64x64x3"). ⚠️  Not supported for detection models (YOLO, SSD, etc.)
   ✓ Change output (e.g., "change output to 100 classes")
   ✓ Add dropout (e.g., "add 0.3 dropout")
-  ✓ Change input shape (e.g., "change input to 64x64x3")
-  ✓ Add resizing layer after input layer (e.g., "add resizing layer") 
   ✓ Learning rate (e.g., "use learning rate 0.0001")
 
 Examples:
@@ -1193,6 +1232,26 @@ Return JSON with modifications list."""
         ])
         
         logger.info("  ✓ LLM parsing successful")
+
+        # ===== VALIDAZIONE: change_input_shape INCOMPATIBILE? =====
+        model_name = state.selected_model.get('name', '') if state.selected_model else ''
+        mods_to_remove = []
+
+        for i, mod in enumerate(result.modifications):
+            if mod.type == 'change_input_shape':
+                if not is_model_compatible_with_input_shape_change(model_name):
+                    logger.error(f"❌ Removing change_input_shape (not supported for {model_name})")
+                    mods_to_remove.append(i)
+                    result.validation.issues.append(
+                        f"change_input_shape: Blocked - {model_name} has fixed input structure"
+                    )
+
+        # Rimuovi in ordine inverso
+        for i in reversed(mods_to_remove):
+            result.modifications.pop(i)
+
+        if mods_to_remove:
+            result.validation.is_valid = False
         
         # ===== VALIDAZIONE PARAMETRI =====
         issues = []
@@ -1977,7 +2036,40 @@ try:
         # input shape funziona!
         
         # Applica altre modifiche con nuovo modello
+        # IMPORTANTE: Applicare in ordine: PRIMA output_classes, POI dropout
+        
+        if 'output_classes' in reconstructive_mods:
+            print("  [applying] Changing output layer...")
+            
+            # ✅ METODO CORRETTO: get_config() preserva skip connections
+            model_config = model.get_config()
+            
+            # Modifica solo l'ultimo layer Dense
+            if 'layers' in model_config and len(model_config['layers']) > 0:
+                last_layer = model_config['layers'][-1]
+                if last_layer.get('class_name') == 'Dense':
+                    old_units = last_layer['config'].get('units', 1000)
+                    last_layer['config']['units'] = reconstructive_mods['output_classes']
+                    print(f"    ✓ Dense layer: {{old_units}} → {{reconstructive_mods['output_classes']}}")
+            
+            # Ricrea modello (skip connections INTATTE!)
+            model_new = tf.keras.Model.from_config(model_config)
+            
+            # Copia pesi (tutti TRANNE l'ultimo Dense)
+            for new_layer, old_layer in zip(model_new.layers[:-1], model.layers[:-1]):
+                try:
+                    new_layer.set_weights(old_layer.get_weights())
+                except:
+                    pass
+            
+            model = model_new
+            modifications_log.append(f"✓ Changed output to {{reconstructive_mods['output_classes']}} classes")
+            print(f"    ✓ Changed output to {{reconstructive_mods['output_classes']}} classes")
+        
+        # Applica dropout come ULTIMO passo (dopo output_classes)
         if 'dropout' in reconstructive_mods:
+            print("  [applying] Adding dropout...")
+            
             penultimate_layer = model.layers[-2]
             output_layer = model.layers[-1]
             
@@ -1987,28 +2079,45 @@ try:
             
             model = Model(inputs=model.input, outputs=new_output)
             modifications_log.append(f"✓ Added Dropout (rate={{reconstructive_mods['dropout']}})")
-            print(f"  [applied] Added Dropout ({{reconstructive_mods['dropout']}})")
-        
-        if 'output_classes' in reconstructive_mods:
-            inputs = model.input
-            x = inputs
-            
-            for layer in model.layers[1:-1]:
-                x = layer(x)
-            
-            x = Dense(reconstructive_mods['output_classes'], activation='softmax', name='predictions')(x)
-            model = Model(inputs=inputs, outputs=x)
-            modifications_log.append(f"✓ Changed output to {{reconstructive_mods['output_classes']}} classes")
-            print(f"  [applied] Changed output to {{reconstructive_mods['output_classes']}} classes")
-
+            print(f"    ✓ Added Dropout ({{reconstructive_mods['dropout']}}) BEFORE output layer")
     
     # ===== FASE 3C: ALTRE MODIFICHE RICOSTRUTTIVE (senza input shape change) =====
     elif reconstructive_mods:
         print("\\n[Phase 3C] Applying reconstructive modifications...")
         
-        # FAST MODE: solo Dropout
-        if (len(reconstructive_mods) == 1 and 'dropout' in reconstructive_mods):
-            print("  [FAST MODE] Inserting dropout without reconstruction...")
+        # ===== CASO 1: Solo output_classes =====
+        if 'output_classes' in reconstructive_mods and 'dropout' not in reconstructive_mods:
+            print("  [output_classes only] Using get_config method...")
+            
+            # ✅ METODO CORRETTO: get_config() preserva skip connections
+            model_config = model.get_config()
+            
+            # Modifica solo l'ultimo layer Dense
+            if 'layers' in model_config and len(model_config['layers']) > 0:
+                last_layer = model_config['layers'][-1]
+                if last_layer.get('class_name') == 'Dense':
+                    old_units = last_layer['config'].get('units', 1000)
+                    last_layer['config']['units'] = reconstructive_mods['output_classes']
+                    print(f"    ✓ Dense layer: {{old_units}} → {{reconstructive_mods['output_classes']}}")
+            
+            # Ricrea modello (skip connections INTATTE!)
+            model_new = tf.keras.Model.from_config(model_config)
+            
+            # Copia pesi (tutti TRANNE l'ultimo Dense)
+            for new_layer, old_layer in zip(model_new.layers[:-1], model.layers[:-1]):
+                try:
+                    new_layer.set_weights(old_layer.get_weights())
+                except:
+                    pass
+            
+            model = model_new
+            model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+            modifications_log.append(f"✓ Changed output to {{reconstructive_mods['output_classes']}} classes")
+            print(f"  ✓ Changed output to {{reconstructive_mods['output_classes']}} classes")
+        
+        # ===== CASO 2: Solo dropout =====
+        elif 'dropout' in reconstructive_mods and 'output_classes' not in reconstructive_mods:
+            print("  [dropout only] Inserting dropout...")
             
             penultimate_layer = model.layers[-2]
             output_layer = model.layers[-1]
@@ -2018,33 +2127,48 @@ try:
             new_output = output_layer(x)
             
             model = Model(inputs=model.input, outputs=new_output)
-            
             modifications_log.append(f"✓ Added Dropout (rate={{reconstructive_mods['dropout']}})")
-            print(f"  [applied] Added Dropout ({{reconstructive_mods['dropout']}}) BEFORE output layer")
+            print(f"  ✓ Added Dropout ({{reconstructive_mods['dropout']}}) BEFORE output layer")
         
-        else:
-            # FULL RECONSTRUCTION MODE
-            print("  [FULL MODE] Reconstructing model...")
+        # ===== CASO 3: Sia dropout che output_classes =====
+        else:  # 'dropout' in reconstructive_mods and 'output_classes' in reconstructive_mods
+            print("  [dropout + output_classes] Applying combined modifications...")
             
-            inputs = model.input
-            x = inputs
+            # Step 1: Cambia output_classes con get_config
+            model_config = model.get_config()
             
-            for layer in model.layers[1:-1]:  # Ricrea il modello layer per layer, escludendo Input (primo) e Output (ultimo).
-                x = layer(x)
+            if 'layers' in model_config and len(model_config['layers']) > 0:
+                last_layer = model_config['layers'][-1]
+                if last_layer.get('class_name') == 'Dense':
+                    old_units = last_layer['config'].get('units', 1000)
+                    last_layer['config']['units'] = reconstructive_mods['output_classes']
+                    print(f"    ✓ Dense layer: {{old_units}} → {{reconstructive_mods['output_classes']}}")
             
-            if 'dropout' in reconstructive_mods:
-                x = Dropout(reconstructive_mods['dropout'])(x)
-                modifications_log.append(f"✓ Added Dropout (rate={{reconstructive_mods['dropout']}})")
-                print(f"  [applied] Added Dropout ({{reconstructive_mods['dropout']}}) BEFORE output layer")
+            # Ricrea modello
+            model_new = tf.keras.Model.from_config(model_config)
             
-            if 'output_classes' in reconstructive_mods:
-                x = Dense(reconstructive_mods['output_classes'], activation='softmax', name='predictions')(x)
-                modifications_log.append(f"✓ Changed output to {{reconstructive_mods['output_classes']}} classes")
-                print(f"  [applied] Changed output to {{reconstructive_mods['output_classes']}} classes")
-            else:
-                x = model.layers[-1](x)
+            # Copia pesi (tranne ultimo Dense)
+            for new_layer, old_layer in zip(model_new.layers[:-1], model.layers[:-1]):
+                try:
+                    new_layer.set_weights(old_layer.get_weights())
+                except:
+                    pass
             
-            model = Model(inputs=inputs, outputs=x)
+            model = model_new
+            modifications_log.append(f"✓ Changed output to {{reconstructive_mods['output_classes']}} classes")
+            print(f"    ✓ Changed output to {{reconstructive_mods['output_classes']}} classes")
+            
+            # Step 2: Aggiungi Dropout prima del nuovo output
+            penultimate_layer = model.layers[-2]
+            output_layer = model.layers[-1]
+            
+            x = penultimate_layer.output
+            x = Dropout(reconstructive_mods['dropout'])(x)
+            new_output = output_layer(x)
+            
+            model = Model(inputs=model.input, outputs=new_output)
+            modifications_log.append(f"✓ Added Dropout (rate={{reconstructive_mods['dropout']}})")
+            print(f"    ✓ Added Dropout ({{reconstructive_mods['dropout']}}) BEFORE output layer")
 
     # ===== SALVA MODELLO =====
     print(f"\\n[Saving] Model saving...")
@@ -2206,7 +2330,7 @@ try:
     num_classes = int(model.output_shape[-1])
     
     # ===== CREA DATASET =====
-    num_samples = 200
+    num_samples = 100 # ridotto a 100 per test veloce
     X = np.random.randn(num_samples, *input_shape).astype('float32') # Prima qui tentava di creare array (200, None, None, 3) e dava errore.
     X = (X - X.mean()) / (X.std() + 1e-7)
     y = np.eye(num_classes)[np.random.randint(0, num_classes, num_samples)]
