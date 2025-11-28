@@ -1962,6 +1962,7 @@ try:
         
         # Ricrea modello
         model_new = tf.keras.Model.from_config(model_config)  # Ricrea il modello intero USANDO la config modificata # IMPORTANTE: questa operazione cambia input shape, preserva architettura (tutti i layer rimangono) e inizializza pesi a random (non copia pesi da modello vecchio).
+        # Model.from_config() ricrea il modello con le GIUSTE PROPORZIONI INTERNE! Quando Keras legge la config modificata, calcola automaticamente tutte le shape successive.
 
         # Copia TUTTI i pesi - NON saltare nessun layer. Copia i pesi dal modello vecchio al modello nuovo
         for new_layer, old_layer in zip(model_new.layers, model.layers):
