@@ -983,7 +983,7 @@ def _get_generic_practices() -> str:
 class Modification(BaseModel):
     """Singola modifica strutturata"""
     type: str = Field(
-        description="Modification type: freeze_layers, freeze_almost_all, change_output_layer, add_dropout, change_input_shape, change_learning_rate"
+        description="Modification type: freeze_layers, freeze_almost_all, change_output_layer, add_dropout, change_input_shape, change_learning_rate, add_resizing_layer"
     )
     description: str = Field(description="Brief description of what this modification does")
     params: dict[str, Any] = Field(description="Parameters for this modification")
@@ -1133,10 +1133,12 @@ Current Model Info:
 Available Modifications:
   ✓ Freeze layers (e.g., "freeze first 5 layers")
   ✓ Freeze almost all (e.g., "keep last 3 layers trainable")
-  ✓ Change input shape (e.g., "change input to 64x64x3"). ⚠️  Not supported for detection models (YOLO, SSD, etc.)
+  ✓ Change input shape (e.g., "change input to 64x64x3"). ⚠️ Not supported for detection models (YOLO, SSD, etc.). Use instead "add resizing layer".
   ✓ Change output (e.g., "change output to 100 classes")
   ✓ Add dropout (e.g., "add 0.3 dropout")
   ✓ Learning rate (e.g., "use learning rate 0.0001")
+  ✓ Add resizing layer (e.g., "Add resizing layer to accept flexible input sizes")
+    ️⚠️ NOTE: Automatically uses your model's original input shape. Zero parameters needed.
 
 Examples:
   • "Freeze all layers except last 3 and add 0.4 dropout"
@@ -1215,6 +1217,10 @@ MODIFICATION TYPES (EXAMPLES):
    - Examples: "learning rate 0.001", "lr 1e-3"
    - Parameters: {{"learning_rate": 0.001}}
 
+7. add_resizing_layer
+   - Examples: "add resizing layer to accept any input size and modify to original shape", "add resizing layer", "Add resizing layer to accept flexible input sizes"
+   - Parameters: {{}}
+
 IMPORTANT RULES:
 1. Extract ALL modifications mentioned (can be multiple)
 2. For dropout: extract rate as decimal (0.0-1.0)
@@ -1222,6 +1228,7 @@ IMPORTANT RULES:
 4. For input shape: extract [height, width, channels]
 5. Match patterns like "0.3 dropout", "dropout 0.3", "add dropout 0.3"
 6. If unsure about parameters, use sensible defaults
+7. If user mentions "flexible", "variable", "any size", "dynamic" → use add_resizing_layer. If user mentions "change input" → use change_input_shape
 
 Return JSON with modifications list."""
         
@@ -1495,170 +1502,179 @@ Training Recommendation:{train_text}
 """
     
     logger.info(preview)
-    
-    # ==================== RICHIESTA CONFERMA ====================
-    
-    # Prompt mostrato all'utente (supporta risposte naturali)
-    confirmation_prompt = {
-        "instruction": "Do you want to apply these modifications? (Yes/No/Edit)",
-        "preview": preview,
-        "options": ["yes", "no", "edit"],
-        "hint": "You can respond naturally (e.g., 'yes please', 'apply it', 'go back')"
-    }
-    
-    # ⏸️ INTERRUPT: Attendi risposta utente
-    user_response = interrupt(confirmation_prompt)
-    
-    # Log della risposta raw
-    logger.info(f"📝 Risposta utente (raw): '{user_response}'")
-    
-    # ==================== PARSING LLM DELLA RISPOSTA ====================
-    
-    try:
-        logger.info(" [Step 1] Interpretando risposta con LLM...")
-        
-        # Inizializza agent con Mistral
-        agent = Agent(model=Ollama(id="mistral"))
-        
-        # Costruisci prompt per interpretare la decisione dell'utente
-        interpretation_prompt = f"""
-Interpret user confirmation response for model modifications.
 
-CONTEXT:
-Model modifications preview was shown to user.
+    # ==================== CONFERMA AUTOMATICA (PER TEST VELOCE) ====================
+    state.modification_confirmed = True # Default: confermato. Per test veloce
+    state.user_wants_to_edit = False
+    logger.info("✅ Modifiche CONFERMATE")
 
-USER RESPONSE TO "Do you want to apply these modifications?":
-"{user_response}"
-
-Interpret the user's intent and return ONLY JSON (no markdown):
-{{
-  "decision": "confirm|reject|edit_request",
-  "decision_description": {{
-    "confirm": "User approves and wants to apply modifications",
-    "reject": "User does NOT want to apply modifications",
-    "edit_request": "User wants to modify/change the modifications (go back)"
-  }},
-  "confidence": 0.95,
-  "reasoning": "Why we interpreted it this way",
-  "user_intent": "What the user actually wants"
-}}
-
-Return ONLY the JSON, no other text.
-"""
-        
-        # Esegui il prompt con LLM
-        response = agent.run(interpretation_prompt)
-        
-        # Normalizza la risposta
-        content = response if isinstance(response, str) else response.content
-        
-        logger.debug(f"   LLM response: {content[:150]}...")
-        
-        # Estrai JSON dalla risposta
-        json_match = re.search(r'\{[\s\S]*\}', content)
-        
-        if json_match:
-            json_str = json_match.group(0)
-            decision_data = json.loads(json_str)
-        else:
-            decision_data = json.loads(content)
-        
-        # Estrai la decisione (default: reject per sicurezza)
-        decision = decision_data.get('decision', 'reject').lower().strip()
-        confidence = decision_data.get('confidence', 0.5)
-        reasoning = decision_data.get('reasoning', 'LLM interpretation')
-        
-        logger.info(f" ✓ LLM Interpretation:")
-        logger.info(f"    • Decision: {decision}")
-        logger.info(f"    • Confidence: {confidence:.0%}")
-        logger.info(f"    • Reasoning: {reasoning}")
-        
-        # Converti decision in booleano e imposta flag di edit se necessario
-        if decision == "confirm":
-            state.modification_confirmed = True
-            state.user_wants_to_edit = False
-            logger.info("✅ Modifiche CONFERMATE")
-            
-        elif decision == "reject":
-            state.modification_confirmed = False
-            state.user_wants_to_edit = False
-            logger.info("❌ Modifiche RIFIUTATE")
-            
-        elif decision == "edit_request":
-            state.modification_confirmed = False
-            state.user_wants_to_edit = True
-            logger.info("✏️  Utente vuole MODIFICARE le modifiche")
-        
-        else:
-            state.modification_confirmed = False
-            state.user_wants_to_edit = False
-            logger.warning(f"⚠️  Decisione non riconosciuta: '{decision}', defaulting to reject")
-    
-    # SE IL PARSING LLM FALLISCE
-    except (json.JSONDecodeError, ValueError, AttributeError) as e:
-        logger.error(f"❌ Errore parsing LLM: {str(e)[:100]}")
-        logger.warning(" [Step 2] Fallback a parsing keyword...")
-        
-        # ==================== FALLBACK: PARSING DIRETTO ====================
-        
-        response_lower = user_response.lower().strip()
-        
-        # Parole chiave per "si"
-        positive_keywords = [
-            'yes', 'si', 'sì', 'yeah', 'yep', 'ok', 'okay',
-            'apply', 'confirm', 'proceed', 'continue', 'go',
-            'approve', 'perfect', 'good', 'sure', 'absolutely'
-        ]
-        
-        # Parole chiave per "no"
-        negative_keywords = [
-            'no', 'nope', 'reject', 'cancel', 'stop', 'abort',
-            'dont', 'don\'t', 'skip', 'refuse', 'decline', 'nah',
-            'absolutely not', 'never', 'no way'
-        ]
-        
-        # Parole chiave per "edit/modifica"
-        edit_keywords = [
-            'edit', 'modifica', 'change', 'modify', 'back',
-            'again', 'different', 'redo', 'rethink', 'again',
-            'let me', 'wait', 'hold on'
-        ]
-        
-        if any(kw in response_lower for kw in positive_keywords):
-            state.modification_confirmed = True
-            state.user_wants_to_edit = False
-            logger.info("✅ Modifiche CONFERMATE (keyword match)")
-        
-        elif any(kw in response_lower for kw in negative_keywords):
-            state.modification_confirmed = False
-            state.user_wants_to_edit = False
-            logger.info("❌ Modifiche RIFIUTATE (keyword match)")
-        
-        elif any(kw in response_lower for kw in edit_keywords):
-            state.modification_confirmed = False
-            state.user_wants_to_edit = True
-            logger.info("✏️  MODIFICA richiesta (keyword match)")
-        
-        else:
-            state.modification_confirmed = False
-            state.user_wants_to_edit = False
-            logger.warning(f"⚠️  Risposta non interpretata, defaulting to reject")
-    
-    except Exception as e:
-        logger.error(f"❌ Errore imprevisto: {str(e)}", exc_info=True)
-        logger.warning("⚠️  Defaulting a reject per sicurezza")
-        
-        state.modification_confirmed = False
-        state.user_wants_to_edit = False
-    
-    # ==================== LOG FINALE ====================
-    
-    logger.info(f"═══════════════════════════════════════════════════════")
-    logger.info(f"👀 Modifica confermata: {state.modification_confirmed}")
-    logger.info(f"✏️  Edit richiesto: {getattr(state, 'user_wants_to_edit', False)}")
-    logger.info(f"═══════════════════════════════════════════════════════")
-    
     return state
+    # ==================== FINE CONFERMA AUTOMATICA ====================
+    #     
+#     # ==================== RICHIESTA CONFERMA ====================
+    
+#     # Prompt mostrato all'utente (supporta risposte naturali)
+#     confirmation_prompt = {
+#         "instruction": "Do you want to apply these modifications? (Yes/No/Edit)",
+#         "preview": preview,
+#         "options": ["yes", "no", "edit"],
+#         "hint": "You can respond naturally (e.g., 'yes please', 'apply it', 'go back')"
+#     }
+    
+#     # ⏸️ INTERRUPT: Attendi risposta utente
+#     user_response = interrupt(confirmation_prompt)
+    
+#     # Log della risposta raw
+#     logger.info(f"📝 Risposta utente (raw): '{user_response}'")
+    
+#     # ==================== PARSING LLM DELLA RISPOSTA ====================
+    
+#     try:
+#         logger.info(" [Step 1] Interpretando risposta con LLM...")
+        
+#         # Inizializza agent con Mistral
+#         agent = Agent(model=Ollama(id="mistral"))
+        
+#         # Costruisci prompt per interpretare la decisione dell'utente
+#         interpretation_prompt = f"""
+# Interpret user confirmation response for model modifications.
+
+# CONTEXT:
+# Model modifications preview was shown to user.
+
+# USER RESPONSE TO "Do you want to apply these modifications?":
+# "{user_response}"
+
+# Interpret the user's intent and return ONLY JSON (no markdown):
+# {{
+#   "decision": "confirm|reject|edit_request",
+#   "decision_description": {{
+#     "confirm": "User approves and wants to apply modifications",
+#     "reject": "User does NOT want to apply modifications",
+#     "edit_request": "User wants to modify/change the modifications (go back)"
+#   }},
+#   "confidence": 0.95,
+#   "reasoning": "Why we interpreted it this way",
+#   "user_intent": "What the user actually wants"
+# }}
+
+# Return ONLY the JSON, no other text.
+# """
+        
+#         # Esegui il prompt con LLM
+#         response = agent.run(interpretation_prompt)
+        
+#         # Normalizza la risposta
+#         content = response if isinstance(response, str) else response.content
+        
+#         logger.debug(f"   LLM response: {content[:150]}...")
+        
+#         # Estrai JSON dalla risposta
+#         json_match = re.search(r'\{[\s\S]*\}', content)
+        
+#         if json_match:
+#             json_str = json_match.group(0)
+#             decision_data = json.loads(json_str)
+#         else:
+#             decision_data = json.loads(content)
+        
+#         # Estrai la decisione (default: reject per sicurezza)
+#         decision = decision_data.get('decision', 'reject').lower().strip()
+#         confidence = decision_data.get('confidence', 0.5)
+#         reasoning = decision_data.get('reasoning', 'LLM interpretation')
+        
+#         logger.info(f" ✓ LLM Interpretation:")
+#         logger.info(f"    • Decision: {decision}")
+#         logger.info(f"    • Confidence: {confidence:.0%}")
+#         logger.info(f"    • Reasoning: {reasoning}")
+        
+#         # Converti decision in booleano e imposta flag di edit se necessario
+#         if decision == "confirm":
+#             state.modification_confirmed = True
+#             state.user_wants_to_edit = False
+#             logger.info("✅ Modifiche CONFERMATE")
+            
+#         elif decision == "reject":
+#             state.modification_confirmed = False
+#             state.user_wants_to_edit = False
+#             logger.info("❌ Modifiche RIFIUTATE")
+            
+#         elif decision == "edit_request":
+#             state.modification_confirmed = False
+#             state.user_wants_to_edit = True
+#             logger.info("✏️  Utente vuole MODIFICARE le modifiche")
+        
+#         else:
+#             state.modification_confirmed = False
+#             state.user_wants_to_edit = False
+#             logger.warning(f"⚠️  Decisione non riconosciuta: '{decision}', defaulting to reject")
+    
+#     # SE IL PARSING LLM FALLISCE
+#     except (json.JSONDecodeError, ValueError, AttributeError) as e:
+#         logger.error(f"❌ Errore parsing LLM: {str(e)[:100]}")
+#         logger.warning(" [Step 2] Fallback a parsing keyword...")
+        
+#         # ==================== FALLBACK: PARSING DIRETTO ====================
+        
+#         response_lower = user_response.lower().strip()
+        
+#         # Parole chiave per "si"
+#         positive_keywords = [
+#             'yes', 'si', 'sì', 'yeah', 'yep', 'ok', 'okay',
+#             'apply', 'confirm', 'proceed', 'continue', 'go',
+#             'approve', 'perfect', 'good', 'sure', 'absolutely'
+#         ]
+        
+#         # Parole chiave per "no"
+#         negative_keywords = [
+#             'no', 'nope', 'reject', 'cancel', 'stop', 'abort',
+#             'dont', 'don\'t', 'skip', 'refuse', 'decline', 'nah',
+#             'absolutely not', 'never', 'no way'
+#         ]
+        
+#         # Parole chiave per "edit/modifica"
+#         edit_keywords = [
+#             'edit', 'modifica', 'change', 'modify', 'back',
+#             'again', 'different', 'redo', 'rethink', 'again',
+#             'let me', 'wait', 'hold on'
+#         ]
+        
+#         if any(kw in response_lower for kw in positive_keywords):
+#             state.modification_confirmed = True
+#             state.user_wants_to_edit = False
+#             logger.info("✅ Modifiche CONFERMATE (keyword match)")
+        
+#         elif any(kw in response_lower for kw in negative_keywords):
+#             state.modification_confirmed = False
+#             state.user_wants_to_edit = False
+#             logger.info("❌ Modifiche RIFIUTATE (keyword match)")
+        
+#         elif any(kw in response_lower for kw in edit_keywords):
+#             state.modification_confirmed = False
+#             state.user_wants_to_edit = True
+#             logger.info("✏️  MODIFICA richiesta (keyword match)")
+        
+#         else:
+#             state.modification_confirmed = False
+#             state.user_wants_to_edit = False
+#             logger.warning(f"⚠️  Risposta non interpretata, defaulting to reject")
+    
+#     except Exception as e:
+#         logger.error(f"❌ Errore imprevisto: {str(e)}", exc_info=True)
+#         logger.warning("⚠️  Defaulting a reject per sicurezza")
+        
+#         state.modification_confirmed = False
+#         state.user_wants_to_edit = False
+    
+#     # ==================== LOG FINALE ====================
+    
+#     logger.info(f"═══════════════════════════════════════════════════════")
+#     logger.info(f"👀 Modifica confermata: {state.modification_confirmed}")
+#     logger.info(f"✏️  Edit richiesto: {getattr(state, 'user_wants_to_edit', False)}")
+#     logger.info(f"═══════════════════════════════════════════════════════")
+    
+#     return state
+
 
 # ============================================================================
 # ARCHITECTURE → CONDA ENVIRONMENT MAPPING
@@ -1945,7 +1961,7 @@ try:
     print(f"✓ Model loaded: {{model.name}}")
     
     modifications_log = []
-    
+
     # ===== FASE 1: MODIFICHE NON-RICOSTRUTTIVE =====
     print("\\n[Phase 1] Applying non-reconstructive modifications...")
     for mod in modifications:
@@ -1980,8 +1996,18 @@ try:
     
     # ===== FASE 2: RACCOGLI MODIFICHE RICOSTRUTTIVE =====
     print("\\n[Phase 2] Collecting reconstructive modifications...")
+    # ===== ESTRAI original_input_shape SUBITO (CRITICA!) =====
+    original_input_shape = model.input_shape  # Es: (None, 416, 416, 3)
+    original_h = original_input_shape[1] if original_input_shape and len(original_input_shape) > 1 else 224
+    original_w = original_input_shape[2] if original_input_shape and len(original_input_shape) > 2 else 224
+    original_c = original_input_shape[3] if original_input_shape and len(original_input_shape) > 3 else 3
+
+    print(f"  [info] Original model input: {{original_input_shape}} "
+      f"(H={{original_h}}, W={{original_w}}, C={{original_c}})")
+
     reconstructive_mods = {{}}
     has_input_shape_change = False
+    has_resizing_layer = False  # ← Fix #1 (dichiarazione)
     
     for mod in modifications:
         mod_type = mod.get('type', '').strip()
@@ -1999,6 +2025,14 @@ try:
         elif mod_type == "change_output_layer":
             reconstructive_mods['output_classes'] = int(mod_params.get('new_classes', 10))
             print(f"  [queued] change_output_layer: {{reconstructive_mods['output_classes']}} classes")
+        
+        elif mod_type == "add_resizing_layer":  # NEW
+            target_h = int(original_h)
+            target_w = int(original_w)
+            reconstructive_mods['resizing'] = (target_h, target_w)
+            has_resizing_layer = True
+            print(f"  [queued] add_resizing_layer: {{target_h}}x{{target_w}}")
+ 
     
     # ===== FASE 3: HANDLE INPUT SHAPE CHANGE (NO SKIP LAYERS) =====
     if has_input_shape_change and 'input_shape' in reconstructive_mods:
@@ -2059,8 +2093,10 @@ try:
             for new_layer, old_layer in zip(model_new.layers[:-1], model.layers[:-1]):
                 try:
                     new_layer.set_weights(old_layer.get_weights())
-                except:
-                    pass
+                except ValueError as e:
+                    print(f"    ⚠️  {{new_layer.name}}: weight shape mismatch (old: {{old_layer.weights.shape if old_layer.weights else 'none'}}, new: {{new_layer.weights.shape if new_layer.weights else 'none'}}), using random init")
+                except Exception as e:
+                    print(f"    ⚠️  {{new_layer.name}}: {{type(e).__name__}}")
             
             model = model_new
             modifications_log.append(f"✓ Changed output to {{reconstructive_mods['output_classes']}} classes")
@@ -2081,9 +2117,9 @@ try:
             modifications_log.append(f"✓ Added Dropout (rate={{reconstructive_mods['dropout']}})")
             print(f"    ✓ Added Dropout ({{reconstructive_mods['dropout']}}) BEFORE output layer")
     
-    # ===== FASE 3C: ALTRE MODIFICHE RICOSTRUTTIVE (senza input shape change) =====
-    elif reconstructive_mods:
-        print("\\n[Phase 3C] Applying reconstructive modifications...")
+    # ===== FASE 3B: ALTRE MODIFICHE RICOSTRUTTIVE (senza input shape change) =====
+    elif reconstructive_mods and not has_resizing_layer:
+        print("\\n[Phase 3B] Applying reconstructive modifications...")
         
         # ===== CASO 1: Solo output_classes =====
         if 'output_classes' in reconstructive_mods and 'dropout' not in reconstructive_mods:
@@ -2107,8 +2143,10 @@ try:
             for new_layer, old_layer in zip(model_new.layers[:-1], model.layers[:-1]):
                 try:
                     new_layer.set_weights(old_layer.get_weights())
-                except:
-                    pass
+                except ValueError as e:
+                    print(f"    ⚠️  {{new_layer.name}}: weight shape mismatch (old: {{old_layer.weights.shape if old_layer.weights else 'none'}}, new: {{new_layer.weights.shape if new_layer.weights else 'none'}}), using random init")
+                except Exception as e:
+                    print(f"    ⚠️  {{new_layer.name}}: {{type(e).__name__}}")
             
             model = model_new
             model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
@@ -2151,8 +2189,10 @@ try:
             for new_layer, old_layer in zip(model_new.layers[:-1], model.layers[:-1]):
                 try:
                     new_layer.set_weights(old_layer.get_weights())
-                except:
-                    pass
+                except ValueError as e:
+                    print(f"    ⚠️  {{new_layer.name}}: weight shape mismatch (old: {{old_layer.weights.shape if old_layer.weights else 'none'}}, new: {{new_layer.weights.shape if new_layer.weights else 'none'}}), using random in it")
+                except Exception as e:
+                    print(f"    ⚠️  {{new_layer.name}}: {{type(e).__name__}}")
             
             model = model_new
             modifications_log.append(f"✓ Changed output to {{reconstructive_mods['output_classes']}} classes")
@@ -2169,6 +2209,21 @@ try:
             model = Model(inputs=model.input, outputs=new_output)
             modifications_log.append(f"✓ Added Dropout (rate={{reconstructive_mods['dropout']}})")
             print(f"    ✓ Added Dropout ({{reconstructive_mods['dropout']}}) BEFORE output layer")
+
+    # ===== FASE 3A: ADD RESIZING LAYER WRAPPER =====
+    if has_resizing_layer and 'resizing' in reconstructive_mods:
+        print(f"  Original model input: {{original_input_shape}}")
+        print(f"  Wrapper will resize any image to: {{target_h}}x{{target_w}}")
+        
+        channels = model.input_shape[3] if len(model.input_shape) > 3 else 3
+
+        new_inputs = tf.keras.Input(shape=(None, None, channels), name="raw_image_input")
+        x = Resizing(target_h, target_w, name="auto_resize_to_model_input")(new_inputs)
+        outputs = model(x)
+
+        model = Model(inputs=new_inputs, outputs=outputs, name=model.name + "_with_auto_resize")
+        modifications_log.append(f"✓ Added automatic Resizing to {{target_h}}x{{target_w}}")
+        print(f"  [applied] Added automatic Resizing layer → {{target_h}}x{{target_w}}")
 
     # ===== SALVA MODELLO =====
     print(f"\\n[Saving] Model saving...")
@@ -2255,6 +2310,7 @@ def _validate_modifications(modifications: dict) -> bool:
         'add_dropout': ['rate'],
         'change_input_shape': ['new_shape'],
         'change_learning_rate': ['learning_rate'],
+        'add_resizing_layer': [],
     } #Definisce per ogni tipo di modifica i parametri obbligatori, ad esempio:
         # freeze_layers → 'num_frozen_layers'
         # add_dropout → 'rate'
@@ -2326,7 +2382,38 @@ output_path = r"{output_path}"
 try:
     model = tf.keras.models.load_model(model_path, compile=False)
     
-    input_shape = model.input_shape[1:]
+    #input_shape = model.input_shape[1:] # # PROBLEMA: (None, None, 3) quando si fa resizing layer. 
+    
+    
+    input_shape_raw = model.input_shape[1:]  
+    target_height = None
+    target_width = None
+
+    # Trova il Resizing layer
+    for layer in model.layers:
+        if 'resizing' in layer.name.lower() or 'auto_resize_to_model_input' in layer.name.lower() or layer.__class__.__name__ == 'Resizing':
+            # print(" VIA get_config():")
+            config = layer.get_config()
+            # print(f"  config = {{config}}")       
+            
+            if 'height' in config and 'width' in config:
+                target_height = int(config['height'])
+                target_width = int(config['width'])
+                print(f" Found Resizing layer: target size={{target_height}}x{{target_width}}")
+                break
+            else:
+                print(f" Found Resizing layer but no target size attributes.") 
+               
+
+    # Usa le dimensioni concrete
+    if target_height is not None and target_width is not None:
+        input_shape = (target_height, target_width, 3)
+        print(f" Using Resizing layer target shape: {{input_shape}}")
+    else:
+        input_shape = tuple(dim if dim is not None else 224 for dim in input_shape_raw)
+        print(f" No Resizing layer found, using input shape: {{input_shape}}")
+
+    
     num_classes = int(model.output_shape[-1])
     
     # ===== CREA DATASET =====
