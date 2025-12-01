@@ -140,32 +140,38 @@ def generate_synthetic_samples(state: MasterState, config: dict) -> MasterState:
         
         # Base signal
         if params.signal_type == "sine":
+            # Sine Wave: Suono puro, utile per testare frequenze specifiche (es. allarmi)
             freq = params.frequency or 440.0
             # Aggiungi leggera variazione di frequenza per realismo
             freq_var = np.random.uniform(-5, 5) 
             signal = params.amplitude * np.sin(2 * np.pi * (freq + freq_var) * t)
             
         elif params.signal_type == "white_noise":
+            # White Noise: Fruscio costante con tutte le frequenze (es. background)
             signal = params.amplitude * np.random.uniform(-1, 1, len(t))
             
         elif params.signal_type == "pink_noise":
+            # Pink Noise: Rumore più naturale/cupo (es. pioggia, vento) - 1/f
             # Approssimazione semplice pink noise (1/f)
             white = np.random.randn(len(t))
             signal = np.cumsum(white) # Brownian noise (1/f^2) actually, but close enough for simple test
             signal = signal / np.max(np.abs(signal)) * params.amplitude
             
         elif params.signal_type == "chirp":
+            # Chirp: Suono che cambia frequenza nel tempo (es. sweep test)
             f_start = params.frequency or 100.0
             f_end = f_start * 10
             k = (f_end - f_start) / params.duration_sec
             signal = params.amplitude * np.sin(2 * np.pi * (f_start * t + (k/2) * t**2))
             
         elif params.signal_type == "impulse":
+            # Impulse: Picco istantaneo (es. click, pop, anomalia improvvisa)
             signal = np.zeros_like(t)
             idx = np.random.randint(0, len(t))
             signal[idx] = params.amplitude
             
         elif params.signal_type == "silence":
+            # Silence: Silenzio assoluto, fondamentale per classe "nulla"
             signal = np.zeros_like(t)
             
         else: # mixed or default
