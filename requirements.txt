@@ -21,7 +21,7 @@ blockbuster==1.5.24
 build==1.2.2.post1
 cachetools==5.5.2
 certifi==2025.1.31
-cffi==1.17.1
+cffi==2.0.0
 charset-normalizer==3.4.1
 chromadb==1.0.9
 click==8.1.8
@@ -180,8 +180,10 @@ pycparser==2.22
 pydantic==2.11.3
 pydantic-settings==2.8.1
 pydantic_core==2.33.1
+PyGithub==2.8.1
 Pygments==2.19.1
 PyJWT==2.10.1
+PyNaCl==1.6.1
 pyparsing==3.2.3
 PyPika==0.48.9
 pyproject_hooks==1.2.0

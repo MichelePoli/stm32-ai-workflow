@@ -49,6 +49,7 @@ from agno.agent import Agent
 #from agno.tools.github import GithubTools
 #utilizza altri tools oltre GoogleSearchTools, vedi dai tools di agno
 from agno.models.ollama import Ollama
+from agno.tools.googlesearch import GoogleSearchTools 
 
 import numpy as np
 

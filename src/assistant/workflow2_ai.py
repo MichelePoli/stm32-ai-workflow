@@ -21,6 +21,7 @@ import logging
 import requests
 import h5py
 import tensorflow as tf
+from github import Github
 
 from typing import Optional, Literal, List
 from datetime import datetime
@@ -37,6 +38,7 @@ from src.assistant.state import MasterState
 
 from agno.tools.googlesearch import GoogleSearchTools
 from agno.models.ollama import Ollama
+from agno.agent import Agent  
 
 
 logger = logging.getLogger(__name__)
@@ -293,7 +295,7 @@ PREDEFINED_MODELS = {
             }
         ]
     },
-    "Human Activity Recognition": {
+    "human_activity_recognition": {
         "description": "Human Activity Recognition",
         "models": [
             {
