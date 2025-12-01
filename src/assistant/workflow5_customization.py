@@ -2342,6 +2342,7 @@ def _validate_modifications(modifications: dict) -> bool:
 def fine_tune_customized_model(state: MasterState, config: dict) -> MasterState:
     """
     ✨ Fine-tuning usando execute_in_environment (state.python_path)
+    Supporta sia Classification che Object Detection (YOLO)
     """
     
     logger.info("🎓 Iniziando fine-tuning...")
@@ -2363,7 +2364,7 @@ def fine_tune_customized_model(state: MasterState, config: dict) -> MasterState:
         
         logger.info(f"  Training params: LR={learning_rate}, epochs={epochs}, batch_size={batch_size}")
         
-        output_path = model_path.replace('.keras', '_finetuned.keras').replace('.h5', '_finetuned.h5') # da .keras a .h5!!
+        output_path = model_path.replace('.keras', '_finetuned.keras').replace('.h5', '_finetuned.h5')
         
         # ===== PYTHON SCRIPT =====
         python_code = f"""
@@ -2382,54 +2383,97 @@ output_path = r"{output_path}"
 try:
     model = tf.keras.models.load_model(model_path, compile=False)
     
-    #input_shape = model.input_shape[1:] # # PROBLEMA: (None, None, 3) quando si fa resizing layer. 
-    
-    
     input_shape_raw = model.input_shape[1:]  
     target_height = None
     target_width = None
 
-    # Trova il Resizing layer
-    for layer in model.layers:
-        if 'resizing' in layer.name.lower() or 'auto_resize_to_model_input' in layer.name.lower() or layer.__class__.__name__ == 'Resizing':
-            # print(" VIA get_config():")
-            config = layer.get_config()
-            # print(f"  config = {{config}}")       
+    print(f"\\n✓ Model loaded")
+    print(f"  Input: {{model.input_shape}}")
+    print(f"  Output: {{model.output_shape}}")
+    
+    # ===== DETECTA TIPO DI MODELLO E LOSS =====
+    output_shape = model.output_shape
+    num_last_dim = int(output_shape[-1]) if len(output_shape) > 1 else None
+    
+    # Object detection: output ha 4 dimensioni (batch, H, W, channels)
+    is_object_detection = (len(output_shape) == 4 and num_last_dim and num_last_dim < 100)
+    
+    # Scegli loss function appropriata
+    if is_object_detection:
+        loss_fn = 'mse'  # Per YOLO, object detection, etc
+        print(f"  → Object detection model (MSE loss)")
+    else:
+        loss_fn = 'categorical_crossentropy'
+        print(f"  → Classification model (categorical_crossentropy loss)")
+    
+    # ===== SEARCH Resizing layer =====
+    print(f"\\n🔍 Searching for Resizing layer...")
+    
+    for i, layer in enumerate(model.layers):
+        layer_class = layer.__class__.__name__
+        
+        if layer_class == 'Resizing':
+            print(f"  [{{i}}] FOUND: {{layer.name}}")
             
-            if 'height' in config and 'width' in config:
-                target_height = int(config['height'])
-                target_width = int(config['width'])
-                print(f" Found Resizing layer: target size={{target_height}}x{{target_width}}")
+            if hasattr(layer, 'target_height'):
+                target_height = int(layer.target_height)
+                target_width = int(layer.target_width)
+                print(f"      ✓ {{target_height}}x{{target_width}}")
                 break
-            else:
-                print(f" Found Resizing layer but no target size attributes.") 
-               
+            
+            if target_height is None:
+                try:
+                    config = layer.get_config()
+                    if 'height' in config and 'width' in config:
+                        target_height = int(config['height'])
+                        target_width = int(config['width'])
+                        print(f"      ✓ {{target_height}}x{{target_width}}")
+                        break
+                except:
+                    pass
+            
+            if target_height is None:
+                try:
+                    target_height = int(layer.output_shape[1])
+                    target_width = int(layer.output_shape[2])
+                    print(f"      ✓ {{target_height}}x{{target_width}}")
+                    break
+                except:
+                    pass
 
-    # Usa le dimensioni concrete
+    # ===== DETERMINA input_shape =====
+    print()
     if target_height is not None and target_width is not None:
-        input_shape = (target_height, target_width, 3)
-        print(f" Using Resizing layer target shape: {{input_shape}}")
+        channels = input_shape_raw[-1] if input_shape_raw[-1] is not None else 3
+        input_shape = (target_height, target_width, channels)
+        print(f"✓ Input shape: {{input_shape}}")
     else:
         input_shape = tuple(dim if dim is not None else 224 for dim in input_shape_raw)
-        print(f" No Resizing layer found, using input shape: {{input_shape}}")
+        print(f"⚠️  Input shape (fallback): {{input_shape}}")
 
-    
-    num_classes = int(model.output_shape[-1])
-    
-    # ===== CREA DATASET =====
-    num_samples = 100 # ridotto a 100 per test veloce
-    X = np.random.randn(num_samples, *input_shape).astype('float32') # Prima qui tentava di creare array (200, None, None, 3) e dava errore.
+    # ===== CREA DATASET APPROPRIATO =====
+    num_samples = 100
+    X = np.random.randn(num_samples, *input_shape).astype('float32')
     X = (X - X.mean()) / (X.std() + 1e-7)
-    y = np.eye(num_classes)[np.random.randint(0, num_classes, num_samples)]
+    
+    # Per object detection: output ha la stessa shape
+    if is_object_detection:
+        # Target shape: (batch, H, W, channels)
+        y = np.random.randn(num_samples, *output_shape[1:]).astype('float32')
+    else:
+        # Per classificazione: (batch, num_classes)
+        num_classes = int(output_shape[-1])
+        y = np.eye(num_classes)[np.random.randint(0, num_classes, num_samples)]
     
     split_idx = int(num_samples * 0.8)
     X_train, X_val = X[:split_idx], X[split_idx:]
     y_train, y_val = y[:split_idx], y[split_idx:]
     
-    print(f"✓ Dataset created: train={{X_train.shape}}, val={{X_val.shape}}")
+    print(f"✓ Dataset: train={{X_train.shape}}, val={{X_val.shape}}")
     
     optimizer = Adam(learning_rate={learning_rate})
-    model.compile(optimizer=optimizer, loss='categorical_crossentropy', metrics=['accuracy'])
+    model.compile(optimizer=optimizer, loss=loss_fn, metrics=['mse'] if is_object_detection else ['accuracy'])
+    print(f"✓ Compiled (loss={{loss_fn}}, LR={learning_rate})\\n")
     
     history = model.fit(
         X_train, y_train,
@@ -2440,23 +2484,36 @@ try:
             EarlyStopping(monitor='val_loss', patience=3, restore_best_weights=True, verbose=0),
             ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=2, min_lr=1e-7, verbose=0)
         ],
-        verbose=1
+        verbose=0
     )
     
     model.save(output_path, save_format='h5')
     
-    final_acc = float(history.history['accuracy'][-1])
-    final_val_acc = float(history.history['val_accuracy'][-1])
-    final_loss = float(history.history['loss'][-1])
-    final_val_loss = float(history.history['val_loss'][-1])
+    # Estrai metriche corrette in base al tipo
+    if is_object_detection:
+        final_mse = float(history.history['mse'][-1])
+        final_val_mse = float(history.history['val_mse'][-1])
+        final_loss = float(history.history['loss'][-1])
+        final_val_loss = float(history.history['val_loss'][-1])
+        # Converti MSE a "accuracy-like" metric (più basso = più accurato)
+        final_acc = 1.0 / (1.0 + final_mse)
+        final_val_acc = 1.0 / (1.0 + final_val_mse)
+    else:
+        final_acc = float(history.history['accuracy'][-1])
+        final_val_acc = float(history.history['val_accuracy'][-1])
+        final_loss = float(history.history['loss'][-1])
+        final_val_loss = float(history.history['val_loss'][-1])
+    
     epochs_trained = len(history.history['loss'])
     
+    print(f"✓ Training complete ({{epochs_trained}} epochs)")
     print(f"SUCCESS: {{final_acc:.4f}}|{{final_val_acc:.4f}}|{{final_loss:.4f}}|{{final_val_loss:.4f}}|{{epochs_trained}}")
     
 except Exception as e:
     print(f"ERROR: {{str(e)}}")
     import traceback
     traceback.print_exc()
+    sys.exit(1)
 """
         
         logger.info(f"  [Subprocess] Executing fine-tuning...")
