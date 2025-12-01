@@ -401,48 +401,27 @@ def decide_after_inspection(state) -> Literal["retrieve_best_practices_for_archi
 # ===========================================================================
 
 def retrieve_best_practices_for_architecture(state: MasterState, config: dict) -> MasterState:
-    """
-    ✨ VERSIONE CORRETTA: Separate Chroma collections per architettura
+    """Con web fetch optional (timeout 10s max)"""
     
-    Struttura:
-    ./chroma_docs/
-      ├── mobilenet/
-      ├── resnet/
-      ├── efficientnet/
-      ├── vgg/
-      ├── yolo/
-      └── har/
-    """
-    
-    # ===== ESTRAI INFO =====
-    model_name = None
-    if state.selected_model:
-        model_name = state.selected_model.get('name', 'Unknown')
+    model_name = state.selected_model.get('name', 'Unknown') if state.selected_model else None
     
     if not model_name:
-        logger.warning("⚠️  No model selected")
         state.best_practices_display = _get_generic_practices()
         return state
     
-    # ===== DETECTA ARCHITETTURA =====
     arch_type = _detect_architecture_type(model_name)
     logger.info(f"🔍 Model: {model_name} → Architecture: {arch_type}")
     
-    # ✅ MIGLIORAMENTO: Path separato per architettura
     base_persist_dir = "./chroma_docs"
     arch_persist_dir = os.path.join(base_persist_dir, arch_type)
     
-    logger.info(f"  Chroma collection: {arch_persist_dir}")
-    
-    # ===== STEP 1: Check Chroma cache per questa architettura =====
+    # ===== STEP 1: Check cache =====
     logger.info(f"  [Step 1/3] Checking cache for {arch_type}...")
     
     arch_db_exists = os.path.exists(arch_persist_dir) and os.listdir(arch_persist_dir)
     
     if arch_db_exists:
         try:
-            logger.info(f"  ✓ Cache found for {arch_type}")
-            
             best_practices = _retrieve_from_chroma(
                 query=f"best practices customization fine-tuning {arch_type}",
                 persist_dir=arch_persist_dir,
@@ -457,34 +436,148 @@ def retrieve_best_practices_for_architecture(state: MasterState, config: dict) -
         
         except Exception as e:
             logger.warning(f"  ⚠️  Cache lookup failed: {str(e)[:60]}")
-    else:
-        logger.info(f"  Cache NOT found for {arch_type}, fetching online...")
     
-    # ===== STEP 2: Fetch online e salva in Chroma per questa architettura =====
-    logger.info(f"  [Step 2/3] Fetching online for {arch_type}...")
+    # ===== STEP 2: Prova web fetch (MAX 10 SECONDI) =====
+    logger.info(f"  [Step 2/3] Attempting online fetch (max 10s)...")
+    
+    import time
+    start_time = time.time()
     
     try:
-        best_practices = _fetch_and_cache_architecture_practices(
+        best_practices = _fetch_and_cache_with_timeout(
             model_name=model_name,
             arch_type=arch_type,
-            persist_dir=arch_persist_dir  # ← Separato per architettura
+            persist_dir=arch_persist_dir,
+            timeout_seconds=10  # ← TIMEOUT RIGOROSO
         )
         
         if best_practices:
-            logger.info(f"  ✓ Fetched and cached {len(best_practices)} docs")
+            logger.info(f"  ✓ Fetched {len(best_practices)} docs in {time.time()-start_time:.1f}s")
             state.best_practices_display = _format_practices(best_practices, source=f"ONLINE_{arch_type}")
             state.best_practices_raw = [p.page_content for p in best_practices]
             return state
     
     except Exception as e:
-        logger.warning(f"  ⚠️  Online fetch failed: {str(e)[:60]}")
+        logger.warning(f"  ⚠️  Online fetch failed ({time.time()-start_time:.1f}s): {str(e)[:40]}")
     
     # ===== STEP 3: Fallback =====
-    logger.info(f"  [Step 3/3] Using fallback for {arch_type}...")
+    logger.info(f"  [Step 3/3] Using fallback practices for {arch_type}...")
     state.best_practices_display = _get_architecture_specific_practices(arch_type)
     state.best_practices_raw = []
     
     return state
+
+
+def _fetch_and_cache_with_timeout(
+    model_name: str,
+    arch_type: str,
+    persist_dir: str,
+    timeout_seconds: int = 10
+) -> Optional[List]:
+    """Web fetch CON TIMEOUT MASSIMO"""
+    
+    import time
+    from threading import Thread
+    
+    start_time = time.time()
+    
+    logger.info(f"  Searching web for {arch_type} (max {timeout_seconds}s)...")
+    
+    queries = _get_search_queries_for_architecture(arch_type)
+    all_docs = []
+    
+    # ===== Search (max 5 secondi) =====
+    try:
+        search_results = []
+        
+        def search():
+            nonlocal search_results
+            try:
+                agent = Agent(
+                    model=Ollama(id="mistral"),
+                    tools=[GoogleSearchTools()],
+                    show_tool_calls=False,
+                    markdown=True
+                )
+                
+                for query in queries[:2]:  # Max 2 query
+                    if time.time() - start_time > timeout_seconds - 5:
+                        break
+                    
+                    response = agent.run(f"Search: {query}\n\nReturn top 3 URLs only.")
+                    
+                    if response:
+                        urls = _extract_urls_from_response(str(response))
+                        search_results.extend(urls)
+                    
+                    if len(search_results) >= 3:
+                        break
+            
+            except Exception as e:
+                logger.debug(f"Search error: {str(e)[:30]}")
+        
+        thread = Thread(target=search, daemon=True)
+        thread.start()
+        thread.join(timeout=5)
+        
+    except Exception as e:
+        logger.debug(f"Search timeout: {str(e)[:30]}")
+        search_results = []
+    
+    if not search_results:
+        logger.warning(f"  No URLs found")
+        return None
+    
+    logger.info(f"  Found {len(search_results)} URLs")
+    
+    # ===== Load URLs (max 5 secondi rimanenti) =====
+    remaining = timeout_seconds - (time.time() - start_time)
+    
+    if remaining < 2:
+        logger.warning(f"  Time budget exhausted")
+        return None
+    
+    for i, result in enumerate(search_results[:2], 1):  # Max 2 URL
+        if time.time() - start_time > timeout_seconds:
+            logger.warning(f"  Overall timeout reached")
+            break
+        
+        url = result.get('url')
+        
+        if not url:
+            continue
+        
+        try:
+            logger.debug(f"  Loading {i}/2: {url[:40]}")
+            
+            loader = RecursiveUrlLoader(
+                url=url,
+                max_depth=1,
+                extractor=lambda x: BeautifulSoup(x, "html.parser").get_text(),
+                prevent_outside=True,
+                timeout=3  # ← 3 SECONDI PER URL
+            )
+            
+            docs = loader.load()
+            
+            if docs:
+                for doc in docs:
+                    doc.metadata['architecture'] = arch_type
+                    doc.metadata['source_url'] = url
+                
+                all_docs.extend(docs)
+                logger.debug(f"    ✓ Loaded {len(docs)} sections")
+        
+        except Exception as e:
+            logger.debug(f"    Failed: {str(e)[:20]}")
+    
+    if not all_docs:
+        logger.warning(f"  No documents loaded")
+        return None
+    
+    logger.info(f"  Loaded {len(all_docs)} docs in {time.time()-start_time:.1f}s")
+    
+    return all_docs[:3]
 
 
 # ============================================================================
