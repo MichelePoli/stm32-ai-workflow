@@ -135,6 +135,12 @@ class MasterState:
     # === COMMON ===
     timestamp: str = field(default_factory=lambda: datetime.now().strftime("%Y%m%d_%H%M%S"))
 
+    # === WORKFLOW 6: SYNTHETIC DATA ===
+    synthetic_request: dict = field(default_factory=dict)  # Parametri richiesta
+    synthetic_data_path: str = ""  # Path output
+    synthetic_files_count: int = 0  # Numero file generati
+    use_synthetic_data: bool = False  # Flag se usare dati sintetici
+
     
 
 # ============================================================================

@@ -86,6 +86,13 @@ from src.assistant.workflow5_customization import (
     ask_continue_after_customization,
 )
 
+# --- Workflow 6: Synthetic Data ---
+from src.assistant.workflow6_synthetic_data import (
+    ask_synthetic_data_requirements,
+    generate_synthetic_samples,
+    validate_synthetic_data,
+)
+
 
 # ============================================================================
 # LOGGING
@@ -344,6 +351,39 @@ def continue_after_customization_routing(state: MasterState) -> Literal["run_ana
     else:
         return "end"
 
+
+def decide_synthetic_data_generation(state: MasterState, config: dict) -> MasterState:
+    """Chiede se generare dati sintetici prima del fine-tuning"""
+    
+    logger.info("🧪 Vuoi generare dati sintetici?")
+    
+    prompt = {
+        "instruction": "Vuoi generare dati sintetici per il fine-tuning? (sì/no)",
+        "note": "Utile se non hai un dataset completo."
+    }
+    
+    user_response = interrupt(prompt)
+    
+    if isinstance(user_response, dict):
+        user_text = str(user_response.get("response", user_response.get("input", ""))).lower()
+    else:
+        user_text = str(user_response).lower()
+        
+    if "sì" in user_text or "si" in user_text or "yes" in user_text:
+        state.use_synthetic_data = True
+    else:
+        state.use_synthetic_data = False
+        
+    return state
+
+
+def synthetic_data_routing(state: MasterState) -> Literal["ask_synthetic_data_requirements", "fine_tune_customized_model"]:
+    """Router per workflow dati sintetici"""
+    if state.use_synthetic_data:
+        return "ask_synthetic_data_requirements"
+    else:
+        return "fine_tune_customized_model"
+
 # ============================================================================
 # MASTER GRAPH 
 # ============================================================================
@@ -393,6 +433,12 @@ builder.add_node("validate_customized_model", validate_customized_model)
 # Salvataggio e decision
 builder.add_node("save_customized_model_final", save_customized_model_final)
 builder.add_node("ask_continue_after_customization", ask_continue_after_customization)
+
+# === WORKFLOW 6: SYNTHETIC DATA ===
+builder.add_node("decide_synthetic_data_generation", decide_synthetic_data_generation)
+builder.add_node("ask_synthetic_data_requirements", ask_synthetic_data_requirements)
+builder.add_node("generate_synthetic_samples", generate_synthetic_samples)
+builder.add_node("validate_synthetic_data", validate_synthetic_data)
 
 # === WORKFLOW 2 CONTINUAZIONE ===
 builder.add_node("run_analyze", run_analyze)
@@ -538,7 +584,22 @@ builder.add_conditional_edges(
 )
 
 # Fase 4: Applicazione modifiche all'architettura
-builder.add_edge("apply_user_customization", "fine_tune_customized_model")
+builder.add_edge("apply_user_customization", "decide_synthetic_data_generation")
+
+# Fase 4b: Decisione Synthetic Data
+builder.add_conditional_edges(
+    "decide_synthetic_data_generation",
+    synthetic_data_routing,
+    {
+        "ask_synthetic_data_requirements": "ask_synthetic_data_requirements",
+        "fine_tune_customized_model": "fine_tune_customized_model"
+    }
+)
+
+# Fase 4c: Workflow Synthetic Data
+builder.add_edge("ask_synthetic_data_requirements", "generate_synthetic_samples")
+builder.add_edge("generate_synthetic_samples", "validate_synthetic_data")
+builder.add_edge("validate_synthetic_data", "fine_tune_customized_model")
 
 # Fase 5: Fine-tuning con dataset reale
 builder.add_edge("fine_tune_customized_model", "validate_customized_model")
