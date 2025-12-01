@@ -2469,10 +2469,13 @@ import tensorflow as tf
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
 import numpy as np
+import glob
 import sys
 
 model_path = r"{model_path}"
 output_path = r"{output_path}"
+use_synthetic_data = {str(state.use_synthetic_data)}
+synthetic_data_path = r"{state.synthetic_data_path}"
 
 try:
     model = tf.keras.models.load_model(model_path, compile=False)
@@ -2545,19 +2548,62 @@ try:
         input_shape = tuple(dim if dim is not None else 224 for dim in input_shape_raw)
         print(f"⚠️  Input shape (fallback): {{input_shape}}")
 
-    # ===== CREA DATASET APPROPRIATO =====
-    num_samples = 100
-    X = np.random.randn(num_samples, *input_shape).astype('float32')
-    X = (X - X.mean()) / (X.std() + 1e-7)
+    # ===== CREA DATASET =====
+    X = None
+    y = None
     
+    # 1. Tenta di caricare dati sintetici
+    if use_synthetic_data and os.path.exists(synthetic_data_path):
+        print(f"\\n🧪 Loading synthetic data from {{synthetic_data_path}}...")
+        files = glob.glob(os.path.join(synthetic_data_path, "*.npy"))
+        
+        if files:
+            loaded_data = []
+            for f in files:
+                try:
+                    data = np.load(f)
+                    # TODO: Implementare resizing/reshaping se necessario
+                    # Per ora assumiamo che il generatore produca dati compatibili o che il modello accetti raw
+                    loaded_data.append(data)
+                except Exception as e:
+                    print(f"  ⚠️ Error loading {{f}}: {{e}}")
+            
+            if loaded_data:
+                X_synth = np.array(loaded_data)
+                print(f"  ✓ Loaded {{len(X_synth)}} synthetic samples. Shape: {{X_synth.shape}}")
+                
+                # Verifica compatibilità shape (molto basic)
+                # Se il modello aspetta (H, W, C) e noi abbiamo (L,), proviamo a usare solo se compatibile
+                # Questo è un punto critico: il generatore audio fa 1D, se il modello è 2D (spettrogramma) fallirà
+                # Per ora usiamo i dati sintetici SOLO se la shape matcha le dimensioni (escluso batch)
+                
+                model_input_dims = len(input_shape)
+                data_dims = len(X_synth.shape) - 1 # escludi batch
+                
+                if model_input_dims == data_dims:
+                     X = X_synth
+                     print(f"  ✓ Shape compatible. Using synthetic data.")
+                else:
+                     print(f"  ❌ Shape mismatch (Model: {{model_input_dims}}D, Data: {{data_dims}}D). Fallback to dummy.")
+        else:
+            print(f"  ⚠️ No .npy files found.")
+
+    # 2. Fallback a Dummy Data
+    if X is None:
+        print(f"\\n⚠️  Using DUMMY data (Random Noise)")
+        num_samples = 100
+        X = np.random.randn(num_samples, *input_shape).astype('float32')
+        X = (X - X.mean()) / (X.std() + 1e-7)
+    
+    # Generazione Labels (Dummy per ora, anche per i dati sintetici)
     # Per object detection: output ha la stessa shape
     if is_object_detection:
         # Target shape: (batch, H, W, channels)
-        y = np.random.randn(num_samples, *output_shape[1:]).astype('float32')
+        y = np.random.randn(len(X), *output_shape[1:]).astype('float32')
     else:
         # Per classificazione: (batch, num_classes)
         num_classes = int(output_shape[-1])
-        y = np.eye(num_classes)[np.random.randint(0, num_classes, num_samples)]
+        y = np.eye(num_classes)[np.random.randint(0, num_classes, len(X))]
     
     split_idx = int(num_samples * 0.8)
     X_train, X_val = X[:split_idx], X[split_idx:]
