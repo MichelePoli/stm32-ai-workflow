@@ -2460,9 +2460,9 @@ def fine_tune_customized_model(state: MasterState, config: dict) -> MasterState:
         logger.info(f"  File size: {os.path.getsize(model_path) / 1024 / 1024:.2f} MB")
         
         training_rec = state.parsed_modifications.get('training_recommendation', {})
-        learning_rate = training_rec.get('learning_rate', state.custom_learning_rate or 0.0001)
-        epochs = training_rec.get('epochs', state.custom_epochs or 10)
-        batch_size = training_rec.get('batch_size', state.custom_batch_size or 32)
+        learning_rate = training_rec.get('learning_rate', state.custom_learning_rate or 0.001)
+        epochs = training_rec.get('epochs', state.custom_epochs or 5)  # Ridotto a 5 per test veloci
+        batch_size = training_rec.get('batch_size', state.custom_batch_size or 64)  # Aumentato per velocità
         
         logger.info(f"  Training params: LR={learning_rate}, epochs={epochs}, batch_size={batch_size}")
         
@@ -2574,8 +2574,8 @@ try:
             X_real = np.load(os.path.join(real_dataset_path, "x_train.npy"))
             y_real = np.load(os.path.join(real_dataset_path, "y_train.npy"))
             
-            # LIMIT: Use only first 5000 samples to avoid OOM
-            max_samples = 5000
+            # LIMIT: Use only first 1000 samples to avoid OOM and speed up testing
+            max_samples = 1000
             if len(X_real) > max_samples:
                 print(f"  ⚠️  Limiting dataset to {{max_samples}} samples (OOM prevention)")
                 X_real = X_real[:max_samples]
