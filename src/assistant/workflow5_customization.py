@@ -2623,7 +2623,25 @@ try:
         X = X_synth
         y = y_synth
 
-    # 4. Fallback a Dummy Data
+    # 4. Resize if needed (fix shape mismatch)
+    if X is not None and X.shape[1:] != input_shape:
+        print(f"\\n🔧 Resizing data from {{X.shape[1:]}} to {{input_shape}}...")
+        import cv2
+        X_resized = []
+        for img in X:
+            if len(img.shape) == 2:  # Grayscale
+                img_resized = cv2.resize(img, (input_shape[1], input_shape[0]))
+                if len(input_shape) == 3 and input_shape[2] == 3:
+                    img_resized = cv2.cvtColor(img_resized, cv2.COLOR_GRAY2RGB)
+                elif len(input_shape) == 3:
+                    img_resized = np.expand_dims(img_resized, axis=-1)
+            else:  # Color
+                img_resized = cv2.resize(img, (input_shape[1], input_shape[0]))
+            X_resized.append(img_resized)
+        X = np.array(X_resized, dtype='float32')
+        print(f"  ✓ Resized to {{X.shape}}")
+
+    # 5. Fallback a Dummy Data
     if X is None:
         print(f"\\n⚠️  Using DUMMY data (Random Noise)")
         num_samples = 100
