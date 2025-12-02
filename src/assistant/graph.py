@@ -93,6 +93,13 @@ from src.assistant.workflow6_synthetic_data import (
     validate_synthetic_data,
 )
 
+# --- Workflow 7: Dataset Selection ---
+from src.assistant.workflow7_dataset import (
+    decide_data_source,
+    select_predefined_dataset,
+    download_dataset,
+)
+
 
 # ============================================================================
 # LOGGING
@@ -384,6 +391,18 @@ def synthetic_data_routing(state: MasterState) -> Literal["ask_synthetic_data_re
     else:
         return "fine_tune_customized_model"
 
+
+def dataset_source_routing(state: MasterState) -> Literal["select_predefined_dataset", "ask_synthetic_data_requirements", "fine_tune_customized_model"]:
+    """Router dopo decide_data_source"""
+    if state.dataset_source == "real":
+        return "select_predefined_dataset"
+    elif state.dataset_source == "synthetic":
+        return "ask_synthetic_data_requirements"
+    elif state.dataset_source == "both":
+        return "select_predefined_dataset" # Prima real, poi synthetic
+    else:
+        return "fine_tune_customized_model"
+
 # ============================================================================
 # MASTER GRAPH 
 # ============================================================================
@@ -439,6 +458,11 @@ builder.add_node("decide_synthetic_data_generation", decide_synthetic_data_gener
 builder.add_node("ask_synthetic_data_requirements", ask_synthetic_data_requirements)
 builder.add_node("generate_synthetic_samples", generate_synthetic_samples)
 builder.add_node("validate_synthetic_data", validate_synthetic_data)
+
+# === WORKFLOW 7: DATASET SELECTION ===
+builder.add_node("decide_data_source", decide_data_source)
+builder.add_node("select_predefined_dataset", select_predefined_dataset)
+builder.add_node("download_dataset", download_dataset)
 
 # === WORKFLOW 2 CONTINUAZIONE ===
 builder.add_node("run_analyze", run_analyze)
@@ -584,19 +608,38 @@ builder.add_conditional_edges(
 )
 
 # Fase 4: Applicazione modifiche all'architettura
-builder.add_edge("apply_user_customization", "decide_synthetic_data_generation")
+builder.add_edge("apply_user_customization", "decide_data_source")
 
-# Fase 4b: Decisione Synthetic Data
+# Fase 4b: Decisione Data Source (Sostituisce la vecchia logica solo synthetic)
 builder.add_conditional_edges(
-    "decide_synthetic_data_generation",
-    synthetic_data_routing,
+    "decide_data_source",
+    dataset_source_routing,
+    {
+        "select_predefined_dataset": "select_predefined_dataset",
+        "ask_synthetic_data_requirements": "ask_synthetic_data_requirements",
+        "fine_tune_customized_model": "fine_tune_customized_model"
+    }
+)
+
+# Branch Real Dataset
+builder.add_edge("select_predefined_dataset", "download_dataset")
+
+def post_download_routing(state: MasterState) -> Literal["ask_synthetic_data_requirements", "fine_tune_customized_model"]:
+    if state.dataset_source == "both":
+        return "ask_synthetic_data_requirements"
+    else:
+        return "fine_tune_customized_model"
+
+builder.add_conditional_edges(
+    "download_dataset",
+    post_download_routing,
     {
         "ask_synthetic_data_requirements": "ask_synthetic_data_requirements",
         "fine_tune_customized_model": "fine_tune_customized_model"
     }
 )
 
-# Fase 4c: Workflow Synthetic Data
+# Branch Synthetic Data (modificato per supportare flow da real)
 builder.add_edge("ask_synthetic_data_requirements", "generate_synthetic_samples")
 builder.add_edge("generate_synthetic_samples", "validate_synthetic_data")
 builder.add_edge("validate_synthetic_data", "fine_tune_customized_model")

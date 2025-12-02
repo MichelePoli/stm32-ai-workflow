@@ -141,6 +141,11 @@ class MasterState:
     synthetic_files_count: int = 0  # Numero file generati
     use_synthetic_data: bool = False  # Flag se usare dati sintetici
 
+    # === WORKFLOW 7: DATASET SELECTION ===
+    dataset_source: str = ""  # "real", "synthetic", "both"
+    real_dataset_name: str = ""  # es. "cifar10", "esc50"
+    real_dataset_path: str = ""  # Path locale del dataset scaricato
+
     
 
 # ============================================================================

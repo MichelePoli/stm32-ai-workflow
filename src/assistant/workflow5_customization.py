@@ -2476,6 +2476,8 @@ model_path = r"{model_path}"
 output_path = r"{output_path}"
 use_synthetic_data = {str(state.use_synthetic_data)}
 synthetic_data_path = r"{state.synthetic_data_path}"
+dataset_source = r"{state.dataset_source}"
+real_dataset_path = r"{state.real_dataset_path}"
 
 try:
     model = tf.keras.models.load_model(model_path, compile=False)
@@ -2552,9 +2554,34 @@ try:
     X = None
     y = None
     
-    # 1. Tenta di caricare dati sintetici
-    if use_synthetic_data and os.path.exists(synthetic_data_path):
-        print(f"\\n🧪 Loading synthetic data from {{synthetic_data_path}}...")
+    X_real = None
+    y_real = None
+    X_synth = None
+    y_synth = None
+    
+    # 1. Carica Real Dataset
+    if (dataset_source == "real" or dataset_source == "both") and os.path.exists(real_dataset_path):
+        print(f"\\n📦 Loading Real Dataset from {{real_dataset_path}}...")
+        try:
+            X_real = np.load(os.path.join(real_dataset_path, "x_train.npy"))
+            y_real = np.load(os.path.join(real_dataset_path, "y_train.npy"))
+            print(f"  ✓ Loaded {{len(X_real)}} real samples. Shape: {{X_real.shape}}")
+            
+            # Normalizzazione se necessario (es. immagini 0-255 -> 0-1)
+            if X_real.max() > 1.0:
+                X_real = X_real.astype('float32') / 255.0
+                
+            # One-hot encoding se y è scalare
+            if len(y_real.shape) == 1 or y_real.shape[-1] == 1:
+                num_classes = int(output_shape[-1])
+                y_real = tf.keras.utils.to_categorical(y_real, num_classes)
+                
+        except Exception as e:
+            print(f"  ❌ Error loading real dataset: {{e}}")
+    
+    # 2. Carica Synthetic Data
+    if (dataset_source == "synthetic" or dataset_source == "both") and os.path.exists(synthetic_data_path):
+        print(f"\\n🧪 Loading Synthetic Data from {{synthetic_data_path}}...")
         files = glob.glob(os.path.join(synthetic_data_path, "*.npy"))
         
         if files:
@@ -2562,8 +2589,6 @@ try:
             for f in files:
                 try:
                     data = np.load(f)
-                    # TODO: Implementare resizing/reshaping se necessario
-                    # Per ora assumiamo che il generatore produca dati compatibili o che il modello accetti raw
                     loaded_data.append(data)
                 except Exception as e:
                     print(f"  ⚠️ Error loading {{f}}: {{e}}")
@@ -2572,38 +2597,45 @@ try:
                 X_synth = np.array(loaded_data)
                 print(f"  ✓ Loaded {{len(X_synth)}} synthetic samples. Shape: {{X_synth.shape}}")
                 
-                # Verifica compatibilità shape (molto basic)
-                # Se il modello aspetta (H, W, C) e noi abbiamo (L,), proviamo a usare solo se compatibile
-                # Questo è un punto critico: il generatore audio fa 1D, se il modello è 2D (spettrogramma) fallirà
-                # Per ora usiamo i dati sintetici SOLO se la shape matcha le dimensioni (escluso batch)
-                
-                model_input_dims = len(input_shape)
-                data_dims = len(X_synth.shape) - 1 # escludi batch
-                
-                if model_input_dims == data_dims:
-                     X = X_synth
-                     print(f"  ✓ Shape compatible. Using synthetic data.")
-                else:
-                     print(f"  ❌ Shape mismatch (Model: {{model_input_dims}}D, Data: {{data_dims}}D). Fallback to dummy.")
+                # Dummy labels per synthetic
+                num_classes = int(output_shape[-1])
+                y_synth = np.eye(num_classes)[np.random.randint(0, num_classes, len(X_synth))]
         else:
             print(f"  ⚠️ No .npy files found.")
 
-    # 2. Fallback a Dummy Data
+    # 3. Merge Datasets
+    if X_real is not None and X_synth is not None:
+        print(f"\\n🔄 Merging Real and Synthetic datasets...")
+        # Check compatibility (dimensions)
+        if X_real.shape[1:] == X_synth.shape[1:]:
+             X = np.concatenate((X_real, X_synth), axis=0)
+             y = np.concatenate((y_real, y_synth), axis=0)
+             print(f"  ✓ Merged dataset size: {{len(X)}}")
+        else:
+             print(f"  ❌ Shape mismatch (Real: {{X_real.shape}}, Synth: {{X_synth.shape}}). Using Real only.")
+             X = X_real
+             y = y_real
+             
+    elif X_real is not None:
+        X = X_real
+        y = y_real
+    elif X_synth is not None:
+        X = X_synth
+        y = y_synth
+
+    # 4. Fallback a Dummy Data
     if X is None:
         print(f"\\n⚠️  Using DUMMY data (Random Noise)")
         num_samples = 100
         X = np.random.randn(num_samples, *input_shape).astype('float32')
         X = (X - X.mean()) / (X.std() + 1e-7)
     
-    # Generazione Labels (Dummy per ora, anche per i dati sintetici)
-    # Per object detection: output ha la stessa shape
-    if is_object_detection:
-        # Target shape: (batch, H, W, channels)
-        y = np.random.randn(len(X), *output_shape[1:]).astype('float32')
-    else:
-        # Per classificazione: (batch, num_classes)
-        num_classes = int(output_shape[-1])
-        y = np.eye(num_classes)[np.random.randint(0, num_classes, len(X))]
+        # Generazione Labels (Dummy)
+        if is_object_detection:
+            y = np.random.randn(len(X), *output_shape[1:]).astype('float32')
+        else:
+            num_classes = int(output_shape[-1])
+            y = np.eye(num_classes)[np.random.randint(0, num_classes, len(X))]
     
     split_idx = int(num_samples * 0.8)
     X_train, X_val = X[:split_idx], X[split_idx:]
