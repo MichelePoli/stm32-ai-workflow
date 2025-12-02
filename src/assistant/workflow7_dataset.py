@@ -23,6 +23,7 @@ from pydantic import BaseModel, Field
 
 from src.assistant.configuration import Configuration
 from src.assistant.state import MasterState
+import numpy as np
 
 logger = logging.getLogger(__name__)
 

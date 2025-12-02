@@ -6,6 +6,9 @@ from unittest.mock import MagicMock
 sys.modules["langgraph"] = MagicMock()
 sys.modules["langgraph.types"] = MagicMock()
 sys.modules["langgraph.graph"] = MagicMock()
+sys.modules["langchain_ollama"] = MagicMock()
+sys.modules["langchain_core"] = MagicMock()
+sys.modules["langchain_core.messages"] = MagicMock()
 
 # Now we can import our modules
 from src.assistant.state import MasterState
