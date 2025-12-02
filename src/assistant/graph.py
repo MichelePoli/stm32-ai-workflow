@@ -359,29 +359,7 @@ def continue_after_customization_routing(state: MasterState) -> Literal["run_ana
         return "end"
 
 
-def decide_synthetic_data_generation(state: MasterState, config: dict) -> MasterState:
-    """Chiede se generare dati sintetici prima del fine-tuning"""
-    
-    logger.info("🧪 Vuoi generare dati sintetici?")
-    
-    prompt = {
-        "instruction": "Vuoi generare dati sintetici per il fine-tuning? (sì/no)",
-        "note": "Utile se non hai un dataset completo."
-    }
-    
-    user_response = interrupt(prompt)
-    
-    if isinstance(user_response, dict):
-        user_text = str(user_response.get("response", user_response.get("input", ""))).lower()
-    else:
-        user_text = str(user_response).lower()
-        
-    if "sì" in user_text or "si" in user_text or "yes" in user_text:
-        state.use_synthetic_data = True
-    else:
-        state.use_synthetic_data = False
-        
-    return state
+
 
 
 def synthetic_data_routing(state: MasterState) -> Literal["ask_synthetic_data_requirements", "fine_tune_customized_model"]:
@@ -454,7 +432,7 @@ builder.add_node("save_customized_model_final", save_customized_model_final)
 builder.add_node("ask_continue_after_customization", ask_continue_after_customization)
 
 # === WORKFLOW 6: SYNTHETIC DATA ===
-builder.add_node("decide_synthetic_data_generation", decide_synthetic_data_generation)
+# builder.add_node("decide_synthetic_data_generation", decide_synthetic_data_generation) # REMOVED: Replaced by decide_data_source
 builder.add_node("ask_synthetic_data_requirements", ask_synthetic_data_requirements)
 builder.add_node("generate_synthetic_samples", generate_synthetic_samples)
 builder.add_node("validate_synthetic_data", validate_synthetic_data)
