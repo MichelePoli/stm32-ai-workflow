@@ -2573,6 +2573,14 @@ try:
         try:
             X_real = np.load(os.path.join(real_dataset_path, "x_train.npy"))
             y_real = np.load(os.path.join(real_dataset_path, "y_train.npy"))
+            
+            # LIMIT: Use only first 5000 samples to avoid OOM
+            max_samples = 5000
+            if len(X_real) > max_samples:
+                print(f"  ⚠️  Limiting dataset to {{max_samples}} samples (OOM prevention)")
+                X_real = X_real[:max_samples]
+                y_real = y_real[:max_samples]
+            
             print(f"  ✓ Loaded {{len(X_real)}} real samples. Shape: {{X_real.shape}}")
             
             # Normalizzazione se necessario (es. immagini 0-255 -> 0-1)
@@ -2644,8 +2652,8 @@ try:
             X = np.expand_dims(X, axis=-1)
             X = np.repeat(X, 3, axis=-1)
         
-        # Resize in batches to avoid OOM (out of memory) (1000 images at a time)
-        batch_size_resize = 1000
+        # Resize in batches to avoid OOM (out of memory) (500 images at a time)
+        batch_size_resize = 500
         X_resized = []
         for i in range(0, len(X), batch_size_resize):
             batch = X[i:i+batch_size_resize]
