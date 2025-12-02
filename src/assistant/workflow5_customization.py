@@ -2637,7 +2637,7 @@ try:
             num_classes = int(output_shape[-1])
             y = np.eye(num_classes)[np.random.randint(0, num_classes, len(X))]
     
-    split_idx = int(num_samples * 0.8)
+    split_idx = int(len(X) * 0.8)
     X_train, X_val = X[:split_idx], X[split_idx:]
     y_train, y_val = y[:split_idx], y[split_idx:]
     
