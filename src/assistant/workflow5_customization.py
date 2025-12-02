@@ -2626,19 +2626,18 @@ try:
     # 4. Resize if needed (fix shape mismatch)
     if X is not None and X.shape[1:] != input_shape:
         print(f"\\n🔧 Resizing data from {{X.shape[1:]}} to {{input_shape}}...")
-        import cv2
-        X_resized = []
-        for img in X:
-            if len(img.shape) == 2:  # Grayscale
-                img_resized = cv2.resize(img, (input_shape[1], input_shape[0]))
-                if len(input_shape) == 3 and input_shape[2] == 3:
-                    img_resized = cv2.cvtColor(img_resized, cv2.COLOR_GRAY2RGB)
-                elif len(input_shape) == 3:
-                    img_resized = np.expand_dims(img_resized, axis=-1)
-            else:  # Color
-                img_resized = cv2.resize(img, (input_shape[1], input_shape[0]))
-            X_resized.append(img_resized)
-        X = np.array(X_resized, dtype='float32')
+        
+        # Use TensorFlow resize (already available)
+        target_h, target_w = input_shape[0], input_shape[1]
+        
+        # Handle grayscale -> RGB conversion if needed
+        if len(X.shape) == 3 and len(input_shape) == 3 and input_shape[2] == 3:
+            # Grayscale (H, W) -> RGB (H, W, 3)
+            X = np.expand_dims(X, axis=-1)
+            X = np.repeat(X, 3, axis=-1)
+        
+        # Resize using TensorFlow
+        X = tf.image.resize(X, [target_h, target_w]).numpy()
         print(f"  ✓ Resized to {{X.shape}}")
 
     # 5. Fallback a Dummy Data
