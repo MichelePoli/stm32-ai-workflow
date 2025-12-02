@@ -75,6 +75,10 @@ Esempi:
         user_text = user_response.get("response", user_response.get("input", str(user_response)))
     else:
         user_text = str(user_response)
+    
+    # Default: 10 sine waves at 440Hz
+    if not user_text or user_text.strip() == "":
+        user_text = "Genera 10 campioni di onda sinusoidale a 440Hz"
         
     logger.info(f"📝 Richiesta utente: '{user_text}'")
     
@@ -229,6 +233,10 @@ def validate_synthetic_data(state: MasterState, config: dict) -> MasterState:
         user_text = str(user_response.get("response", user_response.get("input", ""))).lower()
     else:
         user_text = str(user_response).lower()
+    
+    # Default: proceed with fine-tuning (sì)
+    if not user_text or user_text.strip() == "":
+        user_text = "sì"
         
     if "sì" in user_text or "si" in user_text or "yes" in user_text or "ok" in user_text:
         state.use_synthetic_data = True

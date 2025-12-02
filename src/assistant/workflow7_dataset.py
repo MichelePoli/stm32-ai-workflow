@@ -98,6 +98,10 @@ def decide_data_source(state: MasterState, config: dict) -> MasterState:
         user_text = str(user_response.get("response", user_response.get("input", ""))).lower()
     else:
         user_text = str(user_response).lower()
+    
+    # Default: synthetic (no download)
+    if not user_text or user_text.strip() == "":
+        user_text = "1" # ho messo 1, giusto per velocizzare il test. ma va bene anche '2'
         
     if "1" in user_text or "real" in user_text:
         state.dataset_source = "real"
@@ -146,6 +150,10 @@ def select_predefined_dataset(state: MasterState, config: dict) -> MasterState:
         selection = str(user_response.get("response", user_response.get("input", ""))).lower().strip() # può essere ad esempio: "1", "2", "3", "audio", "vision"
     else:
         selection = str(user_response).lower().strip()
+    
+    # Default: first dataset in the list
+    if not selection or selection.strip() == "":
+        selection = valid_keys[0]
         
     # Fuzzy matching semplice
     selected_key = None

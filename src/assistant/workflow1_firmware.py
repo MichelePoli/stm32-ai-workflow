@@ -124,6 +124,10 @@ Esempio: "Crea progetto MyApp per STM32F401 con CubeIDE"
     else:
         user_text = str(user_response)
     
+    # Default: STM32F401 with CubeIDE
+    if not user_text or user_text.strip() == "":
+        user_text = "STM32F401VCHx, MyProject, STM32CubeIDE"
+    
     logger.info(f"📝 User input RAW: '{user_text}'")
     
     # === USA LLM PER ESTRARRE GLI ATTRIBUTI ===

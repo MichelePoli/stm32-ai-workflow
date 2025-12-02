@@ -248,6 +248,10 @@ def clarify_request(state: MasterState, config: dict) -> MasterState:
     }
     user_choice = interrupt(prompt)
     
+    # Default: option 2 (AI analysis)
+    if not user_choice or str(user_choice).strip() == "":
+        user_choice = "2"
+    
     choice_map = {"1": "firmware", "2": "ai_analysis", "3": "integration", "4": "web_research"}
     state.route = choice_map.get(str(user_choice), "firmware")
     
@@ -273,6 +277,10 @@ def decide_continue_to_ai(state: MasterState, config: dict) -> MasterState:
         user_text = user_response.get("response", user_response.get("input", str(user_response)))
     else:
         user_text = str(user_response).lower()
+    
+    #Default: continue to AI
+    if not user_text or user_text.strip() == "":
+        user_text = "sì"
     
     # LLM per analizzare la risposta
     cfg = Configuration.from_runnable_config(config)
@@ -308,6 +316,10 @@ def decide_continue_to_integration(state: MasterState, config: dict) -> MasterSt
         user_text = user_response.get("response", user_response.get("input", str(user_response)))
     else:
         user_text = str(user_response).lower()
+    
+    # Default: continue to integration
+    if not user_text or user_text.strip() == "":
+        user_text = "sì"
     
     cfg = Configuration.from_runnable_config(config)
     llm = ChatOllama(model=cfg.local_llm, temperature=0)

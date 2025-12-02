@@ -360,6 +360,10 @@ Esempi:
     else:
         user_text = str(user_response)
     
+    # Default: STM32F4, medium compression
+    if not user_text or user_text.strip() == "":
+        user_text = "STM32F4, medium compression"
+    
     logger.info(f"📝 User input RAW: '{user_text}'")
     
     # === ESTRAI TARGET E COMPRESSION ===
@@ -429,6 +433,10 @@ Rispondi: 1, 2, 3, 4 oppure descrivi il task
         user_text = user_response.get("response", user_response.get("input", str(user_response)))
     else:
         user_text = str(user_response).strip()
+    
+    # Default: image classification (option 1)
+    if not user_text or user_text.strip() == "":
+        user_text = "1"
     
     logger.info(f"📝 User task input: '{user_text}'")
     
@@ -654,6 +662,10 @@ def search_recommendation_model(state: MasterState, config: dict) -> MasterState
             confirmation_text = str(user_confirmation.get("response", user_confirmation.get("input", ""))).lower().strip()
         else:
             confirmation_text = str(user_confirmation).lower().strip()
+        
+        # Default: accept model (si)
+        if not confirmation_text or confirmation_text.strip() == "":
+            confirmation_text = "si"
         
         logger.info(f"📝 Risposta utente: '{confirmation_text}'")
         

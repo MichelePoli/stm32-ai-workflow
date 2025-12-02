@@ -350,9 +350,13 @@ Cosa preferisci? (si/no)""",
     user_response = interrupt(prompt)
     
     if isinstance(user_response, dict):
-        user_text = user_response.get("response", user_response.get("input", str(user_response)))
+        user_text = str(user_response.get("response", user_response.get("input", ""))).lower()
     else:
-        user_text = str(user_response)
+        user_text = str(user_response).lower()
+    
+    # Default: no modifications (skip customization)
+    if not user_text or user_text.strip() == "":
+        user_text = "si" #ho messo si, giusto per velocizzare il test. ma va bene anche 'no'
     
     logger.info(f"📝 User response: '{user_text}'")
     
@@ -1248,6 +1252,10 @@ Write your modifications in natural language (or leave empty for defaults):
     # ===== STEP 1: Chiedere all'utente =====
     logger.info("  [Step 1/2] Asking user for modifications...")
     user_modifications = interrupt(prompt)
+    
+    # Default: freeze first 5 layers
+    if not user_modifications or str(user_modifications).strip() == "":
+        user_modifications = "Freeze primi 5 layer, aggiungi dropout 0.3"
     
     # ===== VALIDAZIONE INPUT =====
     if not user_modifications or not isinstance(user_modifications, str):
@@ -2992,6 +3000,11 @@ Quantized: {state.should_quantize}
     }
     
     user_response = interrupt(prompt)
+    
+    # Default: continue with AI analysis
+    if not user_response or str(user_response).strip() == "":
+        user_response = "continue_ai"
+    
     state.continue_after_customization = (user_response == "continue_ai")
     
     return state

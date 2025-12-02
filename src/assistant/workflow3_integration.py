@@ -149,6 +149,10 @@ Esempio risposta: "Integra il codice da ./analisiAI/code_resnet nel firmware di 
         else:
             user_text = str(user_response)
         
+        # Default: use paths from state (already populated)
+        if not user_text or user_text.strip() == "":
+            user_text = f"Firmware: {state.firmware_project_dir}, AI: {state.ai_code_dir}"
+        
         logger.info(f"📝 User input RAW: '{user_text}'")
         
         # === USA LLM PER ESTRARRE I PATH ===
