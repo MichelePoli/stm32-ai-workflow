@@ -2636,8 +2636,16 @@ try:
             X = np.expand_dims(X, axis=-1)
             X = np.repeat(X, 3, axis=-1)
         
-        # Resize using TensorFlow
-        X = tf.image.resize(X, [target_h, target_w]).numpy()
+        # Resize in batches to avoid OOM (out of memory) (1000 images at a time)
+        batch_size_resize = 1000
+        X_resized = []
+        for i in range(0, len(X), batch_size_resize):
+            batch = X[i:i+batch_size_resize]
+            batch_resized = tf.image.resize(batch, [target_h, target_w]).numpy()
+            X_resized.append(batch_resized)
+            if (i // batch_size_resize) % 10 == 0:
+                print(f"  → Resized {{i+len(batch)}}/{{len(X)}} images")
+        X = np.concatenate(X_resized, axis=0)
         print(f"  ✓ Resized to {{X.shape}}")
 
     # 5. Fallback a Dummy Data
@@ -2731,7 +2739,13 @@ except Exception as e:
         if not result['success']:
             logger.error(f"  Subprocess returncode: {result['returncode']}")
             logger.error(f"  Stderr:\n{stderr[:1000]}")
-            raise Exception(f"Subprocess failed: {stderr.split(chr(10))[-2]}")
+            # Fix: Handle empty stderr
+            error_msg = "Unknown error"
+            if stderr:
+                stderr_lines = [line for line in stderr.split('\n') if line.strip()]
+                if stderr_lines:
+                    error_msg = stderr_lines[-1]
+            raise Exception(f"Subprocess failed: {error_msg}")
         
         if "SUCCESS:" in stdout_clean:
             parts = stdout_clean.split("SUCCESS:")[-1].strip().split('|')
