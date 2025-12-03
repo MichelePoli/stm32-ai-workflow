@@ -2728,6 +2728,62 @@ try:
             num_classes = int(output_shape[-1])
             y = np.eye(num_classes)[np.random.randint(0, num_classes, len(X))]
     
+    # ===== DETECT DATASET vs MODEL CLASS MISMATCH =====
+    dataset_num_classes = None
+    if y is not None:
+        # Extract unique classes from dataset
+        dataset_num_classes = len(np.unique(y.argmax(axis=1))) if len(y.shape) > 1 else len(np.unique(y))
+        print(f"\\n📊 Dataset classes detected: {{dataset_num_classes}}")
+    
+    model_num_classes = int(output_shape[-1]) if len(output_shape) > 1 else None
+    print(f"📊 Model output classes: {{model_num_classes}}")
+    
+    # Check for mismatch and warn/replace if needed
+    if dataset_num_classes and model_num_classes:
+        if dataset_num_classes != model_num_classes:
+            print(f"\\n⚠️  CLASS MISMATCH DETECTED!")
+            print(f"  Model expects: {{model_num_classes}} classes (pre-trained on ImageNet/COCO)")
+            print(f"  Dataset has: {{dataset_num_classes}} classes")
+            print(f"\\n🔧 Applying automatic fix: Replacing final layer...")
+            
+            # Remove last Dense layer and add new one with correct num_classes
+            try:
+                # Get output before final layer
+                base_output = model.layers[-2].output
+                
+                # Add new Dense layer with correct number of classes
+                new_output = tf.keras.layers.Dense(
+                    dataset_num_classes, 
+                    activation='softmax', 
+                    name='predictions_finetuned'
+                )(base_output)
+                
+                # Create new model
+                model = tf.keras.Model(inputs=model.input, outputs=new_output)
+                
+                print(f"  ✓ Final layer replaced: Dense({{dataset_num_classes}}, activation='softmax')")
+                print(f"  ✓ New model output shape: {{model.output_shape}}")
+                
+            except Exception as e:
+                print(f"  ❌ Error during layer replacement: {{e}}")
+                print(f"  ⚠️  Continuing with original model (may cause issues)")
+        else:
+            print(f"\\n✓ Class count matches: {{dataset_num_classes}} classes")
+    
+    # Check for extreme input resize mismatch
+    if X is not None and input_shape:
+        original_shape = tuple(X.shape[1:3]) if len(X.shape) >= 3 else None
+        target_shape = tuple(input_shape[:2]) if len(input_shape) >= 2 else None
+        
+        if original_shape and target_shape:
+            resize_factor = (target_shape[0] / original_shape[0], target_shape[1] / original_shape[1])
+            if resize_factor[0] > 4 or resize_factor[1] > 4:
+                print(f"\\n⚠️  EXTREME RESIZE WARNING!")
+                print(f"  Dataset resolution: {{original_shape}}")
+                print(f"  Model expects: {{target_shape}}")
+                print(f"  Upscale factor: {{resize_factor[0]:.1f}}x")
+                print(f"  This may reduce model performance due to pixelation.")
+
     # 6. Prepare Train/Val Split
     if X_val is not None:
         print(f"✓ Using explicit validation set: {{len(X_val)}} samples")

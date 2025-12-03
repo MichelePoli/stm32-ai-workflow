@@ -266,6 +266,16 @@ PREDEFINED_MODELS = {
                 "huggingface_repo": "STMicroelectronics/efficientnetv2",
                 "huggingface_filename": "efficientnet_v2B0_224.h5",
                 "url": "https://github.com/STMicroelectronics/stm32ai-modelzoo/raw/main/image_classification/efficientnetv2/Public_pretrainedmodel_public_dataset/ImageNet/efficientnet_v2B0_224/efficientnet_v2B0_224.h5"
+            },
+            {
+                "name": "MobileNetV2 alpha 0.35 (128x128)",
+                "local_filename": "mobilenetv2_0.35_128.h5",
+                "size": "1.7MB",
+                "accuracy": "60%",
+                "inference_time": "15ms (STM32F4)",
+                "huggingface_repo": "STMicroelectronics/mobilenetv2-small",
+                "huggingface_filename": "mobilenetv2_0.35_128.h5",
+                "url": "https://github.com/STMicroelectronics/stm32ai-modelzoo/raw/main/image_classification/mobilenetv2/Public_pretrainedmodel_public_dataset/ImageNet/mobilenet_v2_0.35_128/mobilenet_v2_0.35_128.h5",
             }
 
         ]
@@ -317,6 +327,31 @@ PREDEFINED_MODELS = {
                 "huggingface_repo": "STMicroelectronics/har-wisdm",
                 "huggingface_filename": "gmp_wl_48.h5",
                 "url": "https://github.com/STMicroelectronics/stm32ai-modelzoo/raw/main/human_activity_recognition/gmp/ST_pretrainedmodel_public_dataset/WISDM/gmp_wl_48/gmp_wl_48.h5"
+            }
+        ]
+    },
+    "audio_event_detection": {
+        "description": "Audio Event Detection (Spectrograms)",
+        "models": [
+            {
+                "name": "MiniResnet",
+                "local_filename": "miniresnet_64x50.h5",
+                "size": "1.2MB",
+                "accuracy": "85%",
+                "inference_time": "18ms (STM32H7)",
+                "huggingface_repo": "STMicroelectronics/miniresnet-aed",
+                "huggingface_filename": "miniresnet_64x50.h5",
+                "url": "https://github.com/STMicroelectronics/stm32ai-modelzoo/raw/main/audio_event_detection/miniresnet/ST_pretrainedmodel_public_dataset/esc10/miniresnet_64x50_tl/miniresnet_64x50_tl.h5"
+            },
+            {
+                "name": "MiniResnetV2",
+                "local_filename": "miniresnetv2_64x50.h5",
+                "size": "1.5MB",
+                "accuracy": "88%",
+                "inference_time": "22ms (STM32H7)",
+                "huggingface_repo": "STMicroelectronics/miniresnetv2-aed",
+                "huggingface_filename": "miniresnetv2_64x50.h5",
+                "url": "https://github.com/STMicroelectronics/stm32ai-modelzoo/raw/main/audio_event_detection/miniresnetv2/ST_pretrainedmodel_public_dataset/esc10/miniresnetv2_64x50_tl/miniresnetv2_64x50_tl.h5"
             }
         ]
     }
