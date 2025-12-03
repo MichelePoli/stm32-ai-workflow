@@ -2768,11 +2768,6 @@ try:
                 print(f"  ✓ Final layer replaced: Dense({{dataset_num_classes}}, activation='softmax')")
                 print(f"  ✓ New model output shape: {{model.output_shape}}")
                 
-                # CRITICAL: Save the modified model to persist the change
-                print(f"  💾 Saving modified model...")
-                model.save(model_path, save_format='h5')
-                print(f"  ✓ Model saved with new architecture")
-                
                 # Update output shape for subsequent logic
                 output_shape = model.output_shape
                 
