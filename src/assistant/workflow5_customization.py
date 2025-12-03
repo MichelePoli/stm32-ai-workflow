@@ -2593,8 +2593,12 @@ try:
                 
             # One-hot encoding se y è scalare
             if len(y_real.shape) == 1 or y_real.shape[-1] == 1:
-                num_classes = int(output_shape[-1])
-                y_real = tf.keras.utils.to_categorical(y_real, num_classes)
+                # Determine classes from data instead of model
+                real_num_classes = len(np.unique(y_real))
+                print(f"  📊 Detected {real_num_classes} classes in real dataset")
+                y_real = tf.keras.utils.to_categorical(y_real, real_num_classes)
+            else:
+                real_num_classes = y_real.shape[-1]
             
             # Check for explicit validation set
             if os.path.exists(os.path.join(real_dataset_path, "x_test.npy")) and os.path.exists(os.path.join(real_dataset_path, "y_test.npy")):
@@ -2611,7 +2615,7 @@ try:
                     X_val_real = X_val_real.astype('float32') / 255.0
                 
                 if len(y_val_real.shape) == 1 or y_val_real.shape[-1] == 1:
-                    y_val_real = tf.keras.utils.to_categorical(y_val_real, num_classes)
+                    y_val_real = tf.keras.utils.to_categorical(y_val_real, real_num_classes)
             else:
                 X_val_real = None
                 y_val_real = None
@@ -2642,8 +2646,13 @@ try:
                 print(f"  ✓ Loaded {{len(X_synth)}} synthetic samples. Shape: {{X_synth.shape}}")
                 
                 # Dummy labels per synthetic
-                num_classes = int(output_shape[-1])
-                y_synth = np.eye(num_classes)[np.random.randint(0, num_classes, len(X_synth))]
+                # Use real_num_classes if available, else model classes
+                if 'real_num_classes' in locals():
+                    synth_num_classes = real_num_classes
+                else:
+                    synth_num_classes = int(output_shape[-1])
+                
+                y_synth = np.eye(synth_num_classes)[np.random.randint(0, synth_num_classes, len(X_synth))]
         else:
             print(f"  ⚠️ No .npy files found.")
 
@@ -2729,8 +2738,12 @@ try:
         if is_object_detection:
             y = np.random.randn(len(X), *output_shape[1:]).astype('float32')
         else:
-            num_classes = int(output_shape[-1])
-            y = np.eye(num_classes)[np.random.randint(0, num_classes, len(X))]
+            # Use real_num_classes if available, else model classes
+            if 'real_num_classes' in locals():
+                dummy_num_classes = real_num_classes
+            else:
+                dummy_num_classes = int(output_shape[-1])
+            y = np.eye(dummy_num_classes)[np.random.randint(0, dummy_num_classes, len(X))]
     
     # ===== DETECT DATASET vs MODEL CLASS MISMATCH =====
     dataset_num_classes = None
@@ -2770,6 +2783,9 @@ try:
                 
                 # Update output shape for subsequent logic
                 output_shape = model.output_shape
+                
+                # No need to re-encode labels as they are already correct!
+                print(f"  ✓ Labels already match new architecture ({{dataset_num_classes}} classes)")
                 
             except Exception as e:
                 print(f"  ❌ Error during layer replacement: {{e}}")
