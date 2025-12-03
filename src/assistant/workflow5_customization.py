@@ -2701,7 +2701,7 @@ try:
             if (i // batch_size_resize) % 10 == 0:
                 print(f"  → Resized {{i+len(batch)}}/{{len(X)}} images")
         X = np.concatenate(X_resized, axis=0)
-        print(f"  ✓ Resized to {X.shape}")
+        print(f"  ✓ Resized to {{X.shape}}")
         
         # Resize validation set if it exists
         if X_val is not None and X_val.shape[1:] != input_shape:
@@ -2712,7 +2712,7 @@ try:
                 batch_resized = tf.image.resize(batch, [target_h, target_w]).numpy()
                 X_val_resized.append(batch_resized)
             X_val = np.concatenate(X_val_resized, axis=0)
-            print(f"  ✓ Resized validation to {X_val.shape}")
+            print(f"  ✓ Resized validation to {{X_val.shape}}")
 
     # 5. Fallback a Dummy Data
     if X is None:
@@ -2730,7 +2730,7 @@ try:
     
     # 6. Prepare Train/Val Split
     if X_val is not None:
-        print(f"✓ Using explicit validation set: {len(X_val)} samples")
+        print(f"✓ Using explicit validation set: {{len(X_val)}} samples")
         # Ensure y_val matches y shape
         if y_val.shape[-1] != y.shape[-1]:
              # Fix mismatch if any (e.g. different one-hot encoding depth?)
@@ -2744,7 +2744,7 @@ try:
         X = X[:split_idx]
         y = y[:split_idx]
     
-    print(f"✓ Dataset: train={X.shape}, val={X_val.shape}")
+    print(f"✓ Dataset: train={{X.shape}}, val={{X_val.shape}}")
     
     # 7. Compile & Train
     model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate={learning_rate}),
@@ -2756,14 +2756,14 @@ try:
     # Custom Callback for feedback
     class PrintEpochProgress(tf.keras.callbacks.Callback):
         def on_epoch_end(self, epoch, logs=None):
-            logs = logs or {}
+            logs = logs or {{}}
             print(f"Epoch {{epoch+1}}/{epochs} - "
                   f"loss: {{logs.get('loss'):.4f}} - "
                   f"accuracy: {{logs.get('accuracy'):.4f}} - "
                   f"val_loss: {{logs.get('val_loss'):.4f}} - "
                   f"val_accuracy: {{logs.get('val_accuracy'):.4f}}")
 
-    model.fit(X, y, 
+    history=model.fit(X, y, 
               epochs={epochs}, 
               batch_size={batch_size}, 
               validation_data=(X_val, y_val),
