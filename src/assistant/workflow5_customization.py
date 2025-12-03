@@ -2591,9 +2591,33 @@ try:
             if len(y_real.shape) == 1 or y_real.shape[-1] == 1:
                 num_classes = int(output_shape[-1])
                 y_real = tf.keras.utils.to_categorical(y_real, num_classes)
+            
+            # Check for explicit validation set
+            if os.path.exists(os.path.join(real_dataset_path, "x_test.npy")) and os.path.exists(os.path.join(real_dataset_path, "y_test.npy")):
+                print(f"  ✓ Found explicit validation set (x_test.npy)")
+                X_val_real = np.load(os.path.join(real_dataset_path, "x_test.npy"))
+                y_val_real = np.load(os.path.join(real_dataset_path, "y_test.npy"))
+                
+                # Limit validation set too
+                if len(X_val_real) > max_samples:
+                     X_val_real = X_val_real[:max_samples]
+                     y_val_real = y_val_real[:max_samples]
+                
+                if X_val_real.max() > 1.0:
+                    X_val_real = X_val_real.astype('float32') / 255.0
+                
+                if len(y_val_real.shape) == 1 or y_val_real.shape[-1] == 1:
+                    y_val_real = tf.keras.utils.to_categorical(y_val_real, num_classes)
+            else:
+                X_val_real = None
+                y_val_real = None
                 
         except Exception as e:
             print(f"  ❌ Error loading real dataset: {{e}}")
+            X_real = None
+            y_real = None
+            X_val_real = None
+            y_val_real = None
     
     # 2. Carica Synthetic Data
     if (dataset_source == "synthetic" or dataset_source == "both") and os.path.exists(synthetic_data_path):
@@ -2620,24 +2644,39 @@ try:
             print(f"  ⚠️ No .npy files found.")
 
     # 3. Merge Datasets
-    if X_real is not None and X_synth is not None:
-        print(f"\\n🔄 Merging Real and Synthetic datasets...")
-        # Check compatibility (dimensions)
-        if X_real.shape[1:] == X_synth.shape[1:]:
-             X = np.concatenate((X_real, X_synth), axis=0)
-             y = np.concatenate((y_real, y_synth), axis=0)
-             print(f"  ✓ Merged dataset size: {{len(X)}}")
+    X = []
+    y = []
+    X_val = []
+    y_val = []
+    
+    if X_real is not None:
+        X.append(X_real)
+        y.append(y_real)
+        if X_val_real is not None:
+            X_val.append(X_val_real)
+            y_val.append(y_val_real)
+            
+    if X_synth is not None:
+        X.append(X_synth)
+        y.append(y_synth)
+        # Synthetic data usually doesn't have a separate pre-generated val set here, 
+        # but we could split it. For now, we'll let the auto-split handle it 
+        # if no real val set exists, or mix it in.
+    
+    if len(X) > 0:
+        X = np.concatenate(X, axis=0)
+        y = np.concatenate(y, axis=0)
+        if len(X_val) > 0:
+            X_val = np.concatenate(X_val, axis=0)
+            y_val = np.concatenate(y_val, axis=0)
         else:
-             print(f"  ❌ Shape mismatch (Real: {{X_real.shape}}, Synth: {{X_synth.shape}}). Using Real only.")
-             X = X_real
-             y = y_real
-             
-    elif X_real is not None:
-        X = X_real
-        y = y_real
-    elif X_synth is not None:
-        X = X_synth
-        y = y_synth
+            X_val = None
+            y_val = None
+    else:
+        X = None
+        y = None
+        X_val = None
+        y_val = None
 
     # 4. Resize if needed (fix shape mismatch)
     if X is not None and X.shape[1:] != input_shape:
@@ -2662,7 +2701,18 @@ try:
             if (i // batch_size_resize) % 10 == 0:
                 print(f"  → Resized {{i+len(batch)}}/{{len(X)}} images")
         X = np.concatenate(X_resized, axis=0)
-        print(f"  ✓ Resized to {{X.shape}}")
+        print(f"  ✓ Resized to {X.shape}")
+        
+        # Resize validation set if it exists
+        if X_val is not None and X_val.shape[1:] != input_shape:
+            print(f"🔧 Resizing validation data...")
+            X_val_resized = []
+            for i in range(0, len(X_val), batch_size_resize):
+                batch = X_val[i:i+batch_size_resize]
+                batch_resized = tf.image.resize(batch, [target_h, target_w]).numpy()
+                X_val_resized.append(batch_resized)
+            X_val = np.concatenate(X_val_resized, axis=0)
+            print(f"  ✓ Resized validation to {X_val.shape}")
 
     # 5. Fallback a Dummy Data
     if X is None:
@@ -2678,27 +2728,50 @@ try:
             num_classes = int(output_shape[-1])
             y = np.eye(num_classes)[np.random.randint(0, num_classes, len(X))]
     
-    split_idx = int(len(X) * 0.8)
-    X_train, X_val = X[:split_idx], X[split_idx:]
-    y_train, y_val = y[:split_idx], y[split_idx:]
+    # 6. Prepare Train/Val Split
+    if X_val is not None:
+        print(f"✓ Using explicit validation set: {len(X_val)} samples")
+        # Ensure y_val matches y shape
+        if y_val.shape[-1] != y.shape[-1]:
+             # Fix mismatch if any (e.g. different one-hot encoding depth?)
+             # Usually shouldn't happen if loaded correctly
+             pass
+    else:
+        print("⚖️  Splitting data (80% train, 20% val)...")
+        split_idx = int(len(X) * 0.8)
+        X_val = X[split_idx:]
+        y_val = y[split_idx:]
+        X = X[:split_idx]
+        y = y[:split_idx]
     
-    print(f"✓ Dataset: train={{X_train.shape}}, val={{X_val.shape}}")
+    print(f"✓ Dataset: train={X.shape}, val={X_val.shape}")
     
-    optimizer = Adam(learning_rate={learning_rate})
-    model.compile(optimizer=optimizer, loss=loss_fn, metrics=['mse'] if is_object_detection else ['accuracy'])
-    print(f"✓ Compiled (loss={{loss_fn}}, LR={learning_rate})\\n")
+    # 7. Compile & Train
+    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate={learning_rate}),
+                  loss='categorical_crossentropy',
+                  metrics=['accuracy'])
+                  
+    print(f"✓ Compiled (loss=categorical_crossentropy, LR={learning_rate})")
     
-    history = model.fit(
-        X_train, y_train,
-        batch_size={batch_size},
-        epochs={epochs},
-        validation_data=(X_val, y_val),
-        callbacks=[
+    # Custom Callback for feedback
+    class PrintEpochProgress(tf.keras.callbacks.Callback):
+        def on_epoch_end(self, epoch, logs=None):
+            logs = logs or {}
+            print(f"Epoch {{epoch+1}}/{epochs} - "
+                  f"loss: {{logs.get('loss'):.4f}} - "
+                  f"accuracy: {{logs.get('accuracy'):.4f}} - "
+                  f"val_loss: {{logs.get('val_loss'):.4f}} - "
+                  f"val_accuracy: {{logs.get('val_accuracy'):.4f}}")
+
+    model.fit(X, y, 
+              epochs={epochs}, 
+              batch_size={batch_size}, 
+              validation_data=(X_val, y_val),
+              callbacks=[PrintEpochProgress(),
             EarlyStopping(monitor='val_loss', patience=3, restore_best_weights=True, verbose=0),
             ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=2, min_lr=1e-7, verbose=0)
         ],
-        verbose=0
-    )
+        verbose=0) # Verbose 0 because we print manually
     
     model.save(output_path, save_format='h5')
     

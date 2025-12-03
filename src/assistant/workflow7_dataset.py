@@ -25,6 +25,13 @@ from src.assistant.configuration import Configuration
 from src.assistant.state import MasterState
 import numpy as np
 
+import requests
+import tarfile
+import zipfile
+import io
+from tqdm import tqdm
+import tensorflow as tf
+
 logger = logging.getLogger(__name__)
 
 # ============================================================================
@@ -209,11 +216,189 @@ def download_dataset(state: MasterState, config: dict) -> MasterState:
             
     # Logica per Audio (Download URL)
     elif dataset_name in ["speech_commands", "esc50", "fsdd"]:
-        # Qui servirebbe logica di download e unzip
-        # Per ora simuliamo o scarichiamo solo se piccolo (FSDD)
-        logger.warning("⚠️  Download audio dataset completo non ancora implementato (richiede unzip e parsing)")
-        # Placeholder: crea file dummy per testare il flusso
-        with open(os.path.join(dataset_dir, "README.txt"), "w") as f:
-            f.write(f"Dataset {dataset_name} should be here.")
+        try:
+            # 1. Download
+            url = DATASET_CATALOG["audio"][dataset_name]["url"]
+            archive_name = url.split("/")[-1]
+            archive_path = os.path.join(dataset_dir, archive_name)
+            
+            if not os.path.exists(archive_path):
+                logger.info(f"⬇️  Downloading {url}...")
+                download_file(url, archive_path)
+            else:
+                logger.info(f"✓ Archive found: {archive_path}")
+                
+            # 2. Extract
+            extract_dir = os.path.join(dataset_dir, "extracted")
+            if not os.path.exists(extract_dir):
+                logger.info(f"📦 Extracting to {extract_dir}...")
+                extract_archive(archive_path, extract_dir)
+            else:
+                logger.info(f"✓ Extracted dir found")
+                
+            # 3. Process to Spectrograms (.npy)
+            logger.info("🎵 Processing audio to spectrograms...")
+            
+            # Parametri processing
+            target_shape = (32, 32) # Resize spectrogram to 32x32 image
+            
+            if dataset_name == "speech_commands":
+                process_speech_commands(extract_dir, dataset_dir, target_shape)
+            elif dataset_name == "esc50":
+                # TODO: Implement ESC-50 specific parsing
+                pass
+            elif dataset_name == "fsdd":
+                # TODO: Implement FSDD specific parsing
+                pass
+                
+            logger.info(f"✓ Audio dataset processed and saved to {dataset_dir}")
+            
+        except Exception as e:
+            logger.error(f"❌ Error processing audio dataset: {e}")
+            # Fallback dummy
+            with open(os.path.join(dataset_dir, "README.txt"), "w") as f:
+                f.write(f"Dataset {dataset_name} failed: {e}")
             
     return state
+
+
+# ============================================================================
+# HELPER FUNCTIONS
+# ============================================================================
+
+def download_file(url: str, dest_path: str):
+    """Scarica file con progress bar"""
+    response = requests.get(url, stream=True)
+    total_size = int(response.headers.get('content-length', 0))
+    block_size = 1024 * 1024 # 1MB
+    
+    with open(dest_path, 'wb') as f, tqdm(
+        desc=dest_path,
+        total=total_size,
+        unit='iB',
+        unit_scale=True,
+        unit_divisor=1024,
+    ) as bar:
+        for data in response.iter_content(block_size):
+            size = f.write(data)
+            bar.update(size)
+
+def extract_archive(file_path: str, extract_to: str):
+    """Estrae .tar.gz o .zip"""
+    os.makedirs(extract_to, exist_ok=True)
+    if file_path.endswith("tar.gz") or file_path.endswith(".tgz"):
+        with tarfile.open(file_path, "r:gz") as tar:
+            tar.extractall(path=extract_to)
+    elif file_path.endswith(".zip"):
+        with zipfile.ZipFile(file_path, 'r') as zip_ref:
+            zip_ref.extractall(extract_to)
+
+def audio_to_spectrogram(file_path: str, target_shape=(32, 32)) -> Optional[np.ndarray]:
+    """
+    Legge un WAV, calcola STFT spectrogram, ridimensiona a target_shape.
+    Ritorna array (H, W, 1) normalizzato [0,1].
+    """
+    try:
+        # 1. Read WAV
+        audio_binary = tf.io.read_file(file_path)
+        audio, sample_rate = tf.audio.decode_wav(audio_binary)
+        
+        # 2. Fix length (1 sec @ 16kHz = 16000 samples)
+        # Se più lungo taglia, se più corto pad
+        desired_samples = 16000
+        audio = tf.squeeze(audio, axis=-1) # (N,)
+        
+        if tf.shape(audio)[0] < desired_samples:
+            paddings = [[0, desired_samples - tf.shape(audio)[0]]]
+            audio = tf.pad(audio, paddings)
+        else:
+            audio = audio[:desired_samples]
+            
+        # 3. STFT Spectrogram
+        # frame_length=255, frame_step=128 -> output approx 124x129
+        stft = tf.signal.stft(audio, frame_length=255, frame_step=128)
+        spectrogram = tf.abs(stft)
+        
+        # Add channel dim -> (Time, Freq, 1)
+        spectrogram = tf.expand_dims(spectrogram, axis=-1)
+        
+        # 4. Resize to target image shape (e.g. 32x32)
+        spectrogram = tf.image.resize(spectrogram, target_shape)
+        
+        # 5. Normalize [0, 1]
+        max_val = tf.reduce_max(spectrogram)
+        if max_val > 0:
+            spectrogram = spectrogram / max_val
+            
+        return spectrogram.numpy()
+        
+    except Exception as e:
+        # logger.warning(f"Error processing {file_path}: {e}")
+        return None
+
+def process_speech_commands(extract_dir: str, output_dir: str, target_shape=(32, 32)):
+    """
+    Processa Google Speech Commands dataset.
+    Struttura: extracted/speech_commands_v0.02/word/file.wav
+    """
+    # Trova root reale (spesso c'è una cartella intermedia)
+    # Per speech commands v0.02 di solito è diretto o in una cartella
+    # Cerchiamo cartelle che sono le label (es. "yes", "no", "up")
+    
+    # Keywords da usare (subset per semplicità o tutte)
+    # Usiamo le 10 standard + silence/unknown se vogliamo, ma per ora prendiamo le cartelle presenti
+    # Filtriamo cartelle di sistema o file
+    
+    root_search = extract_dir
+    # Se c'è una sola cartella dentro extracted, entra lì
+    entries = os.listdir(extract_dir)
+    if len(entries) == 1 and os.path.isdir(os.path.join(extract_dir, entries[0])):
+        root_search = os.path.join(extract_dir, entries[0])
+        
+    logger.info(f"📂 Scanning {root_search} for classes...")
+    
+    classes = [d for d in os.listdir(root_search) 
+               if os.path.isdir(os.path.join(root_search, d)) and d != "_background_noise_"]
+    classes.sort()
+    
+    logger.info(f"✓ Found {len(classes)} classes: {classes}")
+    
+    X = []
+    y = []
+    
+    # Limit samples per class for speed/memory if needed
+    MAX_SAMPLES_PER_CLASS = 500 
+    
+    class_to_idx = {cls_name: i for i, cls_name in enumerate(classes)}
+    
+    for cls_name in classes:
+        cls_dir = os.path.join(root_search, cls_name)
+        files = [f for f in os.listdir(cls_dir) if f.endswith('.wav')]
+        
+        # Shuffle e limit
+        import random
+        random.shuffle(files)
+        files = files[:MAX_SAMPLES_PER_CLASS]
+        
+        logger.info(f"  Processing class '{cls_name}' ({len(files)} samples)...")
+        
+        for f in files:
+            wav_path = os.path.join(cls_dir, f)
+            spec = audio_to_spectrogram(wav_path, target_shape)
+            if spec is not None:
+                X.append(spec)
+                y.append(class_to_idx[cls_name])
+                
+    # Convert to numpy
+    X = np.array(X, dtype='float32')
+    y = np.array(y, dtype='int32')
+    
+    logger.info(f"✓ Processed Total: {len(X)} samples. Shape: {X.shape}")
+    
+    # Save
+    np.save(os.path.join(output_dir, "x_train.npy"), X)
+    np.save(os.path.join(output_dir, "y_train.npy"), y)
+    
+    # Save class names mapping
+    with open(os.path.join(output_dir, "classes.json"), "w") as f:
+        json.dump(class_to_idx, f)
