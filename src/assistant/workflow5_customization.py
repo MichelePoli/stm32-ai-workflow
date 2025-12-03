@@ -1851,7 +1851,9 @@ def execute_in_environment(python_code: str, state: MasterState, timeout: int = 
         logger.error("❌ state.python_path not set!")
         raise Exception("state.python_path is required")
     
-    logger.info(f"  [Subprocess] Environment: {conda_env}, Python: {python_path}")
+    logger.info("🔧 Starting training subprocess...")
+    logger.info(f"   • Environment: {conda_env}")
+    logger.info(f"   • Python: {python_path}")
     
     result = subprocess.run(
         [python_path, '-c', python_code],
@@ -2447,24 +2449,26 @@ def fine_tune_customized_model(state: MasterState, config: dict) -> MasterState:
     Supporta sia Classification che Object Detection (YOLO)
     """
     
-    logger.info("🎓 Iniziando fine-tuning...")
+    logger.info("═══════════════════════════")
+    logger.info("🎯 FINE-TUNING")
+    logger.info("═══════════════════════════")
     
     try:
         model_path = state.customized_model_path
         
         if not model_path or not os.path.exists(model_path):
-            logger.error("❌ customized_model_path is empty!")
+            logger.error("❌ Model file not found")
             raise FileNotFoundError("customized_model_path not set")
         
-        logger.info(f"  Model path: {model_path}")
-        logger.info(f"  File size: {os.path.getsize(model_path) / 1024 / 1024:.2f} MB")
+        model_size_mb = os.path.getsize(model_path) / 1024 / 1024
+        logger.info(f"📌 Model: {os.path.basename(model_path)} ({model_size_mb:.1f}MB)")
         
         training_rec = state.parsed_modifications.get('training_recommendation', {})
         learning_rate = training_rec.get('learning_rate', state.custom_learning_rate or 0.001)
-        epochs = training_rec.get('epochs', state.custom_epochs or 5)  # Ridotto a 5 per test veloci
-        batch_size = training_rec.get('batch_size', state.custom_batch_size or 64)  # Aumentato per velocità
+        epochs = training_rec.get('epochs', state.custom_epochs or 5)
+        batch_size = training_rec.get('batch_size', state.custom_batch_size or 64)
         
-        logger.info(f"  Training params: LR={learning_rate}, epochs={epochs}, batch_size={batch_size}")
+        logger.info(f"📌 Training config: {epochs} epochs, batch={batch_size}, LR={learning_rate}")
         
         output_path = model_path.replace('.keras', '_finetuned.keras').replace('.h5', '_finetuned.h5')
         
@@ -2534,7 +2538,7 @@ try:
                     if 'height' in config and 'width' in config:
                         target_height = int(config['height'])
                         target_width = int(config['width'])
-                        print(f"      ✓ {{target_height}}x{{target_width}}")
+                        print(f"      ✓ {{target_height}}x{{target_w}}")
                         break
                 except:
                     pass
@@ -2543,7 +2547,7 @@ try:
                 try:
                     target_height = int(layer.output_shape[1])
                     target_width = int(layer.output_shape[2])
-                    print(f"      ✓ {{target_height}}x{{target_width}}")
+                    print(f"      ✓ {{target_height}}x{{target_w}}")
                     break
                 except:
                     pass
@@ -2764,6 +2768,14 @@ try:
                 print(f"  ✓ Final layer replaced: Dense({{dataset_num_classes}}, activation='softmax')")
                 print(f"  ✓ New model output shape: {{model.output_shape}}")
                 
+                # CRITICAL: Save the modified model to persist the change
+                print(f"  💾 Saving modified model...")
+                model.save(model_path, save_format='h5')
+                print(f"  ✓ Model saved with new architecture")
+                
+                # Update output shape for subsequent logic
+                output_shape = model.output_shape
+                
             except Exception as e:
                 print(f"  ❌ Error during layer replacement: {{e}}")
                 print(f"  ⚠️  Continuing with original model (may cause issues)")
@@ -2882,7 +2894,8 @@ except Exception as e:
         logger.info(f"  Output:\n{stdout_clean[:1500]}")
         
         if not result['success']:
-            logger.error(f"  Subprocess returncode: {result['returncode']}")
+            logger.error("❌ Training subprocess failed")
+            logger.error(f"   • Return code: {result['returncode']}")
             logger.error(f"  Stderr:\n{stderr[:1000]}")
             # Fix: Handle empty stderr
             error_msg = "Unknown error"
@@ -2916,9 +2929,11 @@ except Exception as e:
             state.training_validation_success = True
             state.customized_model_path = output_path
             
-            logger.info(f"✓ Fine-tuning completato!")
-            logger.info(f"  Final accuracy: {final_acc:.2%}")
-            logger.info(f"  Final val accuracy: {final_val_acc:.2%}")
+            logger.info("✅ Training completed successfully")
+            logger.info(f"   • Final loss: {final_loss:.4f}")
+            logger.info(f"   • Final accuracy: {final_acc:.4f}")
+            logger.info(f"   • Val loss: {final_val_loss:.4f}")
+            logger.info(f"   • Val accuracy: {final_val_acc:.4f}")
         else:
             raise Exception(f"Output does not contain SUCCESS marker")
     
@@ -3091,9 +3106,9 @@ except Exception as e:
                 "format": "H5"  # ← Formato finale
             })
             
-            logger.info(f"✓ Model saved: {final_path}")
-            logger.info(f"  Format: H5 (stedgeai compatible)")
-            logger.info(f"  Size: {state.customized_model_info['model_size_mb']} MB")
+            logger.info("✅ Model saved successfully")
+            logger.info(f"   • Output: {final_path}")
+            logger.info(f"   • Size: {os.path.getsize(final_path) / 1024 / 1024:.1f}MB")
         else:
             logger.error(f"❌ Validation output missing SUCCESS marker")
             state.error_message = "Validation failed"

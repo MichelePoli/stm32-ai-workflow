@@ -88,7 +88,7 @@ DATASET_CATALOG = {
 def decide_data_source(state: MasterState, config: dict) -> MasterState:
     """Chiede all'utente quale fonte dati utilizzare"""
     
-    logger.info("📊 Selezione fonte dati...")
+    logger.info("📊 Dataset Source Selection")
     
     prompt = {
         "instruction": "Quale dataset vuoi utilizzare per il fine-tuning?",
@@ -121,7 +121,7 @@ def decide_data_source(state: MasterState, config: dict) -> MasterState:
         logger.warning(f"⚠️  Scelta non riconosciuta '{user_text}', default a Synthetic")
         state.dataset_source = "synthetic"
         
-    logger.info(f"✓ Data Source: {state.dataset_source}")
+    logger.info(f"✅ Selected: {state.dataset_source}")
     return state
 
 
@@ -175,7 +175,7 @@ def select_predefined_dataset(state: MasterState, config: dict) -> MasterState:
         logger.warning(f"⚠️  Dataset non riconosciuto, uso default: {selected_key}")
         
     state.real_dataset_name = selected_key
-    logger.info(f"✓ Dataset selezionato: {selected_key}")
+    logger.info(f"✅ Dataset selected: {selected_key}")
     
     return state
 
@@ -184,7 +184,7 @@ def download_dataset(state: MasterState, config: dict) -> MasterState:
     """Scarica il dataset selezionato"""
     
     dataset_name = state.real_dataset_name
-    logger.info(f"⬇️  Download dataset: {dataset_name}...")
+    logger.info(f"📥 Downloading: {dataset_name}...")
     
     # Setup dir
     dataset_dir = os.path.join(state.base_dir, "data", "real_datasets", dataset_name)
@@ -209,10 +209,10 @@ def download_dataset(state: MasterState, config: dict) -> MasterState:
             np.save(os.path.join(dataset_dir, "x_test.npy"), x_test)
             np.save(os.path.join(dataset_dir, "y_test.npy"), y_test)
             
-            logger.info(f"✓ Dataset salvato in {dataset_dir}")
+            logger.info(f"✅ Dataset saved to {dataset_dir}")
             
         except Exception as e:
-            logger.error(f"❌ Errore download Keras dataset: {e}")
+            logger.error(f"❌ Download failed: {e}")
             
     # Logica per Audio (Download URL)
     elif dataset_name in ["speech_commands", "esc50", "fsdd"]:
@@ -226,7 +226,7 @@ def download_dataset(state: MasterState, config: dict) -> MasterState:
                 logger.info(f"⬇️  Downloading {url}...")
                 download_file(url, archive_path)
             else:
-                logger.info(f"✓ Archive found: {archive_path}")
+                logger.info(f"✅ Archive found: {archive_path}")
                 
             # 2. Extract
             extract_dir = os.path.join(dataset_dir, "extracted")
@@ -234,7 +234,7 @@ def download_dataset(state: MasterState, config: dict) -> MasterState:
                 logger.info(f"📦 Extracting to {extract_dir}...")
                 extract_archive(archive_path, extract_dir)
             else:
-                logger.info(f"✓ Extracted dir found")
+                logger.info(f"✅ Extracted dir found")
                 
             # 3. Process to Spectrograms (.npy)
             logger.info("🎵 Processing audio to spectrograms...")
@@ -251,7 +251,7 @@ def download_dataset(state: MasterState, config: dict) -> MasterState:
                 # TODO: Implement FSDD specific parsing
                 pass
                 
-            logger.info(f"✓ Audio dataset processed and saved to {dataset_dir}")
+            logger.info(f"✅ Audio dataset processed")
             
         except Exception as e:
             logger.error(f"❌ Error processing audio dataset: {e}")
