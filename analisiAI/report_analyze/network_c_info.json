@@ -7457,54 +7457,54 @@
   ],
   "environment": {
     "generated_model": {
-      "generated_time": "2025-11-21T12:20:39+0100",
+      "generated_time": "2025-12-04T13:45:07+0100",
       "model_files": [
         {
           "name": "network_data_params.h",
-          "signature": "0x70db3cb660582b261a99ca1479a240a4"
+          "signature": "0x9e03da0f9cbab21f59febad31526f846"
         },
         {
           "name": "network_data_params.c",
-          "signature": "0x9ddfb2662085d4b58056ceec53d2fa6d"
+          "signature": "0x77ec48853bea4cf7a85a0725712eb416"
         },
         {
           "name": "network_data.h",
-          "signature": "0x99ed8bdf454d32db5f39e197fbc660bc"
+          "signature": "0x9a0a69b969f0a871d3fa132190041776"
         },
         {
           "name": "network_data.c",
-          "signature": "0x9be98c7dfa6db231696044340452260c"
+          "signature": "0xc87168b7563d9dc38443d1e3aee03d0e"
         },
         {
           "name": "network_config.h",
-          "signature": "0x58d6b437ddb12f998bc8ec388a3f8a49"
+          "signature": "0x4a8194861be04c31e177ae885721bb2a"
         },
         {
           "name": "network.h",
-          "signature": "0xe254768da44276ca8c1a15876ebbeafd"
+          "signature": "0x224c90c015d9c3c9cf7d55bc9a9dc251"
         },
         {
           "name": "network.c",
-          "signature": "0xf7f64e6797f1cb559ffbd500d247adc4"
+          "signature": "0xc18ff9ff1d0b4f901e63fc373fc49150"
         }
       ],
       "name": "network"
     },
-    "network_signature": "0x7c5e2f266517d6d5",
+    "network_signature": "0xa1c4f90829dcdc04",
     "test_name": "",
     "tools": [
       {
-        "arguments": "analyze --model /home/mrusso/.stm32_ai_models/customized/customized_final_20251121_121825.h5 --target stm32f4 --output ./analisiAI/report_analyze",
+        "arguments": "analyze --model /home/mrusso/.stm32_ai_models/mobilenetv2_224.h5 --target stm32f4 --output ./analisiAI/report_analyze",
         "environment": [],
         "input_model": {
           "model_files": [
             {
-              "name": "customized_final_20251121_121825.h5",
-              "signature": "0xc52f89e5078138bb5cfd89b85c8bf034"
+              "name": "mobilenetv2_224.h5",
+              "signature": "0x2bfb5392202c7a642f828f2ad7434894"
             }
           ],
           "n_params": 3504872,
-          "name": "customized_final_20251121_121825",
+          "name": "mobilenetv2_224",
           "size": 14019488,
           "type": "keras"
         },
@@ -9047,7 +9047,7 @@
       "inputs": [
         1360
       ],
-      "name": "customized_final_20251121_121825",
+      "name": "mobilenetv2_224",
       "nodes": [
         {
           "attributes": {

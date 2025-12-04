@@ -1,13 +1,13 @@
 ST Edge AI Core v2.2.0-20266 2adc00962
-Created date          : 2025-11-21 12:21:15
-Parameters            : generate --model /home/mrusso/.stm32_ai_models/mobilenetv2_224.h5 --target stm32f4 --compression high --output ./analisiAI/code_resnet
+Created date          : 2025-12-04 13:45:41
+Parameters            : generate --model /home/mrusso/.stm32_ai_models/mobilenetv2_224.h5 --target stm32f4 --compression medium --output ./analisiAI/code_resnet
 
 Exec/report summary (generate)
 ------------------------------------------------------------------------------------------------
 model file         :   /home/mrusso/.stm32_ai_models/mobilenetv2_224.h5                         
 type               :   keras                                                                    
 c_name             :   network                                                                  
-compression        :   high                                                                     
+compression        :   medium                                                                   
 options            :   allocate-inputs, allocate-outputs                                        
 optimization       :   balanced                                                                 
 target/series      :   stm32f4                                                                  

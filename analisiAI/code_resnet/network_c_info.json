@@ -7457,44 +7457,44 @@
   ],
   "environment": {
     "generated_model": {
-      "generated_time": "2025-11-21T12:21:12+0100",
+      "generated_time": "2025-12-04T13:45:39+0100",
       "model_files": [
         {
           "name": "network_data_params.h",
-          "signature": "0xe3d1a62167f9c5dd8bba664e02f250d8"
+          "signature": "0x9f3dd83851b84270c256528382a640b8"
         },
         {
           "name": "network_data_params.c",
-          "signature": "0xa4fe65bb340f6b78b2e8a754c4608025"
+          "signature": "0xfb94ee57d3f467bede4e7c45df0418a1"
         },
         {
           "name": "network_data.h",
-          "signature": "0x41241255d63a415b921b6d765848475f"
+          "signature": "0x411708d1c7bbabd38d5581633d75cd55"
         },
         {
           "name": "network_data.c",
-          "signature": "0xcf9978a318d70455064d93544c3423c1"
+          "signature": "0xee9e8ae941a0c84489712cce67c90e1a"
         },
         {
           "name": "network_config.h",
-          "signature": "0x302635f1c64381dcf1b900bb6f0f88a3"
+          "signature": "0x561b9387e4af745a7bb4cf50c4e58c02"
         },
         {
           "name": "network.h",
-          "signature": "0xaa3ecbb6aa120c346b5ca0f47811e33d"
+          "signature": "0x3fb4403e5f7f69cfa8115d531f9bfeed"
         },
         {
           "name": "network.c",
-          "signature": "0x3a206138219f88d0d5f39588f3014cc3"
+          "signature": "0x9be53a01f643806620f17b57f3de7ab1"
         }
       ],
       "name": "network"
     },
-    "network_signature": "0x21cc79e102c2dcaa",
+    "network_signature": "0xa2337db5357a9086",
     "test_name": "",
     "tools": [
       {
-        "arguments": "generate --model /home/mrusso/.stm32_ai_models/mobilenetv2_224.h5 --target stm32f4 --compression high --output ./analisiAI/code_resnet",
+        "arguments": "generate --model /home/mrusso/.stm32_ai_models/mobilenetv2_224.h5 --target stm32f4 --compression medium --output ./analisiAI/code_resnet",
         "environment": [],
         "input_model": {
           "model_files": [

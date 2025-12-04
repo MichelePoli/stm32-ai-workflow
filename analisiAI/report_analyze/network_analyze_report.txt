@@ -1,33 +1,33 @@
 ST Edge AI Core v2.2.0-20266 2adc00962
-Created date          : 2025-11-21 12:20:42
-Parameters            : analyze --model /home/mrusso/.stm32_ai_models/customized/customized_final_20251121_121825.h5 --target stm32f4 --output ./analisiAI/report_analyze
+Created date          : 2025-12-04 13:45:10
+Parameters            : analyze --model /home/mrusso/.stm32_ai_models/mobilenetv2_224.h5 --target stm32f4 --output ./analisiAI/report_analyze
 
 Exec/report summary (analyze)
-------------------------------------------------------------------------------------------------------
-model file         :   /home/mrusso/.stm32_ai_models/customized/customized_final_20251121_121825.h5   
-type               :   keras                                                                          
-c_name             :   network                                                                        
-compression        :   lossless                                                                       
-options            :   allocate-inputs, allocate-outputs                                              
-optimization       :   balanced                                                                       
-target/series      :   stm32f4                                                                        
-workspace dir      :   /mnt/shared-storage/mrusso/Langgraph_General_v6/st_ai_ws                       
-output dir         :   /mnt/shared-storage/mrusso/Langgraph_General_v6/analisiAI/report_analyze       
-model_fmt          :   float                                                                          
-model_name         :   customized_final_20251121_121825                                               
-model_hash         :   0xc52f89e5078138bb5cfd89b85c8bf034                                             
-params #           :   3,504,872 items (13.37 MiB)                                                    
-------------------------------------------------------------------------------------------------------
-input 1/1          :   'input_1', f32(1x224x224x3), 588.00 KBytes, activations                        
-output 1/1         :   'predictions', f32(1x1000), 3.91 KBytes, activations                           
-macc               :   313,298,016                                                                    
-weights (ro)       :   13,951,264 B (13.30 MiB) (1 segment) / -68,224(-0.5%) vs float model           
-activations (rw)   :   4,917,696 B (4.69 MiB) (1 segment) *                                           
-ram (total)        :   4,917,696 B (4.69 MiB) = 4,917,696 + 0 + 0                                     
-------------------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------
+model file         :   /home/mrusso/.stm32_ai_models/mobilenetv2_224.h5                           
+type               :   keras                                                                      
+c_name             :   network                                                                    
+compression        :   lossless                                                                   
+options            :   allocate-inputs, allocate-outputs                                          
+optimization       :   balanced                                                                   
+target/series      :   stm32f4                                                                    
+workspace dir      :   /mnt/shared-storage/mrusso/Langgraph_General_v6/st_ai_ws                   
+output dir         :   /mnt/shared-storage/mrusso/Langgraph_General_v6/analisiAI/report_analyze   
+model_fmt          :   float                                                                      
+model_name         :   mobilenetv2_224                                                            
+model_hash         :   0x2bfb5392202c7a642f828f2ad7434894                                         
+params #           :   3,504,872 items (13.37 MiB)                                                
+--------------------------------------------------------------------------------------------------
+input 1/1          :   'input_1', f32(1x224x224x3), 588.00 KBytes, activations                    
+output 1/1         :   'predictions', f32(1x1000), 3.91 KBytes, activations                       
+macc               :   313,298,016                                                                
+weights (ro)       :   13,951,264 B (13.30 MiB) (1 segment) / -68,224(-0.5%) vs float model       
+activations (rw)   :   4,917,696 B (4.69 MiB) (1 segment) *                                       
+ram (total)        :   4,917,696 B (4.69 MiB) = 4,917,696 + 0 + 0                                 
+--------------------------------------------------------------------------------------------------
 (*) 'input'/'output' buffers are allocated in the activations buffer
 
-Model name - customized_final_20251121_121825
+Model name - mobilenetv2_224
 ------ -------------------------------------------------------------- ------------------------ --------------------- ------------ ------------------------------- --- ----------------------- ------------------------ --------------------------------- 
 m_id   layer (type,original)                                          oshape                   param/size                    macc                    connected to   | c_size                  c_macc                   c_type                            
 ------ -------------------------------------------------------------- ------------------------ --------------------- ------------ ------------------------------- --- ----------------------- ------------------------ --------------------------------- 
@@ -361,7 +361,7 @@ model/c-model: macc=320,531,392/313,298,016 -7,233,376(-2.3%) weights=14,019,488
 
 Generated C-graph summary
 ------------------------------------------------------------------------------------------------------------------------
-model name            : customized_final_20251121_121825
+model name            : mobilenetv2_224
 c-name                : network
 c-node #              : 100
 c-array #             : 242

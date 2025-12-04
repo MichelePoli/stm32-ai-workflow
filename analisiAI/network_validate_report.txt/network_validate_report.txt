@@ -1,5 +1,5 @@
 ST Edge AI Core v2.2.0-20266 2adc00962
-Created date          : 2025-11-21 12:21:02
+Created date          : 2025-12-04 13:45:29
 Parameters            : validate --model /home/mrusso/.stm32_ai_models/mobilenetv2_224.h5 --target stm32f4 --output ./analisiAI/network_validate_report.txt
 
 Exec/report summary (validate)
@@ -1093,7 +1093,7 @@ Running the ST.AI c-model (AI RUNNER)...(name=network, mode=HOST)
   weights             :   13951264                                                
   macc                :   313298016                                               
   hash                :   0x2bfb5392202c7a642f828f2ad7434894                      
-  compile_datetime    :   Nov 21 2025 12:20:54                                    
+  compile_datetime    :   Dec  4 2025 13:45:22                                    
   --------------------------------------------------------------------------------
   protocol            :   DLL Driver v2.0 - Direct Python binding                 
   tools               :   ST.AI (legacy api) v2.2.0                               
@@ -1108,7 +1108,7 @@ Running the ST.AI c-model (AI RUNNER)...(name=network, mode=HOST)
   ST.AI Profiling results v2.0 - "network"
   ------------------------------------------------------------------
   nb sample(s)   :   10                                             
-  duration       :   174.884 ms by sample (174.340/175.595/0.341)   
+  duration       :   173.945 ms by sample (173.464/174.618/0.357)   
   macc           :   313298016                                      
   ------------------------------------------------------------------
   
@@ -1262,7 +1262,7 @@ m_id   name                            c_macc                    c_rom          
 8      expanded_conv_project_BN        |||||              2.0%   |                  0.0%   [4]          1.4%                      
 10     block_1_expand_BN               |||||||||||||||    6.1%   |                  0.0%   [5]          4.4%                      
 11     block_1_expand_relu             ||                 0.8%   |                  0.0%   [6]          0.5%                      
-12     block_1_pad                     |||                0.9%   |                  0.0%   [7]          1.1%                      
+12     block_1_pad                     |||                0.9%   |                  0.0%   [7]          1.0%                      
 15     block_1_depthwise_relu          |                  0.2%   |                  0.0%   [8]          0.0%                      
 17     block_1_project_BN              ||||||             2.3%   |                  0.1%   [9]          2.0%                      
 19     block_2_expand_BN               |||||||||          3.5%   |                  0.1%   [10]         2.6%                      
@@ -1347,7 +1347,7 @@ m_id   name                            c_macc                    c_rom          
 142    block_15_add                    |                  0.0%   |                  0.0%   [89]         0.0%                      
 144    block_16_expand_BN              ||||||             2.4%   ||                 4.4%   [90]         2.4%                      
 145    block_16_expand_relu            |                  0.0%   |                  0.0%   [91]         0.0%                      
-147    block_16_depthwise_BN           |                  0.1%   |                  0.3%   [92]         0.1%                      
+147    block_16_depthwise_BN           |                  0.1%   |                  0.3%   [92]         0.2%                      
 148    block_16_depthwise_relu         |                  0.0%   |                  0.0%   [93]         0.0%                      
 150    block_16_project_BN             ||||||||||||       4.8%   ||||               8.8%   [94]         6.7%                      
 152    Conv_1_bn                       ||||||||||||||||   6.4%   |||||             11.8%   [95]         8.0%                      
