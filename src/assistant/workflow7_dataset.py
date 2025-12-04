@@ -78,6 +78,67 @@ DATASET_CATALOG = {
             "type": "image",
             "size": "30 MB"
         }
+    },
+    "object_detection": {
+        "roboflow_vehicles": {
+            "description": "Roboflow Vehicles: Cars, Trucks detection (COCO format)",
+            "url": "https://universe.roboflow.com/roboflow-100/vehicles-q0vsv/dataset/1/download",
+            "type": "image",
+            "size": "~500 MB",
+            "note": "Smaller, focused dataset with COCO-format annotations",
+            "kaggle_alternative": "https://www.kaggle.com/datasets/solesensei/coco-minitrain-2017"
+        },
+        "pascal_voc_2012": {
+            "description": "PASCAL VOC 2012: Object Detection (20 classes)",
+            "tfds_name": "voc/2012",  # Usa TensorFlow Datasets invece di URL
+            "type": "image",
+            "size": "~1.9 GB",
+            "note": "Downloaded via TensorFlow Datasets (tfds) - automatic"
+        }
+    },
+    "human_activity_recognition": {
+        "uci_har": {
+            "description": "UCI HAR: 30 subjects, 6 activities (accelerometer + gyroscope)",
+            "url": "https://archive.ics.uci.edu/ml/machine-learning-databases/00240/UCI%20HAR%20Dataset.zip",
+            "type": "sensor",
+            "size": "~60 MB",
+            "note": "Smartphone sensor data at 50Hz"
+        },
+        "wisdm": {
+            "description": "WISDM: 51 subjects, 18 activities (Accelerometer + Gyroscope)",
+            "url": "https://archive.ics.uci.edu/ml/machine-learning-databases/00507/wisdm-dataset.zip",
+            "type": "sensor",
+            "size": "~295 MB",
+            "note": "UCI ML Repository - Direct download ZIP (20Hz sensor data)"
+        }
+    }
+}
+
+# ============================================================================
+# MODEL TO DATASET MAPPING
+# ============================================================================
+# Maps PREDEFINED_MODELS task types to compatible datasets
+
+MODEL_TO_DATASET_MAP = {
+    "image_classification": {
+        "preferred_datasets": ["cifar10", "mnist", "fashion_mnist"],
+        "task_type": "vision",
+        "notes": "Standard image classification datasets work well"
+    },
+    "object_detection": {
+        "preferred_datasets": ["roboflow_vehicles", "pascal_voc_2012"],
+        "task_type": "object_detection",
+        "notes": "Requires bounding box annotations; Roboflow Vehicles is smaller and faster"
+    },
+    "human_activity_recognition": {
+        "preferred_datasets": ["uci_har", "wisdm"],
+        "task_type": "human_activity_recognition",
+        "notes": "Sensor data (accelerometer/gyroscope); WISDM is simpler with fewer activities"
+    },
+    "audio_event_detection": {
+        "preferred_datasets": ["speech_commands", "esc50", "fsdd"],
+        "task_type": "audio",
+        "notes": "Audio converted to spectrograms for vision models"
     }
 }
 
@@ -123,58 +184,256 @@ def decide_data_source(state: MasterState, config: dict) -> MasterState:
 
 
 def select_predefined_dataset(state: MasterState, config: dict) -> MasterState:
-    """Mostra menu dataset basato sul task"""
+    """
+    Mostra menu dataset basato sul task del modello selezionato.
+    Usa MODEL_TO_DATASET_MAP per determinare automaticamente il task_type più appropriato.
+    """
     
-    # Determina il tipo di task (audio vs vision)
-    # Usiamo state.last_task o euristica sul modello
-    task_type = "vision" # Default
-    if "audio" in state.last_task or "speech" in state.last_task or "sound" in state.last_task:
-        task_type = "audio"
-    elif "image" in state.last_task or "object" in state.last_task or "vision" in state.last_task:
+    logger.info("📊 Selezione dataset intelligente basata sul modello...")
+    
+    # ===== STEP 1: Determina task_type dal modello selezionato =====
+    task_type = "vision"  # Default
+    preferred_datasets = []
+    mapping_notes = ""
+    
+    # Cerca mapping dal last_task salvato (task selezionato dall'utente)
+    if state.last_task:
+        mapping = MODEL_TO_DATASET_MAP.get(state.last_task)
+        if mapping:
+            task_type = mapping["task_type"]
+            preferred_datasets = mapping["preferred_datasets"]
+            mapping_notes = mapping.get("notes", "")
+            logger.info(f"✓ Task type determinato dal modello: {task_type}")
+            logger.info(f"  Preferred datasets: {preferred_datasets}")
+        else:
+            logger.warning(f"⚠️ Task '{state.last_task}' non mappato, uso euristica")
+    
+    # ===== Fallback euristica (backward compatibility) =====
+    if not preferred_datasets:
+        logger.info("  Usando euristica basata su keyword nel task...")
+        if "audio" in state.last_task or "speech" in state.last_task or "sound" in state.last_task:
+            task_type = "audio"
+            preferred_datasets = ["speech_commands", "esc50", "fsdd"]
+        elif "image" in state.last_task or "object" in state.last_task or "vision" in state.last_task:
+            task_type = "vision"
+            preferred_datasets = ["cifar10", "mnist"]
+        elif "human" in state.last_task or "activity" in state.last_task or "har" in state.last_task:
+            task_type = "human_activity_recognition"
+            preferred_datasets = ["uci_har", "wisdm"]
+        elif "detection" in state.last_task:
+            task_type = "object_detection"
+            preferred_datasets = ["coco_minitrain"]
+    
+    # ===== STEP 2: Verifica compatibilità input shape (opzionale) =====
+    if state.model_architecture:
+        input_shape = state.model_architecture.get('input_shape')
+        if input_shape:
+            logger.info(f"  Model input shape: {input_shape}")
+            
+            # Euristica avanzata basata su input shape
+            if isinstance(input_shape, (list, tuple)) and len(input_shape) == 3:
+                h, w, c = input_shape
+                
+                # Audio spectrograms: tipicamente piccoli e mono-channel
+                if c == 1 and (h < 100 or w < 100):
+                    logger.info(f"  ✓ Input shape {input_shape} suggerisce audio (spectrogram)")
+                    if task_type == "vision":  # Solo se non già audio
+                        task_type = "audio"
+                        preferred_datasets = ["speech_commands", "fsdd", "esc50"]
+                
+                # HAR: input 1D o molto piccolo
+                elif len(input_shape) == 2 or (h < 50 and w < 50):
+                    logger.info(f"  ⚠️ Input shape {input_shape} potrebbe essere per HAR (sensor data)")
+    
+    # ===== STEP 3: Seleziona dataset dal catalogo =====
+    options = DATASET_CATALOG.get(task_type, DATASET_CATALOG.get("vision", {}))
+    
+    if not options:
+        logger.error(f"❌ Nessun dataset trovato per task_type '{task_type}'")
+        # Fallback a vision
         task_type = "vision"
-        
-    # Se il modello ha input 1D/2D possiamo raffinare, ma per ora fidiamoci del task
+        options = DATASET_CATALOG["vision"]
+        preferred_datasets = ["cifar10"]
     
-    options = DATASET_CATALOG.get(task_type, DATASET_CATALOG["vision"])
+    # ===== STEP 4: Ordina dataset (preferred prima) =====
+    # Mostra prima i dataset preferiti, poi gli altri
+    all_keys = list(options.keys())
     
-    menu_text = "Scegli un dataset reale:\n"
-    valid_keys = []
-    for key, info in options.items():
-        menu_text += f"- {key}: {info['description']} ({info['size']})\n"
-        valid_keys.append(key)
+    # Filtra preferred che esistono effettivamente nel catalogo
+    valid_preferred = [k for k in preferred_datasets if k in all_keys]
+    other_keys = [k for k in all_keys if k not in valid_preferred]
+    
+    valid_keys = valid_preferred + other_keys
+    
+    # ===== STEP 5: Costruisci menu con badge per dataset consigliati =====
+    menu_text = f"\n{'='*70}\n"
+    menu_text += f"📊 DATASET REALI PER: {task_type.upper().replace('_', ' ')}\n"
+    menu_text += f"{'='*70}\n\n"
+    
+    if mapping_notes:
+        menu_text += f"💡 Note: {mapping_notes}\n\n"
+    
+    menu_text += "Scegli un dataset:\n\n"
+    
+    for idx, key in enumerate(valid_keys, 1):
+        info = options[key]
         
+        # Badge per dataset consigliati
+        badge = "⭐ CONSIGLIATO" if key in valid_preferred else ""
+        note = info.get('note', '')
+        
+        menu_text += f"{idx}. {key}: {info['description']}\n"
+        menu_text += f"   📦 Size: {info['size']}"
+        if badge:
+            menu_text += f"  {badge}"
+        menu_text += "\n"
+        if note:
+            menu_text += f"   💬 {note}\n"
+        menu_text += "\n"
+    
+    menu_text += f"{'='*70}\n"
+    
+    # ===== STEP 6: Mostra informazioni modello selezionato =====
+    if state.selected_model:
+        model_name = state.selected_model.get('name', 'N/A')
+        menu_text += f"\n🤖 Modello selezionato: {model_name}\n"
+    
     prompt = {
         "instruction": menu_text,
-        "valid_options": valid_keys
+        "valid_options": valid_keys,
+        "hint": "Inserisci il numero o il nome del dataset (es: 1 oppure cifar10)"
     }
     
+    # ===== STEP 7: Richiesta input utente =====
     user_response = interrupt(prompt)
     
     if isinstance(user_response, dict):
-        selection = str(user_response.get("response", user_response.get("input", ""))).lower().strip() # può essere ad esempio: "1", "2", "3", "audio", "vision"
+        selection = str(user_response.get("response", user_response.get("input", ""))).lower().strip()
     else:
         selection = str(user_response).lower().strip()
     
-    # Default: first dataset in the list
+    # ===== STEP 8: Parsing risposta utente =====
+    # Default: primo dataset consigliato (o primo disponibile)
     if not selection or selection.strip() == "":
-        selection = valid_keys[0]
-        
-    # Fuzzy matching semplice
+        selection = valid_keys[0] if valid_keys else "cifar10"
+        logger.info(f"  Nessuna selezione, uso default: {selection}")
+    
+    # Fuzzy matching: cerca per nome o per numero
     selected_key = None
-    for key in valid_keys:
-        if key in selection:
-            selected_key = key
-            break
-            
+    
+    # Prova a interpretare come numero
+    try:
+        idx = int(selection) - 1
+        if 0 <= idx < len(valid_keys):
+            selected_key = valid_keys[idx]
+            logger.info(f"  ✓ Dataset selezionato per indice {idx+1}: {selected_key}")
+    except ValueError:
+        pass
+    
+    # Se non è un numero, cerca per match parziale nel nome
     if not selected_key:
-        # Fallback al primo
-        selected_key = valid_keys[0]
-        logger.warning(f"⚠️  Dataset non riconosciuto, uso default: {selected_key}")
-        
+        for key in valid_keys:
+            if key in selection or selection in key:
+                selected_key = key
+                logger.info(f"  ✓ Dataset selezionato per match: {selected_key}")
+                break
+    
+    # Fallback: usa il primo disponibile
+    if not selected_key:
+        selected_key = valid_keys[0] if valid_keys else "cifar10"
+        logger.warning(f"⚠️ Dataset non riconosciuto '{selection}', uso default: {selected_key}")
+    
+    # ===== STEP 9: Verifica compatibilità modello-dataset =====
+    if state.model_architecture and selected_key:
+        compatibility_ok = check_dataset_model_compatibility(
+            state.model_architecture.get('input_shape'),
+            selected_key,
+            task_type
+        )
+        if not compatibility_ok:
+            logger.warning("⚠️ Potrebbe essere necessario preprocessing/resizing del dataset")
+    
+    # ===== STEP 10: Salva selezione =====
     state.real_dataset_name = selected_key
-    logger.info(f"✅ Dataset selected: {selected_key}")
+    logger.info(f"✅ Dataset finale selezionato: {selected_key}")
+    logger.info(f"   Task type: {task_type}")
     
     return state
+
+
+def check_dataset_model_compatibility(model_input_shape, dataset_name: str, task_type: str) -> bool:
+    """
+    Verifica se il dataset è compatibile con l'input del modello.
+    
+    Args:
+        model_input_shape: Input shape del modello (es: [224, 224, 3])
+        dataset_name: Nome del dataset (es: 'cifar10')
+        task_type: Tipo di task (es: 'vision', 'audio', 'human_activity_recognition')
+    
+    Returns:
+        True se compatibile, False se serve preprocessing/resizing
+    """
+    
+    if not model_input_shape:
+        logger.info("  ℹ️  Input shape modello non disponibile, skip compatibilità check")
+        return True
+    
+    # ===== Dimensioni standard dei dataset =====
+    dataset_shapes = {
+        # Vision
+        "cifar10": (32, 32, 3),
+        "mnist": (28, 28, 1),
+        "fashion_mnist": (28, 28, 1),
+        
+        # Audio (dopo conversione a spectrogram)
+        "speech_commands": (32, 32, 1),  # default processing
+        "esc50": (64, 64, 1),  # tipico per ESC-50
+        "fsdd": (28, 28, 1),  # small spectrograms
+        
+        # Object Detection (varia)
+        "coco_minitrain": None,  # Multiple sizes, requires resizing
+        "pascal_voc_2012": None,  # Multiple sizes, requires resizing
+        
+        # HAR (sensor data, varia molto)
+        "uci_har": None,  # Time series, shape depends on window size
+        "wisdm": None,  # Time series, shape depends on window size
+    }
+    
+    expected_shape = dataset_shapes.get(dataset_name)
+    
+    # ===== Se dataset ha shape variabile (None), sempre OK =====
+    if expected_shape is None:
+        logger.info(f"  ✓ Dataset '{dataset_name}' ha dimensioni variabili (supporta preprocessing)")
+        return True
+    
+    # ===== Converti model_input_shape in tuple per confronto =====
+    if isinstance(model_input_shape, list):
+        model_shape_tuple = tuple(model_input_shape)
+    elif isinstance(model_input_shape, tuple):
+        model_shape_tuple = model_input_shape
+    else:
+        logger.warning(f"  ⚠️ Input shape formato non riconosciuto: {type(model_input_shape)}")
+        return True
+    
+    # ===== Confronta dimensioni =====
+    if expected_shape == model_shape_tuple:
+        logger.info(f"  ✓✓ Perfetta compatibilità: dataset {expected_shape} = modello {model_shape_tuple}")
+        return True
+    
+    # ===== Shape diverso → serve resize =====
+    logger.warning(f"  ⚠️ Incompatibilità shape:")
+    logger.warning(f"     Dataset '{dataset_name}': {expected_shape}")
+    logger.warning(f"     Modello richiede: {model_shape_tuple}")
+    
+    # Suggerimenti specifici
+    if task_type == "vision":
+        logger.info(f"  💡 Soluzione: Usa resizing layer o preprocessing per adattare {expected_shape} → {model_shape_tuple}")
+    elif task_type == "audio":
+        logger.info(f"  💡 Soluzione: Modifica parametri spectrogram processing (target_shape)")
+    elif task_type in ["human_activity_recognition", "object_detection"]:
+        logger.info(f"  💡 Soluzione: Configura window size o usa data augmentation con resize")
+    
+    return False
 
 
 def download_dataset(state: MasterState, config: dict) -> MasterState:
@@ -243,9 +502,11 @@ def download_dataset(state: MasterState, config: dict) -> MasterState:
                 process_speech_commands(extract_dir, dataset_dir, target_shape)
             elif dataset_name == "esc50":
                 # TODO: Implement ESC-50 specific parsing
+                logger.warning("⚠️ ESC-50 processing not yet implemented")
                 pass
             elif dataset_name == "fsdd":
                 # TODO: Implement FSDD specific parsing
+                logger.warning("⚠️ FSDD processing not yet implemented")
                 pass
                 
             logger.info(f"✅ Audio dataset processed")
@@ -255,6 +516,168 @@ def download_dataset(state: MasterState, config: dict) -> MasterState:
             # Fallback dummy
             with open(os.path.join(dataset_dir, "README.txt"), "w") as f:
                 f.write(f"Dataset {dataset_name} failed: {e}")
+    
+    # Logica per Object Detection (Download URL o TFDS)
+    elif dataset_name in ["roboflow_vehicles", "pascal_voc_2012"]:
+        try:
+            dataset_info = DATASET_CATALOG["object_detection"][dataset_name]
+            
+            # ===== PASCAL VOC 2012: Usa TensorFlow Datasets =====
+            if dataset_name == "pascal_voc_2012":
+                logger.info(f"📥 Downloading PASCAL VOC 2012 via TensorFlow Datasets...")
+                
+                try:
+                    import tensorflow_datasets as tfds
+                    
+                    # Download dataset con tfds (automatico)
+                    logger.info(f"⬇️  Loading from TFDS: {dataset_info['tfds_name']}")
+                    logger.info(f"   This may take a while for first download (~{dataset_info['size']})...")
+                    
+                    # Load dataset con info
+                    ds_train, ds_info = tfds.load(
+                        dataset_info['tfds_name'],
+                        split='train',
+                        with_info=True,
+                        data_dir=dataset_dir  # Salva in directory specifica
+                    )
+                    
+                    ds_validation = tfds.load(
+                        dataset_info['tfds_name'],
+                        split='validation',
+                        data_dir=dataset_dir
+                    )
+                    
+                    logger.info(f"✅ PASCAL VOC 2012 loaded successfully!")
+                    logger.info(f"   Train samples: {ds_info.splits['train'].num_examples}")
+                    logger.info(f"   Validation samples: {ds_info.splits['validation'].num_examples}")
+                    logger.info(f"   Features: {ds_info.features}")
+                    
+                    # Salva metadata
+                    metadata = {
+                        "dataset_name": dataset_name,
+                        "download_date": datetime.now().isoformat(),
+                        "source": "TensorFlow Datasets (tfds)",
+                        "tfds_name": dataset_info['tfds_name'],
+                        "num_train": int(ds_info.splits['train'].num_examples),
+                        "num_validation": int(ds_info.splits['validation'].num_examples),
+                        "features": str(ds_info.features),
+                        "note": dataset_info.get("note", "")
+                    }
+                    
+                    with open(os.path.join(dataset_dir, "metadata.json"), "w") as f:
+                        json.dump(metadata, f, indent=2)
+                    
+                    # Salva info su come usare il dataset
+                    with open(os.path.join(dataset_dir, "USAGE_INFO.txt"), "w") as f:
+                        f.write(f"PASCAL VOC 2012 Dataset (via TensorFlow Datasets)\n\n")
+                        f.write(f"To load this dataset in your code:\n\n")
+                        f.write(f"import tensorflow_datasets as tfds\n\n")
+                        f.write(f"# Load train split\n")
+                        f.write(f"ds_train = tfds.load('{dataset_info['tfds_name']}', split='train', data_dir='{dataset_dir}')\n\n")
+                        f.write(f"# Load validation split\n")
+                        f.write(f"ds_validation = tfds.load('{dataset_info['tfds_name']}', split='validation', data_dir='{dataset_dir}')\n\n")
+                        f.write(f"Features:\n{ds_info.features}\n")
+                    
+                    logger.info(f"✅ Object Detection dataset (TFDS) setup completato")
+                    logger.info(f"💡 Usage instructions saved in USAGE_INFO.txt")
+                    logger.info(f"⚠️  Note: Dataset includes bounding boxes and segmentation masks")
+                    
+                except ImportError:
+                    logger.error("❌ tensorflow_datasets not installed!")
+                    logger.info("   Install with: pip install tensorflow-datasets")
+                    raise
+                    
+            # ===== Roboflow Vehicles: Download manuale =====
+            elif "roboflow.com" in dataset_info.get("url", ""):
+                url = dataset_info["url"]
+                logger.info(f"📥 Dataset Roboflow rilevato")
+                logger.info(f"")
+                logger.info(f"⚠️  RICHIESTA AZIONE UTENTE:")
+                logger.info(f"   Per scaricare questo dataset:")
+                logger.info(f"")
+                logger.info(f"   1. Visita: {url}")
+                logger.info(f"   2. Crea account Roboflow (gratuito)")
+                logger.info(f"   3. Seleziona formato: COCO JSON")
+                logger.info(f"   4. Download ed estrai in: {dataset_dir}")
+                logger.info(f"")
+                
+                # Salva istruzioni
+                with open(os.path.join(dataset_dir, "DOWNLOAD_INSTRUCTIONS.txt"), "w") as f:
+                    f.write(f"Dataset: {dataset_name}\n")
+                    f.write(f"Roboflow URL: {url}\n\n")
+                    f.write(f"Manual Download Instructions:\n")
+                    f.write(f"1. Visit: {url}\n")
+                    f.write(f"2. Create free Roboflow account\n")
+                    f.write(f"3. Select format: COCO JSON\n")
+                    f.write(f"4. Download and extract to: {dataset_dir}\n\n")
+                    kaggle_alt = dataset_info.get("kaggle_alternative", "")
+                    if kaggle_alt:
+                        f.write(f"Alternative (Kaggle):\n{kaggle_alt}\n")
+                
+                logger.warning(f"⚠️  Download manuale richiesto. Istruzioni salvate in DOWNLOAD_INSTRUCTIONS.txt")
+                
+                # Salva metadata minimale
+                metadata = {
+                    "dataset_name": dataset_name,
+                    "url": url,
+                    "note": dataset_info.get("note", ""),
+                    "manual_download_required": True
+                }
+                with open(os.path.join(dataset_dir, "metadata.json"), "w") as f:
+                    json.dump(metadata, f, indent=2)
+            
+        except Exception as e:
+            logger.error(f"❌ Error downloading object detection dataset: {e}")
+            with open(os.path.join(dataset_dir, "README.txt"), "w") as f:
+                f.write(f"Dataset {dataset_name} download failed: {e}")
+    
+    # Logica per Human Activity Recognition (Download URL)
+    elif dataset_name in ["uci_har", "wisdm"]:
+        try:
+            # 1. Download
+            url = DATASET_CATALOG["human_activity_recognition"][dataset_name]["url"]
+            archive_name = url.split("/")[-1].replace("%20", "_")  # Fix URL encoding
+            archive_path = os.path.join(dataset_dir, archive_name)
+            
+            if not os.path.exists(archive_path):
+                logger.info(f"⬇️  Downloading {url}...")
+                download_file(url, archive_path)
+            else:
+                logger.info(f"✅ Archive found: {archive_path}")
+            
+            # 2. Extract
+            extract_dir = os.path.join(dataset_dir, "extracted")
+            if not os.path.exists(extract_dir):
+                logger.info(f"📦 Extracting to {extract_dir}...")
+                extract_archive(archive_path, extract_dir)
+            else:
+                logger.info(f"✅ Extracted dir found")
+            
+            # 3. Save metadata
+            metadata = {
+                "dataset_name": dataset_name,
+                "download_date": datetime.now().isoformat(),
+                "url": url,
+                "type": "sensor_data",
+                "note": DATASET_CATALOG["human_activity_recognition"][dataset_name].get("note", "")
+            }
+            
+            with open(os.path.join(dataset_dir, "metadata.json"), "w") as f:
+                json.dump(metadata, f, indent=2)
+            
+            logger.info(f"✅ HAR dataset downloaded")
+            logger.info(f"💡 Dataset contains raw sensor data (accelerometer/gyroscope)")
+            logger.info(f"⚠️  Preprocessing required: windowing, feature extraction, normalization")
+            
+        except Exception as e:
+            logger.error(f"❌ Error downloading HAR dataset: {e}")
+            with open(os.path.join(dataset_dir, "README.txt"), "w") as f:
+                f.write(f"Dataset {dataset_name} download failed: {e}")
+            
+    else:
+        logger.warning(f"⚠️ Dataset '{dataset_name}' non supportato per download automatico")
+        with open(os.path.join(dataset_dir, "README.txt"), "w") as f:
+            f.write(f"Dataset {dataset_name} requires manual download and processing")
             
     return state
 

@@ -341,7 +341,7 @@ PREDEFINED_MODELS = {
                 "inference_time": "18ms (STM32H7)",
                 "huggingface_repo": "STMicroelectronics/miniresnet-aed",
                 "huggingface_filename": "miniresnet_64x50.h5",
-                "url": "https://github.com/STMicroelectronics/stm32ai-modelzoo/raw/main/audio_event_detection/miniresnet/ST_pretrainedmodel_public_dataset/esc10/miniresnet_64x50_tl/miniresnet_64x50_tl.h5"
+                "url": "https://github.com/STMicroelectronics/stm32ai-modelzoo/raw/main/audio_event_detection/miniresnet/ST_pretrainedmodel_public_dataset/esc10/miniresnet_1stacks_64x50_tl/miniresnet_1stacks_64x50_tl.h5"
             },
             {
                 "name": "MiniResnetV2",
@@ -351,7 +351,7 @@ PREDEFINED_MODELS = {
                 "inference_time": "22ms (STM32H7)",
                 "huggingface_repo": "STMicroelectronics/miniresnetv2-aed",
                 "huggingface_filename": "miniresnetv2_64x50.h5",
-                "url": "https://github.com/STMicroelectronics/stm32ai-modelzoo/raw/main/audio_event_detection/miniresnetv2/ST_pretrainedmodel_public_dataset/esc10/miniresnetv2_64x50_tl/miniresnetv2_64x50_tl.h5"
+                "url": "https://github.com/STMicroelectronics/stm32ai-modelzoo/raw/main/audio_event_detection/miniresnet/ST_pretrainedmodel_public_dataset/esc10/miniresnet_2stacks_64x50_tl/miniresnet_2stacks_64x50_tl.h5"
             }
         ]
     }
