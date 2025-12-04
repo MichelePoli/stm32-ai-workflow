@@ -388,8 +388,6 @@ def dataset_source_routing(state: MasterState) -> Literal["select_predefined_dat
         return "select_predefined_dataset"
     elif state.dataset_source == "synthetic":
         return "ask_synthetic_data_requirements"
-    elif state.dataset_source == "both":
-        return "select_predefined_dataset" # Prima real, poi synthetic
     else:
         return "fine_tune_customized_model"
 
@@ -615,10 +613,7 @@ builder.add_conditional_edges(
 builder.add_edge("select_predefined_dataset", "download_dataset")
 
 def post_download_routing(state: MasterState) -> Literal["ask_synthetic_data_requirements", "fine_tune_customized_model"]:
-    if state.dataset_source == "both":
-        return "ask_synthetic_data_requirements"
-    else:
-        return "fine_tune_customized_model"
+    return "fine_tune_customized_model"
 
 builder.add_conditional_edges(
     "download_dataset",

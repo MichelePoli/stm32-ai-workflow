@@ -2572,7 +2572,7 @@ try:
     y_synth = None
     
     # 1. Carica Real Dataset
-    if (dataset_source == "real" or dataset_source == "both") and os.path.exists(real_dataset_path):
+    if dataset_source == "real" and os.path.exists(real_dataset_path):
         print(f"\\n📦 Loading Real Dataset from {{real_dataset_path}}...")
         try:
             X_real = np.load(os.path.join(real_dataset_path, "x_train.npy"))
@@ -2628,7 +2628,7 @@ try:
             y_val_real = None
     
     # 2. Carica Synthetic Data
-    if (dataset_source == "synthetic" or dataset_source == "both") and os.path.exists(synthetic_data_path):
+    if dataset_source == "synthetic" and os.path.exists(synthetic_data_path):
         print(f"\\n🧪 Loading Synthetic Data from {{synthetic_data_path}}...")
         files = glob.glob(os.path.join(synthetic_data_path, "*.npy"))
         
@@ -2656,35 +2656,18 @@ try:
         else:
             print(f"  ⚠️ No .npy files found.")
 
-    # 3. Merge Datasets
-    X = []
-    y = []
-    X_val = []
-    y_val = []
-    
-    if X_real is not None:
-        X.append(X_real)
-        y.append(y_real)
-        if X_val_real is not None:
-            X_val.append(X_val_real)
-            y_val.append(y_val_real)
-            
-    if X_synth is not None:
-        X.append(X_synth)
-        y.append(y_synth)
-        # Synthetic data usually doesn't have a separate pre-generated val set here, 
-        # but we could split it. For now, we'll let the auto-split handle it 
-        # if no real val set exists, or mix it in.
-    
-    if len(X) > 0:
-        X = np.concatenate(X, axis=0)
-        y = np.concatenate(y, axis=0)
-        if len(X_val) > 0:
-            X_val = np.concatenate(X_val, axis=0)
-            y_val = np.concatenate(y_val, axis=0)
-        else:
-            X_val = None
-            y_val = None
+    # 3. Assign to X, y
+    if dataset_source == "real":
+        X = X_real
+        y = y_real
+        X_val = X_val_real
+        y_val = y_val_real
+    elif dataset_source == "synthetic":
+        X = X_synth
+        y = y_synth
+        # Synthetic data usually doesn't have a separate pre-generated val set here
+        X_val = None
+        y_val = None
     else:
         X = None
         y = None

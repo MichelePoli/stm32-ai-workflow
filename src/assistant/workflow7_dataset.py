@@ -94,8 +94,7 @@ def decide_data_source(state: MasterState, config: dict) -> MasterState:
         "instruction": "Quale dataset vuoi utilizzare per il fine-tuning?",
         "options": {
             "1": "Real Dataset (CIFAR-10, SpeechCommands, etc.)",
-            "2": "Synthetic Data (Generato ora)",
-            "3": "Both (Real + Synthetic)"
+            "2": "Synthetic Data (Generato ora)"
         }
     }
     
@@ -114,8 +113,6 @@ def decide_data_source(state: MasterState, config: dict) -> MasterState:
         state.dataset_source = "real"
     elif "2" in user_text or "synthetic" in user_text:
         state.dataset_source = "synthetic"
-    elif "3" in user_text or "both" in user_text:
-        state.dataset_source = "both"
     else:
         # Default fallback
         logger.warning(f"⚠️  Scelta non riconosciuta '{user_text}', default a Synthetic")
