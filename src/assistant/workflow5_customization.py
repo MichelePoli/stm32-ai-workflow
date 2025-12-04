@@ -404,6 +404,87 @@ def decide_after_inspection(state) -> Literal["retrieve_best_practices_for_archi
 # RETRIEVE BEST PRACTICES FOR ARCHITECTURE
 # ===========================================================================
 
+def ask_and_parse_user_modifications(state: MasterState, config: dict) -> MasterState:
+    """
+    ✨ NODO: Chiede all'utente quali modifiche apportare e le parsa con LLM.
+    Gestisce anche il caso di "Edit" (ritorno indietro).
+    """
+    
+    logger.info("🔧 Ask & Parse User Modifications")
+    
+    # Recupera info modello
+    model_info = state.model_architecture or {} # Changed from model_architecture_info to model_architecture
+    model_name = state.selected_model.get('name', 'Unknown Model') # Changed from model_info.get('name', 'Unknown Model')
+    total_layers = model_info.get('n_layers', 0) # Changed from total_layers to n_layers
+    output_classes = model_info.get('output_classes', 1000)
+    
+    # Recupera best practices
+    best_practices_text = state.best_practices_display or "No specific best practices found." # Changed from best_practices_context to best_practices_display
+    
+    # Determina il messaggio da mostrare
+    if getattr(state, 'user_wants_to_edit', False):
+        instruction = f"""
+🔄 EDIT MODE: Modifica la tua richiesta precedente.
+
+Modello: {model_name}
+Best Practices suggerite:
+{best_practices_text[:500]}...
+
+Cosa vuoi cambiare rispetto alla proposta precedente?
+(Es: "Cambia il learning rate a 0.001", "Non freezare i layer", "Aggiungi più dropout")
+"""
+    else:
+        instruction = f"""
+🛠️  MODEL CUSTOMIZATION: {model_name}
+
+Ho analizzato il modello e trovato queste Best Practices:
+{best_practices_text[:500]}...
+
+Quali modifiche vuoi apportare?
+(Es: "Freeza i primi 10 layer", "Cambia output a 2 classi", "Aggiungi Dropout 0.5")
+"""
+
+    prompt = {
+        "instruction": instruction
+    }
+    
+    user_response = interrupt(prompt)
+    
+    if isinstance(user_response, dict):
+        user_text = str(user_response.get("response", user_response.get("input", ""))).lower()
+    else:
+        user_text = str(user_response).lower()
+    
+    # === CLASSIFICA CON MISTRAL ===
+    cfg = Configuration.from_runnable_config(config)
+    llm = ChatOllama(
+        model=cfg.local_llm,
+        temperature=0,
+        num_ctx=cfg.llm_context_window
+    )
+    
+    llm_parser = llm.with_structured_output(ModelModification)
+    
+    modification_request = llm_parser.invoke([
+        SystemMessage(content=model_modification_instructions),
+        HumanMessage(content=f"Risposta utente: {user_text}")
+    ])
+    
+    logger.info(f"✓ Richiesta di modifica parsata:")
+    logger.info(f"  Freezing layers: {modification_request.freeze_layers}")
+    logger.info(f"  Target output classes: {modification_request.target_output_classes}")
+    logger.info(f"  Dropout rate: {modification_request.dropout_rate}")
+    logger.info(f"  Learning rate: {modification_request.learning_rate}")
+    logger.info(f"  Additional layers: {modification_request.additional_layers}")
+    logger.info(f"  Confidence: {modification_request.confidence:.2f}")
+    
+    # === SALVA NELLO STATE ===
+    state.model_modification_request = modification_request
+    state.user_wants_to_edit = True # Set to true after the first modification request
+    
+    return state
+
+
 def retrieve_best_practices_for_architecture(state: MasterState, config: dict) -> MasterState:
     """Con web fetch optional (timeout 10s max)"""
     
@@ -1605,177 +1686,172 @@ Training Recommendation:{train_text}
     
     logger.info(preview)
 
-    # ==================== CONFERMA AUTOMATICA (PER TEST VELOCE) ====================
-    state.modification_confirmed = True # Default: confermato. Per test veloce
-    state.user_wants_to_edit = False
-    logger.info("✅ Modifiche CONFERMATE")
+    # ==================== RICHIESTA CONFERMA ====================
+    
+    # Prompt mostrato all'utente (supporta risposte naturali)
+    confirmation_prompt = {
+        "instruction": "Do you want to apply these modifications? (Yes/No/Edit)",
+        "preview": preview,
+        "options": ["yes", "no", "edit"],
+        "hint": "You can respond naturally (e.g., 'yes please', 'apply it', 'go back')"
+    }
+    
+    # ⏸️ INTERRUPT: Attendi risposta utente
+    user_response = interrupt(confirmation_prompt)
+    
+    # Log della risposta raw
+    logger.info(f"📝 Risposta utente (raw): '{user_response}'")
+    
+    # ==================== PARSING LLM DELLA RISPOSTA ====================
+    
+    try:
+        logger.info(" [Step 1] Interpretando risposta con LLM...")
+        
+        # Inizializza agent con Mistral
+        agent = Agent(model=Ollama(id="mistral"))
+        
+        # Costruisci prompt per interpretare la decisione dell'utente
+        interpretation_prompt = f"""
+Interpret user confirmation response for model modifications.
 
+CONTEXT:
+Model modifications preview was shown to user.
+
+USER RESPONSE TO "Do you want to apply these modifications?":
+"{user_response}"
+
+Interpret the user's intent and return ONLY JSON (no markdown):
+{{
+  "decision": "confirm|reject|edit_request",
+  "decision_description": {{
+    "confirm": "User approves and wants to apply modifications",
+    "reject": "User does NOT want to apply modifications",
+    "edit_request": "User wants to modify/change the modifications (go back)"
+  }},
+  "confidence": 0.95,
+  "reasoning": "Why we interpreted it this way",
+  "user_intent": "What the user actually wants"
+}}
+
+Return ONLY the JSON, no other text.
+"""
+        
+        # Esegui il prompt con LLM
+        response = agent.run(interpretation_prompt)
+        
+        # Normalizza la risposta
+        content = response if isinstance(response, str) else response.content
+        
+        logger.debug(f"   LLM response: {content[:150]}...")
+        
+        # Estrai JSON dalla risposta
+        json_match = re.search(r'\{[\s\S]*\}', content)
+        
+        if json_match:
+            json_str = json_match.group(0)
+            decision_data = json.loads(json_str)
+        else:
+            decision_data = json.loads(content)
+        
+        # Estrai la decisione (default: reject per sicurezza)
+        decision = decision_data.get('decision', 'reject').lower().strip()
+        confidence = decision_data.get('confidence', 0.5)
+        reasoning = decision_data.get('reasoning', 'LLM interpretation')
+        
+        logger.info(f" ✓ LLM Interpretation:")
+        logger.info(f"    • Decision: {decision}")
+        logger.info(f"    • Confidence: {confidence:.0%}")
+        logger.info(f"    • Reasoning: {reasoning}")
+        
+        # Converti decision in booleano e imposta flag di edit se necessario
+        if decision == "confirm":
+            state.modification_confirmed = True
+            state.user_wants_to_edit = False
+            logger.info("✅ Modifiche CONFERMATE")
+            
+        elif decision == "reject":
+            state.modification_confirmed = False
+            state.user_wants_to_edit = False
+            logger.info("❌ Modifiche RIFIUTATE")
+            
+        elif decision == "edit_request":
+            state.modification_confirmed = False
+            state.user_wants_to_edit = True
+            logger.info("✏️  Utente vuole MODIFICARE le modifiche")
+        
+        else:
+            state.modification_confirmed = False
+            state.user_wants_to_edit = False
+            logger.warning(f"⚠️  Decisione non riconosciuta: '{decision}', defaulting to reject")
+    
+    # SE IL PARSING LLM FALLISCE
+    except (json.JSONDecodeError, ValueError, AttributeError) as e:
+        logger.error(f"❌ Errore parsing LLM: {str(e)[:100]}")
+        logger.warning(" [Step 2] Fallback a parsing keyword...")
+        
+        # ==================== FALLBACK: PARSING DIRETTO ====================
+        
+        if isinstance(user_response, dict):
+             response_lower = str(user_response.get("response", user_response.get("input", ""))).lower().strip()
+        else:
+             response_lower = str(user_response).lower().strip()
+        
+        # Parole chiave per "si"
+        positive_keywords = [
+            'yes', 'si', 'sì', 'yeah', 'yep', 'ok', 'okay',
+            'apply', 'confirm', 'proceed', 'continue', 'go',
+            'approve', 'perfect', 'good', 'sure', 'absolutely'
+        ]
+        
+        # Parole chiave per "no"
+        negative_keywords = [
+            'no', 'nope', 'reject', 'cancel', 'stop', 'abort',
+            'dont', 'don\'t', 'skip', 'refuse', 'decline', 'nah',
+            'absolutely not', 'never', 'no way'
+        ]
+        
+        # Parole chiave per "edit/modifica"
+        edit_keywords = [
+            'edit', 'modifica', 'change', 'modify', 'back',
+            'again', 'different', 'redo', 'rethink', 'again',
+            'let me', 'wait', 'hold on'
+        ]
+        
+        if any(kw in response_lower for kw in positive_keywords):
+            state.modification_confirmed = True
+            state.user_wants_to_edit = False
+            logger.info("✅ Modifiche CONFERMATE (keyword match)")
+        
+        elif any(kw in response_lower for kw in negative_keywords):
+            state.modification_confirmed = False
+            state.user_wants_to_edit = False
+            logger.info("❌ Modifiche RIFIUTATE (keyword match)")
+        
+        elif any(kw in response_lower for kw in edit_keywords):
+            state.modification_confirmed = False
+            state.user_wants_to_edit = True
+            logger.info("✏️  MODIFICA richiesta (keyword match)")
+        
+        else:
+            state.modification_confirmed = False
+            state.user_wants_to_edit = False
+            logger.warning(f"⚠️  Risposta non interpretata, defaulting to reject")
+    
+    except Exception as e:
+        logger.error(f"❌ Errore imprevisto: {str(e)}", exc_info=True)
+        logger.warning("⚠️  Defaulting a reject per sicurezza")
+        
+        state.modification_confirmed = False
+        state.user_wants_to_edit = False
+    
+    # ==================== LOG FINALE ====================
+    
+    logger.info(f"═══════════════════════════════════════════════════════")
+    logger.info(f"👀 Modifica confermata: {state.modification_confirmed}")
+    logger.info(f"✏️  Edit richiesto: {getattr(state, 'user_wants_to_edit', False)}")
+    logger.info(f"═══════════════════════════════════════════════════════")
+    
     return state
-    # ==================== FINE CONFERMA AUTOMATICA ====================
-    #     
-#     # ==================== RICHIESTA CONFERMA ====================
-    
-#     # Prompt mostrato all'utente (supporta risposte naturali)
-#     confirmation_prompt = {
-#         "instruction": "Do you want to apply these modifications? (Yes/No/Edit)",
-#         "preview": preview,
-#         "options": ["yes", "no", "edit"],
-#         "hint": "You can respond naturally (e.g., 'yes please', 'apply it', 'go back')"
-#     }
-    
-#     # ⏸️ INTERRUPT: Attendi risposta utente
-#     user_response = interrupt(confirmation_prompt)
-    
-#     # Log della risposta raw
-#     logger.info(f"📝 Risposta utente (raw): '{user_response}'")
-    
-#     # ==================== PARSING LLM DELLA RISPOSTA ====================
-    
-#     try:
-#         logger.info(" [Step 1] Interpretando risposta con LLM...")
-        
-#         # Inizializza agent con Mistral
-#         agent = Agent(model=Ollama(id="mistral"))
-        
-#         # Costruisci prompt per interpretare la decisione dell'utente
-#         interpretation_prompt = f"""
-# Interpret user confirmation response for model modifications.
-
-# CONTEXT:
-# Model modifications preview was shown to user.
-
-# USER RESPONSE TO "Do you want to apply these modifications?":
-# "{user_response}"
-
-# Interpret the user's intent and return ONLY JSON (no markdown):
-# {{
-#   "decision": "confirm|reject|edit_request",
-#   "decision_description": {{
-#     "confirm": "User approves and wants to apply modifications",
-#     "reject": "User does NOT want to apply modifications",
-#     "edit_request": "User wants to modify/change the modifications (go back)"
-#   }},
-#   "confidence": 0.95,
-#   "reasoning": "Why we interpreted it this way",
-#   "user_intent": "What the user actually wants"
-# }}
-
-# Return ONLY the JSON, no other text.
-# """
-        
-#         # Esegui il prompt con LLM
-#         response = agent.run(interpretation_prompt)
-        
-#         # Normalizza la risposta
-#         content = response if isinstance(response, str) else response.content
-        
-#         logger.debug(f"   LLM response: {content[:150]}...")
-        
-#         # Estrai JSON dalla risposta
-#         json_match = re.search(r'\{[\s\S]*\}', content)
-        
-#         if json_match:
-#             json_str = json_match.group(0)
-#             decision_data = json.loads(json_str)
-#         else:
-#             decision_data = json.loads(content)
-        
-#         # Estrai la decisione (default: reject per sicurezza)
-#         decision = decision_data.get('decision', 'reject').lower().strip()
-#         confidence = decision_data.get('confidence', 0.5)
-#         reasoning = decision_data.get('reasoning', 'LLM interpretation')
-        
-#         logger.info(f" ✓ LLM Interpretation:")
-#         logger.info(f"    • Decision: {decision}")
-#         logger.info(f"    • Confidence: {confidence:.0%}")
-#         logger.info(f"    • Reasoning: {reasoning}")
-        
-#         # Converti decision in booleano e imposta flag di edit se necessario
-#         if decision == "confirm":
-#             state.modification_confirmed = True
-#             state.user_wants_to_edit = False
-#             logger.info("✅ Modifiche CONFERMATE")
-            
-#         elif decision == "reject":
-#             state.modification_confirmed = False
-#             state.user_wants_to_edit = False
-#             logger.info("❌ Modifiche RIFIUTATE")
-            
-#         elif decision == "edit_request":
-#             state.modification_confirmed = False
-#             state.user_wants_to_edit = True
-#             logger.info("✏️  Utente vuole MODIFICARE le modifiche")
-        
-#         else:
-#             state.modification_confirmed = False
-#             state.user_wants_to_edit = False
-#             logger.warning(f"⚠️  Decisione non riconosciuta: '{decision}', defaulting to reject")
-    
-#     # SE IL PARSING LLM FALLISCE
-#     except (json.JSONDecodeError, ValueError, AttributeError) as e:
-#         logger.error(f"❌ Errore parsing LLM: {str(e)[:100]}")
-#         logger.warning(" [Step 2] Fallback a parsing keyword...")
-        
-#         # ==================== FALLBACK: PARSING DIRETTO ====================
-        
-#         response_lower = user_response.lower().strip()
-        
-#         # Parole chiave per "si"
-#         positive_keywords = [
-#             'yes', 'si', 'sì', 'yeah', 'yep', 'ok', 'okay',
-#             'apply', 'confirm', 'proceed', 'continue', 'go',
-#             'approve', 'perfect', 'good', 'sure', 'absolutely'
-#         ]
-        
-#         # Parole chiave per "no"
-#         negative_keywords = [
-#             'no', 'nope', 'reject', 'cancel', 'stop', 'abort',
-#             'dont', 'don\'t', 'skip', 'refuse', 'decline', 'nah',
-#             'absolutely not', 'never', 'no way'
-#         ]
-        
-#         # Parole chiave per "edit/modifica"
-#         edit_keywords = [
-#             'edit', 'modifica', 'change', 'modify', 'back',
-#             'again', 'different', 'redo', 'rethink', 'again',
-#             'let me', 'wait', 'hold on'
-#         ]
-        
-#         if any(kw in response_lower for kw in positive_keywords):
-#             state.modification_confirmed = True
-#             state.user_wants_to_edit = False
-#             logger.info("✅ Modifiche CONFERMATE (keyword match)")
-        
-#         elif any(kw in response_lower for kw in negative_keywords):
-#             state.modification_confirmed = False
-#             state.user_wants_to_edit = False
-#             logger.info("❌ Modifiche RIFIUTATE (keyword match)")
-        
-#         elif any(kw in response_lower for kw in edit_keywords):
-#             state.modification_confirmed = False
-#             state.user_wants_to_edit = True
-#             logger.info("✏️  MODIFICA richiesta (keyword match)")
-        
-#         else:
-#             state.modification_confirmed = False
-#             state.user_wants_to_edit = False
-#             logger.warning(f"⚠️  Risposta non interpretata, defaulting to reject")
-    
-#     except Exception as e:
-#         logger.error(f"❌ Errore imprevisto: {str(e)}", exc_info=True)
-#         logger.warning("⚠️  Defaulting a reject per sicurezza")
-        
-#         state.modification_confirmed = False
-#         state.user_wants_to_edit = False
-    
-#     # ==================== LOG FINALE ====================
-    
-#     logger.info(f"═══════════════════════════════════════════════════════")
-#     logger.info(f"👀 Modifica confermata: {state.modification_confirmed}")
-#     logger.info(f"✏️  Edit richiesto: {getattr(state, 'user_wants_to_edit', False)}")
-#     logger.info(f"═══════════════════════════════════════════════════════")
-    
-#     return state
 
 
 # ============================================================================

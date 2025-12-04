@@ -577,21 +577,26 @@ builder.add_edge("ask_and_parse_user_modifications", "collect_modification_confi
 # Fase 3: Loop - se l'utente non è soddisfatto, ritorna indietro
 def modification_confirmation_routing(state: MasterState) -> str:
     """
-    Route basato su modifica_confirmed.
-    - Se modification_confirmed=False: l'utente vuole modificare la richiesta
-    - Se modification_confirmed=True: l'utente è soddisfatto, procedi
+    Route basato su modifica_confirmed e user_wants_to_edit.
+    - Se modification_confirmed=True: procedi con applicazione
+    - Se user_wants_to_edit=True: torna a chiedere modifiche
+    - Se modification_confirmed=False (e no edit): annulla tutto e vai ad analyze
     """
-    if not state.modification_confirmed:
+    if state.modification_confirmed:
+        return "apply_user_customization"
+    elif state.user_wants_to_edit:
         return "ask_and_parse_user_modifications"
     else:
-        return "apply_user_customization"
+        # Caso "No" -> Abort customization, go straight to analysis
+        return "run_analyze"
 
 builder.add_conditional_edges(
     "collect_modification_confirmation",
     modification_confirmation_routing,
     {
         "ask_and_parse_user_modifications": "ask_and_parse_user_modifications",
-        "apply_user_customization": "apply_user_customization"
+        "apply_user_customization": "apply_user_customization",
+        "run_analyze": "run_analyze"
     }
 )
 
