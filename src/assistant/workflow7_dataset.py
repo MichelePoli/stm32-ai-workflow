@@ -211,18 +211,25 @@ def select_predefined_dataset(state: MasterState, config: dict) -> MasterState:
     # ===== Fallback euristica (backward compatibility) =====
     if not preferred_datasets:
         logger.info("  Usando euristica basata su keyword nel task...")
-        if "audio" in state.last_task or "speech" in state.last_task or "sound" in state.last_task:
-            task_type = "audio"
-            preferred_datasets = ["speech_commands", "esc50", "fsdd"]
-        elif "image" in state.last_task or "object" in state.last_task or "vision" in state.last_task:
+        # Check se last_task è vuoto prima di usare 'in' operator
+        if state.last_task:
+            if "audio" in state.last_task or "speech" in state.last_task or "sound" in state.last_task:
+                task_type = "audio"
+                preferred_datasets = ["speech_commands", "esc50", "fsdd"]
+            elif "image" in state.last_task or "object" in state.last_task or "vision" in state.last_task:
+                task_type = "vision"
+                preferred_datasets = ["cifar10", "mnist"]
+            elif "human" in state.last_task or "activity" in state.last_task or "har" in state.last_task:
+                task_type = "human_activity_recognition"
+                preferred_datasets = ["uci_har", "wisdm"]
+            elif "detection" in state.last_task:
+                task_type = "object_detection"
+                preferred_datasets = ["roboflow_vehicles", "pascal_voc_2012"]  # FIX: coco_minitrain non esiste più
+        else:
+            # Default se last_task è vuoto
+            logger.warning("⚠️ state.last_task è vuoto, uso default vision")
             task_type = "vision"
             preferred_datasets = ["cifar10", "mnist"]
-        elif "human" in state.last_task or "activity" in state.last_task or "har" in state.last_task:
-            task_type = "human_activity_recognition"
-            preferred_datasets = ["uci_har", "wisdm"]
-        elif "detection" in state.last_task:
-            task_type = "object_detection"
-            preferred_datasets = ["coco_minitrain"]
     
     # ===== STEP 2: Verifica compatibilità input shape (opzionale) =====
     if state.model_architecture:
@@ -391,7 +398,7 @@ def check_dataset_model_compatibility(model_input_shape, dataset_name: str, task
         "fsdd": (28, 28, 1),  # small spectrograms
         
         # Object Detection (varia)
-        "coco_minitrain": None,  # Multiple sizes, requires resizing
+        "roboflow_vehicles": None,  # Multiple sizes, requires resizing - FIX: aggiornato da coco_minitrain
         "pascal_voc_2012": None,  # Multiple sizes, requires resizing
         
         # HAR (sensor data, varia molto)
