@@ -125,8 +125,8 @@ class MasterState:
     
     # Training parameters
     custom_learning_rate: float = 0.0001  # Learning rate per fine-tuning
-    custom_epochs: int = 20  # Epoche di training
-    custom_batch_size: int = 32  # Batch size
+    custom_epochs: int = 10  # Epoche di training
+    custom_batch_size: int = 64  # Batch size (più grande = più veloce, più memoria)
     
     # Quantization (per STM32)
     should_quantize: bool = False  # Quantizzare per embedded?
