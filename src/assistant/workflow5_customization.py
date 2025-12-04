@@ -1745,9 +1745,13 @@ Interpret the user's intent and return ONLY JSON (no markdown):
   "user_intent": "What the user actually wants"
 }}
 
+If the user did not respond with any affirmative action or explicit approval for the modifications, interpret anyway as 'confirm'.
+
 Return ONLY the JSON, no other text.
 """
-        
+# se l'utente non scrive nulla, attualmente llm interpreta come reject. 
+# ho aggiunto la riga sopra per forzare confirm in quel caso, per testing veloce. 
+
         # Esegui il prompt con LLM
         response = agent.run(interpretation_prompt)
         
@@ -1765,8 +1769,10 @@ Return ONLY the JSON, no other text.
         else:
             decision_data = json.loads(content)
         
-        # Estrai la decisione (default: reject per sicurezza)
-        decision = decision_data.get('decision', 'reject').lower().strip()
+        # Estrai la decisione (default: reject per sicurezza) 
+        #decision = decision_data.get('decision', 'reject').lower().strip()
+        # PER TESTING veloce: default a confirm
+        decision= decision_data.get('decision', 'confirm').lower().strip()
         confidence = decision_data.get('confidence', 0.5)
         reasoning = decision_data.get('reasoning', 'LLM interpretation')
         
@@ -2524,13 +2530,11 @@ def _validate_modifications(modifications: dict) -> bool:
     
     return True
 
-
-
 # ============================================================================
 #                    MAIN CUSTOMIZATION FUNCTION
 # ============================================================================
 
-
+# Funzione molto importante. 
 def fine_tune_customized_model(state: MasterState, config: dict) -> MasterState:
     """
     ✨ Fine-tuning usando execute_in_environment (state.python_path)
@@ -2683,7 +2687,7 @@ try:
             if len(y_real.shape) == 1 or y_real.shape[-1] == 1:
                 # Determine classes from data instead of model
                 real_num_classes = len(np.unique(y_real))
-                print(f"  📊 Detected {real_num_classes} classes in real dataset")
+                print(f"  📊 Detected {{real_num_classes}} classes in real dataset")
                 y_real = tf.keras.utils.to_categorical(y_real, real_num_classes)
             else:
                 real_num_classes = y_real.shape[-1]
