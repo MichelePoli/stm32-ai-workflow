@@ -102,6 +102,7 @@ class MasterState:
     # Parsed modifications
     parsed_modifications: Optional[dict] = None  # Structured modifications from LLM
     modification_confirmed: bool = False  # Utente ha confermato le modifiche?
+    user_wants_to_edit: bool = False  # Utente vuole modificare la richiesta di customizzazione?
     
     # Applied customization
     customized_model_path: str = ""  # Path del modello customizzato (.h5)

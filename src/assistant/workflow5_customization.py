@@ -1452,7 +1452,10 @@ Return JSON with modifications list."""
             
             # Freeze_layers validation
             if mod_type == 'freeze_layers':
-                num_frozen = params.get('num_frozen_layers', 1)
+                num_frozen = params.get('num_frozen_layers')
+                if num_frozen is None: # Il parser LLM a volte restituiva None (null) per alcuni parametri (come num_frozen_layers) invece di un numero. Il codice di validazione provava a confrontare questo None con un intero (es. None <= 0), causando l'errore.
+                    num_frozen = 1
+                
                 if num_frozen > total_layers:
                     params['num_frozen_layers'] = max(1, total_layers - 1)
                     issues.append(f"freeze_layers: capped to {total_layers-1}")
@@ -1462,21 +1465,30 @@ Return JSON with modifications list."""
             
             # Change_output_layer validation
             elif mod_type == 'change_output_layer':
-                new_classes = params.get('new_classes', output_classes)
+                new_classes = params.get('new_classes')
+                if new_classes is None:
+                    new_classes = output_classes
+
                 if new_classes <= 0 or new_classes > 10000:
                     params['new_classes'] = output_classes
                     issues.append(f"change_output_layer: invalid {new_classes}, using {output_classes}")
             
             # Add_dropout validation
             elif mod_type == 'add_dropout':
-                rate = params.get('rate', 0.5)
+                rate = params.get('rate')
+                if rate is None:
+                    rate = 0.5
+                
                 if not (0.0 < rate < 1.0):
                     params['rate'] = 0.5
                     issues.append(f"add_dropout: invalid rate {rate}, using 0.5")
             
             # Change_learning_rate validation
             elif mod_type == 'change_learning_rate':
-                lr = params.get('learning_rate', 0.0001)
+                lr = params.get('learning_rate')
+                if lr is None:
+                    lr = 0.0001
+                
                 if lr <= 0 or lr > 1:
                     params['learning_rate'] = 0.0001
                     issues.append(f"change_learning_rate: invalid {lr}, using 0.0001")
