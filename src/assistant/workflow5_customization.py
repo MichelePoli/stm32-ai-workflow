@@ -2888,11 +2888,6 @@ try:
     # ==============================================================================
     # FIX: DATA SHUFFLING (CRITICAL FOR OVERFITTING)
     # ==============================================================================
-    # The dataset is often loaded sequentially by class (e.g., all Class 0, then Class 1).
-    # Without shuffling, a simple split would put entire classes into the Validation set
-    # that are missing from the Training set, leading to 0% validation accuracy.
-    # Shuffling ensures a random distribution of classes in both sets.
-    # ==============================================================================
     indices = np.arange(len(X))
     np.random.shuffle(indices)
     X = X[indices]
@@ -2908,6 +2903,33 @@ try:
         y = y[:split_idx]
     
     print(f"✓ Dataset: train={{X.shape}}, val={{X_val.shape}}")
+
+    # ==============================================================================
+    # DEBUG: CHECK CLASS DISTRIBUTION & NORMALIZATION
+    # ==============================================================================
+    try:
+        # Check Class Distribution
+        y_train_idx = np.argmax(y, axis=1)
+        y_val_idx = np.argmax(y_val, axis=1)
+        
+        train_classes, train_counts = np.unique(y_train_idx, return_counts=True)
+        val_classes, val_counts = np.unique(y_val_idx, return_counts=True)
+        
+        print(f"  📊 Train Class Dist: {{dict(zip(train_classes, train_counts))}}")
+        print(f"  📊 Val Class Dist:   {{dict(zip(val_classes, val_counts))}}")
+        
+        # Check Normalization (MobileNet expects [-1, 1]) 
+        # CIFAR-10 nativamente è 0-255 (interi). Noi lo convertiamo in 0-1 (float). MobileNet però è stato "educato" a vedere il mondo in [-1, 1]. QUINDI soluzione: prende i dati di CIFAR-10 (che vanno bene) e li trasforma nel formato che MobileNet vuole ([-1, 1]).
+        if 'mobilenet' in model.name.lower() or 'mobilenet' in model_path.lower():
+            print("  ℹ️  MobileNet detected: Checking normalization...")
+            if X.min() >= 0.0 and X.max() <= 1.0:
+                print("  ⚠️  Input is [0, 1] but MobileNet expects [-1, 1]. Rescaling...")
+                X = (X - 0.5) * 2.0
+                X_val = (X_val - 0.5) * 2.0
+                print(f"  ✓ Rescaled range: [{{X.min():.2f}}, {{X.max():.2f}}]")
+    except Exception as e:
+        print(f"  ⚠️  Debug info error: {{e}}")
+
     
     # 7. Data Augmentation (for Images)
     data_gen = None
