@@ -2883,15 +2883,24 @@ try:
                 print(f"  This may reduce model performance due to pixelation.")
 
     # 6. Prepare Train/Val Split
+    print("⚖️  Shuffling and Splitting data (80% train, 20% val)...")
+    
+    # ==============================================================================
+    # FIX: DATA SHUFFLING (CRITICAL FOR OVERFITTING)
+    # ==============================================================================
+    # The dataset is often loaded sequentially by class (e.g., all Class 0, then Class 1).
+    # Without shuffling, a simple split would put entire classes into the Validation set
+    # that are missing from the Training set, leading to 0% validation accuracy.
+    # Shuffling ensures a random distribution of classes in both sets.
+    # ==============================================================================
+    indices = np.arange(len(X))
+    np.random.shuffle(indices)
+    X = X[indices]
+    y = y[indices]
+    
     if X_val is not None:
         print(f"✓ Using explicit validation set: {{len(X_val)}} samples")
-        # Ensure y_val matches y shape
-        if y_val.shape[-1] != y.shape[-1]:
-             # Fix mismatch if any (e.g. different one-hot encoding depth?)
-             # Usually shouldn't happen if loaded correctly
-             pass
     else:
-        print("⚖️  Splitting data (80% train, 20% val)...")
         split_idx = int(len(X) * 0.8)
         X_val = X[split_idx:]
         y_val = y[split_idx:]
@@ -2900,7 +2909,29 @@ try:
     
     print(f"✓ Dataset: train={{X.shape}}, val={{X_val.shape}}")
     
-    # 7. Compile & Train
+    # 7. Data Augmentation (for Images)
+    data_gen = None
+    if len(input_shape) == 3 and not is_object_detection:
+        # ==============================================================================
+        # ENHANCEMENT: DATA AUGMENTATION
+        # ==============================================================================
+        # To prevent overfitting on small datasets (common in embedded AI), we generate
+        # new training samples by applying random transformations (rotation, zoom, flip).
+        # This forces the model to learn robust features rather than memorizing pixels.
+        # ==============================================================================
+        print("📸 Enabling Data Augmentation (Rotation, Zoom, Flip)...")
+        from tensorflow.keras.preprocessing.image import ImageDataGenerator
+        
+        data_gen = ImageDataGenerator(
+            rotation_range=20,      # Random rotation ±20°
+            width_shift_range=0.2,  # Random horizontal shift 20%
+            height_shift_range=0.2, # Random vertical shift 20%
+            zoom_range=0.2,         # Random zoom 20%
+            horizontal_flip=True,   # Random horizontal flip
+            fill_mode='nearest'     # Fill empty pixels with nearest value
+        )
+    
+    # 8. Compile & Train
     model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate={learning_rate}),
                   loss='categorical_crossentropy',
                   metrics=['accuracy'])
@@ -2917,15 +2948,32 @@ try:
                   f"val_loss: {{logs.get('val_loss'):.4f}} - "
                   f"val_accuracy: {{logs.get('val_accuracy'):.4f}}")
 
-    history=model.fit(X, y, 
-              epochs={epochs}, 
-              batch_size={batch_size}, 
-              validation_data=(X_val, y_val),
-              callbacks=[PrintEpochProgress(),
-            EarlyStopping(monitor='val_loss', patience=3, restore_best_weights=True, verbose=0),
-            ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=2, min_lr=1e-7, verbose=0)
-        ],
-        verbose=0) # Verbose 0 because we print manually
+    callbacks_list = [
+        PrintEpochProgress(),
+        EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True, verbose=0),
+        ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=3, min_lr=1e-7, verbose=0)
+    ]
+
+    if data_gen:
+        # Use generator for training
+        history = model.fit(
+            data_gen.flow(X, y, batch_size={batch_size}),
+            steps_per_epoch=len(X) // {batch_size},
+            epochs={epochs},
+            validation_data=(X_val, y_val),
+            callbacks=callbacks_list,
+            verbose=0
+        )
+    else:
+        # Standard fit
+        history = model.fit(
+            X, y, 
+            epochs={epochs}, 
+            batch_size={batch_size}, 
+            validation_data=(X_val, y_val),
+            callbacks=callbacks_list,
+            verbose=0
+        )
     
     model.save(output_path, save_format='h5')
     
