@@ -326,20 +326,6 @@ def ask_modification_intent(state, config: dict):
     
     cfg = Configuration.from_runnable_config(config)
     
-    # === MOSTRA ARCHITETTURA ATTUALE ===
-    
-    print("\n" + "="*70)
-    print("🏗️  ARCHITETTURA MODELLO ATTUALE")
-    print("="*70)
-    print(f"\nInput shape:  {state.model_architecture.get('input_shape', 'Unknown')}")
-    print(f"Output shape: {state.model_architecture.get('output_shape', 'Unknown')}")
-    print(f"Layer totali: {state.model_architecture.get('n_layers', 0)}")
-    print(f"Parametri: {state.model_architecture.get('total_params', 0):,}")
-    print(f"Dimensione: {state.model_architecture.get('model_size_mb', 0):.2f} MB")
-    print(f"BatchNorm: {'Sì' if state.model_architecture.get('has_batchnorm') else 'No'}")
-    print(f"Dropout: {'Sì' if state.model_architecture.get('has_dropout') else 'No'}")
-    print("="*70 + "\n")
-    
     # === CHIEDI DECISIONE ===
     
     prompt = {
