@@ -1413,6 +1413,110 @@ def get_task_based_default_model(task: str) -> Optional[dict]:
 
 
 # ============================================================================
+# LEGACY ENVIRONMENT SUPPORT
+# ============================================================================
+
+ARCHITECTURE_ENV_MAP = {
+    'mobilenet': 'stm32_legacy',
+    'resnet': 'stm32_legacy',
+    'vgg': 'stm32_legacy',
+    'efficientnet': 'stm32_legacy',
+    'inception': 'stm32_legacy',
+    'yolo': 'stm32_legacy',
+    'har': 'stm32_legacy',
+    'custom': 'stm32_legacy',
+}
+
+CONDA_PYTHON_PATHS = {
+    'stm32_legacy': '/home/mrusso/miniconda3/envs/stm32_legacy/bin/python', #keras 2.x 
+    'stm32': '/home/mrusso/miniconda3/envs/stm32/bin/python', # keras 3.x
+}
+
+def detect_architecture_from_model(model_path: str) -> str:
+    """Detecta architettura dal nome modello"""
+    model_name = os.path.basename(model_path).lower()
+    if 'mobilenet' in model_name: return 'mobilenet'
+    elif 'resnet' in model_name: return 'resnet'
+    elif 'vgg' in model_name: return 'vgg'
+    elif 'efficient' in model_name: return 'efficientnet'
+    elif 'inception' in model_name: return 'inception'
+    elif 'yolo' in model_name: return 'yolo'
+    elif 'har' in model_name or 'activity' in model_name: return 'har'
+    else: return 'custom'
+
+def execute_in_environment(python_code: str, python_path: str, timeout: int = 60) -> dict:
+    """Esegue codice in subprocess con python specifico"""
+    if not python_path:
+        raise Exception("python_path required")
+    
+    result = subprocess.run(
+        [python_path, '-c', python_code],
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+        env={**os.environ, 'TF_CPP_MIN_LOG_LEVEL': '3'}
+    )
+    return {
+        'success': result.returncode == 0,
+        'stdout': result.stdout.strip(),
+        'stderr': result.stderr.strip(),
+        'returncode': result.returncode
+    }
+
+def inspect_model_via_legacy_env(model_path: str) -> Optional[dict]:
+    """
+    Ispeziona modello usando env legacy (per evitare crash Keras 3 con modelli vecchi)
+    Ritorna dict con info architettura o None se fallisce.
+    """
+    try:
+        arch = detect_architecture_from_model(model_path)
+        env_name = ARCHITECTURE_ENV_MAP.get(arch, 'stm32_legacy')
+        python_path = CONDA_PYTHON_PATHS.get(env_name)
+        
+        if not python_path or not os.path.exists(python_path):
+            logger.warning(f"⚠️  Python path non trovato per {env_name}: {python_path}")
+            return None
+            
+        logger.info(f"🔄 Inspecting via subprocess ({env_name})...")
+        
+        script = f"""
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+import tensorflow as tf
+import json
+import sys
+
+try:
+    model = tf.keras.models.load_model(r'{model_path}', compile=False)
+    
+    trainable = int(sum([tf.size(w).numpy() for w in model.trainable_weights]))
+    
+    info = {{
+        'input_shape': str(model.input_shape),
+        'output_shape': str(model.output_shape),
+        'n_layers': len(model.layers),
+        'total_params': int(model.count_params()),
+        'trainable_params': trainable
+    }}
+    print("JSON_START" + json.dumps(info) + "JSON_END")
+except Exception as e:
+    print(f"ERROR:{{str(e)}}")
+    sys.exit(1)
+"""
+        res = execute_in_environment(script, python_path, timeout=30)
+        
+        if res['success'] and "JSON_START" in res['stdout']:
+            json_str = res['stdout'].split("JSON_START")[1].split("JSON_END")[0]
+            return json.loads(json_str)
+        else:
+            logger.warning(f"⚠️  Legacy inspection failed: {res['stderr'][:100]}")
+            return None
+            
+    except Exception as e:
+        logger.warning(f"⚠️  Legacy inspection exception: {e}")
+        return None
+
+# ============================================================================
 # NODO 3: DOWNLOAD MODELLO
 # ============================================================================
 def download_model(state: MasterState, config: dict) -> MasterState:
@@ -1467,33 +1571,20 @@ def download_model_to_cache(state: MasterState, config: dict, model: dict) -> Ma
         # ✅ STAMPA ARCHITETTURA MODELLO - MODO ROBUSTO
         logger.info(f"\n📋 ANALISI ARCHITETTURA MODELLO (da cache)")
         logger.info("=" * 80)
-        try:
-            # ← PRIMO TENTATIVO: caricamento Keras standard
-            keras_model = load_model(
-                cached_path, 
-                compile=False
-            )
-            logger.info(f"\n{keras_model.summary()}")
+        # ✅ ALGORITMO OTTIMIZZATO (RICHIESTA UTENTE)
+        # 1. Legacy Env Subprocess (Primo tentativo)
+        # 2. HDF5 Raw (Fallback)
+        # 3. NO standard load_model()
+        
+        legacy_info = inspect_model_via_legacy_env(cached_path)
             
-            # ✅ INFO AGGIUNTIVE
-            logger.info(f"\n📊 STATISTICS:")
-            logger.info(f"  Input shape: {keras_model.input_shape}")
-            logger.info(f"  Output shape: {keras_model.output_shape}")
-            logger.info(f"  Total parameters: {keras_model.count_params():,}")
-            logger.info(f"  Trainable parameters: {sum([tf.size(w).numpy() for w in keras_model.trainable_weights]):,}")
-            logger.info("=" * 80 + "\n")
-            
-            state.model_info = {
-                "input_shape": str(keras_model.input_shape),
-                "output_shape": str(keras_model.output_shape),
-                "n_layers": len(keras_model.layers),
-                "total_params": int(keras_model.count_params()),
-                "trainable_params": int(sum([tf.size(w).numpy() for w in keras_model.trainable_weights]))
-            }
-            
-        except Exception as e:
-            logger.warning(f"⚠️  Primo tentativo fallito: {str(e)[:80]}")
-            logger.info(f"   Provo analisi via HDF5 raw...")
+        if legacy_info:
+            logger.info(f"✓ Analisi riuscita (via stm32_legacy)!")
+            logger.info(f"  Input: {legacy_info['input_shape']}")
+            logger.info(f"  Params: {legacy_info['total_params']:,}")
+            state.model_info = legacy_info
+        else:
+            logger.warning(f"⚠️  Legacy subprocess fallito, provo fallback HDF5...")
             
             # ← SECONDO TENTATIVO: lettura raw HDF5 (più robusta)
             try:
@@ -1556,29 +1647,18 @@ def download_model_to_cache(state: MasterState, config: dict, model: dict) -> Ma
                 # ✅ STAMPA ARCHITETTURA - MODO ROBUSTO (uguale a sopra)
                 logger.info(f"\n📋 ANALISI ARCHITETTURA MODELLO (appena scaricato)")
                 logger.info("=" * 80)
-                try:
-                    keras_model = load_model(
-                        cached_path, 
-                        compile=False
-                    )
-                    logger.info(f"\n{keras_model.summary()}")
-                    logger.info(f"\n📊 STATISTICS:")
-                    logger.info(f"  Input shape: {keras_model.input_shape}")
-                    logger.info(f"  Output shape: {keras_model.output_shape}")
-                    logger.info(f"  Total parameters: {keras_model.count_params():,}")
-                    logger.info(f"  Trainable parameters: {sum([tf.size(w).numpy() for w in keras_model.trainable_weights]):,}")
-                    logger.info("=" * 80 + "\n")
-                    
-                    state.model_info = {
-                        "input_shape": str(keras_model.input_shape),
-                        "output_shape": str(keras_model.output_shape),
-                        "n_layers": len(keras_model.layers),
-                        "total_params": int(keras_model.count_params()),
-                        "trainable_params": int(sum([tf.size(w).numpy() for w in keras_model.trainable_weights]))
-                    }
-                    
-                except Exception as e:
-                    logger.warning(f"⚠️  Analisi Keras fallita, provo HDF5...")
+                # ✅ ALGORITMO OTTIMIZZATO (RICHIESTA UTENTE)
+                # 1. Legacy Env Subprocess (Primo tentativo)
+                # 2. HDF5 Raw (Fallback)
+                
+                legacy_info = inspect_model_via_legacy_env(cached_path)
+                
+                if legacy_info:
+                    logger.info(f"✓ Analisi riuscita (via stm32_legacy)!")
+                    logger.info(f"  Input: {legacy_info['input_shape']}")
+                    state.model_info = legacy_info
+                else:
+                    logger.warning(f"⚠️  Legacy subprocess fallito, provo HDF5...")
                     try:
                         with h5py.File(cached_path, 'r') as f:
                             logger.info(f"  File contiene: {list(f.keys())}")
