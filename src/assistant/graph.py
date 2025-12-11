@@ -552,6 +552,8 @@ def build_web_search_graph():
     workflow.add_node("execute_web_search", execute_web_search)
     workflow.add_node("finalize_search", finalize_search)
     
+    workflow.add_edge(START, "classify_search")
+    
     workflow.add_conditional_edges(
         "classify_search",
         search_type_decision,
