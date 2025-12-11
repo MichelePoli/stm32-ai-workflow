@@ -13,6 +13,7 @@
 # Dipendenze: langgraph, langchain, stedgeai, tensorflow, requests
 
 import os
+import sys
 import subprocess
 import shutil
 import re
@@ -362,7 +363,118 @@ PREDEFINED_MODELS = {
 
 
 # ============================================================================
+# ARCHITECTURE → CONDA ENVIRONMENT MAPPING (COPIED FROM WORKFLOW 5)
+# ============================================================================
+
+ARCHITECTURE_ENV_MAP = {
+    'mobilenet': 'stm32_legacy',
+    'resnet': 'stm32_legacy',
+    'vgg': 'stm32_legacy',
+    'efficientnet': 'stm32_legacy',
+    'inception': 'stm32_legacy',
+    'yolo': 'stm32_legacy',
+    'har': 'stm32_legacy',
+    'custom': 'stm32_legacy',
+}
+
+CONDA_PYTHON_PATHS = {
+    'stm32_legacy': '/home/mrusso/miniconda3/envs/stm32_legacy/bin/python', #keras 2.x (per modelli vecchi)
+    'stm32': '/home/mrusso/miniconda3/envs/stm32/bin/python', # keras 3.x
+}
+
+def detect_architecture_from_model(model_path: str) -> str:
+    """Detecta architettura dal nome modello"""
+    
+    model_name = os.path.basename(model_path).lower()
+    
+    if 'mobilenet' in model_name:
+        return 'mobilenet'
+    elif 'resnet' in model_name:
+        return 'resnet'
+    elif 'vgg' in model_name:
+        return 'vgg'
+    elif 'efficient' in model_name:
+        return 'efficientnet'
+    elif 'inception' in model_name:
+        return 'inception'
+    elif 'yolo' in model_name:
+        return 'yolo'
+    elif 'har' in model_name or 'activity' in model_name:
+        return 'har'
+    else:
+        return 'custom'
+
+def inspect_model_in_legacy_env(model_path: str, architecture: str) -> Optional[dict]:
+    """
+    Tenta di ispezionare il modello usando un environment legacy (via subprocess)
+    Ritorna dict con info architettura o None se fallisce.
+    """
+    conda_env = ARCHITECTURE_ENV_MAP.get(architecture, 'stm32_legacy')
+    python_path = CONDA_PYTHON_PATHS.get(conda_env)
+    
+    if not python_path or not os.path.exists(python_path):
+        logger.warning(f"⚠️  Legacy python path not found: {python_path}")
+        return None
+        
+    logger.info(f"🔄 Tentativo ispezione in environment: {conda_env}...")
+    
+    python_code = f"""
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+import tensorflow as tf
+import json
+import sys
+
+try:
+    # Load model
+    model = tf.keras.models.load_model(r'{model_path}', compile=False)
+    
+    # Extract info matches current state.model_architecture structure
+    info = {{
+        "input_shape": str(model.input_shape),
+        "output_shape": str(model.output_shape),
+        "n_layers": len(model.layers),
+        "layer_types": [layer.__class__.__name__ for layer in model.layers],
+        "layer_names": [layer.name for layer in model.layers],
+        "total_params": int(model.count_params()),
+        "trainable_params": int(sum([tf.size(w).numpy() for w in model.trainable_weights])),
+        "model_size_mb": round(os.path.getsize(r'{model_path}') / (1024*1024), 2),
+        "has_batchnorm": any(isinstance(l, tf.keras.layers.BatchNormalization) for l in model.layers),
+        "has_dropout": any(isinstance(l, tf.keras.layers.Dropout) for l in model.layers),
+        "output_classes": model.output_shape[-1] if len(model.output_shape) > 1 else 1
+    }}
+    
+    print("SUCCESS:" + json.dumps(info))
+    
+except Exception as e:
+    print(f"ERROR: {{str(e)}}")
+    sys.exit(1)
+"""
+    
+    try:
+        result = subprocess.run(
+            [python_path, '-c', python_code],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            env={**os.environ, 'TF_CPP_MIN_LOG_LEVEL': '3'}
+        )
+        
+        if result.returncode == 0 and "SUCCESS:" in result.stdout:
+            json_str = result.stdout.split("SUCCESS:")[-1].strip()
+            return json.loads(json_str)
+        else:
+            logger.warning(f"  Legacy inspection failed: {result.stderr[:200]}")
+            return None
+            
+    except Exception as e:
+        logger.warning(f"  Legacy inspection exception: {str(e)}")
+        return None
+
+
+# ============================================================================
 # NODI WORKFLOW 2
+
 # ============================================================================
 def collect_analysis_info(state: MasterState, config: dict) -> MasterState:
     """
@@ -1493,34 +1605,53 @@ def download_model_to_cache(state: MasterState, config: dict, model: dict) -> Ma
             
         except Exception as e:
             logger.warning(f"⚠️  Primo tentativo fallito: {str(e)[:80]}")
-            logger.info(f"   Provo analisi via HDF5 raw...")
             
-            # ← SECONDO TENTATIVO: lettura raw HDF5 (più robusta)
-            try:
-                with h5py.File(cached_path, 'r') as f:
-                    logger.info(f"\n📋 ANALISI HDF5 (raw)")
-                    logger.info(f"  Keys nel file: {list(f.keys())}")
-                    
-                    if 'model_config' in f.attrs:
-                        config_str = f.attrs['model_config']
-                        if isinstance(config_str, bytes):
-                            config_str = config_str.decode('utf-8')
-                        config_dict = json.loads(config_str)
-                        logger.info(f"  Model class: {config_dict.get('class_name', 'Unknown')}")
-                        logger.info(f"  Backend: {config_dict.get('backend', 'Unknown')}")
-                    
-                    if 'model_weights' in f:
-                        weights_group = f['model_weights']
-                        n_layers = len(list(weights_group.keys()))
-                        logger.info(f"  Number of layer groups: {n_layers}")
-                        logger.info(f"  Layers: {list(weights_group.keys())[:20]}{'...' if n_layers > 20 else ''}") # stampa i primi 20 layers
-                    
-                    logger.info("=" * 80 + "\n")
-                    
-                    # Comunque continua - il file è caricabile per inferenza
-                    
-            except Exception as e2:
-                logger.warning(f"⚠️  Analisi HDF5 fallita: {str(e2)[:100]}")
+            # ← SECONDO TENTATIVO: Legacy Environment (subprocess)
+            logger.info("   Tentativo 1b: Ispezione in environment legacy...")
+            
+            # Detect architecture for mapping
+            model_name_for_detect = model.get('name', 'unix')
+            arch_type = detect_architecture_from_model(model_name_for_detect)
+            legacy_info = inspect_model_in_legacy_env(cached_path, arch_type)
+            
+            if legacy_info:
+                logger.info("   ✓ Successo via legacy environment!")
+                logger.info(f"   Input: {legacy_info['input_shape']}")
+                logger.info(f"   Output: {legacy_info['output_shape']}")
+                logger.info(f"   Params: {legacy_info['total_params']:,}")
+                
+                state.model_info = legacy_info
+            
+            else:
+                logger.warning("⚠️  Tentativo legacy fallito")
+                logger.info(f"   Provo analisi via HDF5 raw...")
+                
+                # ← TERZO TENTATIVO: lettura raw HDF5 (più robusta)
+                try:
+                    with h5py.File(cached_path, 'r') as f:
+                        logger.info(f"\\n📋 ANALISI HDF5 (raw)")
+                        logger.info(f"  Keys nel file: {list(f.keys())}")
+                        
+                        if 'model_config' in f.attrs:
+                            config_str = f.attrs['model_config']
+                            if isinstance(config_str, bytes):
+                                config_str = config_str.decode('utf-8')
+                            config_dict = json.loads(config_str)
+                            logger.info(f"  Model class: {config_dict.get('class_name', 'Unknown')}")
+                            logger.info(f"  Backend: {config_dict.get('backend', 'Unknown')}")
+                        
+                        if 'model_weights' in f:
+                            weights_group = f['model_weights']
+                            n_layers = len(list(weights_group.keys()))
+                            logger.info(f"  Number of layer groups: {n_layers}")
+                            logger.info(f"  Layers: {list(weights_group.keys())[:20]}{'...' if n_layers > 20 else ''}") # stampa i primi 20 layers
+                        
+                        logger.info("=" * 80 + "\\n")
+                        
+                        # Comunque continua - il file è caricabile per inferenza
+                        
+                except Exception as e2:
+                    logger.warning(f"⚠️  Analisi HDF5 fallita: {str(e2)[:100]}")
         
         return state
     
