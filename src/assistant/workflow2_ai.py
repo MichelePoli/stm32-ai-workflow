@@ -585,8 +585,8 @@ Rispondi con: numero (1-{len(available_models)+1}) oppure descrivi
             logger.info(f"✓ Modello selezionato: {selected_model['name']}")
             logger.info(f"  Size: {selected_model['size']}, Accuracy: {selected_model['accuracy']}")
             
-            # ✅ DOWNLOAD DIRETTO NEL NODO
-            state = download_model_to_cache(state, config, selected_model)
+            # ✅ STOP DOWNLOAD QUI - CI PENSA IL NODO SUCCESSIVO (download_model)
+            # state = download_model_to_cache(state, config, selected_model)
             
         else:
             logger.warning(f"⚠️  Indice modello fuori range: {model_result.model_index}")
@@ -612,8 +612,8 @@ Rispondi con: numero (1-{len(available_models)+1}) oppure descrivi
                 state.model_discovery_method = "taskbased_fallback"
                 state.model_accepted = True
                 
-                # Download del fallback model
-                state = download_model_to_cache(state, config, fallback_model)
+                # Download del fallback model - STOP, ci pensa il nodo successivo
+                # state = download_model_to_cache(state, config, fallback_model)
             else:
                 # Ultimo fallback: config generico
                 logger.warning("⚠️  Nessun fallback task-based, uso config")
@@ -1583,6 +1583,7 @@ def download_model_to_cache(state: MasterState, config: dict, model: dict) -> Ma
             logger.info(f"  Input: {legacy_info['input_shape']}")
             logger.info(f"  Params: {legacy_info['total_params']:,}")
             state.model_info = legacy_info
+            state.model_architecture = legacy_info # Sync for workflow5 compatibility
         else:
             logger.warning(f"⚠️  Legacy subprocess fallito, provo fallback HDF5...")
             
@@ -1657,6 +1658,7 @@ def download_model_to_cache(state: MasterState, config: dict, model: dict) -> Ma
                     logger.info(f"✓ Analisi riuscita (via stm32_legacy)!")
                     logger.info(f"  Input: {legacy_info['input_shape']}")
                     state.model_info = legacy_info
+                    state.model_architecture = legacy_info # Sync for workflow5 compatibility
                 else:
                     logger.warning(f"⚠️  Legacy subprocess fallito, provo HDF5...")
                     try:

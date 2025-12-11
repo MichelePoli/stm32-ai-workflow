@@ -194,6 +194,11 @@ def inspect_model_architecture(state: MasterState, config: dict) -> MasterState:
 
     logger.info("🔍 Ispezionando architettura modello...")
 
+    # ✅ SKIP ANALISI SE GIA' FATTA IN WORKFLOW 2
+    if state.model_architecture and state.model_architecture.get('n_layers', 0) > 0:
+        logger.info("✓ Info architettura già presenti, skip analisi.")
+        return state
+
     try:
         # ✅ Primo tentativo: load_model standard
         logger.info("   Tentativo 1: load_model() standard...")
