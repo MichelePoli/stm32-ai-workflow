@@ -1496,7 +1496,10 @@ try:
         'output_shape': str(model.output_shape),
         'n_layers': len(model.layers),
         'total_params': int(model.count_params()),
-        'trainable_params': trainable
+        'trainable_params': trainable,
+        'model_size_mb': os.path.getsize(r'{model_path}') / (1024*1024),
+        'has_batchnorm': any(['BatchNormalization' in l.__class__.__name__ for l in model.layers]),
+        'has_dropout': any(['Dropout' in l.__class__.__name__ for l in model.layers])
     }}
     print("JSON_START" + json.dumps(info) + "JSON_END")
 except Exception as e:
@@ -1580,8 +1583,12 @@ def download_model_to_cache(state: MasterState, config: dict, model: dict) -> Ma
             
         if legacy_info:
             logger.info(f"✓ Analisi riuscita (via stm32_legacy)!")
-            logger.info(f"  Input: {legacy_info['input_shape']}")
-            logger.info(f"  Params: {legacy_info['total_params']:,}")
+            logger.info(f"  Input: {legacy_info.get('input_shape')}")
+            logger.info(f"  Output: {legacy_info.get('output_shape')}")
+            logger.info(f"  Params: {legacy_info.get('total_params'):,}")
+            if 'model_size_mb' in legacy_info:
+                logger.info(f"  Size: {legacy_info['model_size_mb']:.2f} MB")
+            logger.info(f"  BN: {'Yes' if legacy_info.get('has_batchnorm') else 'No'} | Dropout: {'Yes' if legacy_info.get('has_dropout') else 'No'}")
             state.model_info = legacy_info
             state.model_architecture = legacy_info # Sync for workflow5 compatibility
         else:
