@@ -6,11 +6,11 @@
 # Responsabilità:
 #   - Routing primario tra i 5 workflow
 #   - Nodi di decisione tra workflow sequenziali
-#   - StateGraph building e compilation
+#   - StateGraph building e compilation con SUBGRAPHS
 #
-# ARCHITETTURA SEMPLIFICATA:
-#   START → route_request → [firmware | ai | integration | web_search | clarify]
-#        → decide_continue_* → [prossimo workflow | END]
+# ARCHITETTURA MODULARE (SUBGRAPHS):
+#   START → route_request → [firmware_flow | ai_flow | integration_flow | search_flow]
+#
 
 import os
 import logging
@@ -84,6 +84,7 @@ from src.assistant.workflow5_customization import (
     validate_customized_model,
     save_customized_model_final,
     ask_continue_after_customization,
+    modification_confirmation_routing as customize_confirmation_routing # Alias to avoid name conflict if needed
 )
 
 # --- Workflow 6: Synthetic Data ---
@@ -220,18 +221,18 @@ def route_request(state: MasterState, config: dict) -> MasterState:
     return state
 
 
-def route_decision(state: MasterState) -> Literal["firmware_branch", "ai_branch", "integration_branch", "search_branch", "clarify"]:
-    """Routing condizionale principale"""
+def route_decision(state: MasterState) -> Literal["firmware_flow", "ai_flow", "integration_flow", "search_flow", "clarify"]:
+    """Routing condizionale principale verso SUBGRAPHS"""
     route_map = {
-        "firmware": "firmware_branch",
-        "ai_analysis": "ai_branch",
-        "integration": "integration_branch",
-        "web_research": "search_branch",
+        "firmware": "firmware_flow",
+        "ai_analysis": "ai_flow",
+        "integration": "integration_flow",
+        "web_research": "search_flow",
         "unknown": "clarify"
     }
     
     result = route_map.get(state.route, "clarify")
-    logger.info(f"→ Routing verso: {result}")
+    logger.info(f"→ Routing verso Subgraph: {result}")
     return result
 
 
@@ -259,7 +260,7 @@ def clarify_request(state: MasterState, config: dict) -> MasterState:
     return state
 
 # ============================================================================
-# DECISION NODES - COLLEGA RAMI SEQUENZIALI
+# DECISION NODES - CONNECTING SUBGRAPHS
 # ============================================================================
 
 def decide_continue_to_ai(state: MasterState, config: dict) -> MasterState:
@@ -267,8 +268,15 @@ def decide_continue_to_ai(state: MasterState, config: dict) -> MasterState:
     
     logger.info("📋 Continuo verso AI analysis?")
     
+    try:
+        project_path = state.firmware_project_path
+        if not project_path:
+             project_path = "tuo progetto"
+    except:
+        project_path = "nuovo progetto"
+
     prompt = {
-        "instruction": "Firmware generato! Continui con analisi AI? (sì/no)",
+        "instruction": f"Firmware generato in {project_path}! Continui con analisi AI? (sì/no)",
     }
     
     user_response = interrupt(prompt)
@@ -282,18 +290,8 @@ def decide_continue_to_ai(state: MasterState, config: dict) -> MasterState:
     if not user_text or user_text.strip() == "":
         user_text = "sì"
     
-    # LLM per analizzare la risposta
-    cfg = Configuration.from_runnable_config(config)
-    llm = ChatOllama(model=cfg.local_llm, temperature=0)
-    
-    response = llm.invoke([
-        SystemMessage(content="Rispondi SOLO con: CONTINUARE o TERMINARE"),
-        HumanMessage(content=f"Risposta: '{user_text}'")
-    ])
-    
-    decision = response.content.strip().upper()
-    
-    if "CONTINUARE" in decision or "SÌ" in decision:
+    # Check semplice
+    if "sì" in user_text.lower() or "si" in user_text.lower() or "yes" in user_text.lower():
         state.route = "continue_to_ai"
     else:
         state.route = "end_workflow"
@@ -321,17 +319,7 @@ def decide_continue_to_integration(state: MasterState, config: dict) -> MasterSt
     if not user_text or user_text.strip() == "":
         user_text = "sì"
     
-    cfg = Configuration.from_runnable_config(config)
-    llm = ChatOllama(model=cfg.local_llm, temperature=0)
-    
-    response = llm.invoke([
-        SystemMessage(content="Rispondi SOLO con: CONTINUARE o TERMINARE"),
-        HumanMessage(content=f"Risposta: '{user_text}'")
-    ])
-    
-    decision = response.content.strip().upper()
-    
-    if "CONTINUARE" in decision or "SÌ" in decision:
+    if "sì" in user_text.lower() or "si" in user_text.lower() or "yes" in user_text.lower():
         state.route = "continue_to_integration"
     else:
         state.route = "end_workflow"
@@ -339,57 +327,245 @@ def decide_continue_to_integration(state: MasterState, config: dict) -> MasterSt
     return state
 
 
-def decision_continue_routing(state: MasterState) -> Literal["collect_analysis_info", "collect_integration_info", "end"]:
-    """Router per decision nodes"""
+def decision_continue_routing(state: MasterState) -> Literal["ai_flow", "integration_flow", "end"]:
+    """Router per decision nodes inter-subgraph"""
     
     if state.route == "continue_to_ai":
-        logger.info("→ Routing verso: collect_analysis_info")
-        return "collect_analysis_info"
+        logger.info("→ Routing verso: ai_flow")
+        return "ai_flow"
     elif state.route == "continue_to_integration":
-        logger.info("→ Routing verso: collect_integration_info")
-        return "collect_integration_info"
+        logger.info("→ Routing verso: integration_flow")
+        return "integration_flow"
     else:
         logger.info("→ Routing verso: END")
         return "end"
 
 
-def modification_confirmation_routing(state: MasterState) -> Literal["apply_user_customization", "ask_and_parse_user_modifications"]:
-    """Router per modifiche customizzazione"""
+# ============================================================================
+# SUBGRAPH BUILDERS
+# ============================================================================
+
+def build_firmware_graph():
+    """Builds the Firmware Generation Subgraph"""
+    workflow = StateGraph(MasterState, config_schema=Configuration)
     
-    if state.modification_confirmed:
-        return "apply_user_customization"
-    else:
-        return "ask_and_parse_user_modifications"
-
-
-def continue_after_customization_routing(state: MasterState) -> Literal["run_analyze", "end"]:
-    """Router dopo customizzazione"""
+    workflow.add_node("collect_project_info", collect_project_info)
+    workflow.add_node("search_and_install_stm32_package", search_and_install_stm32_package)
+    workflow.add_node("check_package_installation", check_package_installation) # Note: check_package_installation logic is usually conditional edge, here defining as node if it does work, otherwise use router logic
+    workflow.add_node("generate_cubemx_script", generate_cubemx_script)
+    workflow.add_node("execute_generation", execute_generation)
+    workflow.add_node("finalize_project", finalize_project)
     
-    if state.continue_after_customization:
-        return "run_analyze"
-    else:
-        return "end"
+    workflow.add_edge(START, "collect_project_info")
+    workflow.add_edge("collect_project_info", "search_and_install_stm32_package")
+    
+    # Routing conditional for package installed/not installed usually handled by node return logic
+    # Here assuming standard flow:
+    workflow.add_conditional_edges(
+        "search_and_install_stm32_package",
+        check_package_installation,
+        {
+            "generate_cubemx_script": "generate_cubemx_script",
+            "finalize_project": "finalize_project" # Skip if fail
+        }
+    )
+    
+    workflow.add_edge("generate_cubemx_script", "execute_generation")
+    workflow.add_edge("execute_generation", "finalize_project")
+    workflow.add_edge("finalize_project", END)
+    
+    return workflow.compile()
 
 
+def build_customization_graph():
+    """Builds the Model Customization Subgraph (Workflow 5 + 6 + 7)"""
+    workflow = StateGraph(MasterState, config_schema=Configuration)
+    
+    # Nodes
+    workflow.add_node("inspect_model_architecture", inspect_model_architecture)
+    workflow.add_node("ask_modification_intent", ask_modification_intent)
+    workflow.add_node("retrieve_best_practices_for_architecture", retrieve_best_practices_for_architecture)
+    workflow.add_node("ask_and_parse_user_modifications", ask_and_parse_user_modifications)
+    workflow.add_node("collect_modification_confirmation", collect_modification_confirmation)
+    workflow.add_node("apply_user_customization", apply_user_customization)
+    
+    # Dataset & Synthetic
+    workflow.add_node("decide_data_source", decide_data_source)
+    workflow.add_node("select_predefined_dataset", select_predefined_dataset)
+    workflow.add_node("download_dataset", download_dataset)
+    workflow.add_node("ask_synthetic_data_requirements", ask_synthetic_data_requirements)
+    workflow.add_node("generate_synthetic_samples", generate_synthetic_samples)
+    workflow.add_node("validate_synthetic_data", validate_synthetic_data)
+    
+    # Training & Save
+    workflow.add_node("fine_tune_customized_model", fine_tune_customized_model)
+    workflow.add_node("validate_customized_model", validate_customized_model)
+    workflow.add_node("save_customized_model_final", save_customized_model_final)
+    workflow.add_node("ask_continue_after_customization", ask_continue_after_customization)
+    
+    # Edges
+    workflow.add_edge(START, "inspect_model_architecture")
+    workflow.add_edge("inspect_model_architecture", "ask_modification_intent")
+    
+    workflow.add_conditional_edges(
+        "ask_modification_intent",
+        decide_after_inspection,
+        {
+            "retrieve_best_practices_for_architecture": "retrieve_best_practices_for_architecture",
+            "run_analyze": END # Exits this subgraph, will be handled by master graph to go to AI flow
+        }
+    )
+    
+    workflow.add_edge("retrieve_best_practices_for_architecture", "ask_and_parse_user_modifications")
+    workflow.add_edge("ask_and_parse_user_modifications", "collect_modification_confirmation")
+    
+    workflow.add_conditional_edges(
+        "collect_modification_confirmation",
+        customize_confirmation_routing,
+        {
+            "ask_and_parse_user_modifications": "ask_and_parse_user_modifications",
+            "apply_user_customization": "apply_user_customization",
+            "run_analyze": END # Exits customization
+        }
+    )
+    
+    workflow.add_edge("apply_user_customization", "decide_data_source")
+    
+    # Data Source Routing
+    def dataset_source_routing(state: MasterState) -> Literal["select_predefined_dataset", "ask_synthetic_data_requirements", "fine_tune_customized_model"]:
+        if state.dataset_source == "real":
+            return "select_predefined_dataset"
+        elif state.dataset_source == "synthetic":
+            return "ask_synthetic_data_requirements"
+        else:
+            return "fine_tune_customized_model"
+
+    workflow.add_conditional_edges(
+        "decide_data_source",
+        dataset_source_routing,
+        {
+            "select_predefined_dataset": "select_predefined_dataset",
+            "ask_synthetic_data_requirements": "ask_synthetic_data_requirements",
+            "fine_tune_customized_model": "fine_tune_customized_model"
+        }
+    )
+    
+    workflow.add_edge("select_predefined_dataset", "download_dataset")
+    workflow.add_edge("download_dataset", "fine_tune_customized_model") # Direct connection
+    
+    workflow.add_edge("ask_synthetic_data_requirements", "generate_synthetic_samples")
+    workflow.add_edge("generate_synthetic_samples", "validate_synthetic_data")
+    workflow.add_edge("validate_synthetic_data", "fine_tune_customized_model")
+    
+    workflow.add_edge("fine_tune_customized_model", "validate_customized_model")
+    workflow.add_edge("validate_customized_model", "save_customized_model_final")
+    workflow.add_edge("save_customized_model_final", "ask_continue_after_customization")
+    
+    # End customization
+    workflow.add_edge("ask_continue_after_customization", END)
+    
+    return workflow.compile()
 
 
+def build_ai_analysis_graph():
+    """Builds the AI Analysis Subgraph (Workflow 2), includes connection to Customization"""
+    workflow = StateGraph(MasterState, config_schema=Configuration)
+    
+    # Nodes
+    workflow.add_node("collect_analysis_info", collect_analysis_info)
+    workflow.add_node("choose_predefined_taskbased_model", choose_predefined_taskbased_model)
+    workflow.add_node("search_recommendation_model", search_recommendation_model)
+    workflow.add_node("download_model", download_model)
+    
+    # HERE WE INSERT THE CUSTOMIZATION SUBGRAPH AS A NODE
+    workflow.add_node("customization_flow", build_customization_graph())
+    
+    workflow.add_node("run_analyze", run_analyze)
+    workflow.add_node("run_validate", run_validate)
+    workflow.add_node("run_generate", run_generate)
+    workflow.add_node("finalize_analysis", finalize_analysis)
+    
+    # Edges
+    workflow.add_edge(START, "collect_analysis_info")
+    workflow.add_edge("collect_analysis_info", "choose_predefined_taskbased_model")
+    
+    # Discovery Routing
+    workflow.add_conditional_edges(
+        "choose_predefined_taskbased_model",
+        model_selection_routing,
+        {
+            "search_recommendation_model": "search_recommendation_model",
+            "download_model": "download_model"
+        }
+    )
+    
+    workflow.add_conditional_edges(
+        "search_recommendation_model",
+        model_selection_routing,
+        {
+            "search_recommendation_model": "search_recommendation_model",
+            "download_model": "download_model"
+        }
+    )
+    
+    # Dopo download, passa sempre per customization flow (che internamente può skippare)
+    workflow.add_edge("download_model", "customization_flow")  
+    
+    # Dopo customization (con o senza modifiche), si va ad analyze
+    workflow.add_edge("customization_flow", "run_analyze")
+    
+    workflow.add_edge("run_analyze", "run_validate")
+    workflow.add_edge("run_validate", "run_generate")
+    workflow.add_edge("run_generate", "finalize_analysis")
+    workflow.add_edge("finalize_analysis", END)
+    
+    return workflow.compile()
 
-def synthetic_data_routing(state: MasterState) -> Literal["ask_synthetic_data_requirements", "fine_tune_customized_model"]:
-    """Router per workflow dati sintetici"""
-    if state.use_synthetic_data:
-        return "ask_synthetic_data_requirements"
-    else:
-        return "fine_tune_customized_model"
+
+def build_integration_graph():
+    """Builds Integration Subgraph"""
+    workflow = StateGraph(MasterState, config_schema=Configuration)
+    
+    workflow.add_node("collect_integration_info", collect_integration_info)
+    workflow.add_node("scan_ai_files", scan_ai_files)
+    workflow.add_node("copy_ai_files", copy_ai_files)
+    workflow.add_node("modify_main_c", modify_main_c)
+    workflow.add_node("verify_integration", verify_integration)
+    workflow.add_node("finalize_integration", finalize_integration)
+    
+    workflow.add_edge(START, "collect_integration_info")
+    workflow.add_edge("collect_integration_info", "scan_ai_files")
+    workflow.add_edge("scan_ai_files", "copy_ai_files")
+    workflow.add_edge("copy_ai_files", "modify_main_c")
+    workflow.add_edge("modify_main_c", "verify_integration")
+    workflow.add_edge("verify_integration", "finalize_integration")
+    workflow.add_edge("finalize_integration", END)
+    
+    return workflow.compile()
 
 
-def dataset_source_routing(state: MasterState) -> Literal["select_predefined_dataset", "ask_synthetic_data_requirements", "fine_tune_customized_model"]:
-    """Router dopo decide_data_source"""
-    if state.dataset_source == "real":
-        return "select_predefined_dataset"
-    elif state.dataset_source == "synthetic":
-        return "ask_synthetic_data_requirements"
-    else:
-        return "fine_tune_customized_model"
+def build_web_search_graph():
+    """Builds Web Search Subgraph"""
+    workflow = StateGraph(MasterState, config_schema=Configuration)
+    
+    workflow.add_node("classify_search", classify_search)
+    workflow.add_node("execute_web_search", execute_web_search)
+    workflow.add_node("finalize_search", finalize_search)
+    
+    workflow.add_conditional_edges(
+        "classify_search",
+        search_type_decision,
+        {
+            "execute_web_search": "execute_web_search",
+            "clarify": END # Exits to master graph to handle clarification
+        }
+    )
+    
+    workflow.add_edge("execute_web_search", "finalize_search")
+    workflow.add_edge("finalize_search", END)
+    
+    return workflow.compile()
+
 
 # ============================================================================
 # MASTER GRAPH 
@@ -400,79 +576,20 @@ builder = StateGraph(
     config_schema=Configuration
 )
 
-# === ROUTER NODE ===
+# === ROUTER & COMMON NODES ===
 builder.add_node("route_request", route_request)
 builder.add_node("clarify", clarify_request)
 
-# === WORKFLOW 1: FIRMWARE ===
-builder.add_node("collect_project_info", collect_project_info)
-builder.add_node("search_and_install_stm32_package", search_and_install_stm32_package)
-builder.add_node("generate_cubemx_script", generate_cubemx_script)
-builder.add_node("execute_generation", execute_generation)
-builder.add_node("finalize_project", finalize_project)
+# === SUBGRAPH NODES ===
+builder.add_node("firmware_flow", build_firmware_graph())
+builder.add_node("ai_flow", build_ai_analysis_graph())
+builder.add_node("integration_flow", build_integration_graph())
+builder.add_node("search_flow", build_web_search_graph())
 
-# === DECISION NODE 1 ===
+# === DECISION NODES (Inter-Workflow) ===
 builder.add_node("decide_continue_to_ai", decide_continue_to_ai)
-
-# === WORKFLOW 2: AI ANALYSIS - CON MODEL DISCOVERY ===
-builder.add_node("collect_analysis_info", collect_analysis_info)
-builder.add_node("choose_predefined_taskbased_model", choose_predefined_taskbased_model)
-builder.add_node("search_recommendation_model", search_recommendation_model)
-builder.add_node("download_model", download_model)
-
-# === WORKFLOW 5: MODEL CUSTOMIZATION (ENHANCED VERSION) ===
-# Architettura
-builder.add_node("inspect_model_architecture", inspect_model_architecture)
-builder.add_node("ask_modification_intent", ask_modification_intent)  # ✅ NUOVO
-builder.add_node("retrieve_best_practices_for_architecture", retrieve_best_practices_for_architecture)
-
-# User interaction & parsing
-builder.add_node("ask_and_parse_user_modifications", ask_and_parse_user_modifications)
-builder.add_node("collect_modification_confirmation", collect_modification_confirmation)
-
-# Applicazione modifiche
-builder.add_node("apply_user_customization", apply_user_customization)
-
-# Fine-tuning e validazione
-builder.add_node("fine_tune_customized_model", fine_tune_customized_model)
-builder.add_node("validate_customized_model", validate_customized_model)
-
-# Salvataggio e decision
-builder.add_node("save_customized_model_final", save_customized_model_final)
-builder.add_node("ask_continue_after_customization", ask_continue_after_customization)
-
-# === WORKFLOW 6: SYNTHETIC DATA ===
-# builder.add_node("decide_synthetic_data_generation", decide_synthetic_data_generation) # REMOVED: Replaced by decide_data_source
-builder.add_node("ask_synthetic_data_requirements", ask_synthetic_data_requirements)
-builder.add_node("generate_synthetic_samples", generate_synthetic_samples)
-builder.add_node("validate_synthetic_data", validate_synthetic_data)
-
-# === WORKFLOW 7: DATASET SELECTION ===
-builder.add_node("decide_data_source", decide_data_source)
-builder.add_node("select_predefined_dataset", select_predefined_dataset)
-builder.add_node("download_dataset", download_dataset)
-
-# === WORKFLOW 2 CONTINUAZIONE ===
-builder.add_node("run_analyze", run_analyze)
-builder.add_node("run_validate", run_validate)
-builder.add_node("run_generate", run_generate)
-builder.add_node("finalize_analysis", finalize_analysis)
-
-# === DECISION NODE 2 ===
 builder.add_node("decide_continue_to_integration", decide_continue_to_integration)
 
-# === WORKFLOW 3: INTEGRATION ===
-builder.add_node("collect_integration_info", collect_integration_info)
-builder.add_node("scan_ai_files", scan_ai_files)
-builder.add_node("copy_ai_files", copy_ai_files)
-builder.add_node("modify_main_c", modify_main_c)
-builder.add_node("verify_integration", verify_integration)
-builder.add_node("finalize_integration", finalize_integration)
-
-# === WORKFLOW 4: WEB RESEARCH ===
-builder.add_node("classify_search", classify_search)
-builder.add_node("execute_web_search", execute_web_search)
-builder.add_node("finalize_search", finalize_search)
 
 # ============================================================================
 # EDGES CONFIGURATION
@@ -486,228 +603,43 @@ builder.add_conditional_edges(
     "route_request",
     route_decision,
     {
-        "firmware_branch": "collect_project_info",
-        "ai_branch": "collect_analysis_info",
-        "integration_branch": "collect_integration_info",
-        "search_branch": "classify_search",
+        "firmware_flow": "firmware_flow",
+        "ai_flow": "ai_flow",
+        "integration_flow": "integration_flow",
+        "search_flow": "search_flow",
         "clarify": "clarify"
     }
 )
 
 builder.add_edge("clarify", "route_request")
 
-# ============================================================================
-# === RAMO 1: FIRMWARE + DECISION ===
-# ============================================================================
-builder.add_edge("collect_project_info", "search_and_install_stm32_package")
+# === FIRMWARE BRANCH CONNECTION ===
+builder.add_edge("firmware_flow", "decide_continue_to_ai")
 
-builder.add_conditional_edges(
-    "search_and_install_stm32_package",
-    check_package_installation,
-    {
-        "generate_cubemx_script": "generate_cubemx_script",
-        "finalize_project": "finalize_project"
-    }
-)
-
-builder.add_edge("generate_cubemx_script", "execute_generation")
-builder.add_edge("execute_generation", "finalize_project")
-builder.add_edge("finalize_project", "decide_continue_to_ai")
-
-# === DECISION ROUTING 1: After Firmware ===
 builder.add_conditional_edges(
     "decide_continue_to_ai",
     decision_continue_routing,
     {
-        "collect_analysis_info": "collect_analysis_info",
+        "ai_flow": "ai_flow",
         "end": END
     }
 )
 
-# ============================================================================
-# === RAMO 2: AI + MODEL CUSTOMIZATION ===
-# ============================================================================
-builder.add_edge("collect_analysis_info", "choose_predefined_taskbased_model")
+# === AI BRANCH CONNECTION ===
+builder.add_edge("ai_flow", "decide_continue_to_integration")
 
-builder.add_conditional_edges(
-    "choose_predefined_taskbased_model",
-    model_selection_routing,
-    {
-        "search_recommendation_model": "search_recommendation_model",
-        "download_model": "download_model"
-    }
-)
-
-# Loop per ricerca multipla di modelli
-builder.add_conditional_edges(
-    "search_recommendation_model",
-    model_selection_routing,
-    {
-        "search_recommendation_model": "search_recommendation_model",
-        "download_model": "download_model"
-    }
-)
-
-# Dopo download, vai a ispezionamento architettura
-builder.add_edge("download_model", "inspect_model_architecture")
-
-# ============================================================================
-# === WORKFLOW 5: MODEL CUSTOMIZATION FLOW ===
-# ============================================================================
-
-# Fase 0: Ispezionamento e decisione intenzione di modifica
-builder.add_edge("inspect_model_architecture", "ask_modification_intent")  # ✅ NUOVO
-
-# ✅ NUOVO ROUTER CONDIZIONALE: Decide se customizzare o skip diretto ad analyze
-builder.add_conditional_edges(
-    "ask_modification_intent",
-    decide_after_inspection,  # Router function
-    {
-        "retrieve_best_practices_for_architecture": "retrieve_best_practices_for_architecture",  # Se vuole modifiche
-        "run_analyze": "run_analyze"  # Se skip diretto ad analyze
-    }
-)
-
-# Fase 1: Analisi e suggerimenti (solo se entra qui)
-builder.add_edge("retrieve_best_practices_for_architecture", "ask_and_parse_user_modifications")
-
-# Fase 2: Parsing richieste utente
-builder.add_edge("ask_and_parse_user_modifications", "collect_modification_confirmation")
-
-# Fase 3: Loop - se l'utente non è soddisfatto, ritorna indietro
-def modification_confirmation_routing(state: MasterState) -> str:
-    """
-    Route basato su modifica_confirmed e user_wants_to_edit.
-    - Se modification_confirmed=True: procedi con applicazione
-    - Se user_wants_to_edit=True: torna a chiedere modifiche
-    - Se modification_confirmed=False (e no edit): annulla tutto e vai ad analyze
-    """
-    if state.modification_confirmed:
-        return "apply_user_customization"
-    elif state.user_wants_to_edit:
-        return "ask_and_parse_user_modifications"
-    else:
-        # Caso "No" -> Abort customization, go straight to analysis
-        return "run_analyze"
-
-builder.add_conditional_edges(
-    "collect_modification_confirmation",
-    modification_confirmation_routing,
-    {
-        "ask_and_parse_user_modifications": "ask_and_parse_user_modifications",
-        "apply_user_customization": "apply_user_customization",
-        "run_analyze": "run_analyze"
-    }
-)
-
-# Fase 4: Applicazione modifiche all'architettura
-builder.add_edge("apply_user_customization", "decide_data_source")
-
-# Fase 4b: Decisione Data Source (Sostituisce la vecchia logica solo synthetic)
-builder.add_conditional_edges(
-    "decide_data_source",
-    dataset_source_routing,
-    {
-        "select_predefined_dataset": "select_predefined_dataset",
-        "ask_synthetic_data_requirements": "ask_synthetic_data_requirements",
-        "fine_tune_customized_model": "fine_tune_customized_model"
-    }
-)
-
-# Branch Real Dataset
-builder.add_edge("select_predefined_dataset", "download_dataset")
-
-def post_download_routing(state: MasterState) -> Literal["ask_synthetic_data_requirements", "fine_tune_customized_model"]:
-    return "fine_tune_customized_model"
-
-builder.add_conditional_edges(
-    "download_dataset",
-    post_download_routing,
-    {
-        "ask_synthetic_data_requirements": "ask_synthetic_data_requirements",
-        "fine_tune_customized_model": "fine_tune_customized_model"
-    }
-)
-
-# Branch Synthetic Data (modificato per supportare flow da real)
-builder.add_edge("ask_synthetic_data_requirements", "generate_synthetic_samples")
-builder.add_edge("generate_synthetic_samples", "validate_synthetic_data")
-builder.add_edge("validate_synthetic_data", "fine_tune_customized_model")
-
-# Fase 5: Fine-tuning con dataset reale
-builder.add_edge("fine_tune_customized_model", "validate_customized_model")
-
-# Fase 6: Validazione modello
-builder.add_edge("validate_customized_model", "save_customized_model_final")
-
-# Fase 7: Salvataggio definitivo con metadata
-builder.add_edge("save_customized_model_final", "ask_continue_after_customization")
-
-# Fase 8: Decisione: proseguire con AI analysis o terminare
-def continue_after_customization_routing(state: MasterState) -> str:
-    """
-    Route dopo customization.
-    - Se continue_after_customization=True: prosegui con X-CUBE-AI analysis
-    - Se continue_after_customization=False: termina
-    """
-    if state.continue_after_customization:
-        return "run_analyze"
-    else:
-        return "end"
-
-builder.add_conditional_edges(
-    "ask_continue_after_customization",
-    continue_after_customization_routing,
-    {
-        "run_analyze": "run_analyze",
-        "end": END
-    }
-)
-
-# ============================================================================
-# === WORKFLOW 2 CONTINUAZIONE: X-CUBE-AI ANALYSIS ===
-# ============================================================================
-builder.add_edge("run_analyze", "run_validate")
-builder.add_edge("run_validate", "run_generate")
-builder.add_edge("run_generate", "finalize_analysis")
-builder.add_edge("finalize_analysis", "decide_continue_to_integration")
-
-# === DECISION ROUTING 2: After AI Analysis ===
 builder.add_conditional_edges(
     "decide_continue_to_integration",
     decision_continue_routing,
     {
-        "collect_integration_info": "collect_integration_info",
+        "integration_flow": "integration_flow",
         "end": END
     }
 )
 
-# ============================================================================
-# === RAMO 3: INTEGRATION (FIRMWARE + AI CODE) ===
-# ============================================================================
-builder.add_edge("collect_integration_info", "scan_ai_files")
-builder.add_edge("scan_ai_files", "copy_ai_files")
-builder.add_edge("copy_ai_files", "modify_main_c")
-builder.add_edge("modify_main_c", "verify_integration")
-builder.add_edge("verify_integration", "finalize_integration")
-builder.add_edge("finalize_integration", END)
+# === OTHER BRANCHES END ===
+builder.add_edge("integration_flow", END)
+builder.add_edge("search_flow", END)
 
-# ============================================================================
-# === RAMO 4: WEB RESEARCH ===
-# ============================================================================
-builder.add_conditional_edges(
-    "classify_search",
-    search_type_decision,
-    {
-        "execute_web_search": "execute_web_search",
-        "clarify": "clarify"
-    }
-)
-
-builder.add_edge("execute_web_search", "finalize_search")
-builder.add_edge("finalize_search", END)
-
-# ============================================================================
 # === COMPILE ===
-# ============================================================================
 graph = builder.compile()
