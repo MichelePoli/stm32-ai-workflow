@@ -351,7 +351,7 @@ def build_firmware_graph():
     
     workflow.add_node("collect_project_info", collect_project_info)
     workflow.add_node("search_and_install_stm32_package", search_and_install_stm32_package)
-    workflow.add_node("check_package_installation", check_package_installation) # Note: check_package_installation logic is usually conditional edge, here defining as node if it does work, otherwise use router logic
+    # check_package_installation is a conditional edge function, not a node
     workflow.add_node("generate_cubemx_script", generate_cubemx_script)
     workflow.add_node("execute_generation", execute_generation)
     workflow.add_node("finalize_project", finalize_project)
