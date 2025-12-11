@@ -3322,3 +3322,23 @@ Quantized: {state.should_quantize}
 # 🥈 Mistral 72B      (GOOD: veloce, OK qualità)
 # 🥉 Qwen2 7B         (OK: leggero ma qualità minore)
 
+
+# ============================================================================
+# ROUTING HELPERS
+# ============================================================================
+
+def modification_confirmation_routing(state: MasterState) -> Literal["apply_user_customization", "ask_and_parse_user_modifications", "run_analyze"]:
+    """
+    Route basato su modifica_confirmed e user_wants_to_edit.
+    - Se modification_confirmed=True: procedi con applicazione
+    - Se user_wants_to_edit=True: torna a chiedere modifiche
+    - Se modification_confirmed=False (e no edit): annulla tutto e vai ad analyze
+    """
+    if state.modification_confirmed:
+        return "apply_user_customization"
+    elif state.user_wants_to_edit:
+        return "ask_and_parse_user_modifications"
+    else:
+        # Caso "No" -> Abort customization, go straight to analysis
+        return "run_analyze"
+
