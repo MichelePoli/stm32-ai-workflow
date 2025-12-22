@@ -726,33 +726,45 @@ def audio_to_spectrogram(file_path: str, target_shape=(32, 32)) -> Optional[np.n
     Ritorna array (H, W, 1) normalizzato [0,1].
     """
     try:
-        # 1. Read WAV
+        # 1. READ WAV FILE (Load & Resample)
+        # Decodes the WAV file. Note: In a real scenario, this should also handle resampling
+        # if the input rate != 16kHz (e.g. using tfio.audio.resample).
         audio_binary = tf.io.read_file(file_path)
         audio, sample_rate = tf.audio.decode_wav(audio_binary)
         
-        # 2. Fix length (1 sec @ 16kHz = 16000 samples)
-        # Se più lungo taglia, se più corto pad
+        # 2. FIX LENGTH (Padding/Truncation)
+        # Ensures all inputs have exactly the same length (1 second @ 16kHz = 16000 samples).
+        # This is CRITICAL for Neural Networks which expect fixed-size input tensors.
         desired_samples = 16000
-        audio = tf.squeeze(audio, axis=-1) # (N,)
+        audio = tf.squeeze(audio, axis=-1) # Remove channel dim: (N, 1) -> (N,)
         
         if tf.shape(audio)[0] < desired_samples:
+            # If too short: Pad with zeros (silence) at the end
             paddings = [[0, desired_samples - tf.shape(audio)[0]]]
             audio = tf.pad(audio, paddings)
         else:
+            # If too long: Truncate to the first 1 second
             audio = audio[:desired_samples]
             
-        # 3. STFT Spectrogram
-        # frame_length=255, frame_step=128 -> output approx 124x129
+        # 3. FEATURE EXTRACTION (STFT Spectrogram)
+        # Converts time-domain signal (waveform) to frequency-domain (image).
+        # Parameters (frame_length, frame_step) control time/freq resolution.
+        # Output shape approx: (124, 129)
         stft = tf.signal.stft(audio, frame_length=255, frame_step=128)
         spectrogram = tf.abs(stft)
         
-        # Add channel dim -> (Time, Freq, 1)
+        # Add channel dim for CNN -> (Time, Freq, 1)
+        # This makes it compatible with 2D Convolution layers (like an image).
         spectrogram = tf.expand_dims(spectrogram, axis=-1)
         
-        # 4. Resize to target image shape (e.g. 32x32)
+        # 4. RESIZE (Adaptation to Model Input)
+        # Resizes the large spectrogram to a smaller 32x32 image.
+        # This drastically reduces RAM usage on STM32 while keeping key features.
         spectrogram = tf.image.resize(spectrogram, target_shape)
         
-        # 5. Normalize [0, 1]
+        # 5. NORMALIZATION
+        # Scales values to [0, 1] range. 
+        # Essential for model convergence and 8-bit quantization later.
         max_val = tf.reduce_max(spectrogram)
         if max_val > 0:
             spectrogram = spectrogram / max_val
