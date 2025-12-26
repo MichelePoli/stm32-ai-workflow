@@ -3094,6 +3094,134 @@ except Exception as e:
     
     return state
 
+
+def ask_optimization_preference(state: MasterState, config: dict) -> MasterState:
+    """Chiede all'utente se vuole usare NNI o training standard"""
+    logger.info("🤔 Chiedo preferenza ottimizzazione...")
+    
+    prompt = {
+        "instruction": "Vuoi eseguire l'ottimizzazione degli iperparametri con NNI o procedere con il fine-tuning standard? (nni/standard)",
+        "options": {
+            "nni": "Usa NNI per trovare i parametri migliori (AutoML)",
+            "standard": "Fine-tuning standard (parametri fissi)"
+        }
+    }
+    
+    try:
+        user_response = interrupt(prompt)
+        if isinstance(user_response, dict):
+            response = user_response.get("response", "standard")
+        else:
+            response = str(user_response)
+    except:
+        response = "standard"
+        
+    state.optimization_mode = "nni" if "nni" in response.lower() else "standard"
+    logger.info(f"✓ Modalità selezionata: {state.optimization_mode}")
+    return state
+
+def optimization_routing(state: MasterState) -> Literal["optimize_hyperparameters_with_nni", "fine_tune_customized_model"]:
+    if getattr(state, "optimization_mode", "standard") == "nni":
+        logger.info("→ Routing verso: NNI Optimization")
+        return "optimize_hyperparameters_with_nni"
+    
+    logger.info("→ Routing verso: Standard Fine-Tuning")
+    return "fine_tune_customized_model"
+    
+    
+def optimize_hyperparameters_with_nni(state: MasterState, config: dict) -> MasterState:
+    """
+    ✨ Esegue ottimizzazione iperparametri con NNI (Agentic/Adaptive Mode)
+    Generate script dinamici basati su modello e dataset.
+    """
+    logger.info("═══════════════════════════")
+    logger.info("🧠 NNI ADAPTIVE OPTIMIZATION")
+    logger.info("═══════════════════════════")
+    
+    try:
+        from src.assistant.nni_optimization.generator import generate_nni_experiment
+        import subprocess
+        
+        model_path = state.model_path 
+        
+        # Determine data path
+        if state.dataset_source == "real":
+             data_path = state.real_dataset_path
+        else:
+             data_path = state.synthetic_data_path
+             
+        # Prepare Info Dictionaries
+        model_info = {
+            "name": os.path.basename(model_path),
+            "path": model_path,
+            "input_shape": state.model_architecture.get("input_shape", "Unknown"),
+            "n_layers": state.model_architecture.get("n_layers", 0),
+            "output_shape": state.model_architecture.get("output_shape", "Unknown")
+        }
+        
+        dataset_info = {
+            "path": data_path,
+            "source": state.dataset_source,
+            # We assume standard numpy names, shape can be inferred or passed if known
+            "num_classes": state.model_architecture.get("output_classes", 10) 
+        }
+        
+        # Output Directory for Generated Scripts
+        experiment_dir = os.path.join(os.path.dirname(model_path), "nni_adaptive_experiment")
+        os.makedirs(experiment_dir, exist_ok=True)
+        
+        # 1. GENERATE
+        logger.info("🚀 Generazione esperimento NNI su misura...")
+        generated_files = generate_nni_experiment(
+            model_info=model_info,
+            dataset_info=dataset_info,
+            output_dir=experiment_dir,
+            model_id=Configuration.from_runnable_config(config).local_llm # Use configured LLM
+        )
+        
+        if not generated_files:
+            logger.error("❌ Generazione fallita. Abort.")
+            return state
+            
+        logger.info("✓ Script generati con successo.")
+        
+        # 2. EXECUTE
+        manager_script = os.path.join(experiment_dir, "manager.py")
+        if not os.path.exists(manager_script):
+             logger.error(f"❌ manager.py non trovato in {experiment_dir}")
+             return state
+             
+        logger.info(f"▶️  Launching NNI Manager: {manager_script}")
+        
+        # Run process
+        # We run it in a way that captures output but doesn't block forever if we want async
+        # For now, blocking to see result
+        try:
+            result = subprocess.run(
+                ["python", manager_script],
+                cwd=experiment_dir, # Run in the dir so imports work
+                capture_output=True,
+                text=True,
+                timeout=None # Or set a timeout
+            )
+            
+            logger.info("✓ Esperimento concluso (o interrotto).")
+            if result.stdout:
+                logger.info(f"STDOUT:\n{result.stdout[:500]}...")
+            if result.stderr:
+                logger.warning(f"STDERR:\n{result.stderr[:500]}...")
+                
+        except Exception as exec_err:
+             logger.error(f"❌ Errore durante esecuzione manager: {exec_err}")
+        
+    except ImportError:
+        logger.error("❌ NNI module not found or import error.")
+    except Exception as e:
+        logger.error(f"❌ NNI Optimization failed: {e}")
+        
+    return state
+
+
 import shutil
 
 def validate_customized_model(state: MasterState, config: dict) -> MasterState:

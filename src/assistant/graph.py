@@ -84,7 +84,10 @@ from src.assistant.workflow5_customization import (
     validate_customized_model,
     save_customized_model_final,
     ask_continue_after_customization,
-    modification_confirmation_routing as customize_confirmation_routing # Alias to avoid name conflict if needed
+    optimize_hyperparameters_with_nni,    # NEW
+    ask_optimization_preference,          # NEW
+    optimization_routing,                 # NEW
+    modification_confirmation_routing as customize_confirmation_routing
 )
 
 # --- Workflow 6: Synthetic Data ---
@@ -450,15 +453,33 @@ def build_customization_graph():
         }
     )
     
-    workflow.add_edge("select_predefined_dataset", "download_dataset")
-    workflow.add_edge("download_dataset", "fine_tune_customized_model") # Direct connection
+    # NNI Nodes
+    workflow.add_node("ask_optimization_preference", ask_optimization_preference)
+    workflow.add_node("optimize_hyperparameters_with_nni", optimize_hyperparameters_with_nni)
+    
+    # ... edges ...
+    
+    workflow.add_edge("download_dataset", "ask_optimization_preference") # Was direct to fine_tune
     
     workflow.add_edge("ask_synthetic_data_requirements", "generate_synthetic_samples")
     workflow.add_edge("generate_synthetic_samples", "validate_synthetic_data")
-    workflow.add_edge("validate_synthetic_data", "fine_tune_customized_model")
+    workflow.add_edge("validate_synthetic_data", "ask_optimization_preference") # Was direct to fine_tune
+    
+    # Conditional Routing for Optimization
+    workflow.add_conditional_edges(
+        "ask_optimization_preference",
+        optimization_routing,
+        {
+            "fine_tune_customized_model": "fine_tune_customized_model",
+            "optimize_hyperparameters_with_nni": "optimize_hyperparameters_with_nni"
+        }
+    )
     
     workflow.add_edge("fine_tune_customized_model", "validate_customized_model")
+    workflow.add_edge("optimize_hyperparameters_with_nni", "validate_customized_model") # NNI connects back to validation
+    
     workflow.add_edge("validate_customized_model", "save_customized_model_final")
+
     workflow.add_edge("save_customized_model_final", "ask_continue_after_customization")
     
     # End customization
