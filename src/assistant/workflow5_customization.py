@@ -3175,12 +3175,18 @@ def ask_optimization_preference(state: MasterState, config: dict) -> MasterState
     return state
 
 def optimization_routing(state: MasterState) -> Literal["optimize_hyperparameters_with_nni", "fine_tune_customized_model"]:
-    if getattr(state, "optimization_mode", "standard") == "nni":
+    if getattr(state, "optimization_mode", "standard") == "nni": 
         logger.info("→ Routing verso: NNI Optimization")
         return "optimize_hyperparameters_with_nni"
     
     logger.info("→ Routing verso: Standard Fine-Tuning")
     return "fine_tune_customized_model"
+
+# getattr(state, "optimization_mode", "standard") -> Legge l'attributo optimization_mode dall'oggetto state. Se l'attributo esiste, restituisce il suo valore (es. "nni" o "standard"). Se l'attributo NON esiste o è None, restituisce il valore di default: "standard"
+
+# == "nni" -> confronta il valore ottenuto con la stringa "nni"
+# Se state.optimization_mode == "nni" → Entra nell'if → Routing verso NNI
+# Altrimenti → Va nell'else → Routing verso Fine-Tuning Standard
     
     
 def optimize_hyperparameters_with_nni(state: MasterState, config: dict) -> MasterState:

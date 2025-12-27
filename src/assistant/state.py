@@ -146,6 +146,9 @@ class MasterState:
     dataset_source: str = ""  # "real", "synthetic", "both"
     real_dataset_name: str = ""  # es. "cifar10", "esc50"
     real_dataset_path: str = ""  # Path locale del dataset scaricato
+    
+    # === NNI OPTIMIZATION ===
+    optimization_mode: str = "standard"  # "nni", "standard" - modalità di ottimizzazione iperparametri
 
     
 
