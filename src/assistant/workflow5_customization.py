@@ -3144,7 +3144,9 @@ except Exception as e:
 
 def ask_optimization_preference(state: MasterState, config: dict) -> MasterState:
     """Chiede all'utente se vuole usare NNI o training standard"""
-    logger.info("🤔 Chiedo preferenza ottimizzazione...")
+    logger.info("=" * 70)
+    logger.info("🤔 ASK_OPTIMIZATION_PREFERENCE NODE EXECUTING")
+    logger.info("=" * 70)
     
     prompt = {
         "instruction": "Vuoi eseguire l'ottimizzazione degli iperparametri con NNI o procedere con il fine-tuning standard? (nni/standard)",
@@ -3154,17 +3156,22 @@ def ask_optimization_preference(state: MasterState, config: dict) -> MasterState
         }
     }
     
-    try:
-        user_response = interrupt(prompt)
-        if isinstance(user_response, dict):
-            response = user_response.get("response", "standard")
-        else:
-            response = str(user_response)
-    except:
-        response = "standard"
+    logger.info("📝 Calling interrupt()...")
+    user_response = interrupt(prompt)
+    logger.info(f"✓ Interrupt returned: {user_response}")
+    
+    if isinstance(user_response, dict):
+        response = user_response.get("response", "standard")
+    else:
+        response = str(user_response)
+    
+    # Default if empty
+    if not response or response.strip() == "":
+        response = "nni" # default
         
     state.optimization_mode = "nni" if "nni" in response.lower() else "standard"
     logger.info(f"✓ Modalità selezionata: {state.optimization_mode}")
+    logger.info("=" * 70)
     return state
 
 def optimization_routing(state: MasterState) -> Literal["optimize_hyperparameters_with_nni", "fine_tune_customized_model"]:
