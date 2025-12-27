@@ -138,6 +138,7 @@ OUTPUT FORMAT (COPY THIS STRUCTURE EXACTLY):
 ```python
 import nni
 import os
+import sys
 from nni.experiment import Experiment
 
 # Get absolute path to current directory
@@ -151,7 +152,8 @@ search_space = {{
 
 # Create experiment
 experiment = Experiment('local')
-experiment.config.trial_command = 'python trial.py'
+# CRITICAL: Use same Python interpreter for trials
+experiment.config.trial_command = f'{{sys.executable}} trial.py'
 experiment.config.trial_code_directory = current_dir  # Use absolute path
 experiment.config.search_space = search_space
 experiment.config.tuner.name = 'TPE'
