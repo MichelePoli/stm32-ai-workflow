@@ -482,13 +482,13 @@ def build_ai_analysis_graph():
     workflow.add_edge("apply_user_customization", "decide_data_source")
     
     # 5. Data Source Routing
-    def dataset_source_routing(state: MasterState) -> Literal["select_predefined_dataset", "ask_synthetic_data_requirements", "fine_tune_customized_model"]:
+    def dataset_source_routing(state: MasterState) -> Literal["select_predefined_dataset", "ask_synthetic_data_requirements", "ask_optimization_preference"]:
         if state.dataset_source == "real":
             return "select_predefined_dataset"
         elif state.dataset_source == "synthetic":
             return "ask_synthetic_data_requirements"
         else:
-            return "fine_tune_customized_model"
+            return "ask_optimization_preference" # Fallback to optimization/training choice
 
     workflow.add_conditional_edges(
         "decide_data_source",
@@ -496,7 +496,7 @@ def build_ai_analysis_graph():
         {
             "select_predefined_dataset": "select_predefined_dataset",
             "ask_synthetic_data_requirements": "ask_synthetic_data_requirements",
-            "fine_tune_customized_model": "fine_tune_customized_model"
+            "ask_optimization_preference": "ask_optimization_preference"
         }
     )
     
