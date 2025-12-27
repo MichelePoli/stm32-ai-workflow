@@ -21,22 +21,48 @@ def normalize_code_escapes(text: str) -> str:
     text = text.replace(r'\\"', '"')
     return text
 
-def extract_files_from_code(code: str) -> Dict[str, str]:
+def extract_files_from_code(code: str, verbose: bool = True) -> Dict[str, str]:
     """
     Extract individual files from code with # FILE: markers.
+    More permissive regex to handle various LLM output formats.
     """
-    if not code or '# FILE:' not in code:
+    if not code:
+        return {}
+        
+    if '# FILE:' not in code and '#FILE:' not in code:
+        if verbose:
+            logger.warning("⚠️  No '# FILE:' markers found, returning as single file")
         return {"main.py": code}
     
-    file_pattern = re.compile(r'^# FILE:\s*(\w+(?:\.\w+)?)\s*$', re.MULTILINE)
+    # More permissive regex:
+    # - Allows optional space after #
+    # - Allows anything after filename (e.g., comments)
+    # - Captures filename with dots, underscores, dashes
+    file_pattern = re.compile(r'^#\s*FILE:\s*([a-zA-Z0-9_\-\.]+)', re.MULTILINE | re.IGNORECASE)
     file_matches = list(file_pattern.finditer(code))
+    
+    if verbose:
+        logger.info(f"   Found {len(file_matches)} file markers")
+        for match in file_matches:
+            logger.info(f"      - {match.group(1)}")
+    
+    if not file_matches:
+        logger.warning("⚠️  # FILE: markers exist but regex didn't match, returning as single file")
+        return {"main.py": code}
     
     files = {}
     for i, match in enumerate(file_matches):
         filename = match.group(1)
-        start = match.end() + 1
-        end = file_matches[i + 1].start() if i + 1 < len(file_matches) else len(code)
-        files[filename] = code[start:end].strip()
+        start = match.end()
+        
+        # Find next file marker or end of string
+        if i + 1 < len(file_matches):
+            end = file_matches[i + 1].start()
+        else:
+            end = len(code)
+        
+        file_content = code[start:end].strip()
+        files[filename] = file_content
         
     return files
 
@@ -158,7 +184,7 @@ def generate_nni_experiment(
             path = os.path.join(output_dir, filename)
             with open(path, "w") as f:
                 f.write(file_content)
-            logger.info(f"   ✓ Written {filename}")
+            logger.info(f"   ✓ Written: {path}")  # Show full path
             
         return files
         
