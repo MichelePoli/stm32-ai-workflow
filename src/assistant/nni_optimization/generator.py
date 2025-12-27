@@ -159,8 +159,8 @@ experiment.config.trial_code_directory = current_dir  # Use absolute path
 experiment.config.search_space = search_space
 experiment.config.tuner.name = 'TPE'
 experiment.config.tuner.class_args = {{'optimize_mode': 'maximize'}}
-experiment.config.max_trial_number = 10
-experiment.config.trial_concurrency = 1
+experiment.config.max_trial_number = 5
+experiment.config.trial_concurrency = 2 # NNI lancerà 2 trial contemporaneamente, dimezzando (più o meno) il tempo totale di attesa
 
 # Run with error handling
 try:
@@ -222,7 +222,7 @@ model.compile(optimizer=keras.optimizers.Adam(learning_rate=lr),
 # Train
 history = model.fit(train_ds, 
                     validation_data=val_ds,
-                    epochs=5, verbose=0)
+                    epochs=3, verbose=0)
 
 # Report
 val_accuracy = history.history['val_accuracy'][-1]
