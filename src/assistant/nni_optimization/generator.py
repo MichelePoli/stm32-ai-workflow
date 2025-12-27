@@ -128,6 +128,7 @@ FILE 2: trial.py
 - Import nni
 - Load model from: {model_info.get('path')}
 - Load data from: {dataset_info.get('path')} (x_train.npy, y_train.npy, x_test.npy, y_test.npy)
+- Resize input data to match model input shape
 - Get hyperparameters with nni.get_next_parameter()
 - Train model
 - Report result with nni.report_final_result(accuracy)
@@ -180,6 +181,7 @@ finally:
 ```python
 import nni
 import numpy as np
+import tensorflow as tf
 from tensorflow import keras
 
 # Get hyperparameters
@@ -196,15 +198,31 @@ y_test = np.load('{dataset_info.get('path')}/y_test.npy')
 # Load model
 model = keras.models.load_model('{model_info.get('path')}')
 
+# --- SHAPE FIX: Resize images if needed ---
+expected_shape = model.input_shape[1:3]  # (H, W)
+print(f"Model expects: {expected_shape}, Data has: {x_train.shape[1:3]}")
+
+def preprocess(x, y):
+    # Resize to expected shape
+    x = tf.image.resize(x, expected_shape)
+    return x, y
+
+# Create efficient tf.data pipeline
+train_ds = tf.data.Dataset.from_tensor_slices((x_train, y_train))
+train_ds = train_ds.map(preprocess).shuffle(1000).batch(batch_size).prefetch(tf.data.AUTOTUNE)
+
+val_ds = tf.data.Dataset.from_tensor_slices((x_test, y_test))
+val_ds = val_ds.map(preprocess).batch(batch_size).prefetch(tf.data.AUTOTUNE)
+
 # Compile
 model.compile(optimizer=keras.optimizers.Adam(learning_rate=lr),
               loss='categorical_crossentropy',
               metrics=['accuracy'])
 
 # Train
-history = model.fit(x_train, y_train, 
-                    validation_data=(x_test, y_test),
-                    epochs=5, batch_size=batch_size, verbose=0)
+history = model.fit(train_ds, 
+                    validation_data=val_ds,
+                    epochs=5, verbose=0)
 
 # Report
 val_accuracy = history.history['val_accuracy'][-1]
