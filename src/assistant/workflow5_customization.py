@@ -3280,6 +3280,15 @@ def optimize_hyperparameters_with_nni(state: MasterState, config: dict) -> Maste
             logger.warning("⏱️  NNI Manager timeout (likely running in background)")
         except Exception as exec_err:
              logger.error(f"❌ Errore durante esecuzione manager: {exec_err}")
+             
+        # --- RETRIEVE BEST MODEL ---
+        best_model_path = os.path.join(experiment_dir, "best_model.h5")
+        if os.path.exists(best_model_path):
+            logger.info(f"🏆 Found optimized model at: {best_model_path}")
+            state.customized_model_path = best_model_path
+            state.model_path = best_model_path # Update source for validation
+        else:
+            logger.warning("⚠️  Optimized model NOT found. Using original/customized path.")
         
     except ImportError:
         logger.error("❌ NNI module not found or import error.")

@@ -123,17 +123,20 @@ FILE 1: manager.py
 - Define search space (learning_rate, batch_size, optimizer, freeze_mode)
 - Set trial_command = "python trial.py"
 - Launch experiment with experiment.run(port=8080)
+- AFTER experiment: Get best params with experiment.export_top_trial()
+- Trigger RETRAIN: Run "trial.py" with env variable RETRAIN_MODE='true' and best params
 
 FILE 2: trial.py
 - Import nni
-- Load model from: {model_info.get('path')}
-- Load data from: {dataset_info.get('path')} (x_train.npy, y_train.npy, x_test.npy, y_test.npy)
-- Resize input data to match model input shape
-- Get hyperparameters (lr, batch_size, optimizer, freeze_mode)
-- Apply freezing logic (freeze_base vs train_all)
-- Select optimizer (Adam vs SGD)
+- Check if os.environ['RETRAIN_MODE'] == 'true'
+  - IF TRUE: Load params from os.environ['NNI_PARAMS']
+  - IF FALSE: Get params from nni.get_next_parameter()
+- Load model and data
+- Resize input data
+- Apply hyperparameters (freezing, optimizer, etc.)
 - Train model
-- Report result with nni.report_final_result(accuracy)
+- IF RETRAIN_MODE: Save model to 'best_model.h5'
+- IF NNI MODE: Report result with nni.report_final_result()
 
 OUTPUT FORMAT (COPY THIS STRUCTURE EXACTLY):
 
@@ -141,7 +144,10 @@ OUTPUT FORMAT (COPY THIS STRUCTURE EXACTLY):
 ```python
 import nni
 import os
+import os
 import sys
+import json
+import subprocess
 from nni.experiment import Experiment
 
 # Get absolute path to current directory
@@ -172,6 +178,30 @@ try:
     print(f"[NNI] Web UI will be available at http://localhost:8080")
     experiment.run(port=8080, wait_completion=True)
     print("[NNI] Experiment completed successfully")
+    
+    # --- AUTO-RETRAIN BEST MODEL ---
+    print("\n[NNI] 🏆 Exporting best trial...")
+    best_trial = experiment.export_top_trial(top_k=1)[0]
+    best_params = best_trial.parameter
+    print(f"   • Best Params: {{best_params}}")
+    
+    print("\n[NNI] 💾 Retraining best model for saving...")
+    
+    # Prepare environment for retrain
+    env = os.environ.copy()
+    env['RETRAIN_MODE'] = 'true'
+    env['NNI_PARAMS'] = json.dumps(best_params)
+    
+    # Re-run trial.py with best params
+    subprocess.run(
+        [sys.executable, 'trial.py'],
+        cwd=current_dir,
+        env=env,
+        check=True
+    )
+    
+    print(f"[NNI] ✅ Best model saved to: {{os.path.join(current_dir, 'best_model.h5')}}")
+
 except Exception as e:
     print(f"[NNI] Error during experiment: {{e}}")
     import traceback
@@ -185,12 +215,22 @@ finally:
 ```python
 import nni
 import os
+import json
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
 
+# Check mode
+IS_RETRAIN = os.environ.get('RETRAIN_MODE', 'false').lower() == 'true'
+
+if IS_RETRAIN:
+    print("[TRIAL] 🔄 Retraining mode activated!")
+    params = json.loads(os.environ.get('NNI_PARAMS', '{}'))
+else:
+    # Standard NNI Mode
+    params = nni.get_next_parameter()
+
 # Get hyperparameters
-params = nni.get_next_parameter()
 lr = params.get('learning_rate', 0.001)
 batch_size = params.get('batch_size', 32)
 optimizer_name = params.get('optimizer', 'Adam')
@@ -249,9 +289,15 @@ history = model.fit(train_ds,
                     validation_data=val_ds,
                     epochs=3, verbose=0)
 
-# Report
-val_accuracy = history.history['val_accuracy'][-1]
-nni.report_final_result(val_accuracy)
+# Report (Only in NNI mode)
+if not IS_RETRAIN:
+    val_accuracy = history.history['val_accuracy'][-1]
+    nni.report_final_result(val_accuracy)
+else:
+    # Save Model (Only in Retrain mode)
+    output_path = 'best_model.h5'
+    model.save(output_path)
+    print(f"[TRIAL] ✅ Model saved to {os.path.abspath(output_path)}")
 ```
 
 NOW GENERATE BOTH FILES FOLLOWING THIS EXACT FORMAT.
