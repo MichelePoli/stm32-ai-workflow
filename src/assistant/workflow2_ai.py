@@ -22,6 +22,7 @@ import requests
 import h5py
 import tensorflow as tf
 from github import Github
+import difflib
 
 from typing import Optional, Literal, List
 from datetime import datetime
@@ -557,14 +558,42 @@ Rispondi con: numero (1-{len(available_models)+1}) oppure descrivi
     
     logger.info(f"📝 User model input: '{model_text}'")
     
-    # === ESTRAI SCELTA MODELLO CON LLM ===
+    # === MANUALE: CHECK FUZZY MATCH SU NOME ===
+    # Permette di scrivere "MobileNet V2" invece di "1"
+    matched_model_index = None
     
-    llm_model_extractor = llm.with_structured_output(ModelSelectionExtraction)
+    user_normalized = model_text.lower().replace(" ", "").replace("-", "").replace("_", "")
     
-    model_result = llm_model_extractor.invoke([
-        SystemMessage(content=model_selection_instructions),
-        HumanMessage(content=f"Numero di modelli disponibili: {len(available_models)}\nRisposta utente: {model_text}")
-    ])
+    # 1. Check Exact/Partial Index (es. "1", "1.")
+    if model_text.strip().replace(".", "").isdigit():
+        pass # Lascia all'LLM o gestisci dopo
+        
+    # 2. Check Name Match
+    else:
+        for i, model in enumerate(available_models, 1):
+            name_normalized = model['name'].lower().replace(" ", "").replace("-", "").replace("_", "")
+            
+            # Match forte: una contiene l'altra
+            if name_normalized in user_normalized or user_normalized in name_normalized:
+                logger.info(f"✓ Fuzzy match trovato: '{model_text}' -> {model['name']} (Index {i})")
+                matched_model_index = i
+                break
+    
+    # Se abbiamo un match manuale, bypassiamo l'LLM o lo usiamo come conferma
+    if matched_model_index is not None:
+        model_result = ModelSelectionExtraction(
+            model_index=matched_model_index, 
+            model_accepted=True, 
+            wants_another_search=False
+        )
+    else:
+        # === FALLBACK: ESTRAI SCELTA CON LLM ===
+        llm_model_extractor = llm.with_structured_output(ModelSelectionExtraction)
+        
+        model_result = llm_model_extractor.invoke([
+            SystemMessage(content=model_selection_instructions),
+            HumanMessage(content=f"Numero di modelli disponibili: {len(available_models)}\nRisposta utente: {model_text}")
+        ])
     
     logger.info(f"✓ Scelta estratta:")
     logger.info(f"  model_index: {model_result.model_index}")
