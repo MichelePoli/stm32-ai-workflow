@@ -120,7 +120,7 @@ CRITICAL REQUIREMENTS:
 
 FILE 1: manager.py
 - Configure NNI experiment
-- Define search space (learning_rate, batch_size, etc.)
+- Define search space (learning_rate, batch_size, optimizer, freeze_mode)
 - Set trial_command = "python trial.py"
 - Launch experiment with experiment.run(port=8080)
 
@@ -129,7 +129,9 @@ FILE 2: trial.py
 - Load model from: {model_info.get('path')}
 - Load data from: {dataset_info.get('path')} (x_train.npy, y_train.npy, x_test.npy, y_test.npy)
 - Resize input data to match model input shape
-- Get hyperparameters with nni.get_next_parameter()
+- Get hyperparameters (lr, batch_size, optimizer, freeze_mode)
+- Apply freezing logic (freeze_base vs train_all)
+- Select optimizer (Adam vs SGD)
 - Train model
 - Report result with nni.report_final_result(accuracy)
 
@@ -148,7 +150,9 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 # Define search space
 search_space = {{
     'learning_rate': {{'_type': 'choice', '_value': [0.001, 0.0001, 0.00001]}},
-    'batch_size': {{'_type': 'choice', '_value': [16, 32, 64]}},
+    'batch_size': {{'_type': 'choice', '_value': [16, 32]}},
+    'optimizer': {{'_type': 'choice', '_value': ['Adam', 'SGD']}},
+    'freeze_mode': {{'_type': 'choice', '_value': ['freeze_base', 'train_all']}},
 }}
 
 # Create experiment
@@ -189,6 +193,8 @@ from tensorflow import keras
 params = nni.get_next_parameter()
 lr = params.get('learning_rate', 0.001)
 batch_size = params.get('batch_size', 32)
+optimizer_name = params.get('optimizer', 'Adam')
+freeze_mode = params.get('freeze_mode', 'freeze_base')
 
 # Load data
 x_train = np.load('{dataset_info.get('path')}/x_train.npy')
@@ -198,6 +204,24 @@ y_test = np.load('{dataset_info.get('path')}/y_test.npy')
 
 # Load model
 model = keras.models.load_model('{model_info.get('path')}')
+
+# --- PARAMETER APPLICATION ---
+# 1. Freeze Logic
+if freeze_mode == 'freeze_base':
+    print("Freezing base layers...")
+    # Freeze all except last 5 layers
+    for layer in model.layers[:-5]:
+        layer.trainable = False
+else:
+    print("Unfreezing all layers...")
+    for layer in model.layers:
+        layer.trainable = True
+
+# 2. Optimizer Selection
+if optimizer_name == 'SGD':
+    opt = keras.optimizers.SGD(learning_rate=lr)
+else:
+    opt = keras.optimizers.Adam(learning_rate=lr)
 
 # --- SHAPE FIX: Resize images if needed ---
 expected_shape = model.input_shape[1:3]  # (H, W)
@@ -216,7 +240,7 @@ val_ds = tf.data.Dataset.from_tensor_slices((x_test, y_test))
 val_ds = val_ds.map(preprocess).batch(batch_size).prefetch(tf.data.AUTOTUNE)
 
 # Compile
-model.compile(optimizer=keras.optimizers.Adam(learning_rate=lr),
+model.compile(optimizer=opt,
               loss='categorical_crossentropy',
               metrics=['accuracy'])
 
