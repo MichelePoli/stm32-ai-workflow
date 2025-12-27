@@ -70,8 +70,7 @@ def generate_nni_experiment(
     model_info: Dict[str, Any],
     dataset_info: Dict[str, Any],
     optimization_goal: str = "Maximize validation accuracy with minimal parameters",
-    output_dir: str = "./nni_generated",
-    model_id: str = "mistral"
+    output_dir: str = "./nni_generated"
 ) -> Dict[str, str]:
     """
     Generates NNI experiment scripts (manager.py, trial.py) using an LLM Agent.
@@ -81,7 +80,6 @@ def generate_nni_experiment(
         dataset_info: Dictionary containing dataset details (path, shapes, classes)
         optimization_goal: The objective of the optimization
         output_dir: Directory to save generated files
-        model_id: LLM model to use (e.g., 'mistral', 'gpt-4')
         
     Returns:
         Dict mapping filenames to their generated content.
