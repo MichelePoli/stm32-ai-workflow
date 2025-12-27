@@ -180,6 +180,7 @@ finally:
 # FILE: trial.py
 ```python
 import nni
+import os
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
