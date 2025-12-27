@@ -3253,16 +3253,20 @@ def optimize_hyperparameters_with_nni(state: MasterState, config: dict) -> Maste
              
         logger.info(f"▶️  Launching NNI Manager: {manager_script}")
         
-        # Run process
-        # We run it in a way that captures output but doesn't block forever if we want async
-        # For now, blocking to see result
+        # Run process with correct Python environment
+        # NNI must be installed in the environment
+        cfg = Configuration.from_runnable_config(config)
+        python_path = CONDA_PYTHON_PATHS.get(cfg.conda_env_for_training, "python")  # Use existing dict
+        
+        logger.info(f"▶️  Launching NNI Manager with: {python_path}")
+        
         try:
             result = subprocess.run(
-                ["python", manager_script],
-                cwd=experiment_dir, # Run in the dir so imports work
+                [python_path, manager_script],  # Use environment Python
+                cwd=experiment_dir,
                 capture_output=True,
                 text=True,
-                timeout=None # Or set a timeout
+                timeout=300  # 5 min timeout for NNI to start
             )
             
             logger.info("✓ Esperimento concluso (o interrotto).")
@@ -3271,6 +3275,8 @@ def optimize_hyperparameters_with_nni(state: MasterState, config: dict) -> Maste
             if result.stderr:
                 logger.warning(f"STDERR:\n{result.stderr[:500]}...")
                 
+        except subprocess.TimeoutExpired:
+            logger.warning("⏱️  NNI Manager timeout (likely running in background)")
         except Exception as exec_err:
              logger.error(f"❌ Errore durante esecuzione manager: {exec_err}")
         
