@@ -108,54 +108,108 @@ def generate_nni_experiment(
     {optimization_goal}
     """
     
-    # Prompt Construction
+    # Prompt Construction - ULTRA EXPLICIT
     prompt = f"""You are an expert NNI (Neural Network Intelligence) Engineer.
+
+Your task: Generate EXACTLY TWO PYTHON FILES for an NNI hyperparameter optimization experiment.
+
+{context_desc}
+
+CRITICAL REQUIREMENTS:
+🔴 YOU MUST GENERATE EXACTLY 2 FILES: manager.py AND trial.py
+🔴 Both files are MANDATORY - DO NOT skip either one
+🔴 Use the exact format shown below with # FILE: markers
+
+FILE 1: manager.py
+- Configure NNI experiment
+- Define search space (learning_rate, batch_size, etc.)
+- Set trial_command = "python trial.py"
+- Launch experiment with experiment.run(port=8080)
+
+FILE 2: trial.py
+- Import nni
+- Load model from: {model_info.get('path')}
+- Load data from: {dataset_info.get('path')} (x_train.npy, y_train.npy, x_test.npy, y_test.npy)
+- Get hyperparameters with nni.get_next_parameter()
+- Train model
+- Report result with nni.report_final_result(accuracy)
+
+OUTPUT FORMAT (COPY THIS STRUCTURE EXACTLY):
+
+# FILE: manager.py
+```python
+import nni
+from nni.experiment import Experiment
+
+# Define search space
+search_space = {{
+    'learning_rate': {{'_type': 'choice', '_value': [0.001, 0.0001, 0.00001]}},
+    'batch_size': {{'_type': 'choice', '_value': [16, 32, 64]}},
+}}
+
+# Create experiment
+experiment = Experiment('local')
+experiment.config.trial_command = 'python trial.py'
+experiment.config.trial_code_directory = '.'
+experiment.config.search_space = search_space
+experiment.config.tuner.name = 'TPE'
+experiment.config.tuner.class_args = {{'optimize_mode': 'maximize'}}
+experiment.config.max_trial_number = 10
+experiment.config.trial_concurrency = 1
+
+# Run
+experiment.run(port=8080)
+input('Press enter to stop...')
+experiment.stop()
+```
+
+# FILE: trial.py
+```python
+import nni
+import numpy as np
+from tensorflow import keras
+
+# Get hyperparameters
+params = nni.get_next_parameter()
+lr = params.get('learning_rate', 0.001)
+batch_size = params.get('batch_size', 32)
+
+# Load data
+x_train = np.load('{dataset_info.get('path')}/x_train.npy')
+y_train = np.load('{dataset_info.get('path')}/y_train.npy')
+x_test = np.load('{dataset_info.get('path')}/x_test.npy')
+y_test = np.load('{dataset_info.get('path')}/y_test.npy')
+
+# Load model
+model = keras.models.load_model('{model_info.get('path')}')
+
+# Compile
+model.compile(optimizer=keras.optimizers.Adam(learning_rate=lr),
+              loss='categorical_crossentropy',
+              metrics=['accuracy'])
+
+# Train
+history = model.fit(x_train, y_train, 
+                    validation_data=(x_test, y_test),
+                    epochs=5, batch_size=batch_size, verbose=0)
+
+# Report
+val_accuracy = history.history['val_accuracy'][-1]
+nni.report_final_result(val_accuracy)
+```
+
+NOW GENERATE BOTH FILES FOLLOWING THIS EXACT FORMAT.
+Start with # FILE: manager.py, then # FILE: trial.py.
+DO NOT SKIP EITHER FILE.
+"""
     
-    Your task is to write a COMPLETE, EXECUTABLE NNI experiment to optimize the TARGET MODEL on the TARGET DATASET.
-    
-    {context_desc}
-    
-    REQUIREMENTS:
-    1. Generate TWO files:
-       - `manager.py`: Configures the NNI Experiment, Search Space, and launches it.
-       - `trial.py`: The trial code that loads the model, applies params, keeps the base frozen (or not), trains, and reports results.
-    
-    2. SEARCH SPACE Strategy:
-       - Since the goal is "{optimization_goal}", define a search space that makes sense.
-       - E.g., if optimizing architecture, try different numbers of dense layers or units.
-       - E.g., if optimizing training, tune LR, Batch Size, Optimizer.
-       
-    3. IMPLEMENTATION DETAILS:
-       - In `trial.py`:
-         - Use `tensorflow` to load the model from `{model_info.get('path')}`.
-         - Use `nni.get_next_parameter()` to get params.
-         - Load data from `{dataset_info.get('path')}` (expect .npy files: x_train.npy, y_train.npy...).
-         - Report final accuracy with `nni.report_final_result(acc)`.
-       - In `manager.py`:
-         - Use `nni.experiment.Experiment`.
-         - Set `trial_command` to `python trial.py`.
-         - Use `local` mode.
-    
-    FORMAT OUTPUT EXACTLY LIKE THIS:
-    
-    # FILE: manager.py
-    ```python
-    ... code ...
-    ```
-    
-    # FILE: trial.py
-    ```python
-    ... code ...
-    ```
-    
-    DO NOT use markdown for the whole block, just clear # FILE markers.
-    """
-    
-    # Initialize Agent
+    # Initialize Agent with more powerful model
     agent = Agent(
-        model=Ollama(id=model_id),
+        model=Ollama(id="gpt-oss:20b"),  # More powerful than mistral for complex instructions
         description="You are an AI specialized in writing NNI optimization code.",
-        instructions="Return only valid Python code with # FILE markers.",
+        instructions="Return only valid Python code with # FILE markers. Generate BOTH manager.py and trial.py.",
+        tools=[],
+        show_tool_calls=False,
         markdown=False
     )
     

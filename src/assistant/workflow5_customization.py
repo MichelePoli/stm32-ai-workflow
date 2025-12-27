@@ -3167,7 +3167,7 @@ def ask_optimization_preference(state: MasterState, config: dict) -> MasterState
     
     # Default if empty
     if not response or response.strip() == "":
-        response = "nni" # default
+        response = "nni" # default a NNI !
         
     state.optimization_mode = "nni" if "nni" in response.lower() else "standard"
     logger.info(f"✓ Modalità selezionata: {state.optimization_mode}")
