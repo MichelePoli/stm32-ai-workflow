@@ -348,6 +348,11 @@ def decision_continue_routing(state: MasterState) -> Literal["ai_flow", "integra
 # SUBGRAPH BUILDERS
 # ============================================================================
 
+
+# ============================================================================
+# SUBGRAPH BUILDERS
+# ============================================================================
+
 def build_firmware_graph():
     """Builds the Firmware Generation Subgraph"""
     workflow = StateGraph(MasterState, config_schema=Configuration)
@@ -380,11 +385,17 @@ def build_firmware_graph():
     return workflow.compile()
 
 
-def build_customization_graph():
-    """Builds the Model Customization Subgraph (Workflow 5 + 6 + 7)"""
+def build_ai_analysis_graph():
+    """Builds the AI Analysis Subgraph (Workflow 2), includes Customization (Workflow 5+6+7) flattened"""
     workflow = StateGraph(MasterState, config_schema=Configuration)
     
-    # Nodes
+    # === NODES: BASIC AI FLOW ===
+    workflow.add_node("collect_analysis_info", collect_analysis_info)
+    workflow.add_node("choose_predefined_taskbased_model", choose_predefined_taskbased_model)
+    workflow.add_node("search_recommendation_model", search_recommendation_model)
+    workflow.add_node("download_model", download_model)
+    
+    # === NODES: CUSTOMIZATION & NNI ===
     workflow.add_node("inspect_model_architecture", inspect_model_architecture)
     workflow.add_node("ask_modification_intent", ask_modification_intent)
     workflow.add_node("retrieve_best_practices_for_architecture", retrieve_best_practices_for_architecture)
@@ -400,117 +411,28 @@ def build_customization_graph():
     workflow.add_node("generate_synthetic_samples", generate_synthetic_samples)
     workflow.add_node("validate_synthetic_data", validate_synthetic_data)
     
-    # Training & Save
+    # Training & NNI
+    workflow.add_node("ask_optimization_preference", ask_optimization_preference)
+    workflow.add_node("optimize_hyperparameters_with_nni", optimize_hyperparameters_with_nni)
     workflow.add_node("fine_tune_customized_model", fine_tune_customized_model)
     workflow.add_node("validate_customized_model", validate_customized_model)
     workflow.add_node("save_customized_model_final", save_customized_model_final)
     workflow.add_node("ask_continue_after_customization", ask_continue_after_customization)
     
-    # Edges
-    workflow.add_edge(START, "inspect_model_architecture")
-    workflow.add_edge("inspect_model_architecture", "ask_modification_intent")
-    
-    workflow.add_conditional_edges(
-        "ask_modification_intent",
-        decide_after_inspection,
-        {
-            "retrieve_best_practices_for_architecture": "retrieve_best_practices_for_architecture",
-            "run_analyze": END # Exits this subgraph, will be handled by master graph to go to AI flow
-        }
-    )
-    
-    workflow.add_edge("retrieve_best_practices_for_architecture", "ask_and_parse_user_modifications")
-    workflow.add_edge("ask_and_parse_user_modifications", "collect_modification_confirmation")
-    
-    workflow.add_conditional_edges(
-        "collect_modification_confirmation",
-        customize_confirmation_routing,
-        {
-            "ask_and_parse_user_modifications": "ask_and_parse_user_modifications",
-            "apply_user_customization": "apply_user_customization",
-            "run_analyze": END # Exits customization
-        }
-    )
-    
-    workflow.add_edge("apply_user_customization", "decide_data_source")
-    
-    # Data Source Routing
-    def dataset_source_routing(state: MasterState) -> Literal["select_predefined_dataset", "ask_synthetic_data_requirements", "fine_tune_customized_model"]:
-        if state.dataset_source == "real":
-            return "select_predefined_dataset"
-        elif state.dataset_source == "synthetic":
-            return "ask_synthetic_data_requirements"
-        else:
-            return "fine_tune_customized_model"
-
-    workflow.add_conditional_edges(
-        "decide_data_source",
-        dataset_source_routing,
-        {
-            "select_predefined_dataset": "select_predefined_dataset",
-            "ask_synthetic_data_requirements": "ask_synthetic_data_requirements",
-            "fine_tune_customized_model": "fine_tune_customized_model"
-        }
-    )
-    
-    # NNI Nodes
-    workflow.add_node("ask_optimization_preference", ask_optimization_preference)
-    workflow.add_node("optimize_hyperparameters_with_nni", optimize_hyperparameters_with_nni)
-    
-    # ... edges ...
-    
-    workflow.add_edge("download_dataset", "ask_optimization_preference") # Was direct to fine_tune
-    
-    workflow.add_edge("ask_synthetic_data_requirements", "generate_synthetic_samples")
-    workflow.add_edge("generate_synthetic_samples", "validate_synthetic_data")
-    workflow.add_edge("validate_synthetic_data", "ask_optimization_preference") # Was direct to fine_tune
-    
-    # Conditional Routing for Optimization
-    workflow.add_conditional_edges(
-        "ask_optimization_preference",
-        optimization_routing,
-        {
-            "fine_tune_customized_model": "fine_tune_customized_model",
-            "optimize_hyperparameters_with_nni": "optimize_hyperparameters_with_nni"
-        }
-    )
-    
-    workflow.add_edge("fine_tune_customized_model", "validate_customized_model")
-    workflow.add_edge("optimize_hyperparameters_with_nni", "validate_customized_model") # NNI connects back to validation
-    
-    workflow.add_edge("validate_customized_model", "save_customized_model_final")
-
-    workflow.add_edge("save_customized_model_final", "ask_continue_after_customization")
-    
-    # End customization
-    workflow.add_edge("ask_continue_after_customization", END)
-    
-    return workflow.compile()
-
-
-def build_ai_analysis_graph():
-    """Builds the AI Analysis Subgraph (Workflow 2), includes connection to Customization"""
-    workflow = StateGraph(MasterState, config_schema=Configuration)
-    
-    # Nodes
-    workflow.add_node("collect_analysis_info", collect_analysis_info)
-    workflow.add_node("choose_predefined_taskbased_model", choose_predefined_taskbased_model)
-    workflow.add_node("search_recommendation_model", search_recommendation_model)
-    workflow.add_node("download_model", download_model)
-    
-    # HERE WE INSERT THE CUSTOMIZATION SUBGRAPH AS A NODE
-    workflow.add_node("customization_flow", build_customization_graph())
-    
+    # === NODES: ANALYSIS & GENERATION ===
     workflow.add_node("run_analyze", run_analyze)
     workflow.add_node("run_validate", run_validate)
     workflow.add_node("run_generate", run_generate)
     workflow.add_node("finalize_analysis", finalize_analysis)
     
-    # Edges
+    # ========================================================================
+    # EDGES & ROUTING
+    # ========================================================================
+    
     workflow.add_edge(START, "collect_analysis_info")
     workflow.add_edge("collect_analysis_info", "choose_predefined_taskbased_model")
     
-    # Discovery Routing
+    # 1. Model Discovery Routing
     workflow.add_conditional_edges(
         "choose_predefined_taskbased_model",
         model_selection_routing,
@@ -529,12 +451,83 @@ def build_ai_analysis_graph():
         }
     )
     
-    # Dopo download, passa sempre per customization flow (che internamente può skippare)
-    workflow.add_edge("download_model", "customization_flow")  
+    # 2. Connection to Customization
+    workflow.add_edge("download_model", "inspect_model_architecture")
+    workflow.add_edge("inspect_model_architecture", "ask_modification_intent")
     
-    # Dopo customization (con o senza modifiche), si va ad analyze
-    workflow.add_edge("customization_flow", "run_analyze")
+    # 3. Decision: Modify or Skip to Analyze?
+    workflow.add_conditional_edges(
+        "ask_modification_intent",
+        decide_after_inspection,
+        {
+            "retrieve_best_practices_for_architecture": "retrieve_best_practices_for_architecture",
+            "run_analyze": "run_analyze" # Skip customization entirely
+        }
+    )
     
+    workflow.add_edge("retrieve_best_practices_for_architecture", "ask_and_parse_user_modifications")
+    workflow.add_edge("ask_and_parse_user_modifications", "collect_modification_confirmation")
+    
+    # 4. Confirmation Routing
+    workflow.add_conditional_edges(
+        "collect_modification_confirmation",
+        customize_confirmation_routing,
+        {
+            "ask_and_parse_user_modifications": "ask_and_parse_user_modifications", # Loop back
+            "apply_user_customization": "apply_user_customization",
+            "run_analyze": "run_analyze" # Skip to analyze
+        }
+    )
+    
+    workflow.add_edge("apply_user_customization", "decide_data_source")
+    
+    # 5. Data Source Routing
+    def dataset_source_routing(state: MasterState) -> Literal["select_predefined_dataset", "ask_synthetic_data_requirements", "fine_tune_customized_model"]:
+        if state.dataset_source == "real":
+            return "select_predefined_dataset"
+        elif state.dataset_source == "synthetic":
+            return "ask_synthetic_data_requirements"
+        else:
+            return "fine_tune_customized_model"
+
+    workflow.add_conditional_edges(
+        "decide_data_source",
+        dataset_source_routing,
+        {
+            "select_predefined_dataset": "select_predefined_dataset",
+            "ask_synthetic_data_requirements": "ask_synthetic_data_requirements",
+            "fine_tune_customized_model": "fine_tune_customized_model"
+        }
+    )
+    
+    workflow.add_edge("select_predefined_dataset", "download_dataset")
+    workflow.add_edge("download_dataset", "ask_optimization_preference") 
+    
+    workflow.add_edge("ask_synthetic_data_requirements", "generate_synthetic_samples")
+    workflow.add_edge("generate_synthetic_samples", "validate_synthetic_data")
+    workflow.add_edge("validate_synthetic_data", "ask_optimization_preference") 
+    
+    # 6. Optimization Preference (NNI vs Standard)
+    workflow.add_conditional_edges(
+        "ask_optimization_preference",
+        optimization_routing,
+        {
+            "fine_tune_customized_model": "fine_tune_customized_model",
+            "optimize_hyperparameters_with_nni": "optimize_hyperparameters_with_nni"
+        }
+    )
+    
+    workflow.add_edge("fine_tune_customized_model", "validate_customized_model")
+    workflow.add_edge("optimize_hyperparameters_with_nni", "validate_customized_model")
+    
+    workflow.add_edge("validate_customized_model", "save_customized_model_final")
+    workflow.add_edge("save_customized_model_final", "ask_continue_after_customization")
+    
+    # 7. Resume Analysis Flow
+    # Assuming ask_continue just pauses or logs, we move to analyze
+    workflow.add_edge("ask_continue_after_customization", "run_analyze")
+    
+    # 8. STEdgeAI Analysis
     workflow.add_edge("run_analyze", "run_validate")
     workflow.add_edge("run_validate", "run_generate")
     workflow.add_edge("run_generate", "finalize_analysis")

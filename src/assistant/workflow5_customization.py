@@ -150,6 +150,53 @@ Output: {
 """
 
 
+class ModelModification(BaseModel):
+    """Schema per le modifiche richieste dall'utente"""
+    freeze_layers: Optional[str] = Field(description="Quali layer freezare (es. 'all', 'none', 'first_10')")
+    target_output_classes: Optional[int] = Field(description="Numero di classi di output desiderate")
+    dropout_rate: Optional[float] = Field(description="Rate di dropout da aggiungere (0.0 - 1.0)")
+    learning_rate: Optional[float] = Field(description="Learning rate suggerito")
+    additional_layers: Optional[List[str]] = Field(description="Layer aggiuntivi richiesti")
+    confidence: float = Field(description="Confidenza del parsing (0-1)")
+
+model_modification_instructions = """Sei un esperto di Deep Learning che interpreta richieste di modifica ai modelli.
+
+Analizza la richiesta dell'utente e estrai le modifiche architetturali desiderate.
+
+PARAMETRI DA ESTRARRE:
+1. freeze_layers: 
+   - 'all': freeza tutto (tranne l'ultima parte)
+   - 'none': sblocca tutto
+   - 'first_N': freeza i primi N layer
+   - 'last_N': freeza gli ultimi N layer
+   - 'base': freeza solo il backbone
+
+2. target_output_classes: Numero intero. Se l'utente dice "2 classi", estrai 2.
+
+3. dropout_rate: Float tra 0.0 e 1.0. Se l'utente dice "Aggiungi dropout", usa 0.5 come default se non specificato.
+
+4. learning_rate: Float (es. 0.001).
+
+ESEMPI:
+
+Input: "Voglio classificare cani e gatti, freeza tutto il resto."
+Output: {
+    "freeze_layers": "all",
+    "target_output_classes": 2,
+    "confidence": 0.95
+}
+
+Input: "Aggiungi un dropout del 30% e usa learning rate 1e-4"
+Output: {
+    "dropout_rate": 0.3,
+    "learning_rate": 0.0001,
+    "confidence": 0.98
+}
+
+Se un parametro non è menzionato, lascialo null.
+"""
+
+
 def load_or_create_sample_dataset(num_samples: int = 100, 
                                    img_size: Tuple[int, int] = (32, 32),
                                    num_classes: int = 10) -> Tuple[np.ndarray, np.ndarray]:
