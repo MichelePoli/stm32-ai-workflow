@@ -3254,9 +3254,8 @@ def optimize_hyperparameters_with_nni(state: MasterState, config: dict) -> Maste
         logger.info(f"▶️  Launching NNI Manager: {manager_script}")
         
         # Run process with correct Python environment
-        # NNI must be installed in the environment
-        cfg = Configuration.from_runnable_config(config)
-        python_path = CONDA_PYTHON_PATHS.get(cfg.conda_env_for_training, "python")  # Use existing dict
+        # NNI must be installed in the environment (stm32_legacy by default)
+        python_path = CONDA_PYTHON_PATHS.get('stm32_legacy', "python")
         
         logger.info(f"▶️  Launching NNI Manager with: {python_path}")
         
