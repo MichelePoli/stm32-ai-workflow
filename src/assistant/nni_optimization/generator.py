@@ -156,10 +156,10 @@ experiment.config.max_trial_number = 10
 experiment.config.trial_concurrency = 1
 
 # Run
-experiment.run(port=8080)
-input('Press enter to stop...')
+experiment.run(port=8080, wait_completion=True)
 experiment.stop()
 ```
+
 
 # FILE: trial.py
 ```python

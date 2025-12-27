@@ -3226,9 +3226,12 @@ def optimize_hyperparameters_with_nni(state: MasterState, config: dict) -> Maste
             "num_classes": state.model_architecture.get("output_classes", 10) 
         }
         
-        # Output Directory for Generated Scripts
-        experiment_dir = os.path.join(os.path.dirname(model_path), "nni_adaptive_experiment")
+        # Output Directory for Generated Scripts - Save in project root
+        project_root = "/mnt/shared-storage/mrusso/Langgraph_General_v7_subnodes"
+        experiment_dir = os.path.join(project_root, "nni_experiments", f"exp_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
         os.makedirs(experiment_dir, exist_ok=True)
+        
+        logger.info(f"📁 NNI Experiment directory: {experiment_dir}")
         
         # 1. GENERATE
         logger.info("🚀 Generazione esperimento NNI su misura...")
