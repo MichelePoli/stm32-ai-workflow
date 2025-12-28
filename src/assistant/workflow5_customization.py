@@ -3151,7 +3151,7 @@ def ask_optimization_preference(state: MasterState, config: dict) -> MasterState
     prompt = {
         "instruction": "Vuoi eseguire l'ottimizzazione degli iperparametri con NNI o procedere con il fine-tuning standard? (nni/standard)",
         "options": {
-            "nni": "Usa NNI per trovare i parametri migliori (AutoML)",
+            "nni": "Usa NNI per trovare i parametri migliori (AutoML) - ⚠️ Richiede tempo (2-3 ore)",
             "standard": "Fine-tuning standard (parametri fissi)"
         }
     }
