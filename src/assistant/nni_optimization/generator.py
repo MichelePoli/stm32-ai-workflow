@@ -196,7 +196,7 @@ try:
     best_trial = max(valid_trials, key=lambda t: float(t.finalMetricData[0].data))
     
     best_params = best_trial.hyperParameters['parameters']
-    print(f"   • Best Params: {best_params}")
+    print(f"   • Best Params: {{best_params}}")
     
     print("\n[NNI] 💾 Retraining best model for saving...")
     
