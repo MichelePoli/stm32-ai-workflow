@@ -182,9 +182,21 @@ try:
     
     # --- AUTO-RETRAIN BEST MODEL ---
     print("\n[NNI] 🏆 Exporting best trial...")
-    best_trial = experiment.export_top_trial(top_k=1)[0]
-    best_params = best_trial.parameter
-    print(f"   • Best Params: {{best_params}}")
+    
+    # Robust way to get best trial (export_top_trial might be missing)
+    trials = experiment.list_trial_jobs()
+    valid_trials = [t for t in trials if t.status == 'SUCCEEDED' and t.finalMetricData]
+    
+    if not valid_trials:
+        raise Exception("No successful trials found.")
+        
+    # Sort by metric (assuming 'maximize' mode -> higher is better)
+    # finalMetricData is a list of MetricData, we take the last one (or index 0 if only one)
+    # data is usually a string, convert to float
+    best_trial = max(valid_trials, key=lambda t: float(t.finalMetricData[0].data))
+    
+    best_params = best_trial.hyperParameters['parameters']
+    print(f"   • Best Params: {best_params}")
     
     print("\n[NNI] 💾 Retraining best model for saving...")
     
