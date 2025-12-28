@@ -225,7 +225,7 @@ IS_RETRAIN = os.environ.get('RETRAIN_MODE', 'false').lower() == 'true'
 
 if IS_RETRAIN:
     print("[TRIAL] 🔄 Retraining mode activated!")
-    params = json.loads(os.environ.get('NNI_PARAMS', '{}'))
+    params = json.loads(os.environ.get('NNI_PARAMS', '{{}}'))
 else:
     # Standard NNI Mode
     params = nni.get_next_parameter()
@@ -237,13 +237,13 @@ optimizer_name = params.get('optimizer', 'Adam')
 freeze_mode = params.get('freeze_mode', 'freeze_base')
 
 # Load data
-x_train = np.load('{dataset_info.get('path')}/x_train.npy')
-y_train = np.load('{dataset_info.get('path')}/y_train.npy')
-x_test = np.load('{dataset_info.get('path')}/x_test.npy')
-y_test = np.load('{dataset_info.get('path')}/y_test.npy')
+x_train = np.load('{{dataset_info.get('path')}}/x_train.npy')
+y_train = np.load('{{dataset_info.get('path')}}/y_train.npy')
+x_test = np.load('{{dataset_info.get('path')}}/x_test.npy')
+y_test = np.load('{{dataset_info.get('path')}}/y_test.npy')
 
 # Load model
-model = keras.models.load_model('{model_info.get('path')}')
+model = keras.models.load_model('{{model_info.get('path')}}')
 
 # --- PARAMETER APPLICATION ---
 # 1. Freeze Logic
@@ -297,7 +297,7 @@ else:
     # Save Model (Only in Retrain mode)
     output_path = 'best_model.h5'
     model.save(output_path)
-    print(f"[TRIAL] ✅ Model saved to {os.path.abspath(output_path)}")
+    print(f"[TRIAL] ✅ Model saved to {{os.path.abspath(output_path)}}")
 ```
 
 NOW GENERATE BOTH FILES FOLLOWING THIS EXACT FORMAT.
