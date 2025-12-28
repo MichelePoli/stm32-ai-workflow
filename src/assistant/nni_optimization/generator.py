@@ -250,13 +250,36 @@ optimizer_name = params.get('optimizer', 'Adam')
 freeze_mode = params.get('freeze_mode', 'freeze_base')
 
 # Load data
+# Load data
 x_train = np.load('{dataset_info.get('path')}/x_train.npy')
 y_train = np.load('{dataset_info.get('path')}/y_train.npy')
 x_test = np.load('{dataset_info.get('path')}/x_test.npy')
 y_test = np.load('{dataset_info.get('path')}/y_test.npy')
 
+# --- DATASET FIX: Ensure One-Hot Labels ---
+if len(y_train.shape) == 1 or y_train.shape[-1] == 1:
+    num_classes = len(np.unique(y_train))
+    print(f"[TRIAL] Converting sparse labels to categorical (classes={{num_classes}})...")
+    y_train = keras.utils.to_categorical(y_train, num_classes)
+    y_test = keras.utils.to_categorical(y_test, num_classes)
+else:
+    num_classes = y_train.shape[-1]
+
+print(f"[TRIAL] Dataset classes: {{num_classes}}")
+
 # Load model
 model = keras.models.load_model('{model_info.get('path')}')
+
+# --- MODEL FIX: Adaptive Output Layer ---
+if model.output_shape[-1] != num_classes:
+    print(f"[TRIAL] ⚠️ Class Mismatch: Model={{model.output_shape[-1]}}, Data={{num_classes}}")
+    print("[TRIAL] 🔧 Replacing final layer...")
+    
+    # Simple replacement for Sequential/Functional (assumes last layer is Dense)
+    x = model.layers[-2].output
+    output = keras.layers.Dense(num_classes, activation='softmax', name='adaptive_output')(x)
+    model = keras.Model(inputs=model.input, outputs=output)
+    print(f"[TRIAL] ✓ New output shape: {{model.output_shape}}")
 
 # --- PARAMETER APPLICATION ---
 # 1. Freeze Logic
