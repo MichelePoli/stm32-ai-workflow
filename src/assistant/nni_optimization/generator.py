@@ -244,7 +244,7 @@ x_test = np.load('{dataset_info.get('path')}/x_test.npy')
 y_test = np.load('{dataset_info.get('path')}/y_test.npy')
 
 # Load model
-model = keras.models.load_model('{model_info.get('path')}
+model = keras.models.load_model('{model_info.get('path')}')
 
 # --- PARAMETER APPLICATION ---
 # 1. Freeze Logic
@@ -269,7 +269,11 @@ expected_shape = model.input_shape[1:3]  # (H, W)
 print(f"Model expects: {{expected_shape}}, Data has: {{x_train.shape[1:3]}}")
 
 def preprocess(x, y):
-    # Resize to expected shape
+    # 1. Cast to float32 (CRITICAL for compatibility)
+    x = tf.cast(x, tf.float32)
+    # 2. Normalize
+    x = x / 255.0
+    # 3. Resize to expected shape
     x = tf.image.resize(x, expected_shape)
     return x, y
 
