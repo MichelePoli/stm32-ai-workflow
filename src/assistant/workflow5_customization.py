@@ -3267,7 +3267,7 @@ def optimize_hyperparameters_with_nni(state: MasterState, config: dict) -> Maste
                 cwd=experiment_dir,
                 capture_output=True,
                 text=True,
-                timeout=3600  # 60 min timeout for NNI to start
+                timeout=10800  # 3 hours timeout for NNI to start/run
             )
             
             logger.info("✓ Esperimento concluso (o interrotto).")

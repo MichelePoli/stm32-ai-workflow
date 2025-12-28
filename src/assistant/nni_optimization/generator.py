@@ -169,8 +169,8 @@ experiment.config.trial_code_directory = current_dir  # Use absolute path
 experiment.config.search_space = search_space
 experiment.config.tuner.name = 'TPE'
 experiment.config.tuner.class_args = {{'optimize_mode': 'maximize'}}
-experiment.config.max_trial_number = 5
-experiment.config.trial_concurrency = 2 # NNI lancerà 2 trial contemporaneamente, dimezzando (più o meno) il tempo totale di attesa
+experiment.config.max_trial_number = 6
+experiment.config.trial_concurrency = 3 # NNI lancerà 3 trial contemporaneamente
 
 # Run with error handling
 try:
