@@ -117,6 +117,7 @@ CRITICAL REQUIREMENTS:
 🔴 YOU MUST GENERATE EXACTLY 2 FILES: manager.py AND trial.py
 🔴 Both files are MANDATORY - DO NOT skip either one
 🔴 Use the exact format shown below with # FILE: markers
+🔴 DO NOT use keras.datasets.load_data(). ALWAYS load data from the provided path.
 
 FILE 1: manager.py
 - Configure NNI experiment
@@ -237,13 +238,13 @@ optimizer_name = params.get('optimizer', 'Adam')
 freeze_mode = params.get('freeze_mode', 'freeze_base')
 
 # Load data
-x_train = np.load('{{dataset_info.get('path')}}/x_train.npy')
-y_train = np.load('{{dataset_info.get('path')}}/y_train.npy')
-x_test = np.load('{{dataset_info.get('path')}}/x_test.npy')
-y_test = np.load('{{dataset_info.get('path')}}/y_test.npy')
+x_train = np.load('{dataset_info.get('path')}/x_train.npy')
+y_train = np.load('{dataset_info.get('path')}/y_train.npy')
+x_test = np.load('{dataset_info.get('path')}/x_test.npy')
+y_test = np.load('{dataset_info.get('path')}/y_test.npy')
 
 # Load model
-model = keras.models.load_model('{{model_info.get('path')}}')
+model = keras.models.load_model('{model_info.get('path')}
 
 # --- PARAMETER APPLICATION ---
 # 1. Freeze Logic
