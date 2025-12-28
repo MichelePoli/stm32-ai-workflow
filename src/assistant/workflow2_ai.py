@@ -1922,7 +1922,7 @@ def run_generate(state: MasterState, config: dict) -> MasterState:
         "stedgeai", "generate",
         "--model", state.model_path,
         "--target", state.target,
-        "--compression", state.compression,
+        "--compression", state.compression, # fondamentale. X-CUBE-AI ha capacità di quantizzazione integrata. Se richiesto dall'utente, X-CUBE-AI usa questo parametro per applicare automaticamente tecniche di compressione/quantizzazione durante l'analisi e la generazione del codice C.
         "--output", code_dir
     ]
     res = subprocess.run(cmd, capture_output=True, text=True)
