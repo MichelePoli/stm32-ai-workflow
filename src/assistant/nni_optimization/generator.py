@@ -281,32 +281,32 @@ if model.output_shape[-1] != num_classes:
 
 # --- PARAMETER APPLICATION ---
 # Optimizer Selection (Adam vs SGD)
-if optimizer_name == 'SGD':
+if optimizer_name.lower() == 'sgd':
     opt = keras.optimizers.SGD(learning_rate=lr)
 else:
     opt = keras.optimizers.Adam(learning_rate=lr)
 
 # --- SHAPE FIX: Resize images if needed ---
 expected_shape = model.input_shape[1:3]  # (H, W)
-print(f"Model expects: {{expected_shape}}, Data has: {{x_train.shape[1:3]}}")
+print(f"Model expects: {expected_shape}, Data has: {x_train.shape[1:3]}")
 
 def preprocess(x, y):
     # 1. Cast to float32 (CRITICAL for compatibility)
     x = tf.cast(x, tf.float32)
-    # 2. Normalize
+    # 2. Normalize to [0...1]
     x = x / 255.0
     # 3. Resize to expected shape
     x = tf.image.resize(x, expected_shape)
     return x, y
 
-# Create efficient tf.data pipeline
+# Datasets with caching
 train_ds = tf.data.Dataset.from_tensor_slices((x_train, y_train))
 train_ds = train_ds.map(preprocess).cache().shuffle(1000).batch(batch_size).prefetch(tf.data.AUTOTUNE)
 
 val_ds = tf.data.Dataset.from_tensor_slices((x_test, y_test))
 val_ds = val_ds.map(preprocess).cache().batch(batch_size).prefetch(tf.data.AUTOTUNE)
 
-# Compile
+# FINAL COMPILE (Generate ONLY this block)
 model.compile(optimizer=opt,
               loss='categorical_crossentropy',
               metrics=['accuracy'])
@@ -316,15 +316,13 @@ history = model.fit(train_ds,
                     validation_data=val_ds,
                     epochs=3, verbose=0)
 
-# Report (Only in NNI mode)
+# Report or Save
 if not IS_RETRAIN:
     val_accuracy = history.history['val_accuracy'][-1]
     nni.report_final_result(val_accuracy)
 else:
-    # Save Model (Only in Retrain mode)
-    output_path = 'best_model.h5'
-    model.save(output_path)
-    print(f"[TRIAL] ✅ Model saved to {{os.path.abspath(output_path)}}")
+    model.save('best_model.h5')
+    print(f"[TRIAL] ✅ Best model saved.")
 ```
 
 NOW GENERATE BOTH FILES FOLLOWING THIS EXACT FORMAT.
