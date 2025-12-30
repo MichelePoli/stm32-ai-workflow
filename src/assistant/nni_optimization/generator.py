@@ -288,7 +288,7 @@ else:
 
 # --- SHAPE FIX: Resize images if needed ---
 expected_shape = model.input_shape[1:3]  # (H, W)
-print(f"Model expects: {expected_shape}, Data has: {x_train.shape[1:3]}")
+print(f"Model expects: {{expected_shape}}, Data has: {{x_train.shape[1:3]}}")
 
 def preprocess(x, y):
     # 1. Cast to float32 (CRITICAL for compatibility)
