@@ -120,28 +120,24 @@ CRITICAL REQUIREMENTS:
 🔴 DO NOT use keras.datasets.load_data(). ALWAYS load data from the provided path.
 
 FILE 1: manager.py
-- Configure NNI experiment
-- Define search space (learning_rate, batch_size, optimizer, freeze_mode)
+- Configure NNI experiment (TPE tuner, maximize mode)
+- Define search space (learning_rate, batch_size, optimizer)
 - Set trial_command = "python trial.py"
-- Launch experiment with experiment.run(port=8080)
-- AFTER experiment: Get best params with experiment.export_top_trial()
-- Trigger RETRAIN: Run "trial.py" with env variable RETRAIN_MODE='true' and best params
+- Launch experiment with experiment.run(port=8080, wait_completion=True)
+- AFTER experiment: Find the best trial USING ONLY experiment.list_trial_jobs()
+- Trigger RETRAIN: Run "trial.py" as a subprocess with env RETRAIN_MODE='true' and best NNI_PARAMS
 
 FILE 2: trial.py
-- Import nni
-- Check if os.environ['RETRAIN_MODE'] == 'true'
-  - IF TRUE: Load params from os.environ['NNI_PARAMS']
-  - IF FALSE: Get params from nni.get_next_parameter()
-- Load model and data
-- Resize input data
-- Apply hyperparameters (freezing, optimizer, etc.)
-- Train model
-- IF RETRAIN_MODE: Save model to 'best_model.h5'
-- IF NNI MODE: Report result with nni.report_final_result()
+- Get parameters (from NNI_PARAMS if RETRAIN_MODE, else from nni.get_next_parameter())
+- Load model and data from provided paths
+- Adapt model final layer if classes mismatch
+- Train model for 3 epochs
+- Report accuracy to NNI (if not retrain) or Save 'best_model.h5' (if retrain)
 
-⚠️ CRITICAL WARNING ⚠️
-DO NOT USE experiment.export_top_trial() - THIS METHOD DOES NOT EXIST!
-ALWAYS USE experiment.list_trial_jobs() as shown in the example below.
+⚠️ CRITICAL RULES:
+🔴 DO NOT USE experiment.export_top_trial() OR experiment.get_best_trial() - THEY DO NOT EXIST.
+🔴 ALWAYS USE experiment.list_trial_jobs() to find the best trial manually.
+🔴 KEEP manager.py simple and follow the structure below.
 
 OUTPUT FORMAT (COPY THIS STRUCTURE EXACTLY):
 
