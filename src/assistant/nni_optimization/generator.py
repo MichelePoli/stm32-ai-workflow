@@ -157,9 +157,8 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 # Define search space
 search_space = {{
     'learning_rate': {{'_type': 'choice', '_value': [0.001, 0.0001, 0.00001]}},
-    'batch_size': {{'_type': 'choice', '_value': [16, 32]}},
+    'batch_size': {{'_type': 'choice', '_value': [16, 32, 64]}},
     'optimizer': {{'_type': 'choice', '_value': ['Adam', 'SGD']}},
-    'freeze_mode': {{'_type': 'choice', '_value': ['freeze_base', 'train_all']}},
 }}
 
 # Create experiment
@@ -247,7 +246,6 @@ else:
 lr = params.get('learning_rate', 0.001)
 batch_size = params.get('batch_size', 32)
 optimizer_name = params.get('optimizer', 'Adam')
-freeze_mode = params.get('freeze_mode', 'freeze_base')
 
 # Load data
 # Load data
@@ -282,18 +280,7 @@ if model.output_shape[-1] != num_classes:
     print(f"[TRIAL] ✓ New output shape: {{model.output_shape}}")
 
 # --- PARAMETER APPLICATION ---
-# 1. Freeze Logic
-if freeze_mode == 'freeze_base':
-    print("Freezing base layers...")
-    # Freeze all except last 5 layers
-    for layer in model.layers[:-5]:
-        layer.trainable = False
-else:
-    print("Unfreezing all layers...")
-    for layer in model.layers:
-        layer.trainable = True
-
-# 2. Optimizer Selection
+# Optimizer Selection (Adam vs SGD)
 if optimizer_name == 'SGD':
     opt = keras.optimizers.SGD(learning_rate=lr)
 else:
