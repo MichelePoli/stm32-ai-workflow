@@ -312,9 +312,10 @@ model.compile(optimizer=opt,
               metrics=['accuracy'])
 
 # Train
+print(f"[TRIAL] 🚀 Starting training (First epoch may be slow due to resizing/caching)...")
 history = model.fit(train_ds, 
                     validation_data=val_ds,
-                    epochs=3, verbose=0)
+                    epochs=3, verbose=1)
 
 # Report or Save
 if not IS_RETRAIN:
