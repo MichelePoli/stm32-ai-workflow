@@ -180,7 +180,7 @@ try:
     print("[NNI] Experiment completed successfully")
     
     # --- AUTO-RETRAIN BEST MODEL ---
-    print("\n[NNI] 🏆 Exporting best trial...")
+    print("\\n[NNI] 🏆 Exporting best trial...")
     
     # Robust way to get best trial (export_top_trial might be missing)
     trials = experiment.list_trial_jobs()
@@ -197,7 +197,7 @@ try:
     best_params = best_trial.hyperParameters['parameters']
     print(f"   • Best Params: {{best_params}}")
     
-    print("\n[NNI] 💾 Retraining best model for saving...")
+    print("\\n[NNI] 💾 Retraining best model for saving...")
     
     # Prepare environment for retrain
     env = os.environ.copy()
