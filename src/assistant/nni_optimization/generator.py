@@ -301,10 +301,10 @@ def preprocess(x, y):
 
 # Create efficient tf.data pipeline
 train_ds = tf.data.Dataset.from_tensor_slices((x_train, y_train))
-train_ds = train_ds.map(preprocess).shuffle(1000).batch(batch_size).prefetch(tf.data.AUTOTUNE)
+train_ds = train_ds.map(preprocess).cache().shuffle(1000).batch(batch_size).prefetch(tf.data.AUTOTUNE)
 
 val_ds = tf.data.Dataset.from_tensor_slices((x_test, y_test))
-val_ds = val_ds.map(preprocess).batch(batch_size).prefetch(tf.data.AUTOTUNE)
+val_ds = val_ds.map(preprocess).cache().batch(batch_size).prefetch(tf.data.AUTOTUNE)
 
 # Compile
 model.compile(optimizer=opt,
