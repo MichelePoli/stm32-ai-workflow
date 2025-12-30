@@ -139,6 +139,10 @@ FILE 2: trial.py
 - IF RETRAIN_MODE: Save model to 'best_model.h5'
 - IF NNI MODE: Report result with nni.report_final_result()
 
+⚠️ CRITICAL WARNING ⚠️
+DO NOT USE experiment.export_top_trial() - THIS METHOD DOES NOT EXIST!
+ALWAYS USE experiment.list_trial_jobs() as shown in the example below.
+
 OUTPUT FORMAT (COPY THIS STRUCTURE EXACTLY):
 
 # FILE: manager.py
