@@ -170,7 +170,8 @@ experiment.config.search_space = search_space
 experiment.config.tuner.name = 'TPE'
 experiment.config.tuner.class_args = {{'optimize_mode': 'maximize'}}
 experiment.config.max_trial_number = 6
-experiment.config.trial_concurrency = 3 # NNI lancerà 3 trial contemporaneamente
+experiment.config.trial_concurrency = 2 # Reduced to 2 to prevent GPU OOM
+experiment.config.training_service.use_active_gpu = True # Enable GPU Usage
 
 # Run with error handling
 try:
@@ -231,6 +232,16 @@ import json
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
+
+# GPU Memory Growth (Prevent OOM)
+gpus = tf.config.list_physical_devices('GPU')
+if gpus:
+    try:
+        for gpu in gpus:
+            tf.config.experimental.set_memory_growth(gpu, True)
+        print(f"[TRIAL] 🎮 GPU initialized: {len(gpus)} devices")
+    except RuntimeError as e:
+        print(e)
 
 # Check mode
 IS_RETRAIN = os.environ.get('RETRAIN_MODE', 'false').lower() == 'true'
