@@ -151,6 +151,12 @@ import json
 import subprocess
 from nni.experiment import Experiment
 
+# FORCE LOAD CUDA LIBRARIES (Fix for Conda Envs)
+conda_lib_path = os.path.join(sys.prefix, 'lib')
+if os.path.exists(conda_lib_path):
+    os.environ['LD_LIBRARY_PATH'] = f"{{conda_lib_path}}:{os.environ.get('LD_LIBRARY_PATH', '')}"
+    print(f"[NNI] 🔧 Added Conda lib to LD_LIBRARY_PATH: {{conda_lib_path}}")
+
 # Get absolute path to current directory
 current_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -232,6 +238,14 @@ import json
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
+
+# FORCE LOAD CUDA LIBRARIES (Fix for Conda Envs)
+# Must be satisfied before other library loads if possible, but definitely before TF initialization
+import sys
+if 'LD_LIBRARY_PATH' not in os.environ:
+    conda_lib_path = os.path.join(sys.prefix, 'lib')
+    if os.path.exists(conda_lib_path):
+        os.environ['LD_LIBRARY_PATH'] = conda_lib_path
 
 # GPU Memory Growth (Prevent OOM)
 gpus = tf.config.list_physical_devices('GPU')

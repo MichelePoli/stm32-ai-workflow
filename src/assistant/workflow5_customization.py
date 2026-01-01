@@ -3256,7 +3256,8 @@ def optimize_hyperparameters_with_nni(state: MasterState, config: dict) -> Maste
         logger.info(f"▶️  Launching NNI Manager: {manager_script}")
         
         # Run process with correct Python environment
-        # NNI must be installed in the environment (stm32_legacy by default)
+        # NNI must be installed in the environment (stm32_legacy by default) 
+        # viene usato stm32_legacy (e precisamente il path /home/mrusso/miniconda3/envs/stm32_legacy/bin/python) per lanciare il manager NNI !!!
         python_path = CONDA_PYTHON_PATHS.get('stm32_legacy', "python")
         
         logger.info(f"▶️  Launching NNI Manager with: {python_path}")
