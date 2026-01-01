@@ -1,10 +1,29 @@
-import tensorflow as tf
+import sys
 import os
 
+# --- FIX AUTOMATICO CONDA ---
+# Aggiunge le librerie di questo environment al path del sistema
+conda_lib_path = os.path.join(sys.prefix, 'lib')
+if os.path.exists(conda_lib_path):
+    # Aggiorna env var per il processo corrente
+    # Nota: per TensorFlow a volte serve impostarlo PRIMA di importare tf,
+    # ma proviamo a farlo dinamicamente qui.
+    current_ld = os.environ.get('LD_LIBRARY_PATH', '')
+    if conda_lib_path not in current_ld:
+        os.environ['LD_LIBRARY_PATH'] = f"{conda_lib_path}:{current_ld}"
+        print(f"🔧 Autoconfigurazione: Aggiunto {conda_lib_path} a LD_LIBRARY_PATH")
+        
+        # Trucco: Riavvia lo script con le nuove variabili d'ambiente se necessario
+        # (TensorFlow legge le variabili all'avvio, modificarle dopo import tf spesso non basta)
+        if 'RESTARTED_WITH_LD' not in os.environ:
+             print("🔄 Riavvio script per applicare le modifiche...")
+             os.environ['RESTARTED_WITH_LD'] = 'true'
+             try:
+                 os.execv(sys.executable, [sys.executable] + sys.argv)
+             except Exception as e:
+                 print(f"⚠️ Fallito riavvio automatico: {e}")
+
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # Meno log di C++
-
-import sys
-
 print("----------------------------------------------------------------")
 print(f"Python Executable: {sys.executable}")
 print(f"TensorFlow Version: {tf.__version__}")
