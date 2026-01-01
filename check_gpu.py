@@ -3,8 +3,12 @@ import os
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # Meno log di C++
 
+import sys
+
 print("----------------------------------------------------------------")
+print(f"Python Executable: {sys.executable}")
 print(f"TensorFlow Version: {tf.__version__}")
+print(f"LD_LIBRARY_PATH: {os.environ.get('LD_LIBRARY_PATH', 'Not Set')}")
 print("----------------------------------------------------------------")
 
 gpus = tf.config.list_physical_devices('GPU')
