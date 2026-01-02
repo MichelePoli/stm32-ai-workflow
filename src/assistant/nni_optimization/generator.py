@@ -295,6 +295,11 @@ finally:
 ```python
 import sys
 import os
+import nni
+import json
+import numpy as np
+import tensorflow as tf
+from tensorflow import keras
 
 # --- AUTO-CONFIGURE CUDA PATH (Robust) ---
 # Must be done BEFORE loading TensorFlow
@@ -312,12 +317,6 @@ if 'LD_LIBRARY_PATH' not in os.environ:
                  os.execv(sys.executable, [sys.executable] + sys.argv)
              except Exception as e:
                  print(f"[TRIAL] ⚠️ Restart failed: {{e}}")
-
-import nni
-import json
-import numpy as np
-import tensorflow as tf
-from tensorflow import keras
 
 # GPU Memory Growth (Prevent OOM)
 gpus = tf.config.list_physical_devices('GPU')
@@ -427,11 +426,16 @@ Start with # FILE: manager.py, then # FILE: trial.py.
 DO NOT SKIP EITHER FILE.
 """
     
-    # Initialize Agent with more powerful model
+    # Initialize Agent with DeepSeek R1 for code generation
     agent = Agent(
-        model=Ollama(id="gpt-oss:20b"),  # More powerful than mistral for complex instructions
+        model=Ollama(id="deepseek-r1:latest"),
         description="You are an AI specialized in writing NNI optimization code.",
-        instructions="Return only valid Python code with # FILE markers. Generate BOTH manager.py and trial.py.",
+        instructions="""Return ONLY valid Python code with # FILE markers. Generate BOTH manager.py and trial.py.
+        
+CRITICAL: Do NOT add any explanations, comments, or text after the code. 
+Do NOT add closing remarks like 'This completes the implementation' or similar.
+Your response must END immediately after the final line of Python code in trial.py.
+Output format: # FILE: manager.py, then code, then # FILE: trial.py, then code, then STOP.""",
         tools=[],
         show_tool_calls=False,
         markdown=False
@@ -471,7 +475,7 @@ DO NOT SKIP EITHER FILE.
         return {}
     finally:
         # ALWAYS unload model to free GPU for NNI
-        force_unload_ollama("gpt-oss:20b")
+        force_unload_ollama("deepseek-r1:latest")
 
 if __name__ == "__main__":
     # Test stub
