@@ -426,9 +426,9 @@ Start with # FILE: manager.py, then # FILE: trial.py.
 DO NOT SKIP EITHER FILE.
 """
     
-    # Initialize Agent with DeepSeek R1 for code generation
+    # Initialize Agent with Llama3 Groq Tool Use for fast code generation
     agent = Agent(
-        model=Ollama(id="deepseek-r1:latest"),
+        model=Ollama(id="llama3-groq-tool-use:8b"),
         description="You are an AI specialized in writing NNI optimization code.",
         instructions="""Return ONLY valid Python code with # FILE markers. Generate BOTH manager.py and trial.py.
         
@@ -475,7 +475,7 @@ Output format: # FILE: manager.py, then code, then # FILE: trial.py, then code, 
         return {}
     finally:
         # ALWAYS unload model to free GPU for NNI
-        force_unload_ollama("deepseek-r1:latest")
+        force_unload_ollama("llama3-groq-tool-use:8b")
 
 if __name__ == "__main__":
     # Test stub
