@@ -3507,8 +3507,8 @@ Quantized: {state.should_quantize}
         "options": ["continue_ai", "end"]
     }
     
-    # user_response = interrupt(prompt) # per adesso commentata per velocizzare
-    user_response = "" # BYPASS
+    user_response = interrupt(prompt)
+    # user_response = "" # BYPASS
     # Default: continue with AI analysis
     if not user_response or str(user_response).strip() == "":
         user_response = "continue_ai"

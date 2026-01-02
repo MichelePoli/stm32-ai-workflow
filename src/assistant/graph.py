@@ -250,8 +250,8 @@ def clarify_request(state: MasterState, config: dict) -> MasterState:
             "4": "Ricerca informazioni online"
         }
     }
-    # user_choice = interrupt(prompt) # per adesso commentata per velocizzare
-    user_choice = "" # BYPASS
+    user_choice = interrupt(prompt)
+    # user_choice = "" # BYPASS
     
     # Default: option 2 (AI analysis)
     if not user_choice or str(user_choice).strip() == "":
@@ -283,8 +283,8 @@ def decide_continue_to_ai(state: MasterState, config: dict) -> MasterState:
         "instruction": f"Firmware generato in {project_path}! Continui con analisi AI? (sì/no)",
     }
     
-    # user_response = interrupt(prompt)
-    user_response = "" # BYPASS
+    user_response = interrupt(prompt)
+    # user_response = "" # BYPASS
     
     if isinstance(user_response, dict):
         user_text = user_response.get("response", user_response.get("input", str(user_response)))
@@ -313,8 +313,8 @@ def decide_continue_to_integration(state: MasterState, config: dict) -> MasterSt
         "instruction": "Analisi AI completata! Continui con integrazione? (sì/no)",
     }
     
-    # user_response = interrupt(prompt)
-    user_response = "" # BYPASS
+    user_response = interrupt(prompt)
+    # user_response = "" # BYPASS
     
     if isinstance(user_response, dict):
         user_text = user_response.get("response", user_response.get("input", str(user_response)))
