@@ -386,7 +386,7 @@ Cosa preferisci? (si/no)""",
     }
     
     # user_response = interrupt(prompt) # per adesso commentata per velocizzare 
-    
+    user_response = "" # BYPASS
     if isinstance(user_response, dict):
         user_text = str(user_response.get("response", user_response.get("input", ""))).lower()
     else:
@@ -487,7 +487,7 @@ Quali modifiche vuoi apportare?
     }
     
     # user_response = interrupt(prompt) # per adesso commentata per velocizzare 
-    
+    user_response = "" # BYPASS
     if isinstance(user_response, dict):
         user_text = str(user_response.get("response", user_response.get("input", ""))).lower()
     else:
@@ -1747,7 +1747,8 @@ Training Recommendation:{train_text}
     }
     
     # ⏸️ INTERRUPT: Attendi risposta utente
-    user_response = interrupt(confirmation_prompt)
+    # user_response = interrupt(confirmation_prompt)
+    user_response = "" # BYPASS
     
     # Log della risposta raw
     logger.info(f"📝 Risposta utente (raw): '{user_response}'")
@@ -3158,6 +3159,7 @@ def ask_optimization_preference(state: MasterState, config: dict) -> MasterState
     
     logger.info("📝 Calling interrupt()...")
     # user_response = interrupt(prompt) # per adesso commentata per velocizzare 
+    user_response = "" # BYPASS
     # logger.info(f"✓ Interrupt returned: {user_response}")
     
     if isinstance(user_response, dict):
@@ -3504,7 +3506,7 @@ Quantized: {state.should_quantize}
     }
     
     # user_response = interrupt(prompt) # per adesso commentata per velocizzare
-    
+    user_response = "" # BYPASS
     # Default: continue with AI analysis
     if not user_response or str(user_response).strip() == "":
         user_response = "continue_ai"

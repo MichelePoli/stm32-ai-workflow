@@ -390,7 +390,7 @@ Esempi:
     }
     
     # user_response = interrupt(prompt) # per adesso commentata per velocizzare
-    
+    user_response = "" # BYPASS
     if isinstance(user_response, dict):
         user_text = user_response.get("response", user_response.get("input", str(user_response)))
     else:
@@ -464,7 +464,7 @@ Rispondi: 1, 2, 3, 4 oppure descrivi il task
     }
     
     # user_response = interrupt(prompt) # per adesso commentata per velocizzare
-    
+    user_response = "" # BYPASS
     if isinstance(user_response, dict):
         user_text = user_response.get("response", user_response.get("input", str(user_response)))
     else:

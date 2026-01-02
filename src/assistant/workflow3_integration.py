@@ -141,7 +141,8 @@ Esempio risposta: "Integra il codice da ./analisiAI/code_resnet nel firmware di 
         }
         
         # L'utente risponde in linguaggio naturale
-        user_response = interrupt(prompt)
+        # user_response = interrupt(prompt) # per adesso commentata per velocizzare
+        user_response = "" # BYPASS
         
         # Gestisci il caso in cui sia dict o stringa/int
         if isinstance(user_response, dict):
