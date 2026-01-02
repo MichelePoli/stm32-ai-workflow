@@ -232,20 +232,31 @@ finally:
 
 # FILE: trial.py
 ```python
-import nni
+import sys
 import os
+
+# --- AUTO-CONFIGURE CUDA PATH (Robust) ---
+# Must be done BEFORE loading TensorFlow
+if 'LD_LIBRARY_PATH' not in os.environ:
+    conda_lib_path = os.path.join(sys.prefix, 'lib')
+    if os.path.exists(conda_lib_path):
+        os.environ['LD_LIBRARY_PATH'] = f"{{conda_lib_path}}:{{os.environ.get('LD_LIBRARY_PATH', '')}}"
+        print(f"[TRIAL] 🔧 Added Conda lib to LD_LIBRARY_PATH: {{conda_lib_path}}")
+        
+        # Self-restart to apply env vars to dynamic linker
+        if 'RESTARTED_WITH_LD' not in os.environ:
+             print("[TRIAL] 🔄 Restarting script to apply environment...")
+             os.environ['RESTARTED_WITH_LD'] = 'true'
+             try:
+                 os.execv(sys.executable, [sys.executable] + sys.argv)
+             except Exception as e:
+                 print(f"[TRIAL] ⚠️ Restart failed: {{e}}")
+
+import nni
 import json
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
-
-# FORCE LOAD CUDA LIBRARIES (Fix for Conda Envs)
-# Must be satisfied before other library loads if possible, but definitely before TF initialization
-import sys
-if 'LD_LIBRARY_PATH' not in os.environ:
-    conda_lib_path = os.path.join(sys.prefix, 'lib')
-    if os.path.exists(conda_lib_path):
-        os.environ['LD_LIBRARY_PATH'] = conda_lib_path
 
 # GPU Memory Growth (Prevent OOM)
 gpus = tf.config.list_physical_devices('GPU')
@@ -253,7 +264,7 @@ if gpus:
     try:
         for gpu in gpus:
             tf.config.experimental.set_memory_growth(gpu, True)
-        print(f"[TRIAL] 🎮 GPU initialized: {len(gpus)} devices")
+        print(f"[TRIAL] 🎮 GPU initialized: {{len(gpus)}} devices")
     except RuntimeError as e:
         print(e)
 
