@@ -226,6 +226,10 @@ except Exception as e:
     import traceback
     traceback.print_exc()
 finally:
+    # Keep server alive for debugging
+    print("\n[NNI] 🛑 Experiment flow finished.")
+    print("[NNI] Press Enter to stop the NNI Web UI and exit...")
+    input()
     experiment.stop()
 ```
 
