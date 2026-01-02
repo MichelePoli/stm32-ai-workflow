@@ -549,7 +549,8 @@ Rispondi con: numero (1-{len(available_models)+1}) oppure descrivi
         """
     }
     
-    model_response = interrupt(model_prompt)
+    # model_response = interrupt(model_prompt) # per adesso commentata per velocizzare
+    model_response = "" # BYPASS
     
     if isinstance(model_response, dict):
         model_text = model_response.get("response", model_response.get("input", str(model_response)))

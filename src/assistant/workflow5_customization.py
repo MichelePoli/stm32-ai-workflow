@@ -1370,7 +1370,8 @@ Write your modifications in natural language (or leave empty for defaults):
     
     # ===== STEP 1: Chiedere all'utente =====
     logger.info("  [Step 1/2] Asking user for modifications...")
-    user_modifications = interrupt(prompt)
+    # user_modifications = interrupt(prompt) # commentato per adesso per velocizzare i test
+    user_modifications = ""
     
     # Default: freeze first 5 layers
     if not user_modifications or str(user_modifications).strip() == "":
