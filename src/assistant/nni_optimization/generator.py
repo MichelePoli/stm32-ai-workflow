@@ -142,6 +142,7 @@ CRITICAL REQUIREMENTS:
 🔴 Both files are MANDATORY - DO NOT skip either one
 🔴 Use the exact format shown below with # FILE: markers
 🔴 DO NOT use keras.datasets.load_data(). ALWAYS load data from the provided path.
+🔴 IMPORTANT: If data labels (y_train) have shape (N, 1), they are SPARSE. Convert them to categorical (one-hot) before training.
 
 FILE 1: manager.py
 - Configure NNI experiment (TPE tuner, maximize mode)
@@ -316,14 +317,16 @@ y_train = np.load(f'{dataset_info.get('path')}/y_train.npy')
 x_test = np.load(f'{dataset_info.get('path')}/x_test.npy')
 y_test = np.load(f'{dataset_info.get('path')}/y_test.npy')
 
-# --- DATASET FIX: Ensure One-Hot Labels ---
-if len(y_train.shape) == 1 or y_train.shape[-1] == 1:
+# --- DATASET FIX: Ensure One-Hot Labels (Categorical) ---
+# Check if labels are sparse (1D or 2D with last dim 1)
+if len(y_train.shape) == 1 or (len(y_train.shape) == 2 and y_train.shape[-1] == 1):
     num_classes = len(np.unique(y_train))
-    print(f"[TRIAL] Converting sparse labels to categorical (classes={{num_classes}})...")
+    print(f"[TRIAL] Sparse labels detected. Classes: {{num_classes}}")
     y_train = keras.utils.to_categorical(y_train, num_classes)
     y_test = keras.utils.to_categorical(y_test, num_classes)
 else:
     num_classes = y_train.shape[-1]
+    print(f"[TRIAL] Categorical labels detected. Classes: {{num_classes}}")
 
 print(f"[TRIAL] Dataset classes: {{num_classes}}")
 
