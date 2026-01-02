@@ -250,39 +250,6 @@ except Exception as e:
     import traceback
     traceback.print_exc()
 
-# --- DEBUGGING: PRINT FAILED TRIAL LOGS ---
-try:
-    print("\\n[NNI] 🔍 Checking for failed trials...")
-    trials = experiment.list_trial_jobs()
-    failed = [t for t in trials if t.status == 'FAILED']
-    
-    if failed:
-        print(f"[NNI] ❌ Found {{len(failed)}} FAILED trials. Dumping logs:\\n")
-        home = os.path.expanduser('~')
-        for t in failed:
-            print(f"\\n{{'='*40}}")
-            print(f"   TRIAL ID: {{t.trialJobId}}")
-            print(f"{{'='*40}}")
-            
-            # Construct path: ~/nni-experiments/{{exp_id}}/environments/local-env/trials/{{trial_id}}/stderr
-            log_path = os.path.join(home, 'nni-experiments', experiment.id, 'environments', 'local-env', 'trials', t.trialJobId, 'stderr')
-            
-            if os.path.exists(log_path):
-                print(f"📄 Log file: {{log_path}}\\n")
-                try:
-                    with open(log_path, 'r') as f:
-                        print(f.read())
-                except Exception as read_err:
-                    print(f"⚠️ Could not read file: {{read_err}}")
-            else:
-                print(f"⚠️ Log file not found at: {{log_path}}")
-                print(f"   (Check if NNI is using a custom experiment directory)")
-    else:
-        print("[NNI] ✅ No failed trials.")
-
-except Exception as debug_err:
-    print(f"[NNI] ⚠️ Could not fetch trial logs: {{debug_err}}")
-
 finally:
     # Keep server alive for debugging
     print("\\n[NNI] 🛑 Experiment flow finished.")
@@ -426,9 +393,9 @@ Start with # FILE: manager.py, then # FILE: trial.py.
 DO NOT SKIP EITHER FILE.
 """
     
-    # Initialize Agent with Llama3 Groq Tool Use for fast code generation
+    # Initialize Agent with GPT-OSS 20B for code generation
     agent = Agent(
-        model=Ollama(id="llama3-groq-tool-use:8b"),
+        model=Ollama(id="gpt-oss:20b"),
         description="You are an AI specialized in writing NNI optimization code.",
         instructions="""Return ONLY valid Python code with # FILE markers. Generate BOTH manager.py and trial.py.""",
         tools=[],
@@ -470,7 +437,7 @@ DO NOT SKIP EITHER FILE.
         return {}
     finally:
         # ALWAYS unload model to free GPU for NNI
-        force_unload_ollama("llama3-groq-tool-use:8b")
+        force_unload_ollama("gpt-oss:20b")
 
 if __name__ == "__main__":
     # Test stub
