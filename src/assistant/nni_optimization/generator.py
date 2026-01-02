@@ -430,12 +430,7 @@ DO NOT SKIP EITHER FILE.
     agent = Agent(
         model=Ollama(id="llama3-groq-tool-use:8b"),
         description="You are an AI specialized in writing NNI optimization code.",
-        instructions="""Return ONLY valid Python code with # FILE markers. Generate BOTH manager.py and trial.py.
-        
-CRITICAL: Do NOT add any explanations, comments, or text after the code. 
-Do NOT add closing remarks like 'This completes the implementation' or similar.
-Your response must END immediately after the final line of Python code in trial.py.
-Output format: # FILE: manager.py, then code, then # FILE: trial.py, then code, then STOP.""",
+        instructions="""Return ONLY valid Python code with # FILE markers. Generate BOTH manager.py and trial.py.""",
         tools=[],
         show_tool_calls=False,
         markdown=False
