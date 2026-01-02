@@ -29,6 +29,11 @@ print("----------------------------------------------------------------")
 print(f"Python Executable: {sys.executable}")
 print(f"TensorFlow Version: {tf.__version__}")
 print(f"LD_LIBRARY_PATH: {os.environ.get('LD_LIBRARY_PATH', 'Not Set')}")
+try:
+    build_info = tf.sysconfig.get_build_info()
+    print(f"TF Build Info: cuda_version={build_info.get('cuda_version', '?')} cudnn_version={build_info.get('cudnn_version', '?')}")
+except Exception:
+    print("TF Build Info: N/A")
 print("----------------------------------------------------------------")
 
 gpus = tf.config.list_physical_devices('GPU')
