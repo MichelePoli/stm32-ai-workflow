@@ -200,7 +200,7 @@ experiment.config.search_space = search_space
 experiment.config.tuner.name = 'TPE'
 experiment.config.tuner.class_args = {{'optimize_mode': 'maximize'}}
 experiment.config.max_trial_number = 6
-experiment.config.trial_concurrency = 1 # Reduced to 1 to prevent GPU OOM
+experiment.config.trial_concurrency = 3 # Increased concurrency to 3 for faster experimentation
 experiment.config.training_service.use_active_gpu = True # Enable GPU Usage
 
 # Run with error handling
