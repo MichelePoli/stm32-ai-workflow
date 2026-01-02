@@ -228,12 +228,12 @@ except Exception as e:
 
 # --- DEBUGGING: PRINT FAILED TRIAL LOGS ---
 try:
-    print("\n[NNI] 🔍 Checking for failed trials...")
+    print("\\n[NNI] 🔍 Checking for failed trials...")
     trials = experiment.list_trial_jobs()
     failed = [t for t in trials if t.status == 'FAILED']
     
     if failed:
-        print(f"[NNI] ❌ Found {{len(failed)}} FAILED trials. Dumping logs:\n")
+        print(f"[NNI] ❌ Found {{len(failed)}} FAILED trials. Dumping logs:\\n")
         home = os.path.expanduser('~')
         for t in failed:
             print(f"\\n{{'='*40}}")
@@ -261,7 +261,7 @@ except Exception as debug_err:
 
 finally:
     # Keep server alive for debugging
-    print("\n[NNI] 🛑 Experiment flow finished.")
+    print("\\n[NNI] 🛑 Experiment flow finished.")
     print("[NNI] Press Enter to stop the NNI Web UI and exit...")
     input()
 ```
