@@ -486,7 +486,7 @@ Quali modifiche vuoi apportare?
         "instruction": instruction
     }
     
-    user_response = interrupt(prompt) # per adesso commentata per velocizzare 
+    user_response = interrupt(prompt)
     # non si può commentare . Prevent "racing" through the graph.
     
     if isinstance(user_response, dict):
