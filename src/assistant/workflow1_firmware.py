@@ -116,7 +116,8 @@ Esempio: "Crea progetto MyApp per STM32F401 con CubeIDE"
     }
     
     # L'utente risponde in linguaggio naturale
-    user_response = interrupt(prompt)
+    # user_response = interrupt(prompt) # per adesso commentata per velocizzare
+    user_response = "si" # BYPASS
     
     # Gestisci il caso in cui sia dict o stringa/int
     if isinstance(user_response, dict):
@@ -651,6 +652,7 @@ def decide_continue_to_integration(state: MasterState, config: dict) -> MasterSt
     
     # L'utente risponde in linguaggio naturale
     user_response = interrupt(prompt)
+    
     
     # DEBUG: Stampa quello che hai ricevuto
     # logger.info(f"🔍 user_response RAW: {user_response}")

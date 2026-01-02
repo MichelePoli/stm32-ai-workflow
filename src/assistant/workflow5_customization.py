@@ -385,7 +385,7 @@ Opzioni:
 Cosa preferisci? (si/no)""",
     }
     
-    user_response = interrupt(prompt)
+    # user_response = interrupt(prompt) # per adesso commentata per velocizzare 
     
     if isinstance(user_response, dict):
         user_text = str(user_response.get("response", user_response.get("input", ""))).lower()
@@ -486,7 +486,7 @@ Quali modifiche vuoi apportare?
         "instruction": instruction
     }
     
-    user_response = interrupt(prompt)
+    # user_response = interrupt(prompt) # per adesso commentata per velocizzare 
     
     if isinstance(user_response, dict):
         user_text = str(user_response.get("response", user_response.get("input", ""))).lower()
@@ -3157,8 +3157,8 @@ def ask_optimization_preference(state: MasterState, config: dict) -> MasterState
     }
     
     logger.info("📝 Calling interrupt()...")
-    user_response = interrupt(prompt)
-    logger.info(f"✓ Interrupt returned: {user_response}")
+    # user_response = interrupt(prompt) # per adesso commentata per velocizzare 
+    # logger.info(f"✓ Interrupt returned: {user_response}")
     
     if isinstance(user_response, dict):
         response = user_response.get("response", "standard")
@@ -3503,7 +3503,7 @@ Quantized: {state.should_quantize}
         "options": ["continue_ai", "end"]
     }
     
-    user_response = interrupt(prompt)
+    # user_response = interrupt(prompt) # per adesso commentata per velocizzare
     
     # Default: continue with AI analysis
     if not user_response or str(user_response).strip() == "":
