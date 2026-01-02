@@ -1,5 +1,6 @@
 import sys
 import os
+import tensorflow as tf
 
 # --- FIX AUTOMATICO CONDA ---
 # Aggiunge le librerie di questo environment al path del sistema
