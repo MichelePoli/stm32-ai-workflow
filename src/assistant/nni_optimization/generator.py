@@ -284,11 +284,10 @@ batch_size = params.get('batch_size', 32)
 optimizer_name = params.get('optimizer', 'Adam')
 
 # Load data
-# Load data
-x_train = np.load('{dataset_info.get('path')}/x_train.npy')
-y_train = np.load('{dataset_info.get('path')}/y_train.npy')
-x_test = np.load('{dataset_info.get('path')}/x_test.npy')
-y_test = np.load('{dataset_info.get('path')}/y_test.npy')
+x_train = np.load(f'{dataset_info.get('path')}/x_train.npy')
+y_train = np.load(f'{dataset_info.get('path')}/y_train.npy')
+x_test = np.load(f'{dataset_info.get('path')}/x_test.npy')
+y_test = np.load(f'{dataset_info.get('path')}/y_test.npy')
 
 # --- DATASET FIX: Ensure One-Hot Labels ---
 if len(y_train.shape) == 1 or y_train.shape[-1] == 1:
