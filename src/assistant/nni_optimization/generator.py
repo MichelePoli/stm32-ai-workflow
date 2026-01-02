@@ -400,7 +400,7 @@ DO NOT SKIP EITHER FILE.
     agent = Agent(
         model=Ollama(id="gpt-oss:20b"),
         description="You are an AI specialized in writing NNI optimization code.",
-        instructions="""Return ONLY valid Python code with # FILE markers. Generate BOTH manager.py and trial.py.""",
+        instructions="""Return ONLY valid Python code with # FILE markers. Generate BOTH manager.py and trial.py. Don't add explanations or your personal comments.""",
         tools=[],
         show_tool_calls=False,
         markdown=False
