@@ -137,6 +137,15 @@ Your task: Generate EXACTLY TWO PYTHON FILES for an NNI hyperparameter optimizat
 
 {context_desc}
 
+🚨 CRITICAL PATH REQUIREMENTS 🚨:
+- Dataset files are at: {dataset_info.get('path')}
+  Load data using: np.load('{dataset_info.get('path')}/x_train.npy'), np.load('{dataset_info.get('path')}/y_train.npy'), etc.
+- Model file is at: {model_info.get('path')}
+  Load model using: keras.models.load_model('{model_info.get('path')}')
+
+NEVER use placeholder paths like ~/data or ~/models!
+ALWAYS use the EXACT paths specified above!
+
 CRITICAL REQUIREMENTS:
 🔴 YOU MUST GENERATE EXACTLY 2 FILES: manager.py AND trial.py
 🔴 Both files are MANDATORY - DO NOT skip either one
@@ -154,7 +163,7 @@ FILE 1: manager.py
 
 FILE 2: trial.py
 - Get parameters (from NNI_PARAMS if RETRAIN_MODE, else from nni.get_next_parameter())
-- Load model and data from provided paths
+- Load model and data from provided paths (USE EXACT PATHS ABOVE!)
 - Adapt model final layer if classes mismatch
 - Train model for 3 epochs
 - Report accuracy to NNI (if not retrain) or Save 'best_model.h5' (if retrain)
@@ -163,13 +172,13 @@ FILE 2: trial.py
 🔴 DO NOT USE experiment.export_top_trial() OR experiment.get_best_trial() - THEY DO NOT EXIST.
 🔴 ALWAYS USE experiment.list_trial_jobs() to find the best trial manually.
 🔴 KEEP manager.py simple and follow the structure below.
+🔴 Use exact paths from context: {dataset_info.get('path')} and {model_info.get('path')}
 
 OUTPUT FORMAT (COPY THIS STRUCTURE EXACTLY):
 
 # FILE: manager.py
 ```python
 import nni
-import os
 import os
 import sys
 import json
@@ -385,6 +394,7 @@ history = model.fit(train_ds,
 # Report or Save
 if not IS_RETRAIN:
     val_accuracy = history.history['val_accuracy'][-1]
+    print(f"[TRIAL] Validation accuracy: {{val_accuracy:.4f}}")
     nni.report_final_result(val_accuracy)
 else:
     model.save('best_model.h5')
@@ -394,6 +404,7 @@ else:
 NOW GENERATE BOTH FILES FOLLOWING THIS EXACT FORMAT.
 Start with # FILE: manager.py, then # FILE: trial.py.
 DO NOT SKIP EITHER FILE.
+USE THE EXACT PATHS PROVIDED ABOVE - DO NOT USE PLACEHOLDERS!
 """
     
     # Initialize Agent with GPT-OSS 20B for code generation
