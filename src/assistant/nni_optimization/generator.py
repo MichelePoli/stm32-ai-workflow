@@ -2,6 +2,30 @@ import os
 import logging
 import json
 import re
+import urllib.request
+
+def force_unload_ollama(model_name: str = "gpt-oss:20b"):
+    """
+    Force Ollama to unload the model from GPU to free up VRAM for TensorFlow/NNI.
+    Sends a request with keep_alive=0.
+    """
+    try:
+        url = "http://localhost:11434/api/generate"
+        data = {
+            "model": model_name,
+            "keep_alive": 0
+        }
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(data).encode('utf-8'),
+            headers={'Content-Type': 'application/json'}
+        )
+        with urllib.request.urlopen(req) as response:
+            logger.info(f"🔫 Ollama model '{model_name}' unloaded to free VRAM for NNI.")
+            
+    except Exception as e:
+        logger.warning(f"⚠️ Failed to unload Ollama model: {e}")
+
 from typing import Dict, Any, Optional
 from agno.agent import Agent
 from agno.models.ollama import Ollama
@@ -176,7 +200,7 @@ experiment.config.search_space = search_space
 experiment.config.tuner.name = 'TPE'
 experiment.config.tuner.class_args = {{'optimize_mode': 'maximize'}}
 experiment.config.max_trial_number = 6
-experiment.config.trial_concurrency = 2 # Reduced to 2 to prevent GPU OOM
+experiment.config.trial_concurrency = 1 # Reduced to 1 to prevent GPU OOM
 experiment.config.training_service.use_active_gpu = True # Enable GPU Usage
 
 # Run with error handling
@@ -445,6 +469,9 @@ DO NOT SKIP EITHER FILE.
     except Exception as e:
         logger.error(f"❌ Generation failed: {e}")
         return {}
+    finally:
+        # ALWAYS unload model to free GPU for NNI
+        force_unload_ollama("gpt-oss:20b")
 
 if __name__ == "__main__":
     # Test stub
