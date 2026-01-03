@@ -385,8 +385,8 @@ Opzioni:
 Cosa preferisci? (si/no)""",
     }
     
-    # user_response = interrupt(prompt) # per adesso commentata per velocizzare 
-    user_response = "" # BYPASS
+    user_response = interrupt(prompt)
+    
     if isinstance(user_response, dict):
         user_text = str(user_response.get("response", user_response.get("input", ""))).lower()
     else:
@@ -441,6 +441,87 @@ def decide_after_inspection(state) -> Literal["retrieve_best_practices_for_archi
 # ============================================================================
 # RETRIEVE BEST PRACTICES FOR ARCHITECTURE
 # ===========================================================================
+
+def ask_and_parse_user_modifications(state: MasterState, config: dict) -> MasterState:
+    """
+    ✨ NODO: Chiede all'utente quali modifiche apportare e le parsa con LLM.
+    Gestisce anche il caso di "Edit" (ritorno indietro).
+    """
+    
+    logger.info("🔧 Ask & Parse User Modifications")
+    
+    # Recupera info modello
+    model_info = state.model_architecture or {} # Changed from model_architecture_info to model_architecture
+    model_name = state.selected_model.get('name', 'Unknown Model') # Changed from model_info.get('name', 'Unknown Model')
+    total_layers = model_info.get('n_layers', 0) # Changed from total_layers to n_layers
+    output_classes = model_info.get('output_classes', 1000)
+    
+    # Recupera best practices
+    best_practices_text = state.best_practices_display or "No specific best practices found." # Changed from best_practices_context to best_practices_display
+    
+    # Determina il messaggio da mostrare
+    if getattr(state, 'user_wants_to_edit', False):
+        instruction = f"""
+🔄 EDIT MODE: Modifica la tua richiesta precedente.
+
+Modello: {model_name}
+Best Practices suggerite:
+{best_practices_text[:500]}...
+
+Cosa vuoi cambiare rispetto alla proposta precedente?
+(Es: "Cambia il learning rate a 0.001", "Non freezare i layer", "Aggiungi più dropout")
+"""
+    else:
+        instruction = f"""
+🛠️  MODEL CUSTOMIZATION: {model_name}
+
+Ho analizzato il modello e trovato queste Best Practices:
+{best_practices_text[:500]}...
+
+Quali modifiche vuoi apportare?
+(Es: "Freeza i primi 10 layer", "Cambia output a 2 classi", "Aggiungi Dropout 0.5")
+"""
+
+    prompt = {
+        "instruction": instruction
+    }
+    
+    user_response = interrupt(prompt)
+    
+    if isinstance(user_response, dict):
+        user_text = str(user_response.get("response", user_response.get("input", ""))).lower()
+    else:
+        user_text = str(user_response).lower()
+    
+    # === CLASSIFICA CON MISTRAL ===
+    cfg = Configuration.from_runnable_config(config)
+    llm = ChatOllama(
+        model=cfg.local_llm,
+        temperature=0,
+        num_ctx=cfg.llm_context_window
+    )
+    
+    llm_parser = llm.with_structured_output(ModelModification)
+    
+    modification_request = llm_parser.invoke([
+        SystemMessage(content=model_modification_instructions),
+        HumanMessage(content=f"Risposta utente: {user_text}")
+    ])
+    
+    logger.info(f"✓ Richiesta di modifica parsata:")
+    logger.info(f"  Freezing layers: {modification_request.freeze_layers}")
+    logger.info(f"  Target output classes: {modification_request.target_output_classes}")
+    logger.info(f"  Dropout rate: {modification_request.dropout_rate}")
+    logger.info(f"  Learning rate: {modification_request.learning_rate}")
+    logger.info(f"  Additional layers: {modification_request.additional_layers}")
+    logger.info(f"  Confidence: {modification_request.confidence:.2f}")
+    
+    # === SALVA NELLO STATE ===
+    state.model_modification_request = modification_request
+    state.user_wants_to_edit = True # Set to true after the first modification request
+    
+    return state
+
 
 def retrieve_best_practices_for_architecture(state: MasterState, config: dict) -> MasterState:
     """Con web fetch optional (timeout 10s max)"""
@@ -1290,7 +1371,6 @@ Write your modifications in natural language (or leave empty for defaults):
     # ===== STEP 1: Chiedere all'utente =====
     logger.info("  [Step 1/2] Asking user for modifications...")
     user_modifications = interrupt(prompt)
-    # user_modifications = "" # BYPASS (commentato per adesso per velocizzare i test)
     
     # Default: freeze first 5 layers
     if not user_modifications or str(user_modifications).strip() == "":
@@ -1667,8 +1747,7 @@ Training Recommendation:{train_text}
     }
     
     # ⏸️ INTERRUPT: Attendi risposta utente
-    # user_response = interrupt(confirmation_prompt)
-    user_response = "" # BYPASS
+    user_response = interrupt(confirmation_prompt)
     
     # Log della risposta raw
     logger.info(f"📝 Risposta utente (raw): '{user_response}'")
@@ -3072,15 +3151,14 @@ def ask_optimization_preference(state: MasterState, config: dict) -> MasterState
     prompt = {
         "instruction": "Vuoi eseguire l'ottimizzazione degli iperparametri con NNI o procedere con il fine-tuning standard? (nni/standard)",
         "options": {
-            "nni": "Usa NNI per trovare i parametri migliori (AutoML) - ⚠️ Richiede tempo (2-3 ore)",
+            "nni": "Usa NNI per trovare i parametri migliori (AutoML)",
             "standard": "Fine-tuning standard (parametri fissi)"
         }
     }
     
     logger.info("📝 Calling interrupt()...")
-    # user_response = interrupt(prompt) # per adesso commentata per velocizzare 
-    user_response = "" # BYPASS
-    # logger.info(f"✓ Interrupt returned: {user_response}")
+    user_response = interrupt(prompt)
+    logger.info(f"✓ Interrupt returned: {user_response}")
     
     if isinstance(user_response, dict):
         response = user_response.get("response", "standard")
@@ -3124,8 +3202,7 @@ def optimize_hyperparameters_with_nni(state: MasterState, config: dict) -> Maste
         from src.assistant.nni_optimization.generator import generate_nni_experiment
         import subprocess
         
-        # Use the customized model (with adapted head) as starting point for NNI
-        model_path = state.customized_model_path if state.customized_model_path else state.model_path
+        model_path = state.model_path 
         
         # Determine data path
         if state.dataset_source == "real":
@@ -3161,8 +3238,7 @@ def optimize_hyperparameters_with_nni(state: MasterState, config: dict) -> Maste
         generated_files = generate_nni_experiment(
             model_info=model_info,
             dataset_info=dataset_info,
-            output_dir=experiment_dir,
-            num_ctx=config.get('llm_context_window', 8192) if config else 8192
+            output_dir=experiment_dir
         )
         
         if not generated_files:
@@ -3180,8 +3256,7 @@ def optimize_hyperparameters_with_nni(state: MasterState, config: dict) -> Maste
         logger.info(f"▶️  Launching NNI Manager: {manager_script}")
         
         # Run process with correct Python environment
-        # NNI must be installed in the environment (stm32_legacy by default) 
-        # viene usato stm32_legacy (e precisamente il path /home/mrusso/miniconda3/envs/stm32_legacy/bin/python) per lanciare il manager NNI !!!
+        # NNI must be installed in the environment (stm32_legacy by default)
         python_path = CONDA_PYTHON_PATHS.get('stm32_legacy', "python")
         
         logger.info(f"▶️  Launching NNI Manager with: {python_path}")
@@ -3192,7 +3267,7 @@ def optimize_hyperparameters_with_nni(state: MasterState, config: dict) -> Maste
                 cwd=experiment_dir,
                 capture_output=True,
                 text=True,
-                timeout=10800  # 3 hours timeout for NNI to start/run
+                timeout=3600  # 60 min timeout for NNI to start
             )
             
             logger.info("✓ Esperimento concluso (o interrotto).")
@@ -3205,15 +3280,6 @@ def optimize_hyperparameters_with_nni(state: MasterState, config: dict) -> Maste
             logger.warning("⏱️  NNI Manager timeout (likely running in background)")
         except Exception as exec_err:
              logger.error(f"❌ Errore durante esecuzione manager: {exec_err}")
-             
-        # --- RETRIEVE BEST MODEL ---
-        best_model_path = os.path.join(experiment_dir, "best_model.h5")
-        if os.path.exists(best_model_path):
-            logger.info(f"🏆 Found optimized model at: {best_model_path}")
-            state.customized_model_path = best_model_path
-            state.model_path = best_model_path # Update source for validation
-        else:
-            logger.warning("⚠️  Optimized model NOT found. Using original/customized path.")
         
     except ImportError:
         logger.error("❌ NNI module not found or import error.")
@@ -3428,7 +3494,7 @@ Quantized: {state.should_quantize}
     }
     
     user_response = interrupt(prompt)
-    # user_response = "" # BYPASS
+    
     # Default: continue with AI analysis
     if not user_response or str(user_response).strip() == "":
         user_response = "continue_ai"
