@@ -3160,7 +3160,8 @@ def optimize_hyperparameters_with_nni(state: MasterState, config: dict) -> Maste
         generated_files = generate_nni_experiment(
             model_info=model_info,
             dataset_info=dataset_info,
-            output_dir=experiment_dir
+            output_dir=experiment_dir,
+            num_ctx=config.get('llm_context_window', 8192) if config else 8192
         )
         
         if not generated_files:

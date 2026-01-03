@@ -93,8 +93,9 @@ def extract_files_from_code(code: str, verbose: bool = True) -> Dict[str, str]:
 def generate_nni_experiment(
     model_info: Dict[str, Any],
     dataset_info: Dict[str, Any],
-    optimization_goal: str = "Maximize validation accuracy with minimal parameters",
-    output_dir: str = "./nni_generated"
+    optimization_goal: str = "Maximize validation accuracy and minimize latency",
+    output_dir: str = "./nni_experiment",
+    num_ctx: int = 8192
 ) -> Dict[str, str]:
     """
     Generates NNI experiment scripts (manager.py, trial.py) using an LLM Agent.
@@ -104,6 +105,7 @@ def generate_nni_experiment(
         dataset_info: Dictionary containing dataset details (path, shapes, classes)
         optimization_goal: The objective of the optimization
         output_dir: Directory to save generated files
+        num_ctx: LLM context window (default 8192)
         
     Returns:
         Dict mapping filenames to their generated content.
@@ -216,8 +218,20 @@ experiment.config.training_service.use_active_gpu = True # Enable GPU Usage
 # Run with error handling
 try:
     print(f"[NNI] Starting experiment in {{current_dir}}")
-    print(f"[NNI] Web UI will be available at http://localhost:8080")
-    experiment.run(port=8080, wait_completion=True)
+    
+    # --- PORT HUNTING ---
+    import socket
+    def find_free_port(start_port=8080, max_attempts=20):
+        for port in range(start_port, start_port + max_attempts):
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                if s.connect_ex(('localhost', port)) != 0:
+                    return port
+        return start_port
+
+    target_port = find_free_port(8080)
+    print(f"[NNI] Web UI will be available at http://localhost:{{target_port}}")
+    
+    experiment.run(port=target_port, wait_completion=True)
     print("[NNI] Experiment completed successfully")
     
     # --- AUTO-RETRAIN BEST MODEL ---
@@ -409,7 +423,10 @@ USE THE EXACT PATHS PROVIDED ABOVE - DO NOT USE PLACEHOLDERS!
     
     # Initialize Agent with GPT-OSS 20B for code generation
     agent = Agent(
-        model=Ollama(id="gpt-oss:20b"),
+        model=Ollama(
+            id="gpt-oss:20b",
+            options={"num_ctx": num_ctx}
+        ),
         description="You are an AI specialized in writing NNI optimization code.",
         instructions="""Return ONLY valid Python code with # FILE markers. Generate BOTH manager.py and trial.py. Don't add explanations or your personal comments.""",
         tools=[],
