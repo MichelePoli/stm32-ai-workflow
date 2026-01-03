@@ -197,11 +197,11 @@ if os.path.exists(conda_lib_path):
 current_dir = os.path.dirname(os.path.abspath(__file__))
 
 # Define search space
-search_space = {{
-    'learning_rate': {{'_type': 'choice', '_value': [0.001, 0.0001, 0.00001]}},
-    'batch_size': {{'_type': 'choice', '_value': [16, 32, 64]}},
-    'optimizer': {{'_type': 'choice', '_value': ['Adam', 'SGD']}},
-}}
+search_space = {
+    'learning_rate': {'_type': 'choice', '_value': [0.001, 0.0005, 0.0001]},
+    'batch_size': {'_type': 'choice', '_value': [16, 32, 64]},
+    'optimizer': {'_type': 'choice', '_value': ['Adam']},
+}
 
 # Create experiment
 experiment = Experiment('local')
@@ -387,12 +387,12 @@ def preprocess(x, y):
     x = tf.image.resize(x, expected_shape)
     return x, y
 
-# Datasets with caching
+# Datasets (Removed caching of resized images to save RAM)
 train_ds = tf.data.Dataset.from_tensor_slices((x_train, y_train))
-train_ds = train_ds.map(preprocess).cache().shuffle(1000).batch(batch_size).prefetch(tf.data.AUTOTUNE)
+train_ds = train_ds.shuffle(1000).map(preprocess).batch(batch_size).prefetch(tf.data.AUTOTUNE)
 
 val_ds = tf.data.Dataset.from_tensor_slices((x_test, y_test))
-val_ds = val_ds.map(preprocess).cache().batch(batch_size).prefetch(tf.data.AUTOTUNE)
+val_ds = val_ds.map(preprocess).batch(batch_size).prefetch(tf.data.AUTOTUNE)
 
 # FINAL COMPILE (Generate ONLY this block)
 model.compile(optimizer=opt,

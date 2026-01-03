@@ -3156,6 +3156,41 @@ def optimize_hyperparameters_with_nni(state: MasterState, config: dict) -> Maste
         
         logger.info(f"📁 NNI Experiment directory: {experiment_dir}")
         
+        # --- DATASET SUBSETTING FOR NNI (User Request: Generalized 50% Subsetting) ---
+        nni_data_path = data_path
+        
+        # try:
+        #     import numpy as np
+        #     x_train_path = os.path.join(data_path, "x_train.npy")
+        #     if os.path.exists(x_train_path):
+        #         # Check actual size with mmap to avoid loading the whole thing
+        #         x_sample = np.load(x_train_path, mmap_mode='r')
+        #         total_samples = len(x_sample)
+        #         subset_size = total_samples // 2
+        #         
+        #         logger.info(f"✂️ Generalized Subsetting: Using 50% ({subset_size}/{total_samples}) for NNI...")
+        #         subset_dir = os.path.join(experiment_dir, "dataset_subset")
+        #         os.makedirs(subset_dir, exist_ok=True)
+        #         
+        #         # Load and save subsets
+        #         for filename in ["x_train.npy", "y_train.npy", "x_test.npy", "y_test.npy"]:
+        #             src_path = os.path.join(data_path, filename)
+        #             if os.path.exists(src_path):
+        #                 data = np.load(src_path)
+        #                 # Take 50% of whatever file it is (train or test)
+        #                 file_subset_size = len(data) // 2
+        #                 if len(data) > file_subset_size:
+        #                     data = data[:file_subset_size]
+        #                 np.save(os.path.join(subset_dir, filename), data)
+        #         
+        #         nni_data_path = subset_dir
+        #         logger.info(f"✅ Dynamic Subset created at: {nni_data_path}")
+        # except Exception as subset_err:
+        #     logger.error(f"⚠️ Error during dynamic subsetting: {subset_err}. Using full dataset.")
+
+        # Update dataset info with potentially new path
+        dataset_info["path"] = nni_data_path
+
         # 1. GENERATE
         logger.info("🚀 Generazione esperimento NNI su misura...")
         generated_files = generate_nni_experiment(
