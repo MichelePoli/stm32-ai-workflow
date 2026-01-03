@@ -442,88 +442,6 @@ def decide_after_inspection(state) -> Literal["retrieve_best_practices_for_archi
 # RETRIEVE BEST PRACTICES FOR ARCHITECTURE
 # ===========================================================================
 
-def ask_and_parse_user_modifications(state: MasterState, config: dict) -> MasterState:
-    """
-    ✨ NODO: Chiede all'utente quali modifiche apportare e le parsa con LLM.
-    Gestisce anche il caso di "Edit" (ritorno indietro).
-    """
-    
-    logger.info("🔧 Ask & Parse User Modifications")
-    
-    # Recupera info modello
-    model_info = state.model_architecture or {} # Changed from model_architecture_info to model_architecture
-    model_name = state.selected_model.get('name', 'Unknown Model') # Changed from model_info.get('name', 'Unknown Model')
-    total_layers = model_info.get('n_layers', 0) # Changed from total_layers to n_layers
-    output_classes = model_info.get('output_classes', 1000)
-    
-    # Recupera best practices
-    best_practices_text = state.best_practices_display or "No specific best practices found." # Changed from best_practices_context to best_practices_display
-    
-    # Determina il messaggio da mostrare
-    if getattr(state, 'user_wants_to_edit', False):
-        instruction = f"""
-🔄 EDIT MODE: Modifica la tua richiesta precedente.
-
-Modello: {model_name}
-Best Practices suggerite:
-{best_practices_text[:500]}...
-
-Cosa vuoi cambiare rispetto alla proposta precedente?
-(Es: "Cambia il learning rate a 0.001", "Non freezare i layer", "Aggiungi più dropout")
-"""
-    else:
-        instruction = f"""
-🛠️  MODEL CUSTOMIZATION: {model_name}
-
-Ho analizzato il modello e trovato queste Best Practices:
-{best_practices_text[:500]}...
-
-Quali modifiche vuoi apportare?
-(Es: "Freeza i primi 10 layer", "Cambia output a 2 classi", "Aggiungi Dropout 0.5")
-"""
-
-    prompt = {
-        "instruction": instruction
-    }
-    
-    user_response = interrupt(prompt)
-    # non si può commentare . Prevent "racing" through the graph.
-    
-    if isinstance(user_response, dict):
-        user_text = str(user_response.get("response", user_response.get("input", ""))).lower()
-    else:
-        user_text = str(user_response).lower()
-    
-    # === CLASSIFICA CON MISTRAL ===
-    cfg = Configuration.from_runnable_config(config)
-    llm = ChatOllama(
-        model=cfg.local_llm,
-        temperature=0,
-        num_ctx=cfg.llm_context_window
-    )
-    
-    llm_parser = llm.with_structured_output(ModelModification)
-    
-    modification_request = llm_parser.invoke([
-        SystemMessage(content=model_modification_instructions),
-        HumanMessage(content=f"Risposta utente: {user_text}")
-    ])
-    
-    logger.info(f"✓ Richiesta di modifica parsata:")
-    logger.info(f"  Freezing layers: {modification_request.freeze_layers}")
-    logger.info(f"  Target output classes: {modification_request.target_output_classes}")
-    logger.info(f"  Dropout rate: {modification_request.dropout_rate}")
-    logger.info(f"  Learning rate: {modification_request.learning_rate}")
-    logger.info(f"  Additional layers: {modification_request.additional_layers}")
-    logger.info(f"  Confidence: {modification_request.confidence:.2f}")
-    
-    # === SALVA NELLO STATE ===
-    state.model_modification_request = modification_request
-    state.user_wants_to_edit = True # Set to true after the first modification request
-    
-    return state
-
-
 def retrieve_best_practices_for_architecture(state: MasterState, config: dict) -> MasterState:
     """Con web fetch optional (timeout 10s max)"""
     
@@ -1371,8 +1289,8 @@ Write your modifications in natural language (or leave empty for defaults):
     
     # ===== STEP 1: Chiedere all'utente =====
     logger.info("  [Step 1/2] Asking user for modifications...")
-    # user_modifications = interrupt(prompt) # commentato per adesso per velocizzare i test
-    user_modifications = ""
+    user_modifications = interrupt(prompt)
+    # user_modifications = "" # BYPASS (commentato per adesso per velocizzare i test)
     
     # Default: freeze first 5 layers
     if not user_modifications or str(user_modifications).strip() == "":
