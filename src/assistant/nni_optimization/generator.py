@@ -141,7 +141,7 @@ Your task: Generate EXACTLY TWO PYTHON FILES for an NNI hyperparameter optimizat
 
 🚨 CRITICAL PATH REQUIREMENTS 🚨:
 - Dataset files are at: {dataset_info.get('path')}
-  Load data using: np.load('{dataset_info.get('path')}/x_train.npy'), np.load('{dataset_info.get('path')}/y_train.npy'), etc.
+  Load data using: np.load('{dataset_info.get('path')}/x_train.npy', mmap_mode='r'), np.load('{dataset_info.get('path')}/y_train.npy', mmap_mode='r'), etc.
 - Model file is at: {model_info.get('path')}
   Load model using: keras.models.load_model('{model_info.get('path')}')
 
@@ -166,6 +166,8 @@ FILE 1: manager.py
 FILE 2: trial.py
 - Get parameters (from NNI_PARAMS if RETRAIN_MODE, else from nni.get_next_parameter())
 - Load model and data from provided paths (USE EXACT PATHS ABOVE!)
+- MEMORY OPTIMIZATION: Load data with `mmap_mode='r'` to avoid RAM overload.
+- DATASET SUBSET: Use only 50% of the dataset to save RAM.
 - Adapt model final layer if classes mismatch
 - Train model for 3 epochs
 - Report accuracy to NNI (if not retrain) or Save 'best_model.h5' (if retrain)
@@ -190,18 +192,18 @@ from nni.experiment import Experiment
 # FORCE LOAD CUDA LIBRARIES (Fix for Conda Envs)
 conda_lib_path = os.path.join(sys.prefix, 'lib')
 if os.path.exists(conda_lib_path):
-    os.environ['LD_LIBRARY_PATH'] = f"{{conda_lib_path}}:{os.environ.get('LD_LIBRARY_PATH', '')}"
+    os.environ['LD_LIBRARY_PATH'] = f"{{conda_lib_path}}:{{os.environ.get('LD_LIBRARY_PATH', '')}}"
     print(f"[NNI] 🔧 Added Conda lib to LD_LIBRARY_PATH: {{conda_lib_path}}")
 
 # Get absolute path to current directory
 current_dir = os.path.dirname(os.path.abspath(__file__))
 
 # Define search space
-search_space = {
-    'learning_rate': {'_type': 'choice', '_value': [0.001, 0.0005, 0.0001]},
-    'batch_size': {'_type': 'choice', '_value': [16, 32, 64]},
-    'optimizer': {'_type': 'choice', '_value': ['Adam']},
-}
+search_space = {{
+    'learning_rate': {{'_type': 'choice', '_value': [0.001, 0.0005, 0.0001]}},
+    'batch_size': {{'_type': 'choice', '_value': [16, 32, 64]}},
+    'optimizer': {{'_type': 'choice', '_value': ['Adam']}},
+}}
 
 # Create experiment
 experiment = Experiment('local')
@@ -212,7 +214,7 @@ experiment.config.search_space = search_space
 experiment.config.tuner.name = 'TPE'
 experiment.config.tuner.class_args = {{'optimize_mode': 'maximize'}}
 experiment.config.max_trial_number = 6
-experiment.config.trial_concurrency = 3 # Increased concurrency to 3 for faster experimentation
+experiment.config.trial_concurrency = 1 # REDUCED TO 1 TO SAVE RAM
 experiment.config.training_service.use_active_gpu = True # Enable GPU Usage
 
 # Run with error handling
@@ -334,11 +336,24 @@ lr = params.get('learning_rate', 0.001)
 batch_size = params.get('batch_size', 32)
 optimizer_name = params.get('optimizer', 'Adam')
 
-# Load data
-x_train = np.load(f'{dataset_info.get('path')}/x_train.npy')
-y_train = np.load(f'{dataset_info.get('path')}/y_train.npy')
-x_test = np.load(f'{dataset_info.get('path')}/x_test.npy')
-y_test = np.load(f'{dataset_info.get('path')}/y_test.npy')
+# Load data with MMAP to save RAM
+print("[TRIAL] 📂 Loading data (Memory Mapped)...")
+x_train = np.load(f'{dataset_info.get('path')}/x_train.npy', mmap_mode='r')
+y_train = np.load(f'{dataset_info.get('path')}/y_train.npy', mmap_mode='r')
+x_test = np.load(f'{dataset_info.get('path')}/x_test.npy', mmap_mode='r')
+y_test = np.load(f'{dataset_info.get('path')}/y_test.npy', mmap_mode='r')
+
+# --- DATASET SUBSETTING (Memory Optimization - 50%) ---
+# We take only a subset of the data to reduce RAM usage during training
+subset_ratio = 0.5
+num_samples = int(len(x_train) * subset_ratio)
+
+# Simple slicing for mmap efficiency (avoid random access on risk of thrashing if not careful, 
+# but linear slice is safe and effective for memory)
+x_train = x_train[:num_samples]
+y_train = y_train[:num_samples]
+
+print(f"[TRIAL] ✂️ Subsetting dataset: {{len(x_train)}} samples ({{subset_ratio*100}}%)")
 
 # --- DATASET FIX: Ensure One-Hot Labels (Categorical) ---
 # Check if labels are sparse (1D or 2D with last dim 1)
