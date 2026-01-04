@@ -199,11 +199,12 @@ if os.path.exists(conda_lib_path):
 current_dir = os.path.dirname(os.path.abspath(__file__))
 
 # Define search space
-search_space = {{
-    'learning_rate': {{'_type': 'choice', '_value': [0.001, 0.0005, 0.0001]}},
-    'batch_size': {{'_type': 'choice', '_value': [16, 32, 64]}},
-    'optimizer': {{'_type': 'choice', '_value': ['Adam']}},
-}}
+search_space = {
+    'learning_rate': {'_type': 'choice', '_value': [0.001, 0.0005, 0.0001]},
+    'batch_size': {'_type': 'choice', '_value': [16, 32, 64]},
+    'optimizer': {'_type': 'choice', '_value': ['Adam']},
+    'freeze_backbone': {'_type': 'choice', '_value': [True, False]}
+}
 
 # Create experiment
 experiment = Experiment('local')
@@ -213,8 +214,8 @@ experiment.config.trial_code_directory = current_dir  # Use absolute path
 experiment.config.search_space = search_space
 experiment.config.tuner.name = 'TPE'
 experiment.config.tuner.class_args = {{'optimize_mode': 'maximize'}}
-experiment.config.max_trial_number = 6
-experiment.config.trial_concurrency = 1 # REDUCED TO 1 TO SAVE RAM
+experiment.config.max_trial_number = 8
+experiment.config.trial_concurrency = 2 # REDUCED TO 1 TO SAVE RAM
 experiment.config.training_service.use_active_gpu = True # Enable GPU Usage
 
 # Run with error handling
@@ -335,6 +336,7 @@ else:
 lr = params.get('learning_rate', 0.001)
 batch_size = params.get('batch_size', 32)
 optimizer_name = params.get('optimizer', 'Adam')
+freeze_backbone = params.get('freeze_backbone', False)
 
 # Load data with MMAP to save RAM
 print("[TRIAL] 📂 Loading data (Memory Mapped)...")
@@ -382,6 +384,14 @@ if model.output_shape[-1] != num_classes:
     model = keras.Model(inputs=model.input, outputs=output)
     print(f"[TRIAL] ✓ New output shape: {{model.output_shape}}")
 
+# --- TRANSFER LEARNING: TUNABLE FREEZING ---
+if freeze_backbone:
+    print("[TRIAL] 🧊 Freezing backbone (all layers except last 5)...")
+    for layer in model.layers[:-5]:
+        layer.trainable = False
+else:
+    print("[TRIAL] 🔥 Unfrozen backbone: Model will learn on all layers.")
+
 # --- PARAMETER APPLICATION ---
 # Optimizer Selection (Adam vs SGD)
 if optimizer_name.lower() == 'sgd':
@@ -403,8 +413,21 @@ def preprocess(x, y):
     return x, y
 
 # Datasets (Removed caching of resized images to save RAM)
+# --- DATA AUGMENTATION ---
+data_augmentation = keras.Sequential([
+    keras.layers.RandomFlip("horizontal"),
+    keras.layers.RandomRotation(0.1),
+    keras.layers.RandomZoom(0.1),
+])
+
+def augment(x, y):
+    x = data_augmentation(x)
+    return x, y
+
 train_ds = tf.data.Dataset.from_tensor_slices((x_train, y_train))
-train_ds = train_ds.shuffle(1000).map(preprocess).batch(batch_size).prefetch(tf.data.AUTOTUNE)
+# Apply augment AFTER batching usually, but for tf.data it can be map. 
+# Better: Shuffle -> Batch -> Augment -> Prefetch
+train_ds = train_ds.shuffle(1000).map(preprocess).batch(batch_size).map(augment, num_parallel_calls=tf.data.AUTOTUNE).prefetch(tf.data.AUTOTUNE)
 
 val_ds = tf.data.Dataset.from_tensor_slices((x_test, y_test))
 val_ds = val_ds.map(preprocess).batch(batch_size).prefetch(tf.data.AUTOTUNE)

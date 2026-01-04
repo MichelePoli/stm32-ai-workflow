@@ -3237,7 +3237,23 @@ def optimize_hyperparameters_with_nni(state: MasterState, config: dict) -> Maste
                 logger.warning(f"STDERR:\n{result.stderr[:500]}...")
                 
         except subprocess.TimeoutExpired:
-            logger.warning("⏱️  NNI Manager timeout (likely running in background)")
+            logger.error("⏱️  NNI Manager timeout (3 hours). Force closing everything...")
+            # FORCE CLEANUP: Kill manager, trials, and NNI server
+            try:
+                # 1. Kill the specific manager process if possible (though Popen object is lost in run)
+                # 2. Use 'nnictl stop --all' to kill NNI experiments
+                logger.info("💀 Executing 'nnictl stop --all'...")
+                subprocess.run([python_path, "-m", "nni.tools.nnictl", "stop", "--all"], check=False)
+                
+                # 3. Aggressive cleanup of python processes related to 'manager.py' or 'trial.py' in this dir
+                # (Optional but safer)
+                logger.info("💀 Force killing lingering NNI processes...")
+                subprocess.run(["pkill", "-f", "nni.main"], check=False)
+                subprocess.run(["pkill", "-f", "trial.py"], check=False)
+                
+            except Exception as cleanup_err:
+                logger.error(f"⚠️ Error during cleanup: {cleanup_err}")
+                
         except Exception as exec_err:
              logger.error(f"❌ Errore durante esecuzione manager: {exec_err}")
              
