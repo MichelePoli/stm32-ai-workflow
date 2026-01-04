@@ -200,10 +200,10 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 
 # Define search space
 search_space = {
-    'learning_rate': {'_type': 'choice', '_value': [0.001, 0.0005, 0.0001]},
-    'batch_size': {'_type': 'choice', '_value': [16, 32, 64]},
-    'optimizer': {'_type': 'choice', '_value': ['Adam']},
-    'freeze_backbone': {'_type': 'choice', '_value': [True, False]}
+    'learning_rate': {{'_type': 'choice', '_value': [0.001, 0.0005, 0.0001]}},
+    'batch_size': {{'_type': 'choice', '_value': [16, 32, 64]}},
+    'optimizer': {{'_type': 'choice', '_value': ['Adam']}},
+    'freeze_backbone': {{'_type': 'choice', '_value': [True, False]}}
 }
 
 # Create experiment
