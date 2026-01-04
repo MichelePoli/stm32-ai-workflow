@@ -278,10 +278,9 @@ except Exception as e:
     traceback.print_exc()
 
 finally:
-    # Keep server alive for debugging
-    print("\\n[NNI] 🛑 Experiment flow finished.")
-    print("[NNI] Press Enter to stop the NNI Web UI and exit...")
-    input()
+    # Stop experiment and exit
+    print("\\n[NNI] 🛑 Experiment flow finished. Stopping NNI...")
+    experiment.stop()
 ```
 
 
