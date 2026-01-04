@@ -1,10 +1,10 @@
 ST Edge AI Core v2.2.0-20266 2adc00962
-Created date          : 2026-01-04 16:11:44
-Parameters            : validate --model /mnt/shared-storage/mrusso/Langgraph_General_v7_subnodes/nni_experiments/exp_20260104_160026/best_model.h5 --target stm32f4 --output ./analisiAI/network_validate_report.txt
+Created date          : 2026-01-04 20:29:58
+Parameters            : validate --model /mnt/shared-storage/mrusso/Langgraph_General_v7_subnodes/nni_experiments/exp_20260104_200307/best_model.h5 --target stm32f4 --output ./analisiAI/network_validate_report.txt
 
 Exec/report summary (validate)
 ------------------------------------------------------------------------------------------------------------------------------------
-model file         :   /mnt/shared-storage/mrusso/Langgraph_General_v7_subnodes/nni_experiments/exp_20260104_160026/best_model.h5   
+model file         :   /mnt/shared-storage/mrusso/Langgraph_General_v7_subnodes/nni_experiments/exp_20260104_200307/best_model.h5   
 type               :   keras                                                                                                        
 c_name             :   network                                                                                                      
 compression        :   lossless                                                                                                     
@@ -15,7 +15,7 @@ workspace dir      :   /mnt/shared-storage/mrusso/Langgraph_General_v7_subnodes/
 output dir         :   /mnt/shared-storage/mrusso/Langgraph_General_v7_subnodes/analisiAI/network_validate_report.txt               
 model_fmt          :   float                                                                                                        
 model_name         :   best_model                                                                                                   
-model_hash         :   0xe188d07e6155ea9e7935123c5e73e3fc                                                                           
+model_hash         :   0x0c10d490e379825ce4518ad91e070202                                                                           
 params #           :   2,236,682 items (8.53 MiB)                                                                                   
 ------------------------------------------------------------------------------------------------------------------------------------
 input 1/1          :   'input_1', f32(1x224x224x3), 588.00 KBytes, activations                                                      
@@ -1092,8 +1092,8 @@ Running the ST.AI c-model (AI RUNNER)...(name=network, mode=HOST)
   activations         :   4917696                                                 
   weights             :   8878504                                                 
   macc                :   312014976                                               
-  hash                :   0xe188d07e6155ea9e7935123c5e73e3fc                      
-  compile_datetime    :   Jan  4 2026 16:11:37                                    
+  hash                :   0x0c10d490e379825ce4518ad91e070202                      
+  compile_datetime    :   Jan  4 2026 20:29:51                                    
   --------------------------------------------------------------------------------
   protocol            :   DLL Driver v2.0 - Direct Python binding                 
   tools               :   ST.AI (legacy api) v2.2.0                               
@@ -1108,7 +1108,7 @@ Running the ST.AI c-model (AI RUNNER)...(name=network, mode=HOST)
   ST.AI Profiling results v2.0 - "network"
   ------------------------------------------------------------------
   nb sample(s)   :   10                                             
-  duration       :   172.881 ms by sample (172.354/173.988/0.532)   
+  duration       :   174.267 ms by sample (173.863/175.356/0.427)   
   macc           :   312014976                                      
   ------------------------------------------------------------------
   
@@ -1117,14 +1117,14 @@ Running the ST.AI c-model (AI RUNNER)...(name=network, mode=HOST)
   tensor   #    type[shape]:size              min     max     mean      std  name       
   --------------------------------------------------------------------------------------
   I.0      10   f32[1,224,224,3]:602112     0.000   1.000    0.500    0.289  input_1    
-  O.0      10   f32[1,1,1,10]:40            0.000   0.853    0.100    0.234  output_1   
+  O.0      10   f32[1,1,1,10]:40            0.000   0.538    0.100    0.179  output_1   
   --------------------------------------------------------------------------------------
  
 Saving validation data...
  output directory: /mnt/shared-storage/mrusso/Langgraph_General_v7_subnodes/analisiAI/network_validate_report.txt
  creating /mnt/shared-storage/mrusso/Langgraph_General_v7_subnodes/analisiAI/network_validate_report.txt/network_val_io.npz
- m_outputs_1: (10, 10)/float32, min/max=[0.000000, 0.853117], mean/std=[0.100000, 0.233668], adaptive
- c_outputs_1: (10, 1, 1, 10)/float32, min/max=[0.000000, 0.853115], mean/std=[0.100000, 0.233668], adaptive
+ m_outputs_1: (10, 10)/float32, min/max=[0.000114, 0.537682], mean/std=[0.100000, 0.178841], adaptive
+ c_outputs_1: (10, 1, 1, 10)/float32, min/max=[0.000114, 0.537684], mean/std=[0.100000, 0.178841], adaptive
 
  
 Computing the metrics...
@@ -1134,15 +1134,15 @@ Computing the metrics...
  notes: - the output of the reference model is used as ground truth/reference value
         - 10 samples (10 items per sample)
 
-  acc=100.00% rmse=0.000000996 mae=0.000000482 l2r=0.000003919 mean=0.000000 std=0.000001 nse=1.000000 cos=1.000000 
+  acc=100.00% rmse=0.000000630 mae=0.000000290 l2r=0.000003073 mean=0.000000 std=0.000001 nse=1.000000 cos=1.000000 
  
   Confusion matrix (axis=-1) - 10 classes (10 samples)
   ----------------------------------------------------------
   C0        0    .    .    .    .    .    .    .    .    .  
   C1        .    0    .    .    .    .    .    .    .    .  
   C2        .    .    0    .    .    .    .    .    .    .  
-  C3        .    .    .    0    .    .    .    .    .    .  
-  C4        .    .    .    .   10    .    .    .    .    .  
+  C3        .    .    .   10    .    .    .    .    .    .  
+  C4        .    .    .    .    0    .    .    .    .    .  
   C5        .    .    .    .    .    0    .    .    .    .  
   C6        .    .    .    .    .    .    0    .    .    .  
   C7        .    .    .    .    .    .    .    0    .    .  
@@ -1271,20 +1271,20 @@ m_id   name                            c_macc                    c_rom          
 2      bn_Conv1                        |||||||||          3.5%   |                  0.0%   [0]          3.1%                      
 3      Conv1_relu                      |                  0.3%   |                  0.0%   [1]          0.1%                      
 5      expanded_conv_depthwise_BN      |||                1.2%   |                  0.0%   [2]          1.4%                      
-6      expanded_conv_depthwise_relu    |                  0.3%   |                  0.0%   [3]          0.1%                      
+6      expanded_conv_depthwise_relu    |                  0.3%   |                  0.0%   [3]          0.3%                      
 8      expanded_conv_project_BN        |||||              2.1%   |                  0.0%   [4]          1.4%                      
 10     block_1_expand_BN               |||||||||||||||    6.2%   |                  0.1%   [5]          4.4%                      
-11     block_1_expand_relu             ||                 0.8%   |                  0.0%   [6]          0.5%                      
+11     block_1_expand_relu             ||                 0.8%   |                  0.0%   [6]          1.1%                      
 12     block_1_pad                     |||                0.9%   |                  0.0%   [7]          1.0%                      
 15     block_1_depthwise_relu          |                  0.2%   |                  0.0%   [8]          0.0%                      
 17     block_1_project_BN              ||||||             2.3%   |                  0.1%   [9]          2.0%                      
-19     block_2_expand_BN               |||||||||          3.5%   |                  0.2%   [10]         2.7%                      
+19     block_2_expand_BN               |||||||||          3.5%   |                  0.2%   [10]         2.6%                      
 20     block_2_expand_relu             |                  0.3%   |                  0.0%   [11]         0.0%                      
 22     block_2_depthwise_BN            ||||               1.3%   |                  0.1%   [12]         1.5%                      
 23     block_2_depthwise_relu          |                  0.3%   |                  0.0%   [13]         0.0%                      
-25     block_2_project_BN              |||||||||          3.5%   |                  0.2%   [14]         3.2%                      
+25     block_2_project_BN              |||||||||          3.5%   |                  0.2%   [14]         3.1%                      
 26     block_2_add                     |                  0.0%   |                  0.0%   [15]         0.0%                      
-28     block_3_expand_BN               |||||||||          3.5%   |                  0.2%   [16]         2.7%                      
+28     block_3_expand_BN               |||||||||          3.5%   |                  0.2%   [16]         2.6%                      
 29     block_3_expand_relu             |                  0.3%   |                  0.0%   [17]         0.0%                      
 30     block_3_pad                     |                  0.3%   |                  0.1%   [18]         0.4%                      
 33     block_3_depthwise_relu          |                  0.1%   |                  0.0%   [19]         0.0%                      
@@ -1310,19 +1310,19 @@ m_id   name                            c_macc                    c_rom          
 65     block_7_expand_relu             |                  0.0%   |                  0.0%   [39]         0.0%                      
 67     block_7_depthwise_BN            |                  0.2%   |                  0.2%   [40]         0.2%                      
 68     block_7_depthwise_relu          |                  0.0%   |                  0.0%   [41]         0.0%                      
-70     block_7_project_BN              ||||               1.5%   |                  1.1%   [42]         2.0%                      
+70     block_7_project_BN              ||||               1.5%   |                  1.1%   [42]         1.9%                      
 71     block_7_add                     |                  0.0%   |                  0.0%   [43]         0.0%                      
 73     block_8_expand_BN               ||||               1.5%   |                  1.1%   [44]         1.3%                      
 74     block_8_expand_relu             |                  0.0%   |                  0.0%   [45]         0.0%                      
 76     block_8_depthwise_BN            |                  0.2%   |                  0.2%   [46]         0.2%                      
 77     block_8_depthwise_relu          |                  0.0%   |                  0.0%   [47]         0.0%                      
-79     block_8_project_BN              ||||               1.5%   |                  1.1%   [48]         2.0%                      
+79     block_8_project_BN              ||||               1.5%   |                  1.1%   [48]         1.9%                      
 80     block_8_add                     |                  0.0%   |                  0.0%   [49]         0.0%                      
 82     block_9_expand_BN               ||||               1.5%   |                  1.1%   [50]         1.3%                      
 83     block_9_expand_relu             |                  0.0%   |                  0.0%   [51]         0.0%                      
 85     block_9_depthwise_BN            |                  0.2%   |                  0.2%   [52]         0.2%                      
 86     block_9_depthwise_relu          |                  0.0%   |                  0.0%   [53]         0.0%                      
-88     block_9_project_BN              ||||               1.5%   |                  1.1%   [54]         2.0%                      
+88     block_9_project_BN              ||||               1.5%   |                  1.1%   [54]         1.9%                      
 89     block_9_add                     |                  0.0%   |                  0.0%   [55]         0.0%                      
 91     block_10_expand_BN              ||||               1.5%   |                  1.1%   [56]         1.3%                      
 92     block_10_expand_relu            |                  0.0%   |                  0.0%   [57]         0.0%                      
@@ -1345,7 +1345,7 @@ m_id   name                            c_macc                    c_rom          
 118    block_13_expand_relu            |                  0.1%   |                  0.0%   [74]         0.0%                      
 119    block_13_pad                    |                  0.1%   |                  0.3%   [75]         0.1%                      
 122    block_13_depthwise_relu         |                  0.0%   |                  0.0%   [76]         0.0%                      
-124    block_13_project_BN             ||||               1.4%   ||||               4.2%   [77]         2.0%                      
+124    block_13_project_BN             ||||               1.4%   ||||               4.2%   [77]         1.9%                      
 126    block_14_expand_BN              ||||||             2.4%   ||||||             7.0%   [78]         2.4%                      
 127    block_14_expand_relu            |                  0.0%   |                  0.0%   [79]         0.0%                      
 129    block_14_depthwise_BN           |                  0.1%   |                  0.4%   [80]         0.1%                      
@@ -1354,7 +1354,7 @@ m_id   name                            c_macc                    c_rom          
 133    block_14_add                    |                  0.0%   |                  0.0%   [83]         0.0%                      
 135    block_15_expand_BN              ||||||             2.4%   ||||||             7.0%   [84]         2.4%                      
 136    block_15_expand_relu            |                  0.0%   |                  0.0%   [85]         0.0%                      
-138    block_15_depthwise_BN           |                  0.1%   |                  0.4%   [86]         0.2%                      
+138    block_15_depthwise_BN           |                  0.1%   |                  0.4%   [86]         0.1%                      
 139    block_15_depthwise_relu         |                  0.0%   |                  0.0%   [87]         0.0%                      
 141    block_15_project_BN             ||||||             2.4%   ||||||             6.9%   [88]         3.4%                      
 142    block_15_add                    |                  0.0%   |                  0.0%   [89]         0.0%                      
@@ -1362,11 +1362,11 @@ m_id   name                            c_macc                    c_rom          
 145    block_16_expand_relu            |                  0.0%   |                  0.0%   [91]         0.0%                      
 147    block_16_depthwise_BN           |                  0.1%   |                  0.4%   [92]         0.1%                      
 148    block_16_depthwise_relu         |                  0.0%   |                  0.0%   [93]         0.0%                      
-150    block_16_project_BN             ||||||||||||       4.8%   ||||||||||||      13.9%   [94]         6.8%                      
-152    Conv_1_bn                       ||||||||||||||||   6.4%   ||||||||||||||||  18.5%   [95]         8.1%                      
+150    block_16_project_BN             ||||||||||||       4.8%   ||||||||||||      13.9%   [94]         6.7%                      
+152    Conv_1_bn                       ||||||||||||||||   6.4%   ||||||||||||||||  18.5%   [95]         8.0%                      
 153    out_relu                        |                  0.0%   |                  0.0%   [96]         0.0%                      
 154    global_average_pooling2d_pool   |                  0.0%   |                  0.0%   [97]         0.0%                      
-156    adaptive_output_dense           |                  0.0%   |                  0.6%   [98, 99]     0.0%   3.91911271e-06 *   
+156    adaptive_output_dense           |                  0.0%   |                  0.6%   [98, 99]     0.0%   3.07251639e-06 *   
 ------ ------------------------------- ------------------------- ------------------------- ---------- -------- ------------------ 
 macc=312,014,976 weights=8,878,504 act=4,917,696 ram_io=0
 
@@ -1374,7 +1374,7 @@ Evaluation report (summary)
 ------------------------------------------------------------------------------------------------------------------------------------------------------
 Output       acc       rmse          mae           l2r           mean       std        nse        cos        tensor                                   
 ------------------------------------------------------------------------------------------------------------------------------------------------------
-X-cross #1   100.00%   0.000000996   0.000000482   0.000003919   0.000000   0.000001   1.000000   1.000000   'adaptive', 10 x f32(1x10), m_id=[156]   
+X-cross #1   100.00%   0.000000630   0.000000290   0.000003073   0.000000   0.000001   1.000000   1.000000   'adaptive', 10 x f32(1x10), m_id=[156]   
 ------------------------------------------------------------------------------------------------------------------------------------------------------
 
  acc  : Accuracy (class, axis=-1)
