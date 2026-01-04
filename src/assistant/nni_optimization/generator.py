@@ -255,16 +255,28 @@ try:
     # DEBUG: Inspect structure
     print(f"   • Raw hyperParameters type: {{type(best_trial.hyperParameters)}}")
     print(f"   • Raw hyperParameters value: {{best_trial.hyperParameters}}")
+    sys.stdout.flush()
+    # le print di debug appariranno subito.
 
-    # Handle hyperParameters structure (can be list or dict depending on NNI version)
+
+    # Handle hyperParameters structure
     hp = best_trial.hyperParameters
+    
+    # 1. If list, take the latest one
     if isinstance(hp, list):
-         # If list, usually takes the last one or index 0? Error said "list indices must be integers"
-         # implying we tried list['parameters'].
-         # We will try the last element if it's a list
-         best_params = hp[-1]['parameters']
+         latest_hp = hp[-1]
     else:
-         best_params = hp['parameters']
+         latest_hp = hp
+         
+    # 2. Extract 'parameters' dict (handle Object vs Dict)
+    if hasattr(latest_hp, 'parameters'):
+        best_params = latest_hp.parameters
+    elif isinstance(latest_hp, dict):
+        best_params = latest_hp['parameters']
+    else:
+        # Fallback: assume latest_hp IS the params dict (very old NNI?)
+        print(f"[NNI] Warning: Unknown HP structure. Type: {{type(latest_hp)}}")
+        best_params = latest_hp
     print(f"   • Best Params: {{best_params}}")
     
     print("\\n[NNI] 💾 Retraining best model for saving...")
