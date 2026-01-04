@@ -214,7 +214,7 @@ experiment.config.trial_code_directory = current_dir  # Use absolute path
 experiment.config.search_space = search_space
 experiment.config.tuner.name = 'TPE'
 experiment.config.tuner.class_args = {{'optimize_mode': 'maximize'}}
-experiment.config.max_trial_number = 8
+experiment.config.max_trial_number = 2 # REDUCED TO 2 FOR TESTING, usually 8 
 experiment.config.trial_concurrency = 2 # REDUCED TO 1 TO SAVE RAM
 experiment.config.training_service.use_active_gpu = True # Enable GPU Usage
 
