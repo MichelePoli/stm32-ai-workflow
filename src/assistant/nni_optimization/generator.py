@@ -252,7 +252,19 @@ try:
     # data is usually a string, convert to float
     best_trial = max(valid_trials, key=lambda t: float(t.finalMetricData[0].data))
     
-    best_params = best_trial.hyperParameters['parameters']
+    # DEBUG: Inspect structure
+    print(f"   • Raw hyperParameters type: {{type(best_trial.hyperParameters)}}")
+    print(f"   • Raw hyperParameters value: {{best_trial.hyperParameters}}")
+
+    # Handle hyperParameters structure (can be list or dict depending on NNI version)
+    hp = best_trial.hyperParameters
+    if isinstance(hp, list):
+         # If list, usually takes the last one or index 0? Error said "list indices must be integers"
+         # implying we tried list['parameters'].
+         # We will try the last element if it's a list
+         best_params = hp[-1]['parameters']
+    else:
+         best_params = hp['parameters']
     print(f"   • Best Params: {{best_params}}")
     
     print("\\n[NNI] 💾 Retraining best model for saving...")
