@@ -1,0 +1,196 @@
+\documentclass[12pt,a4paper,twoside,openright,english,tipotesi=magistrale]{toptesi} 
+%\setcounter{secnumdepth}{3}
+\usepackage[a-1b]{pdfx}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}	%Font di compilazione
+\usepackage{lmodern}		%Font non bitmapped
+\usepackage[pdfa]{hyperref}
+\hypersetup{%
+	pdfpagemode={UseOutlines},
+	bookmarksopen,
+	pdfstartview={FitH}, 
+	colorlinks,
+	linkcolor={black},
+	citecolor={black},
+	urlcolor={black}
+}
+
+%bibliography
+\usepackage{csquotes}
+\usepackage[backend=biber,style=numeric,sorting=none,urldate=long]{biblatex}
+%\usepackage[backend=biber, sorting=none, autocite=inline]{biblatex}
+\addbibresource{bibliography.bib}
+%\addbibresource{./chap1/bibliography.bib}
+%\addbibresource{./chap2/bibliography.bib}
+%\addbibresource{./chap3/bibliography.bib}
+%\addbibresource{./chap4/bibliography.bib}
+%\addbibresource{./chap5/bibliography.bib}
+
+\usepackage{paralist} %for lists
+\usepackage{verbatim} %textit
+\usepackage{xspace} %Spaziature
+\usepackage{booktabs}               %  beautiful tables
+\usepackage[section]{placeins} %Immagini all'interno della sezione in cui sono dichiarate
+%\usepackage{graphicx}
+\usepackage{subfigure}
+\usepackage{listings}
+\lstset{escapeinside={(*@}{@*)}}
+\usepackage{color}
+\usepackage{rotating}
+
+\usepackage{enumitem}
+\usepackage{siunitx}
+\usepackage{longtable}
+\usepackage{caption}
+\lstset{
+  basicstyle=\ttfamily\small,
+  frame = single,
+  mathescape
+}
+
+\usepackage{pgfplots} %bar chart
+\pgfplotsset{compat=1.15}
+\usepackage{tikz} %bar chart
+\usetikzlibrary{spy} %zoom
+% Define bar chart colors
+%
+\definecolor{lightcyan}{rgb}{0.88, 1.0, 1.0}
+\definecolor{bblue}{HTML}{4F81BD}
+\definecolor{rred}{HTML}{C0504D}
+\definecolor{ggreen}{HTML}{9BBB59}
+\definecolor{ppurple}{HTML}{9F4C7C}
+
+\lstdefinestyle{C++Style}{
+				language=C++,
+				numbers=left,
+%				xleftmargin=1cm, 
+%				xrightmargin=1cm,
+%				framexleftmargin=30pt,
+				basicstyle=\ttfamily\scriptsize,
+                frame=tb,
+                captionpos=b,
+                keywordstyle=\color{blue}\ttfamily,
+                stringstyle=\color{red}\ttfamily,
+                commentstyle=\color{green}\ttfamily,
+                morecomment=[l][\color{magenta}]{\#},
+                aboveskip=20pt,
+                belowskip=20pt
+}
+
+\lstdefinestyle{C++StyleTiny}{
+				language=C++,
+				numbers=left,
+%				xleftmargin=1cm, 
+%				xrightmargin=1cm,
+%				framexleftmargin=30pt,
+				basicstyle=\ttfamily\tiny,
+                frame=tb,
+                captionpos=b,
+                keywordstyle=\color{blue}\ttfamily,
+                stringstyle=\color{red}\ttfamily,
+                commentstyle=\color{green}\ttfamily,
+                morecomment=[l][\color{magenta}]{\#},
+                aboveskip=20pt,
+                belowskip=20pt
+}
+
+\lstdefinestyle{pseudoCode}{
+				language=Matlab,
+				numbers=left,
+%				xleftmargin=1cm, 
+%				xrightmargin=1cm,
+%				framexleftmargin=30pt,
+				basicstyle=\scriptsize,
+                frame=tb,
+                captionpos=b,
+                keywordstyle=\color{blue}\ttfamily,
+                stringstyle=\color{red}\ttfamily,
+                commentstyle=\color{green}\ttfamily,
+                morecomment=[l][\color{magenta}]{\#},
+                aboveskip=20pt,
+                belowskip=20pt
+}
+
+\newenvironment{itemize*}{
+\begin{itemize}
+  \setlength{\itemsep}{1pt}
+  \setlength{\parskip}{0pt}
+  \setlength{\parsep}{0pt}
+}{\end{itemize}}
+
+\newenvironment{itemizeT}{
+\vspace{-1.7mm}
+\begin{itemize}
+  \setlength{\itemsep}{0pt}
+  \setlength{\parskip}{0pt}
+  \setlength{\parsep}{0pt}
+}{\end{itemize}}
+
+%math
+\newcommand*{\mathfont}{\fontfamily{pcr}\selectfont}
+\usepackage{amsmath}
+\usepackage{amsfonts}               %  Pacchetto speciale per i font matematici AMS
+\usepackage{amssymb}                %  Pacchetto speciale per i simboli matematici AMS
+\usepackage{mathtools}
+\usepackage{nicefrac}
+
+%%%%%%commands
+\newcommand*\equationame{Equation\xspace}	%Comando per figure
+\newcommand*\sw{S-W\xspace}	%Comando per nedelman Smith Waterman
+\newcommand*\nw{N-W\xspace}	%Comando per nedelman Needleman Wunsch
+\newcommand*\nt{nt\xspace}	%Comando per nucleotides
+\newcommand*\amino{aa\xspace}	%Comando per amino acids
+\newcommand*\dgsnw{DGS\_N-W\xspace}	%Comando per dgs-NW
+\newcommand*\dgssw{DGS\_S-W\xspace}	%Comando per dgs-SW
+\newcommand*\dgs{DGS\xspace}	%Comando per dgs
+\newcommand*\seqan{SeqAn\xspace}
+\newcommand*{\tcoffee}{T-Coffee\xspace}
+\newcommand*{\balibase}{BAliBASE\xspace}
+\newcommand*{\bralibase}{BRAliBase\xspace}
+\newcommand*{\sabmark}{SABmark\xspace}
+\newcommand*{\sabre}{SABRE\xspace}
+\newcommand*{\alibench}{aliBench\xspace}
+\newcommand*{\alex}{AlEx\xspace}
+\newcommand*{\gra}{\textbf}
+\newcommand*{\crct}{\color{black}}
+\newcommand*{\mmd}{\color{ppurple}}
+%\newcommand*{\addheight}[2][.5ex]{%
+%  \raisebox{0pt}[\dimexpr\height+(#1)\relax]{#2}%
+%}
+
+
+\begin{document}
+\include{header}
+
+\selectlanguage{english}
+\frontmatter
+\input{abstract3.tex}
+%Indice
+\tableofcontents
+\listoffigures
+\listoftables
+ 
+ 
+% Scaletta tesi
+
+%\input{thesis_structure}
+ 
+%Corpo della tesi
+\mainmatter  
+\input{./chap1/introduction.tex}
+\input{./chap2/background.tex}
+\input{./chap3/work.tex}
+\input{./chap4/results.tex}
+\input{./chap5/conclusion.tex}
+
+%\addcontentsline{toc}{chapter}{\bibname} %print the index
+
+%Eventualiappendici
+
+%\input{./appendix.tex}
+
+\input{./acknowledgments.tex}
+
+\printbibliography[heading=bibintoc]
+
+\end{document}

@@ -1,0 +1,50 @@
+\chapter{Introduction}
+
+The electronics market has been recently revolutionized with the massive manufacturing of the so-called Micro-Electro-Mechanical Systems (MEMS): micro-scale devices, with moving parts, that can be manufactured using some of the typical fabrication processes for Integrated Circuits (IC). 
+Possible applications of these devices include a great number of different sensors, like Inertial Measurement Units (IMU), composed of accelerometers, gyroscope and magnetometer. 
+Thanks to their already available assembly lines, silicon foundries started to produce these devices, making them small, easy to integrate, highly available and, most importantly, low cost. 
+
+In particular, small and low-cost are two important keywords when talking about Internet of Things (IoT). 
+IoT is a term used to describe those objects composed of sensors, processing abilities, software and technologies for data transmission. Usually, their goal is fetching data from the environment using sensors, process that information and send it (raw or elaborated) to other devices, over the Internet or by custom connections. 
+These devices are pretty easy to be found nowadays: lots of people have a smartwatch on their wrist, constantly fetching data about their physical activity and making users aware of their results via a smartphone application. Even homes are starting to be more IoT-friendly, with security cameras, alarm systems and thermostats that are connected to the Internet. As they are getting always smaller and cheaper, more and more people are buying them to make their lives easier.
+%Smart cities?
+Another important field in which IoT is getting success is Industry 4.0: this word is used to group all the technological shifts that are interesting the industry domain in these days, including interconnection between different machines or assembly lines and smart automation. Also in this case the role of low-cost sensing and connected devices is important: different conditions during the manufacturing process can be easily monitored (sensors), fetched (interconnection) and elaborated, in order to understand how the processes currently used is working, if there is any improvement to be done, and eventually apply these changes automatically (smart automation).  
+Figure \ref{fig:typical-IoT} reports an example of a configuration in which multiple IoT devices are used. Two nodes, represented in orange, are connected via a low-range transmission protocol (in this case Bluetooth) to an hub that can receive data from multiple devices. Then, the hub is responsible to encapsulate them and send them over WiFi to a centralized server. Another node, in green, overcomes the need of an intermediary and is capable of sending all the data via Internet. The centralized server is then used to receive all the data, perform elaboration on them, and generate some outputs that the final user can see on a website or on a smartphone application.   
+
+     \begin{figure}[ht!]
+        \centering
+        \includegraphics[width=0.75\textwidth]{chap1/figure/IoT typical.png}
+        \caption{A configuration example for commercial IoT nodes}
+        \label{fig:typical-IoT}
+    \end{figure}
+
+To sum it up, IoT requires a great number of sensors, and MEMS technologies can produce them easily and in a cheap way: their development is proceeding hand-in-hand, and nowadays different vendors, including ST Microelectronics and Bosch, have their own lines of micro sensors that can be implemented in a lot of applications. To improve their devices, they also embed functionalities other than the mere sensing ones, inside these MEMS: for example, some recent IMU devices from ST offer programmable Finite State Machines (FSM), that can generate interrupts when a particular condition is met. In this way, the microcontroller has less lines of code to execute, and doesn't have to continuously poll the sensor, with consequent energy savings. \\
+\\
+For this thesis, I worked on some off-the-shelf boards that include different sensors. Some of them are evaluation boards, on which developers can deploy their firmware and verify if the available hardware is good for their goals. It's the case for the devices from ST Microelectronics, the SensorTile.box and the BlueTile. Other ones are ready-to-use solutions for motion and environmental data analysis: MetaMotionS boards from MBIENTLAB include all the hardware and the software for this scope. 
+
+These boards include different sensors:
+\begin{itemize}
+    \item Environmental sensors: temperature, pressure, humidity and light sensors.
+    \item IMU sensors: accelerometer, gyroscope, magnetometer.
+    \item Microphone for audio data analysis (Fast Fourier Transform FFT) or transmission.
+\end{itemize}
+ST boards embed MEMS sensors from their own lineup, while MetaMotionS ones are primarily from Bosch.   
+
+Of course, cheapness and reduced dimensions have their own costs: the signal coming from the sensors is not high-precision, a lot of noise is present and output values are subject to bias. Better performing solutions are available, but only at much higher prices, they require more space and, last but not least important, more power. They also can't be wireless and battery-operated, that are the most important points of the above mentioned sensors boards.   
+
+My main goal has been working with these kind of sensors, trying to get the best out of them. In particular, I set up a data acquisition system in which multiple sensor boards, from different vendors, can be connected: in this way, it is possible to join the different information from the different sensors to get more accurate information. For example, sensors can be all placed on the same spot, to capture data on the same event happening on the same place, and signals can be compared to get rid of noise and bias. Another possibility is to place them on independent spots, capturing data of different nature. Then, with the help of Machine Learning algorithms, the fetched data can be joined to easily recognize different events: for example, putting sensors on more parts of the human body can help motion detection algorithms to return more accurate results. An example is reported in chapter 2.7.\\
+\\
+Good part of the work has been the design of a mechanism to keep results synchronized over time. Each sensor board includes its own clock, subject to drift and offset: it is important that, in the final result, each sample is tagged with the moment of acquisition with the greatest precision possible, but more importantly that the timestamps obtained from the different devices are aligned as best as possible. In this way, the above mentioned sensor fusion algorithms can work correctly and produce coherent results. 
+
+As I have been working with low-cost IoT devices, with a very limited computational power, it is important that even this synchronization mechanism is low-cost and easy to implement: a good solution would be a trade-off between precision and complexity. Also the limitations of the Bluetooth Low Energy (BLE) protocol, used by all the considered boards, are taken into consideration. \\
+\\
+The obtained result from this work is a system of 7 sensor boards, connected via BLE to a single client (a Linux computer). The client is responsible of collecting all the data coming from the nodes, synchronize them over time and elaborate them to be further analyzed by other software solutions (like MATLAB) or algorithms (like sensor fusion ones). I tried to keep the time synchronization accuracy under 100~ms. \\
+\\
+The system has been tested in different experiments: the first one has been carried out to understand the best data rate at which the boards can output data using Bluetooth Low Energy, to find an acceptable trade-off between the percentage of lost packets and the frequency at which data packets are generated. In this case, multiple situations have been tested, using different numbers of sensor boards and Bluetooth adapters. 
+The second experiment, instead, had the goal of understanding how good the developed time synchronization is. In this case, all the devices streamed data for 15 minutes and, at the end, I gave them an acceleration on the Z-axis by making them fall (on a soft surface). Then, the delays between the accelerometer values are analyzed and discussed.
+The last experiment consisted of installing all sensors inside a car, collecting all the data from the sensors during a driving session. This was the most extensive test, and the system worked as expected.
+Some other simpler test have been performed during the development, including ones to verify the accuracy of the FFT, ones to test the audio streaming and ones to verify the direction of the axis for all the sensor boards.\\
+\\
+To make the data acquisition campaign on the car, I also developed a calibration algorithm that is capable of aligning the sensor reference system to the vehicle reference system. In this way, even if sensors are not correctly aligned during the installation (as in our case), automation correction can be performed. Applying this algorithm to the data coming from the car experiment resulted in a correct rotation of the axes. \\  
+\\
+Possible applications of the developed system include human activity recognition for the electronics mass-market, and predictive maintenance for the industry. In my case, I explored the automotive domain during the last test: the resulting samples can then be labeled, and eventually a machine learning algorithm would be able to recognize in real time the different driving conditions (road bumps, left/right turns, and so on).   

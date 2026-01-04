@@ -1,0 +1,31 @@
+\chapter{Materials and methods}
+After analyzing some previous works on the topic and taking a look at the hardware at disposal, in this chapter, I present the work I carried out to develop the final system, composed of all the sensors streaming data synchronized in time. In particular, the focus is on:
+\begin{itemize}
+    \item Firmware development for the ST sensor nodes
+    \item Python client development for the computer hub
+    \item MATLAB script development for data processing
+\end{itemize}
+Figure \ref{fig:system-block-diag} is a block diagram to represent the entire system I developed. Each device, represented by a coloured rectangle, is shown with the software/firmware components built for it. Figure \ref{fig:system-flow} is another block diagram, that represents (in an higher abstraction level) the flow of operation of the system. Sensor boards can recognize motion, temperature, pressure and other data, and send them via BLE to a Linux Computer acting as the client. On the client, a Python script is responsible of fetching data while keeping data synchronized in time, while some MATLAB scripts can reorganize all the data, represent and analyze them. 
+
+The chapter contains the implementation details of the solution, and the tools used for the process are reported at the end of it .
+
+    \begin{figure}[ht!]
+        \centering
+        \includegraphics[width=0.85\textwidth]{chap3/figure/System_Diagram(1).png}
+        \caption{Block diagram representing the developed system.}
+        \label{fig:system-block-diag}
+    \end{figure}
+
+    \begin{figure}[ht!]
+        \centering
+        \includegraphics[width=0.85\textwidth]{chap3/figure/flow.png}
+        \caption{Block diagram representing the flow of operation of the system.}
+        \label{fig:system-flow}
+    \end{figure}
+
+\input{chap3/sections/firmware.tex}
+\input{chap3/sections/timesync.tex}
+\input{chap3/sections/clients.tex}
+\input{chap3/sections/matlab.tex}
+\input{chap3/sections/calibration.tex}
+\input{chap3/sections/tools.tex}

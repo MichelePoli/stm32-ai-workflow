@@ -1,0 +1,26 @@
+\chapter*{Abstract}
+
+Nowadays, Internet of Things (IoT) hardware and technologies are getting more and more importance in our everyday lives: these small, low-cost devices, composed of sensors and wireless data transmitter, are gaining popularity. 
+Despite all of this, these systems present some drawbacks and developers are forced to find compromises between measurement accuracy, battery duration and system costs, trying to optimize all these variables for deploying amazing smart applications. 
+
+Sensor fusion is one of the emerging techniques for analysing heterogeneous data coming from different sensors, for elaborating information to be exploited in several IoT applications. 
+However, for the correct implementation of sensor fusion models, synchronization of the heterogeneous signals is a must. 
+The literature presents some works on clock alignment, but those are intended for systems based on the same HW platform, require optimization of low-level connection layers (not available to developers in most cases), and are not always thought for wireless transmission. 
+Hence, even if the presented results are promising, those methods can’t be easily applied to heterogeneous, mass-produced devices. 
+
+In this thesis I present the system developed to synchronize the wireless-based acquisition of signals from four different sensor boards from ST Microelectronics and three from MBIENTLAB.
+I also explored the possibility to use the embedded microphones and the consequent audio data to synchronize and label data, finding valid ways to stream sound and implement Fast Fourier Transform (FFT) on the microcontrollers. 
+I gave particular attention in getting the most out of the Bluetooth Low Energy protocol (BLE): it is a good solution from the energy-efficiency and compatibility points of view, but at the same time some optimization is necessary to keep a good throughput and maintain an efficient bi-directional connection. 
+Finally, I developed time synchronization on the application layer of the BLE stack: it consists in the periodic exchange of timestamped packets between the client and the sensors. 
+The client is then aware of the internal timestamp of the sensors in those re-synchronization moments, and can tag the samples with the precise moment in time they are acquired. 
+The goals are 
+a) development of firmware for the open-source ST devices, with a personalized time synchronization mechanism, 
+b) design of clients for all the devices, formatting data in a consistent way and 
+c) writing of MATLAB scripts to join together the resulting data. 
+
+The developed system behaves as expected in the experiments that have been carried out. 
+I made initial tests to determine the best sample rate for the sensors, to guarantee the correct transmission through the BLE channel and to keep the packet loss/received ratio lower than 1\%, which is 75~Hz. 
+Then, I verified the behaviour of the time synchronization after 15 minutes of data streaming, showing a precision of around 70~ms, while the same setup without synchronization presents samples with delays of more than 1s. 
+Finally, I performed an extensive test by installing the sensors in a car and collecting data in that environment, with the help of a camera and GPS devices. 
+In this case, data have been labelled using sounds at predefined frequencies and elaborated at the node level. A calibration algorithm has been developed to rotate the sensor reference system for aligning it to the vehicle reference system.
+Results demonstrated that sensor information remains aligned in time and consistent with the recorded audio data. After the application of the calibration algorithm, data is also well aligned and consistent under this point of view.

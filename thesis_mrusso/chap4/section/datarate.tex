@@ -1,0 +1,109 @@
+\section{Maximum data rate on Bluetooth Low Energy}
+One of the first experiments done for the entire system has been a simple test to determine the maximum speed for the data to be transmitted via Bluetooth Low Energy. In particular, the ST devices have been programmed to only transmit a number that is incremented at each transmission, instead of the accelerometer data. The number of packets to be transmitted is fixed, and corresponds to the number of packets to transmit in 5 minutes. For example, if the data rate is set to 25~Hz, the number of packets is limited to: \(25*60*5 = 7500\). Once all the expected packets have been received, the number in them is used to understand how many packets have been lost.
+
+At the same time, as MBIENTLAB devices have closed source firmware, the estimation on them is done by making them stream data for 5 minutes: the number of effectively received packets is compared to the expected number of packets, and then the percentage is calculated.
+
+Different tests have been performed, using a different number of connected devices and Bluetooth adapters. In particular, the dongles at my disposal have been:
+\begin{itemize}
+    \item 1x Intel internal Bluetooth Adapter.
+    \item 6x ASUS BT-400 Bluetooth 4.0 USB Adapter, based on the Broadcom BCM20702 chip.
+\end{itemize}
+
+For both ST and MBIENTLAB devices, values in the tables have been calculated with Equation \ref{loss-percentage}:
+\begin{equation} \label{loss-percentage}
+    loss(\%) = (1 - (\frac{received\_packets}{expected\_packets})) * 100
+\end{equation}
+
+\begin{itemize}
+    \item Table \ref{table1} reports the experiment of two devices, a BlueTile and a SensorTile.box, connected to one ASUS BT-400 adapter.
+    \item Table \ref{table2} presents the test of three devices, a SensorTile.box (ST.b), a BlueTile (BT) and a MetaMotionS (MM), all connected to one, two or three different ASUS-BT400 adapters.
+    \item Table \ref{table3} describes the results obtained from connecting all the seven devices to different number of Bluetooth adapters (the Intel internal adapter has been used only in the case of 7 dongles). In the 75~Hz case, MetaMotionS have been configured at 50~Hz, because that particular data rate is not present in the device's APIs.
+\end{itemize}
+
+
+\begin{table}[ht!]
+\centering
+\caption{Test 1. Two devices, both connected to one adapter.}
+\begin{tabular}{|c|c|c|}
+\hline
+\textbf{Frequency} & \textbf{BlueTile losses} & \textbf{SensorTile.box losses}   \\ \hline
+\textbf{25Hz}      & 0\%                      & 0\%                              \\ \hline
+\textbf{50Hz}      & 0\%                      & 0\%                              \\ \hline
+\textbf{100Hz}     & 0.14\%                   & 0\%                              \\ \hline
+\textbf{200Hz}     & 3.4\%                    & 0.22\%                           \\ \hline
+\textbf{333.3Hz}   & 42.3\%                   & 0\%                              \\ \hline
+\end{tabular}
+\label{table1}
+\end{table}
+
+
+\begin{table}[ht!]
+\centering
+\caption{Test 2. Three devices. One, two or three adapters}
+\begin{tabular}{|c|c|c|c|c|}
+ \hline
+\textbf{Frequency} & \textbf{Device} & \textbf{1 Dongle} & \textbf{2 Dongles} & \textbf{3 Dongles} \\ \hline
+\textbf{25Hz}      & ST.b            & 0\%               & 0\%                 & 0\%                \\ \hline
+                   & BT              & 0\%               & 0\%                 & 0\%                \\ \hline
+                   & MM              & 0\%               & 0\%                 & 0\%                \\ \hline
+\textbf{50Hz}      & ST.b            & 0\%               & 0\%                 & 0\%                \\ \hline
+                   & BT              & 0\%               & 0\%                 & 0\%                \\ \hline
+                   & MM              & 0\%               & 0\%                 & 0\%                \\ \hline
+\textbf{100Hz}     & ST.b            & 0\%               & 1.26\%              & 23.7\%             \\ \hline
+                   & BT              & 0.2\%             & 0.19\%              & 0.6\%              \\ \hline
+                   & MM              & 0\%               & 0\%                 & 0\%                \\ \hline
+\textbf{200Hz}     & ST.b            & 33.3\%            & 21\%                & 6.96\%             \\ \hline
+\textbf{}          & BT              & 20\%              & 26.9\%              & 0.74\%             \\ \hline
+                   & MM              & 17.3\%            & 14.9\%              & 3,33\%             \\ \hline
+\end{tabular}
+\label{table2}
+\end{table}
+
+
+\begin{table}[ht!]
+\centering
+\caption{Test 3. All devices. Two, four or seven adapters.}
+\begin{tabular}{|c|c|c|c|c|}
+ \hline
+\textbf{Frequency} & \textbf{Device} & \textbf{2 Dongles} & \textbf{4 Dongles} & \textbf{7 Dongles} \\ \hline
+\textbf{25Hz}      & ST.b 1          & 0\%                & 0\%                & 0\%                 \\ \hline
+                   & ST.b 2          & 7.6\%              & 0\%                & 0\%                 \\ \hline
+                   & BT              & 0\%                & 0\%                & 0\%                 \\ \hline
+                   & MM 1            & 0\%                & 0\%                & 0\%                 \\ \hline
+                   & MM 2            & 0\%                & 0\%                & 0\%                 \\ \hline
+                   & MM 3            & 0\%                & 0\%                & 0\%                 \\ \hline
+\textbf{50Hz}      & ST.b 1          & 0.73\%             & 0\%                & 0\%                 \\ \hline
+                   & ST.b 2          & 0\%                & 0\%                & 0\%                 \\ \hline
+                   & BT              & 0.06\%             & 0\%                & 0\%                 \\ \hline
+                   & MM 1            & 0\%                & 0\%                & 0\%                 \\ \hline
+                   & MM 2            & 0\%                & 0\%                & 0\%                 \\ \hline
+                   & MM 3            & 0\%                & 0\%                & 0\%                 \\ \hline    
+\textbf{75Hz}      & ST.b 1          & 0.51\%             & 0\%                & 0\%                 \\ \hline
+                   & ST.b 2          & 0\%                & 0\%                & 0\%                 \\ \hline
+                   & BT              & 3.7\%              & 1.2\%              & 0.06\%              \\ \hline
+                   & MM 1            & 0\%                & 0\%                & 0\%                 \\ \hline
+                   & MM 2            & 0\%                & 0\%                & 0\%                 \\ \hline
+                   & MM 3            & 0\%                & 0\%                & 0\%                 \\ \hline
+\textbf{100Hz}     & ST.b 1          & 41.5\%             & 0\%                & 24.18\%             \\ \hline
+                   & ST.b 2          & 0\%                & 0\%                & 0\%                 \\ \hline
+                   & BT              & 0\%                & 22.4\%             & 0.36\%              \\ \hline
+                   & MM 1            & 0\%                & 0\%                & 0.25\%              \\ \hline
+                   & MM 2            & 0\%                & 0\%                & 9.4\%               \\ \hline
+                   & MM 3            & 0\%                & 0\%                & 6.37\%              \\ \hline
+\end{tabular}
+\label{table3}
+\end{table}
+
+\FloatBarrier
+
+In conclusion, it is evident that the percentage of loss packets heavily depends on the output data rate, that should be chosen accordingly to the desired application. To get higher data rates with the same number of devices, it is a better idea to find a good tradeoff using multiple Bluetooth Adapters. 
+
+Nevertheless, other issues may come into play in this situation. For example, in Chapter 2.2 I reported the results of a study, which found that the Bluetooth adapter heavily impacts the percentage of received packets, so maybe these results can be expanded by trying different dongles. 
+
+Another point is that the same test performed in different moments can cause big changes in the results. I noticed that repeating a test immediately usually returns similar numbers of losses, while repeating the same experiment the following day generated different results. A possible explanation of this behaviour can be the fact that Bluetooth uses the 2.4~GHz wireless band: a lot of other devices use it (WiFi, alarm systems). The BLE protocol includes a frequency hopping mechanism, to find the best channel for every connection event, but the Wireless traffic is usually not deterministic and prone to immediate variations, that can impact the performances of these nodes.
+
+Also, the remote node seems to make a difference. In particular, MetaMotionS seems to perform better in these tests. As their firmware is not open-source, I can only make some assumptions to try to explain this: (1) the Nordic Bluetooth stack may act differently from the ST one, giving better results, (2) the design of their boards (and antennas) allows better transmission performances, or maybe (3) the library used by their Python APIs performs better than BluePy (that is the one I used for the ST client).
+
+In any case, even if the percentage of loss packets may not vary that much, the usage of multiple dongles is recommended. During the tests done with 7 devices and 7 dongles, the connection procedure was fast and I never encountered failures, while using less dongles may require more time to perform the connection and sometimes it fails. 
+
+For further experiments, and for the final version of the acquisition system, I chose 75~Hz as the data rate for ST devices, and consequently 50~Hz for the MBIENTLAB ones. 

@@ -1,0 +1,17 @@
+[0] Config.pm:307> INFO - This is Biber 2.19
+[0] Config.pm:310> INFO - Logfile is 'document.blg'
+[40] biber-darwin:340> INFO - === Sun Jan  4, 2026, 20:30:19
+[52] Biber.pm:419> INFO - Reading 'document.bcf'
+[101] Biber.pm:979> INFO - Found 19 citekeys in bib section 0
+[109] Biber.pm:4419> INFO - Processing section 0
+[115] Biber.pm:4610> INFO - Looking for bibtex file 'bibliography.bib' for section 0
+[116] bibtex.pm:1713> INFO - LaTeX decoding ...
+[126] bibtex.pm:1519> INFO - Found BibTeX data source 'bibliography.bib'
+[190] UCollate.pm:68> INFO - Overriding locale 'it-IT' defaults 'variable = shifted' with 'variable = non-ignorable'
+[190] UCollate.pm:68> INFO - Overriding locale 'it-IT' defaults 'normalization = NFD' with 'normalization = prenormalized'
+[190] Biber.pm:4239> INFO - Sorting list 'none/global//global/global' of type 'entry' with template 'none' and locale 'it-IT'
+[190] Biber.pm:4245> INFO - No sort tailoring available for locale 'it-IT'
+[200] bbl.pm:660> INFO - Writing 'document.bbl' with encoding 'UTF-8'
+[207] bbl.pm:763> INFO - Output to document.bbl
+[207] Biber.pm:131> WARN - BibTeX subsystem: /var/folders/6l/pz7fgw6s2rqgl5c7dv0v9b780000gn/T/biber_tmp_WkKX/f4d088b3f9f145b5c3058da33afd57d4_8204.utf8, line 1, warning: 2 characters of junk seen at toplevel
+[207] Biber.pm:133> INFO - WARNINGS: 1

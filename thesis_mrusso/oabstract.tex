@@ -1,0 +1,76 @@
+\documentclass[12pt,a4paper,twoside,openright,english]{toptesi} 
+\usepackage[a-1b]{pdfx}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}	%Font di compilazione
+\usepackage{lmodern}		%Font non bitmapped
+\usepackage[pdfa]{hyperref}
+\hypersetup{%
+	pdfpagemode={UseOutlines},
+	bookmarksopen,
+	pdfstartview={FitH}, 
+	colorlinks,
+	linkcolor={blue},
+	citecolor={blue},
+	urlcolor={blue}
+}
+
+
+\usepackage{csquotes}
+
+\usepackage{paralist} %for lists
+\usepackage{verbatim} %textit
+\usepackage{xspace} %Spaziature
+\usepackage{booktabs}               %  beautiful tables
+\usepackage[section]{placeins} %Immagini all'interno della sezione in cui sono dichiarate
+%\usepackage{graphicx}
+\usepackage{subfigure}
+\usepackage{listings}
+\lstset{escapeinside={(*@}{@*)}}
+\usepackage{color}
+\usepackage{rotating}
+
+\usepackage{pgfplots} %bar chart
+\usepackage{tikz} %bar chart
+\usetikzlibrary{spy} %zoom
+% Define bar chart colors
+%
+\definecolor{lightcyan}{rgb}{0.88, 1.0, 1.0}
+\definecolor{bblue}{HTML}{4F81BD}
+\definecolor{rred}{HTML}{C0504D}
+\definecolor{ggreen}{HTML}{9BBB59}
+\definecolor{ppurple}{HTML}{9F4C7C}
+\newenvironment{itemize*}{
+\begin{itemize}
+  \setlength{\itemsep}{1pt}
+  \setlength{\parskip}{0pt}
+  \setlength{\parsep}{0pt}
+}{\end{itemize}}
+
+%math
+
+%%%%%%commands
+\newcommand*\equationame{Equation\xspace}	%Comando per figure
+\newcommand*\sw{S-W\xspace}	%Comando per nedelman Smith Waterman
+\newcommand*\nw{N-W\xspace}	%Comando per nedelman Needleman Wunsch
+\newcommand*\nt{nt\xspace}	%Comando per nucleotides
+\newcommand*\amino{aa\xspace}	%Comando per amino acids
+\newcommand*\dgsnw{DGS\_N-W\xspace}	%Comando per dgs-NW
+\newcommand*\dgssw{DGS\_S-W\xspace}	%Comando per dgs-SW
+\newcommand*\dgs{DGS\xspace}	%Comando per dgs
+\newcommand*\seqan{SeqAn\xspace}
+\newcommand*{\tcoffee}{T-Coffee\xspace}
+\newcommand*{\balibase}{BAliBASE\xspace}
+\newcommand*{\bralibase}{BRAliBase\xspace}
+\newcommand*{\sabmark}{SABmark\xspace}
+\newcommand*{\sabre}{SABRE\xspace}
+\newcommand*{\alibench}{aliBench\xspace}
+\newcommand*{\alex}{AlEx\xspace}
+\newcommand*{\gra}{\textbf}
+\newcommand*{\crct}{\color{red}}
+\newcommand*{\mmd}{\color{ppurple}}
+
+\begin{document}
+%\input{header}
+\selectlanguage{english}
+\input{abstract3.tex}
+\end{document}

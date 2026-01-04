@@ -1,0 +1,37 @@
+\chapter{Conclusion}
+In this thesis I propose a complete system designed to acquire data from heterogeneous sensors, with time synchronization. I put particular attention in finding the best configuration for all of them, both on the data sensing and transmission parts. To complete it all, I also explored some possibilities to automatically label samples using audio information. 
+
+The developed firmware for the ST devices tries to get the most out of the available hardware, with the personalized time synchronization mechanism. 
+I wrote Python clients for the computer to collect the data from all the sensor boards, using different Bluetooth adapters to maximize stability and throughput. 
+As I had to deal with different devices, those scripts are personalized to generate coherent and synchronized output files. 
+Finally, the MATLAB scripts I prepared can be used to analyze the resulting data and eventually perform some elaboration on them, using the tools available in the Signal Processing Toolbox. 
+
+Tests performed in different environments, including the real-life case of a car driven for about an hour on different paths, confirmed that all the parts of the system are working as expected: data is coherent between the different sensors and is correctly aligned. 
+
+In this last test I also used microphone data to label the data, and this idea gave interesting results that can be analyzed in further works.
+
+Also the calibration algorithm, that automatically rotated the reference system of the sensors to the reference system of the vehicle, gave a good outcome even without GPS data. \\
+\\
+I can consider the obtained results satisfying when compared to the expected ones. The time synchronization accuracy is around 70~ms, that is less than the desired 100ms. The relative mechanism is easy to implement on any BLE-capable microcontroller, as it only makes use of the standard Application Layer of the protocol. It is also low-power, as it has been designed to impact performances as less as possible (only two packets are exchanged).  
+
+Multiple devices are well-supported, and new ones can be easily integrated. If the developer has the ability to personalize the firmware of new devices, it is possible to add them inside the system with the already available client: the new board should be programmed using the ST devices firmware as an example. If the device is closed-source, a new client should be written for them using their APIs, but then it can work in a parallel way. The current configuration, used in the experiments reported in this thesis, is represented in Figure \ref{fig:system-image}.\\
+
+\begin{figure}[ht!]
+        \centering
+        \includegraphics[width=0.9\textwidth]{chap5/system.JPG}
+        \caption{Image representing the components of the developed system.}
+        \label{fig:system-image}
+\end{figure}
+
+A nice part of this work is that it can be considered a part of a bigger framework that can be further developed. For example, I'm reporting some possible ideas:
+\paragraph{Labeling Improvement} The last experiment tried to use audio data for labeling, but as discussed in 4.3, the results can be improved. If automatic labeling is a priority in the desired framework, it is easy to implement all the proposed fixes and then use the audio frequencies analysis to tag data. 
+
+\paragraph{Labeling using voice} Another exciting possibility, that would require a more powerful device (but maybe can be implemented inside the client) is to do the automatic labeling using a voice recognition engine. In this way, the driver could simply express by voice the current condition, and the system would then label the IMU data in the required way.   
+
+\paragraph{Edge Computing} The entire system relies on a central device, the client, that gathers all the output data and is responsible of the time synchronization. The main problem of this solution is that this device is a powerful but power-hungry one, as it is a personal computer, with a complete operating system on it. A possible way that can be explored is, depending on the target application, to leverage the computing power available on the boards (for example, SensorTile.box provide a quite powerful microcontroller from the STM32 line) to perform data analysis directly on them and export on BLE only the desired features. ST Microelectronics already provides some Machine Learning libraries, optimized for their hardware. \\
+
+To conclude the discussion, I imagined some possible applications for this system:
+\begin{itemize}
+    \item \textbf{Predictive Maintenance} Everyday, people are using different high-cost machines. It could be the case of a car engine, when someone is reaching their workplace, but it could be also the case of big appliances in industries. In both cases, one of the most wanted things for both the end-user of the car and the managers of the industry is to reduce the costs for maintenance. The system developed in this thesis can help: data from IMUs, microphone and environmental sensors can be used to recognize any abnormality in the monitored system before it would cause any irreversible (and expensive) harm to other components.
+    \item \textbf{Sports and Healthcare} Another interesting possibility is applying the set of sensor on different spots of the human body, in order to analyze how a person is moving and, eventually, study their motion during a sport or in  everyday life. In this way, possible dangerous patterns can be recognized, helping the patient in avoiding useless harm. An example is the posture recognition as in section 2.7.
+\end{itemize}

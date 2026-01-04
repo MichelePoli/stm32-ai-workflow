@@ -1,0 +1,44 @@
+\section{Time Synchronization Accuracy}
+To validate the time synchronization mechanisms, two tests have been carried out. Both of them consist of 15 minutes of sampling, keeping the sensors steady. When the time expires, all the boards are moved in the same direction on the Z-axis, with a coherent movement. The difference between the two tests is that one of them is performed using the last version of the client, while I carried out the second test using a different version of the script that ignores synchronization packets: the association between the device timestamp and the current UNIX timestamp is done at the moment of connection only. 
+
+ST devices are streaming data at a rate of 75~Hz, with a re-synchronization time (for the time synchronization mechanism) of 1~s. MBIENTLAB ones are set with an Output Data Rate (ODR) of 50~Hz. 
+
+The re-synchronization time has been set at that particular value because, after some tests at different intervals, I found 1~s to be the best trade-off between the synchronization accuracy and the packet loss percentage. This happens because each re-synchronization requires an interrupt procedure to be performed on the sensor boards, with an additional exchange of data between it and the client, and all of this comes at a cost from the performance point of view.   
+
+The results are presented in the following Figures, which compare the delay between the first sample of the first registered peak and the last sample of the same peak. In an ideal condition, they should be perfectly aligned.
+
+Figure \ref{fig:ex1nots} represents the data without the time synchronization mechanism, while Figure \ref{fig:ex1wts_test2} contains the results with the mechanism turned on. In the first case, a delay of 1.18 seconds is evident.  The second case shows a better situation: 65~ms of difference, which is more than acceptable for our applications. 
+
+\begin{figure}[ht!]
+        \centering
+        \includegraphics[width=0.85\textwidth]{chap4/figure/ex1_no_ts.png}
+        \caption{Experiment with no time synchronization: delay > 1s. }
+        \label{fig:ex1nots}
+\end{figure}
+
+\begin{figure}[ht!]
+        \centering
+        \includegraphics[width=0.85\textwidth]{chap4/figure/2nd_test_delay.png}
+        \caption{Experiment with time synchronization: delay around 65ms. }
+        \label{fig:ex1wts_test2}
+\end{figure} 
+
+Then, in Figure \ref{fig:ex1wts_compare} I compare the results got in the second case (experiment with time synchronization) with the ones from the MBIENTLAB devices, that include a personalized, closed-source system for time synchronization. It is easy to notice that the samples of the MetaMotionS devices (dotted lines) are better synchronized in time, with a maximum delay of 20~ms. 
+
+\begin{figure}[ht!]
+        \centering
+        \includegraphics[width=0.85\textwidth]{chap4/figure/2nd_test_compare.png}
+        \caption{Experiment with time synchronization: comparison with MBIENTLAB devices. }
+        \label{fig:ex1wts_compare}
+\end{figure}
+
+Finally, Figure \ref{fig:ex1wts_worst} reports the worst case I found analyzing the results of these experiment. In this case, the delay between the samples of the same event is 70~ms. Hence, I chose 70~ms as the precision value for this synchronization mechanism. 
+
+\begin{figure}[ht!]
+        \centering
+        \includegraphics[width=0.85\textwidth]{chap4/figure/ex1_w_ts.png}
+        \caption{Experiment with time synchronization: worst result. }
+        \label{fig:ex1wts_worst}
+\end{figure}
+
+In light of these results, I can consider this implementation of the time synchronization as satisfying. The accuracy of commercial solutions is better, but my solution can be considered comparable, also considering the easiness of implementation. The benefits of including this mechanism instead of using the device timestamp only are pretty evident.

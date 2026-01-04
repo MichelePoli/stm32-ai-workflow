@@ -1,0 +1,24 @@
+\section{Precise Sensor Synchronization in Robotic Computing}
+Paper \cite{liu2021brief} summarizes the development of time synchronization systems done by a development team interested in different commercial robotic and autonomous driving products. They underline the importance of time synchronization by presenting the example of a camera and a Laser Imaging Detection and Ranging (LiDAR) sensor: if the measurements are not aligned on time, those would cause inaccurate and ambiguous view of the environment, with the possibility of catastrophic outcomes.
+
+\paragraph{Addressed issues and goals} The main goal of the researchers has been to \textit{ensure that sensor samples that have the same timestamps correspond to the same event}. To reach this objective, they developed two kinds of synchronization: intra-machine (synchronizing sensors within a particular machine) and inter-machine (synchronizing sensors across different machines). They reported some examples to motivate the need for synchronization:
+\begin{itemize}
+    \item Perception tasks: in order to fuse 2D information from cameras and 3D information from LiDARs, their data must be synchronized (intra-machine).
+    \item Localization tasks: autonomous machines use multi-sensor fusion algorithms to obtain accurate localization estimations, for example fusion of camera and IMU information (intra-machine). It was observed that a misalignment of 40~ms can cause a 10~m translational error with a 3° rotational error.
+    \item Interaction with other machines: when dealing with robots (or other devices) collaborating together, their synchronization could be critical (inter-machine). The example of two Road Side Units is reported: they use the position of a vehicle with the corresponding timestamp when calculating its speed. If the timestamps are not coherent, the speed may vary significantly.      
+\end{itemize}
+
+\paragraph{Synchronization principles} In order to perform the synchronization, two requirements have been found: first, all sensors should be triggered simultaneously, and secondly, each sensor sample should be associated with a precise timestamp. This is challenging, as all sensor have different triggering and time-stamping mechanisms. 
+Four (theoretical) principles have been found:
+\begin{itemize}
+    \item Externally-triggered sensors should be triggered in hardware. Camera and IMUs can be easily triggered via software, but the driver stack may generate different latencies that can't be precisely predicted. The solution is the trigger through custom hardware.
+    \item Use a shared timer to simultaneously initiate internally-triggered and externally-triggered sensors. Internally-triggered sensors, such as LiDARs, usually accept an external initialization signal, then they would generate samples at a defined rate. It is important to use a common timer to generate both this initialization signal for them and the trigger signal for the other devices.  
+    \item Synchronize machine timer with GPS global clock. If inter-machine synchronization is necessary, it is important that their time sources are aligned to a global high-precision atomic clock, like the time data transmitted by GPS satellites.
+    \item Obtain the timestamp for a sensor sample as close to the sensor source as possible. Again, the easiest way would be to timestamp samples via software, but as explained before this can be not so precise. A better solution is to obtain the time information directly at the sensor interface, that is, when the sensor data is received by the SoC from the off-chip sensor. 
+\end{itemize}
+
+\paragraph{Adopted Solution} The researchers decided to adopt an FPGA-based solution to satisfy all the principles stated above. In particular, the Xilinx Zynq Board contains a general-purpose ARM CPU to run the software components, with a lot of I/O interfaces for all the connectivity necessities.
+
+A serial port interface accepts GPS global data, distributing it to all hardware and software timers. Trigger and timers units, designed in hardware, manage the triggering and the initialization of the sensors. Finally, Serial port, CAN and MIPI interfaces are designed to automatically assign timestamps to the samples as soon as they're received from (respectively) the IMU, camera and radar sensors. 
+
+The obtained circuit is lightweight (6.9K LUTs and 7.1K Registers). Accuracy is particularly good, as timestamping is performed at cycle-level precision for most sensors, while the LiDAR sensor (internally triggered) showed variations within 100~\(\mu\)s.

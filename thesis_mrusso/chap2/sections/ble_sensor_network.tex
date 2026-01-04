@@ -1,0 +1,13 @@
+\section{Bluetooth performances in Sensor Networks} 
+After understanding how BLE works and how to get the most out of it when dealing with a single node, I focused on more complex configurations. In \cite{reich2020bluetooth}, the goal is to set up a sensor network and to find the highest possible data rate, in order to use data coming from IMU devices for Human Activity Recognition (HAR) purposes. The researchers state that, for a good HAR analysis, they would require data coming from as many sensors as possible, with a sampling data rate between 25~ms (40~Hz) and 35~ms (28~Hz).     
+
+From the technical point of view, they decided to use notifications to reduce the number of exchanged packets to the bare minimum, left the original setting of the sensor node with regards to the Connection Interval and used a Python script to harvest all the data and perform the analysis on them. To make the performance analysis as complete as possible, they had 20 sensor nodes available, and used different computers as clients, each one with a different Bluetooth adapter. To be more precise, they used up to 20 \textit{Arduino Nano 33 BLE Sense}, with 9-axis IMU, barometer and temperature sensors connected at different computers, each one with its own Bluetooth Adapter. 
+
+The main test consisted of finding the maximum number of Bluetooth sensors that can be connected to a single client, varying the data rate between 25~ms and 35~ms and trying all the different computers. The results then were compared considering the percentage of lost packets. The results table in the paper makes it evident that the choice of the Bluetooth adapter is quite important: 10 sensors connected, with data rate of 35ms, resulted in 20\% data loss for the Macbook Pro 2014, while the Intel NUC 8 shows a loss percentage of 0.07\% only. 
+
+To sum up this experimental analysis and its conclusions:
+\begin{itemize}
+    \item Reseachers showed that the best performance are obtained by using a DeLock Bluetooth Adapter, based on the Broadcom BCM20702A0 chip. It managed 13 simultaneous connections, with a loss percentage of 0.03\% with the sensors set at 35ms data rate.
+    \item Notifications perform better than indications in high performance sensor settings.
+    \item There are big differences in performance between Bluetooth modules.
+\end{itemize}
