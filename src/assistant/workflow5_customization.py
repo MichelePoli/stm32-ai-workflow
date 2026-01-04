@@ -3232,7 +3232,7 @@ def optimize_hyperparameters_with_nni(state: MasterState, config: dict) -> Maste
             
             logger.info("✓ Esperimento concluso (o interrotto).")
             if result.stdout:
-                logger.info(f"STDOUT:\n{result.stdout[:500]}...")
+                logger.info(f"STDOUT (last 5000 chars):\n...{result.stdout[-5000:]}") # non mi servono i primi 500 caratteri. Mostro gli ultimi 5000 caratteri ([-5000:]) invece dei primi 500. 
             if result.stderr:
                 logger.warning(f"STDERR:\n{result.stderr[:500]}...")
                 
