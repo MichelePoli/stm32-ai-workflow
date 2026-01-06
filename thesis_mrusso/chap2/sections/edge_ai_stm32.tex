@@ -1,0 +1,23 @@
+\section{Edge AI and the STM32 Ecosystem}
+\label{sec:edge-ai-stm32}
+
+Edge Artificial Intelligence (Edge AI) refers to the deployment of machine learning models directly on embedded devices, such as microcontrollers (MCUs) and digital signal processors (DSPs), rather than on centralized cloud servers. This paradigm shift is driven by the need for low latency, reduced bandwidth consumption, data privacy, and improved energy efficiency \cite{warden2019tinyml}. However, deploying sophisticated AI on resource-constrained hardware like the STM32 family presents significant technical challenges.
+
+\subsection{Challenges of TinyML}
+The field of Tiny Machine Learning (TinyML) focuses on enabling inference on devices with power consumption typically in the milliwatt range. The primary constraints include:
+
+\begin{itemize}
+    \item \textbf{Memory Limitations}: MCUs often have limited RAM (typically hundreds of KB) and Flash memory (a few MB). This necessitates aggressive model compression techniques such as quantization and pruning.
+    \item \textbf{Computational Power}: Without the benefit of high-end GPUs, models must be optimized for execution on ARM Cortex-M cores, sometimes leveraging hardware accelerators like the STM32 NPU where available.
+    \item \textbf{Energy Efficiency}: Many Edge AI applications are battery-powered, requiring architectures that minimize active clock cycles and maximize sleep states.
+\end{itemize}
+
+\subsection{The STM32 Developer Toolchain}
+STMicroelectronics provides a mature ecosystem for managing the transition from high-level AI models to optimized C code. The core tools utilized and orchestrated in this work include:
+
+\begin{itemize}
+    \item \textbf{STM32CubeMX}: A graphical tool for configuring MCU peripherals and generating initialization code. In an automated MLOps workflow, this tool provides the "hardware context" (e.g., pinout, clock settings) necessary for integration.
+    \item \textbf{STEdgeAI / X-CUBE-AI}: This specialized expansion pack converts pre-trained models (from TensorFlow Lite, Keras, or ONNX) into optimized C code for STM32. It provides critical feedback on memory footprint (RAM/Flash) and estimated cycles for inference, acting as the primary bridge between the AI and embedded domains \cite{st_cubeai_docs}.
+\end{itemize}
+
+The orchestration of these tools is traditionally a manual, iterative process. Developers must repeatedly adjust model parameters in Python, re-run the conversion tool, and verify hardware compatibility. This work proposes to automate this "plumbing" via agentic workflows.
