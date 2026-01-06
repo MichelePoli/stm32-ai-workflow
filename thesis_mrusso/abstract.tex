@@ -1,25 +1,25 @@
 \section{Abstract}
- 
-Traditional computing architectures based on the von Neumann model face inefficiencies when processing massively parallel and event-driven Artificial Intelligence (AI) workloads, suffering from memory–computation bottlenecks and high power consumption. Neuromorphic computing, inspired by biological neural systems, addresses these challenges through asynchronous, event-driven processing with low latency and high energy efficiency. Recent advances in neuromorphic hardware have further promoted algorithm–hardware co-design to improve adaptability and scalability in real-time and edge computing. 
-
-However, these benefits are often constrained by the lack of accessible development tools, standardized methodologies, and comprehensive documentation. Existing implementations frequently derive from research prototypes tailored to specific experiments rather than reusable, structured libraries, making new developments complex and often dependent on expert intervention.
-
-Large Language Models (LLMs) are increasingly employed to simplify program synthesis and vibe coding in conventional AI workflows. Yet, their potential in supporting neuromorphic system design remains unexplored. This thesis aims to address the gap by extending emerging AI-driven development assistance to neuromorphic applications.
-
-The proposed solution integrates into key stages of the MLOps lifecycle, supporting code synthesis, model design, and optimization through the use of \textit{LangGraph}, a state-of-art graph-based multi-agent framework.
-
-The approach relies on three branches: web search, academic search, and code generation \& validation. Each acts as a node in a unified LangGraph pipeline, enabling contextual information retrieval, research knowledge extraction, and automated code generation with iterative self-correction.
-
-The developed method was evaluated experimentally across all branches. It achieved high scores on standard large language model metrics in both web and academic search tasks,
-showing strong factual accuracy and completeness. The results indicate a close alignment between generated content and reference material, with performance generally within the 80--90\% range. The evaluation followed the LLM-as-a-Judge paradigm, employing GPT-5 to assess reliability, clarity, and relevance.
-
-The core component of code synthesis is organized around a central orchestrator coordinating specialized agents. Each agent includes vector stores for domain knowledge of \texttt{snnTorch} for spiking network simulation and the \texttt{Neural Network Intelligence (NNI)} toolkit for automated optimization.
-
-Code validation follows the four main dimensions adopted in the literature. 
-i) Functional correctness is tested through automated execution in isolated cloud environments. 
-ii) Static code quality is verified with static type checking and module consistency analysis. 
-iii) Runtime performance metrics are collected to evaluate efficiency. 
-iv) Feedback-based evaluation incorporates expert input during synthesis, enabling iterative refinement.
-These validation layers ensure the correctness and robustness of the synthesis process. Reference-based normalization allows fair performance comparisons across experiments. 
-
-Overall, the results confirm the system’s reliability and ability to generate accurate, high-quality code across heterogeneous sources, demonstrating the feasibility of agent-based systems to support neuromorphic applications development.
+%  
+% Traditional computing architectures based on the von Neumann model face inefficiencies when processing massively parallel and event-driven Artificial Intelligence (AI) workloads, suffering from memory–computation bottlenecks and high power consumption. Neuromorphic computing, inspired by biological neural systems, addresses these challenges through asynchronous, event-driven processing with low latency and high energy efficiency. Recent advances in neuromorphic hardware have further promoted algorithm–hardware co-design to improve adaptability and scalability in real-time and edge computing. 
+% 
+% However, these benefits are often constrained by the lack of accessible development tools, standardized methodologies, and comprehensive documentation. Existing implementations frequently derive from research prototypes tailored to specific experiments rather than reusable, structured libraries, making new developments complex and often dependent on expert intervention.
+% 
+% Large Language Models (LLMs) are increasingly employed to simplify program synthesis and vibe coding in conventional AI workflows. Yet, their potential in supporting neuromorphic system design remains unexplored. This thesis aims to address the gap by extending emerging AI-driven development assistance to neuromorphic applications.
+% 
+% The proposed solution integrates into key stages of the MLOps lifecycle, supporting code synthesis, model design, and optimization through the use of \textit{LangGraph}, a state-of-art graph-based multi-agent framework.
+% 
+% The approach relies on three branches: web search, academic search, and code generation \& validation. Each acts as a node in a unified LangGraph pipeline, enabling contextual information retrieval, research knowledge extraction, and automated code generation with iterative self-correction.
+% 
+% The developed method was evaluated experimentally across all branches. It achieved high scores on standard large language model metrics in both web and academic search tasks,
+% showing strong factual accuracy and completeness. The results indicate a close alignment between generated content and reference material, with performance generally within the 80--90\% range. The evaluation followed the LLM-as-a-Judge paradigm, employing GPT-5 to assess reliability, clarity, and relevance.
+% 
+% The core component of code synthesis is organized around a central orchestrator coordinating specialized agents. Each agent includes vector stores for domain knowledge of \texttt{snnTorch} for spiking network simulation and the \texttt{Neural Network Intelligence (NNI)} toolkit for automated optimization.
+% 
+% Code validation follows the four main dimensions adopted in the literature. 
+% i) Functional correctness is tested through automated execution in isolated cloud environments. 
+% ii) Static code quality is verified with static type checking and module consistency analysis. 
+% iii) Runtime performance metrics are collected to evaluate efficiency. 
+% iv) Feedback-based evaluation incorporates expert input during synthesis, enabling iterative refinement.
+% These validation layers ensure the correctness and robustness of the synthesis process. Reference-based normalization allows fair performance comparisons across experiments. 
+% 
+% Overall, the results confirm the system’s reliability and ability to generate accurate, high-quality code across heterogeneous sources, demonstrating the feasibility of agent-based systems to support neuromorphic applications development.
