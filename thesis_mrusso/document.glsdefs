@@ -1,0 +1,364 @@
+\glsdefs@newdocentry{ai}%
+{%
+name={\acronymfont {\glsentryshort {ai}}},%
+sort={AI},%
+type={main},%
+first={AI},%
+firstplural={AIs},%
+text={AI},%
+plural={AIs},%
+description={Artificial Intelligence},%
+descriptionplural={Artificial Intelligence},%
+symbol={\relax },%
+symbolplural={\relax },%
+user1={},%
+user2={},%
+user3={},%
+user4={},%
+user5={},%
+user6={},%
+long={Artificial Intelligence},%
+longplural={Artificial Intelligences},%
+short={AI},%
+shortplural={AIs},%
+counter={page},%
+parent={},%
+%
+}%
+
+\glsdefs@newdocentry{ann}%
+{%
+name={\acronymfont {\glsentryshort {ann}}},%
+sort={ANN},%
+type={main},%
+first={ANN},%
+firstplural={ANNs},%
+text={ANN},%
+plural={ANNs},%
+description={Artificial Neural Network},%
+descriptionplural={Artificial Neural Network},%
+symbol={\relax },%
+symbolplural={\relax },%
+user1={},%
+user2={},%
+user3={},%
+user4={},%
+user5={},%
+user6={},%
+long={Artificial Neural Network},%
+longplural={Artificial Neural Networks},%
+short={ANN},%
+shortplural={ANNs},%
+counter={page},%
+parent={},%
+%
+}%
+
+\glsdefs@newdocentry{llm}%
+{%
+name={\acronymfont {\glsentryshort {llm}}},%
+sort={LLM},%
+type={main},%
+first={LLM},%
+firstplural={LLMs},%
+text={LLM},%
+plural={LLMs},%
+description={Large Language Model},%
+descriptionplural={Large Language Model},%
+symbol={\relax },%
+symbolplural={\relax },%
+user1={},%
+user2={},%
+user3={},%
+user4={},%
+user5={},%
+user6={},%
+long={Large Language Model},%
+longplural={Large Language Models},%
+short={LLM},%
+shortplural={LLMs},%
+counter={page},%
+parent={},%
+%
+}%
+
+\glsdefs@newdocentry{rag}%
+{%
+name={\acronymfont {\glsentryshort {rag}}},%
+sort={RAG},%
+type={main},%
+first={RAG},%
+firstplural={RAGs},%
+text={RAG},%
+plural={RAGs},%
+description={retrieval-augmented generation},%
+descriptionplural={retrieval-augmented generation},%
+symbol={\relax },%
+symbolplural={\relax },%
+user1={},%
+user2={},%
+user3={},%
+user4={},%
+user5={},%
+user6={},%
+long={retrieval-augmented generation},%
+longplural={retrieval-augmented generations},%
+short={RAG},%
+shortplural={RAGs},%
+counter={page},%
+parent={},%
+%
+}%
+
+\glsdefs@newdocentry{ml}%
+{%
+name={\acronymfont {\glsentryshort {ml}}},%
+sort={ML},%
+type={main},%
+first={ML},%
+firstplural={MLs},%
+text={ML},%
+plural={MLs},%
+description={Machine Learning},%
+descriptionplural={Machine Learning},%
+symbol={\relax },%
+symbolplural={\relax },%
+user1={},%
+user2={},%
+user3={},%
+user4={},%
+user5={},%
+user6={},%
+long={Machine Learning},%
+longplural={Machine Learnings},%
+short={ML},%
+shortplural={MLs},%
+counter={page},%
+parent={},%
+%
+}%
+
+\glsdefs@newdocentry{dl}%
+{%
+name={\acronymfont {\glsentryshort {dl}}},%
+sort={DL},%
+type={main},%
+first={DL},%
+firstplural={DLs},%
+text={DL},%
+plural={DLs},%
+description={Deep Learning},%
+descriptionplural={Deep Learning},%
+symbol={\relax },%
+symbolplural={\relax },%
+user1={},%
+user2={},%
+user3={},%
+user4={},%
+user5={},%
+user6={},%
+long={Deep Learning},%
+longplural={Deep Learnings},%
+short={DL},%
+shortplural={DLs},%
+counter={page},%
+parent={},%
+%
+}%
+
+\glsdefs@newdocentry{relu}%
+{%
+name={\acronymfont {\glsentryshort {relu}}},%
+sort={ReLU},%
+type={main},%
+first={ReLU},%
+firstplural={ReLUs},%
+text={ReLU},%
+plural={ReLUs},%
+description={Rectified Linear Unit},%
+descriptionplural={Rectified Linear Unit},%
+symbol={\relax },%
+symbolplural={\relax },%
+user1={},%
+user2={},%
+user3={},%
+user4={},%
+user5={},%
+user6={},%
+long={Rectified Linear Unit},%
+longplural={Rectified Linear Units},%
+short={ReLU},%
+shortplural={ReLUs},%
+counter={page},%
+parent={},%
+%
+}%
+
+\glsdefs@newdocentry{rnn}%
+{%
+name={\acronymfont {\glsentryshort {rnn}}},%
+sort={RNN},%
+type={main},%
+first={RNN},%
+firstplural={RNNs},%
+text={RNN},%
+plural={RNNs},%
+description={Recurrent Neural Network},%
+descriptionplural={Recurrent Neural Network},%
+symbol={\relax },%
+symbolplural={\relax },%
+user1={},%
+user2={},%
+user3={},%
+user4={},%
+user5={},%
+user6={},%
+long={Recurrent Neural Network},%
+longplural={Recurrent Neural Networks},%
+short={RNN},%
+shortplural={RNNs},%
+counter={page},%
+parent={},%
+%
+}%
+
+\glsdefs@newdocentry{snn}%
+{%
+name={\acronymfont {\glsentryshort {snn}}},%
+sort={SNN},%
+type={main},%
+first={SNN},%
+firstplural={SNNs},%
+text={SNN},%
+plural={SNNs},%
+description={Spiking Neural Networks},%
+descriptionplural={Spiking Neural Networks},%
+symbol={\relax },%
+symbolplural={\relax },%
+user1={},%
+user2={},%
+user3={},%
+user4={},%
+user5={},%
+user6={},%
+long={Spiking Neural Networks},%
+longplural={Spiking Neural Networkss},%
+short={SNN},%
+shortplural={SNNs},%
+counter={page},%
+parent={},%
+%
+}%
+
+\glsdefs@newdocentry{ir}%
+{%
+name={\acronymfont {\glsentryshort {ir}}},%
+sort={IR},%
+type={main},%
+first={IR},%
+firstplural={IRs},%
+text={IR},%
+plural={IRs},%
+description={Information Retrieval},%
+descriptionplural={Information Retrieval},%
+symbol={\relax },%
+symbolplural={\relax },%
+user1={},%
+user2={},%
+user3={},%
+user4={},%
+user5={},%
+user6={},%
+long={Information Retrieval},%
+longplural={Information Retrievals},%
+short={IR},%
+shortplural={IRs},%
+counter={page},%
+parent={},%
+%
+}%
+
+\glsdefs@newdocentry{hitl}%
+{%
+name={\acronymfont {\glsentryshort {hitl}}},%
+sort={HITL},%
+type={main},%
+first={HITL},%
+firstplural={HITLs},%
+text={HITL},%
+plural={HITLs},%
+description={Human In The Loop},%
+descriptionplural={Human In The Loop},%
+symbol={\relax },%
+symbolplural={\relax },%
+user1={},%
+user2={},%
+user3={},%
+user4={},%
+user5={},%
+user6={},%
+long={Human In The Loop},%
+longplural={Human In The Loops},%
+short={HITL},%
+shortplural={HITLs},%
+counter={page},%
+parent={},%
+%
+}%
+
+\glsdefs@newdocentry{api}%
+{%
+name={\acronymfont {\glsentryshort {api}}},%
+sort={API},%
+type={main},%
+first={API},%
+firstplural={APIs},%
+text={API},%
+plural={APIs},%
+description={Application Programming Interface},%
+descriptionplural={Application Programming Interface},%
+symbol={\relax },%
+symbolplural={\relax },%
+user1={},%
+user2={},%
+user3={},%
+user4={},%
+user5={},%
+user6={},%
+long={Application Programming Interface},%
+longplural={Application Programming Interfaces},%
+short={API},%
+shortplural={APIs},%
+counter={page},%
+parent={},%
+%
+}%
+
+\glsdefs@newdocentry{nni}%
+{%
+name={\acronymfont {\glsentryshort {nni}}},%
+sort={NNI},%
+type={main},%
+first={NNI},%
+firstplural={NNIs},%
+text={NNI},%
+plural={NNIs},%
+description={Neural Network Intelligence},%
+descriptionplural={Neural Network Intelligence},%
+symbol={\relax },%
+symbolplural={\relax },%
+user1={},%
+user2={},%
+user3={},%
+user4={},%
+user5={},%
+user6={},%
+long={Neural Network Intelligence},%
+longplural={Neural Network Intelligences},%
+short={NNI},%
+shortplural={NNIs},%
+counter={page},%
+parent={},%
+%
+}%
+
