@@ -1,38 +1,25 @@
-\chapter*{Abstract}
-Nowadays, Internet of Things devices and technologies are getting more and more importance in our everyday lives and are almost everywhere. 
-The motivations behind their fast development are easy to understand: first of all, Micro-Electro-Mechanical Systems (MEMS) sensors are small, easy to be integrated and are getting cheaper; modern microcontrollers are easy to get and program and, finally, recent studies on the field of energy efficiency allow the development of IoT nodes with appropriate lifetime. 
-Thanks to all of this, these little devices capable of sending sensor data for further processing are getting popularity in different fields.
+\section{Abstract}
+ 
+Traditional computing architectures based on the von Neumann model face inefficiencies when processing massively parallel and event-driven Artificial Intelligence (AI) workloads, suffering from memory–computation bottlenecks and high power consumption. Neuromorphic computing, inspired by biological neural systems, addresses these challenges through asynchronous, event-driven processing with low latency and high energy efficiency. Recent advances in neuromorphic hardware have further promoted algorithm–hardware co-design to improve adaptability and scalability in real-time and edge computing. 
 
-Despite all of this, these systems present their drawbacks: data coming from these MEMS sensors is heavily affected by noise and biases, low-energy transmission protocols present low throughput and significant delays, the computational power of the microcontrollers is limited and a large number of factors affect the battery duration of these devices. 
-Developers are forced to find compromises between measurement accuracy, battery duration and system costs, trying to optimize as much as possible all the variables coming into play. 
+However, these benefits are often constrained by the lack of accessible development tools, standardized methodologies, and comprehensive documentation. Existing implementations frequently derive from research prototypes tailored to specific experiments rather than reusable, structured libraries, making new developments complex and often dependent on expert intervention.
 
+Large Language Models (LLMs) are increasingly employed to simplify program synthesis and vibe coding in conventional AI workflows. Yet, their potential in supporting neuromorphic system design remains unexplored. This thesis aims to address the gap by extending emerging AI-driven development assistance to neuromorphic applications.
 
-The literature presents different solutions to these problems. 
-One of the most interesting solutions is sensor fusion, which consists in joining together heterogeneous data coming from different sensors to get accurate information. 
-Different algorithms are available, and often some are already available in the firmware of sensor boards from different manufacturers. 
-In order to generate satisfying results, these algorithms need the sensor signals to be synchronized in time: this is a big challenge when dealing with IoT and embedded systems, and it is even more important in critical applications. 
-For example, when considering object-recognition algorithms in car accident-prevention systems, accuracy is heavily impacted when data from camera (2D information) and LiDAR (depth) is not correctly synchronized. 
+The proposed solution integrates into key stages of the MLOps lifecycle, supporting code synthesis, model design, and optimization through the use of \textit{LangGraph}, a state-of-art graph-based multi-agent framework.
 
+The approach relies on three branches: web search, academic search, and code generation \& validation. Each acts as a node in a unified LangGraph pipeline, enabling contextual information retrieval, research knowledge extraction, and automated code generation with iterative self-correction.
 
-Synchronization of Wireless Sensor Networks has been object of different studies, all aimed at clock alignment. 
-The application presented in these papers are not aimed at a specific connection protocol, they may require control of the low-level layers of the connection and the computational power requested is not negligible. 
-Hence, even if the presented results are promising, those methods can’t be easily applied to all hardware. 
+The developed method was evaluated experimentally across all branches. It achieved high scores on standard large language model metrics in both web and academic search tasks,
+showing strong factual accuracy and completeness. The results indicate a close alignment between generated content and reference material, with performance generally within the 80--90\% range. The evaluation followed the LLM-as-a-Judge paradigm, employing GPT-5 to assess reliability, clarity, and relevance.
 
+The core component of code synthesis is organized around a central orchestrator coordinating specialized agents. Each agent includes vector stores for domain knowledge of \texttt{snnTorch} for spiking network simulation and the \texttt{Neural Network Intelligence (NNI)} toolkit for automated optimization.
 
-In this thesis I present a work, based on off-the-shelf hardware, in which four different sensor boards from ST Microelectronics and three from MBIENTLAB are programmed to work together, synchronized in time. 
-The possibility to use the embedded microphones and the consequent audio data to synchronize and label data is explored, finding valid ways to stream sound and implement Fourier Fast Transform (FFT) on the microcontrollers. 
-Particular attention was given in getting the most out of the Bluetooth Low Energy protocol: it is a good solution from the energy-efficiency and compatibility points of view, but at the same time some optimization is necessary to keep a good throughput and maintain an efficient bi-directional connection.
-Time synchronization has been developed on the application layer of the BLE stack: it consists in the periodic exchange of timestamped packets between the client and the sensors. 
-The client is then aware of the internal timestamp of the sensors in those re-synchronization moment, and can tag the samples with the precise moment in time they are acquired.
-The goals are:
-a) development of firmware for the open-source ST devices, with a personalized time synchronization mechanism, 
-b) design of clients for all the devices, formatting data in a consistent way and 
-c) writing of MATLAB scripts to join together the resulting data. 
+Code validation follows the four main dimensions adopted in the literature. 
+i) Functional correctness is tested through automated execution in isolated cloud environments. 
+ii) Static code quality is verified with static type checking and module consistency analysis. 
+iii) Runtime performance metrics are collected to evaluate efficiency. 
+iv) Feedback-based evaluation incorporates expert input during synthesis, enabling iterative refinement.
+These validation layers ensure the correctness and robustness of the synthesis process. Reference-based normalization allows fair performance comparisons across experiments. 
 
-
-The developed system behaves as expected in the experiments that have been carried out. 
-Initial tests have been made to determine the best data rate for the sensor information (to keep an acceptable percentage of packet losses), which is 75Hz. 
-Then, the behavior of the time synchronization is tested after 15 minutes of data streaming, showing a precision of around 70 ms in our experience, while the same setup without synchronization presents samples with delays of more than 1s. 
-Finally, an extensive test has been performed by installing the sensors in a car and collecting data in that environment, with the help of a camera and GPS devices. 
-In this case, data have been labeled using sounds at predefined frequencies and elaborated at the node level. 
-Sensor information remains aligned in time and consistent with the recorded audio data. 
+Overall, the results confirm the system’s reliability and ability to generate accurate, high-quality code across heterogeneous sources, demonstrating the feasibility of agent-based systems to support neuromorphic applications development.

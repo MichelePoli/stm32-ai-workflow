@@ -1,10 +1,17 @@
 \documentclass[12pt,a4paper,twoside,openright,english,tipotesi=magistrale]{toptesi} 
 %\setcounter{secnumdepth}{3}
+\def\Relatore{Advisor}
+\def\Relatori{Advisors}
+\def\Candidato{Candidate}
 \usepackage[a-1b]{pdfx}
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}	%Font di compilazione
 \usepackage{lmodern}		%Font non bitmapped
+\usepackage{glossaries} % for \gls command
 \usepackage[pdfa]{hyperref}
+\usepackage[pdfa]{hyperref}
+\usepackage{algorithm}
+\usepackage{algorithmic}
 \hypersetup{%
 	pdfpagemode={UseOutlines},
 	bookmarksopen,
@@ -17,6 +24,8 @@
 
 %bibliography
 \usepackage{csquotes}
+\usepackage{textgreek} % for Greek letters like β
+
 \usepackage[backend=biber,style=numeric,sorting=none,urldate=long]{biblatex}
 %\usepackage[backend=biber, sorting=none, autocite=inline]{biblatex}
 \addbibresource{bibliography.bib}
@@ -45,7 +54,9 @@
 \lstset{
   basicstyle=\ttfamily\small,
   frame = single,
-  mathescape
+  mathescape,
+  columns=fullflexible,
+  breaklines=true 
 }
 
 \usepackage{pgfplots} %bar chart
@@ -164,7 +175,7 @@
 
 \selectlanguage{english}
 \frontmatter
-\input{abstract3.tex}
+\input{abstract.tex}
 %Indice
 \tableofcontents
 \listoffigures
@@ -174,6 +185,8 @@
 % Scaletta tesi
 
 %\input{thesis_structure}
+\input{acronyms}
+
  
 %Corpo della tesi
 \mainmatter  

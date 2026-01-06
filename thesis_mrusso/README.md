@@ -1,1 +1,1 @@
-MSc Thesis describing the testbench implementation voted to exploit the DGS abilities
+readme

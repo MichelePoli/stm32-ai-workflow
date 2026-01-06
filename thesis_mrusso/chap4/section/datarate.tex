@@ -1,109 +1,103 @@
-\section{Maximum data rate on Bluetooth Low Energy}
-One of the first experiments done for the entire system has been a simple test to determine the maximum speed for the data to be transmitted via Bluetooth Low Energy. In particular, the ST devices have been programmed to only transmit a number that is incremented at each transmission, instead of the accelerometer data. The number of packets to be transmitted is fixed, and corresponds to the number of packets to transmit in 5 minutes. For example, if the data rate is set to 25~Hz, the number of packets is limited to: \(25*60*5 = 7500\). Once all the expected packets have been received, the number in them is used to understand how many packets have been lost.
+\section{Information Retrieval Use Cases}
 
-At the same time, as MBIENTLAB devices have closed source firmware, the estimation on them is done by making them stream data for 5 minutes: the number of effectively received packets is compared to the expected number of packets, and then the percentage is calculated.
+\subsection{Experiment 1: Web Search Branch}
 
-Different tests have been performed, using a different number of connected devices and Bluetooth adapters. In particular, the dongles at my disposal have been:
+This experiment evaluates the effectiveness of the \textbf{web search branch} within the LangGraph-based research system. The objective is to demonstrate that integrating real-time web search with pre-trained knowledge produces more accurate, current, and contextually relevant information compared to relying solely on pre-training data. The study uses the \textbf{Italian Tech Week 2025} event as a case study, where the system was tasked with retrieving comprehensive and up-to-date information about event details, speakers, and program elements.
+
+
+\textbf{Query Task:} The system was instructed to research the event ``Italian Tech Week 2025'' held in Turin, Italy (October 2025), with explicit requirements to provide:
 \begin{itemize}
-    \item 1x Intel internal Bluetooth Adapter.
-    \item 6x ASUS BT-400 Bluetooth 4.0 USB Adapter, based on the Broadcom BCM20702 chip.
+  \item Exact event dates and venue name
+  \item Event theme and slogan
+  \item At least five major speakers with descriptions
+  \item Key program elements and their relevance
+  \item Event scale metrics (attendees, startups, investors, sessions)
+  \item At least two reliable web citations from sources published after 2023
+  \item \textbf{Critical constraint:} Base answers only on up-to-date web information, not on pre-training data
 \end{itemize}
 
-For both ST and MBIENTLAB devices, values in the tables have been calculated with Equation \ref{loss-percentage}:
-\begin{equation} \label{loss-percentage}
-    loss(\%) = (1 - (\frac{received\_packets}{expected\_packets})) * 100
-\end{equation}
+This task design ensures that the web search capability is necessary for providing current, factual information that may not exist in the model's training data or may have changed since training.
 
+The system's performance was evaluated using the \textbf{DeepEval framework}, employing four complementary metrics designed to assess different dimensions of retrieval-augmented generation (RAG) quality.
+
+\begin{table}[h]
+\centering
+\caption{Experiment 1: DeepEval Metrics Summary}
+\begin{tabular}{lcccl}
+\toprule
+\textbf{Metric} & \textbf{Score} & \textbf{Status} & \textbf{Interpretation} \\
+\midrule
+Faithfulness & \( 0.80 \) & \( \checkmark \) Pass & Strong source alignment \\
+Answer Relevancy & \( 0.923 \) &  \( \checkmark \) Pass & Highly targeted response \\
+Contextual Relevancy & \( 0.88 \) &  \( \checkmark \) Pass & Excellent retrieval \\
+Hallucination Detection & \( 0.94 \) & \( \checkmark \) Pass & Minimal hallucinations \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Faithfulness (Score: \( 0.80 \)):} Measures the degree to which the generated output aligns with and is supported by the retrieved context. This metric validates whether the system accurately represents information from source documents without distortion or selective misuse. The generated response demonstrated strong alignment with retrieved context regarding core topics (sustainability, AI advancements, fintech). The score does not reach \( 0.95+ \) because certain mentioned aspects, specifically digital entrepreneurship and mobility, were not explicitly reinforced in all retrieved documents. This indicates the system successfully grounded its output in web sources but had limited explicit evidence for peripheral claims. The score reflects reliable factual grounding, with the system conservatively anchoring claims to retrieval context.
+
+\textbf{Answer Relevancy (Score: \( 0.923 \)):} Assesses whether the generated response directly addresses the user's query with accurate, specific, and pertinent details, evaluating the system's ability to provide targeted information rather than generic or tangential output. The response provided accurate and comprehensive details addressing all core query elements: event dates (October 1--3, 2025), venue (OGR Torino), theme (AI/fintech/digital innovation), confirmed speakers (Jeff Bezos, John Elkann, Luciana Lixandru, Ursula von der Leyen, Antonio Emilio Calegari), program elements (keynotes, panels, masterclasses, networking), and event scale (3,000+ attendees). The score does not reach maximum because the response, while comprehensive, did not include inline citations or direct URLs embedded within the narrative for all findings, limiting transparency in the final output. The achieved score indicates highly relevant and targeted responses, with the system successfully prioritizing the most important information requested and presenting it coherently.
+
+\textbf{Contextual Relevancy (Score: \( 0.88 \)):} Evaluates the quality of retrieved documents by measuring whether they are genuinely relevant to the user's query. Unlike Faithfulness (which validates the generator's use of context), Contextual Relevancy validates the \textbf{retriever's} selection process, identifying whether the retrieval system has selected appropriate source documents that meaningfully contribute to answering the query. The achieved score of \( 0.88 \) reflects strong retrieval performance: all core documents directly address the query, with no irrelevant or misleading sources included. This metric validates that the web search retrieval component functions effectively, selecting documents that provide genuine value for subsequent generation.
+
+\textbf{Hallucination Detection (Score: \( 0.94 \), Hallucination Rate: \( 6\% \)):} Explicitly identifies claims in the generated output that contradict, lack support in the retrieval context, or introduce unsupported assertions. This metric flags \textbf{negative cases}, statements that directly contradict sources or introduce information absent from retrieved documents. Analysis of \( 50 \) distinct factual claims identified: \( 47 \) well-supported claims (\( 94\% \)), \( 3 \) unsupported claims (\( 6\% \)), and \( 0 \) contradictory claims (\( 0\% \)). Examples of hallucinations include: ``Binario 3 Stage offers specialized AI workshops'' (unsupported; sources only mention ``additional programming''), ``The event expects 5,000+ attendees'' (overestimation; sources state ``3,000+ attendees''), and ``Antonio Calegari will discuss quantum computing applications'' (unsupported; sources identify him as AI4I director without specifying focus). Well-supported claims include event dates (October 1--3, 2025), venue (OGR Torino, Turin), confirmed speakers, and theme (AI, fintech, digital innovation)---all verified in retrieved documents. The achieved score indicates that \( 94\% \) of generated claims are directly supported by retrieved context, with only minor unsupported inferences (\( 6\% \)) that do not contradict sources. This demonstrates system reliability and restraint in avoiding invention of facts not present in sources.
+
+\vspace{0.3cm}
+
+\noindent \textbf{Overall System Performance:} All metrics demonstrate that the web search branch successfully integrates external knowledge with pre-training to produce accurate, contextually grounded, and up-to-date responses. The web-enriched approach shows substantial improvements across multiple dimensions, validating the architectural decision to integrate web retrieval as a core component of the multi-branch research system.
+
+
+
+\subsection{Experiment 2: Academic Search Branch: }
+
+This experiment evaluates the effectiveness of the \textbf{academic search branch} within the LangGraph-based research system. The objective is to demonstrate that integrating specialized academic retrieval with domain-specific query generation produces comprehensive, research-grade summaries that accurately capture recent developments, methodologies, and open challenges in rapidly evolving fields compared to relying solely on pre-training data. The study uses SNNs in 2025 as a case study, where the system was tasked with synthesizing state-of-the-art advances directly from the user's specific requirements: identification of key models, performance benchmarks, and open research challenges.
+
+\textbf{Query Task:} The system was instructed to summarize recent advances in Spiking Neural Networks for 2025 with explicit requirements to provide:
 \begin{itemize}
-    \item Table \ref{table1} reports the experiment of two devices, a BlueTile and a SensorTile.box, connected to one ASUS BT-400 adapter.
-    \item Table \ref{table2} presents the test of three devices, a SensorTile.box (ST.b), a BlueTile (BT) and a MetaMotionS (MM), all connected to one, two or three different ASUS-BT400 adapters.
-    \item Table \ref{table3} describes the results obtained from connecting all the seven devices to different number of Bluetooth adapters (the Intel internal adapter has been used only in the case of 7 dongles). In the 75~Hz case, MetaMotionS have been configured at 50~Hz, because that particular data rate is not present in the device's APIs.
+\item Key models and architectures with specific names and descriptions
+\item Quantitative performance benchmarks demonstrating improvements
+\item Core technical innovations and methodological advances
+\item Primary applications across distinct domains
+\item Explicit enumeration of open research challenges and unresolved problems
 \end{itemize}
 
+This task design ensures that the academic search capability is necessary for providing cutting-edge, research-validated information organized precisely around the user's structured requirements.
 
-\begin{table}[ht!]
+The system's performance was evaluated using the \textbf{DeepEval framework}, employing five complementary metrics designed to assess different dimensions of query-aligned academic synthesis quality.
+
+\begin{table}[h]
 \centering
-\caption{Test 1. Two devices, both connected to one adapter.}
-\begin{tabular}{|c|c|c|}
-\hline
-\textbf{Frequency} & \textbf{BlueTile losses} & \textbf{SensorTile.box losses}   \\ \hline
-\textbf{25Hz}      & 0\%                      & 0\%                              \\ \hline
-\textbf{50Hz}      & 0\%                      & 0\%                              \\ \hline
-\textbf{100Hz}     & 0.14\%                   & 0\%                              \\ \hline
-\textbf{200Hz}     & 3.4\%                    & 0.22\%                           \\ \hline
-\textbf{333.3Hz}   & 42.3\%                   & 0\%                              \\ \hline
+\caption{Experiment 2: DeepEval Metrics Summary}
+\begin{tabular}{lccl}
+\toprule
+\textbf{Metric} & \textbf{Score} & \textbf{Status} & \textbf{Interpretation} \\
+\midrule
+Faithfulness & \( 0.89 \) & \( \checkmark \) Pass & Excellent source fidelity \\
+Answer Relevancy & \( 0.87 \) & \( \checkmark \) Pass & High coverage of requirements \\
+Hallucination Detection & \( 0.96 \) & \( \checkmark \) Pass & Minimal unsupported claims \\
+Requirement Completeness & \( 0.84 \) & \( \checkmark \) Pass & All query elements addressed \\
+\bottomrule
 \end{tabular}
-\label{table1}
 \end{table}
 
 
-\begin{table}[ht!]
-\centering
-\caption{Test 2. Three devices. One, two or three adapters}
-\begin{tabular}{|c|c|c|c|c|}
- \hline
-\textbf{Frequency} & \textbf{Device} & \textbf{1 Dongle} & \textbf{2 Dongles} & \textbf{3 Dongles} \\ \hline
-\textbf{25Hz}      & ST.b            & 0\%               & 0\%                 & 0\%                \\ \hline
-                   & BT              & 0\%               & 0\%                 & 0\%                \\ \hline
-                   & MM              & 0\%               & 0\%                 & 0\%                \\ \hline
-\textbf{50Hz}      & ST.b            & 0\%               & 0\%                 & 0\%                \\ \hline
-                   & BT              & 0\%               & 0\%                 & 0\%                \\ \hline
-                   & MM              & 0\%               & 0\%                 & 0\%                \\ \hline
-\textbf{100Hz}     & ST.b            & 0\%               & 1.26\%              & 23.7\%             \\ \hline
-                   & BT              & 0.2\%             & 0.19\%              & 0.6\%              \\ \hline
-                   & MM              & 0\%               & 0\%                 & 0\%                \\ \hline
-\textbf{200Hz}     & ST.b            & 33.3\%            & 21\%                & 6.96\%             \\ \hline
-\textbf{}          & BT              & 20\%              & 26.9\%              & 0.74\%             \\ \hline
-                   & MM              & 17.3\%            & 14.9\%              & 3,33\%             \\ \hline
-\end{tabular}
-\label{table2}
-\end{table}
 
 
-\begin{table}[ht!]
-\centering
-\caption{Test 3. All devices. Two, four or seven adapters.}
-\begin{tabular}{|c|c|c|c|c|}
- \hline
-\textbf{Frequency} & \textbf{Device} & \textbf{2 Dongles} & \textbf{4 Dongles} & \textbf{7 Dongles} \\ \hline
-\textbf{25Hz}      & ST.b 1          & 0\%                & 0\%                & 0\%                 \\ \hline
-                   & ST.b 2          & 7.6\%              & 0\%                & 0\%                 \\ \hline
-                   & BT              & 0\%                & 0\%                & 0\%                 \\ \hline
-                   & MM 1            & 0\%                & 0\%                & 0\%                 \\ \hline
-                   & MM 2            & 0\%                & 0\%                & 0\%                 \\ \hline
-                   & MM 3            & 0\%                & 0\%                & 0\%                 \\ \hline
-\textbf{50Hz}      & ST.b 1          & 0.73\%             & 0\%                & 0\%                 \\ \hline
-                   & ST.b 2          & 0\%                & 0\%                & 0\%                 \\ \hline
-                   & BT              & 0.06\%             & 0\%                & 0\%                 \\ \hline
-                   & MM 1            & 0\%                & 0\%                & 0\%                 \\ \hline
-                   & MM 2            & 0\%                & 0\%                & 0\%                 \\ \hline
-                   & MM 3            & 0\%                & 0\%                & 0\%                 \\ \hline    
-\textbf{75Hz}      & ST.b 1          & 0.51\%             & 0\%                & 0\%                 \\ \hline
-                   & ST.b 2          & 0\%                & 0\%                & 0\%                 \\ \hline
-                   & BT              & 3.7\%              & 1.2\%              & 0.06\%              \\ \hline
-                   & MM 1            & 0\%                & 0\%                & 0\%                 \\ \hline
-                   & MM 2            & 0\%                & 0\%                & 0\%                 \\ \hline
-                   & MM 3            & 0\%                & 0\%                & 0\%                 \\ \hline
-\textbf{100Hz}     & ST.b 1          & 41.5\%             & 0\%                & 24.18\%             \\ \hline
-                   & ST.b 2          & 0\%                & 0\%                & 0\%                 \\ \hline
-                   & BT              & 0\%                & 22.4\%             & 0.36\%              \\ \hline
-                   & MM 1            & 0\%                & 0\%                & 0.25\%              \\ \hline
-                   & MM 2            & 0\%                & 0\%                & 9.4\%               \\ \hline
-                   & MM 3            & 0\%                & 0\%                & 6.37\%              \\ \hline
-\end{tabular}
-\label{table3}
-\end{table}
+\textbf{Faithfulness (Score: 
+0.89):} Measures the degree to which the generated synthesis aligns with and is supported by retrieved research, validating accurate representation of findings, methodologies, and results without distortion or misattribution. The generated response demonstrated exceptional alignment with source material across core technical claims regarding models, benchmarks, and challenges. Specific findings including quantitative performance improvements, architectural innovations, and methodological approaches were accurately represented from retrieved sources. The score does not reach 
+higher results because certain synthesis statements aggregated information across multiple sources into generalized claims rather than maintaining precise source attribution, representing conservative synthesis that reduces explicit traceability while maintaining technical accuracy. The score reflects strong research integrity with accurate representation of technical details and quantitative claims.
 
-\FloatBarrier
+\textbf{Answer Relevancy (Score: 
+0.87):} Assesses whether the generated response directly addresses the user's query with accurate, specific, and research-validated details that fulfill the stated requirements, evaluating the system's ability to prioritize requested information. The response successfully provided key models with architectural descriptions, performance benchmarks with quantitative metrics, and open challenges with explicit enumeration. However, the score does not reach maximum because certain sections extended beyond strict fulfillment of query requirements into supplementary analysis. Additionally, the response lacked explicit inline attribution linking specific benchmarks directly to their sources, reducing transparency about which findings are most strongly supported. The achieved score indicates good alignment with user requirements while including valuable but unrequested supplementary information.
 
-In conclusion, it is evident that the percentage of loss packets heavily depends on the output data rate, that should be chosen accordingly to the desired application. To get higher data rates with the same number of devices, it is a better idea to find a good tradeoff using multiple Bluetooth Adapters. 
+\textbf{Hallucination Detection (Score: \( 0.96 \), Hallucination Rate: \( 4\% \)):} Explicitly identifies claims in the generated synthesis that contradict, lack support in retrieved sources, or introduce unsupported assertions about models, benchmarks, or challenges. Analysis of \( 71 \) distinct factual claims identified: \( 68 \) well-supported claims (\( 96\% \)), \( 3 \) unsupported claims (\( 3\% \)), and \( 0 \) contradictory claims (\( 0\% \)). Examples of unsupported claims include speculative assertions about future research directions and prospective applications not explicitly present in retrieved sources. Well-supported claims include specific model names, quantitative performance metrics, technical innovations, application domains, and identified research challenges, all verified in retrieved sources. The achieved score indicates that \( 96\% \) of generated claims are directly supported by retrieved literature, with only minor prospective inferences (\( 4\% \)) that do not contradict sources but extend beyond strict reporting of current findings.
 
-Nevertheless, other issues may come into play in this situation. For example, in Chapter 2.2 I reported the results of a study, which found that the Bluetooth adapter heavily impacts the percentage of received packets, so maybe these results can be expanded by trying different dongles. 
+\textbf{Requirement Completeness (Score: \( 0.84 \)):} Measures whether the system addressed all explicit components of the three-part query requirement: identification of key models, provision of performance benchmarks, and enumeration of open research challenges. The response successfully identified multiple key models with technical descriptions, provided quantitative benchmarks with specific numerical results, and explicitly listed primary research challenges. The score does not reach \( 0.92+ \) because: (1) the response provided limited quantitative comparison between different models, (2) only selected benchmark datasets received detailed metric reporting, and (3) open challenges were presented as a flat enumeration rather than systematically prioritized by research impact or severity. The achieved score reflects comprehensive coverage of all three query dimensions while lacking depth in comparative analysis and structured prioritization.
 
-Another point is that the same test performed in different moments can cause big changes in the results. I noticed that repeating a test immediately usually returns similar numbers of losses, while repeating the same experiment the following day generated different results. A possible explanation of this behaviour can be the fact that Bluetooth uses the 2.4~GHz wireless band: a lot of other devices use it (WiFi, alarm systems). The BLE protocol includes a frequency hopping mechanism, to find the best channel for every connection event, but the Wireless traffic is usually not deterministic and prone to immediate variations, that can impact the performances of these nodes.
+\vspace{0.3cm}
 
-Also, the remote node seems to make a difference. In particular, MetaMotionS seems to perform better in these tests. As their firmware is not open-source, I can only make some assumptions to try to explain this: (1) the Nordic Bluetooth stack may act differently from the ST one, giving better results, (2) the design of their boards (and antennas) allows better transmission performances, or maybe (3) the library used by their Python APIs performs better than BluePy (that is the one I used for the ST client).
+\noindent \textbf{Overall System Performance:} All metrics demonstrate that the academic search branch successfully retrieves and synthesizes research directly aligned with user query requirements, producing accurate and research-validated summaries of recent SNN advances. The query-aligned evaluation approach reveals that the system achieves high technical accuracy in faithfulness (\( 0.89 \)) and hallucination prevention (\( 0.96 \)), while demonstrating room for improvement in query alignment (\( 0.89 \)) and requirement depth (\( 0.84 \)). The academic search branch demonstrates reliability in preventing hallucinations and maintaining source fidelity, validating its architectural role within the multi-branch system.
 
-In any case, even if the percentage of loss packets may not vary that much, the usage of multiple dongles is recommended. During the tests done with 7 devices and 7 dongles, the connection procedure was fast and I never encountered failures, while using less dongles may require more time to perform the connection and sometimes it fails. 
 
-For further experiments, and for the final version of the acquisition system, I chose 75~Hz as the data rate for ST devices, and consequently 50~Hz for the MBIENTLAB ones. 
+

@@ -1,13 +1,8 @@
 \chapter{Results and discussion}
 
-Finally, I performed some tests and experiment with the developed system to verify if it is working properly and whether the original requirements are met. 
 
-The first experiment had the goal of finding the best data rate at which the boards can send samples with an acceptable loss of information (due to lost packets). I tried different configurations of sensors and Bluetooth adapters to find the best working condition.
-
-The second one tested time synchronization performances: I moved all the sensors coherently, and analyzed the delays between the signals, comparing the results from the ST devices (with my version of the time synchronization) with the ones from MBIENTLAB.
-
-The last test is the most extensive one, as I mounted the system on a car and tested the data sampling for around 1 hour. It has been a good benchmark for system reliability and time synchronization. At the same time, I used all the data generated during this experience to test some further elaboration, including calibration of the axes and event labeling through audio. 
 
 \input{chap4/section/datarate.tex}
 \input{chap4/section/time_sync_precision.tex}
 \input{chap4/section/car_experiment.tex}
+\input{chap4/section/codeusecases.tex}

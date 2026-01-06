@@ -1,0 +1,109 @@
+\section{Models and Infrastructure}
+
+\subsection{Large Language Models Used}
+
+The system employs a heterogeneous collection of open-source language models served locally via Ollama, each optimized for distinct computational tasks and complexity profiles. This multi-model approach balances inference latency, context window size, reasoning capability, and computational resource constraints. The following four models form the backbone of the system:
+
+\subsubsection{Mistral: Lightweight Routing and Decision-Making}
+
+\textbf{Model:} Mistral 7B (mistral:latest) | \textbf{Size:} 4.4 GB 
+
+Mistral is employed for relatively low-reasoning tasks where rapid inference and minimal computational overhead are prioritized over deep semantic understanding. Its primary use cases include:
+
+\begin{itemize}
+    \item \textbf{Routing decisions}: Determining which branch (web research, academic search, or code generation) should process a given user query.
+    
+    \item \textbf{Query classification}: Categorizing user questions into predefined types (e.g., implementation request, configuration question, architecture inquiry).
+    
+    \item \textbf{Simple text transformations}: Formatting, parsing, and lightweight text preprocessing tasks that do not require extensive reasoning.
+\end{itemize}
+
+Mistral's relatively small parameter count (7B) enables fast inference on limited hardware while maintaining sufficient semantic capability for these structured decision tasks. Its efficiency makes it suitable for high-throughput scenarios where latency is critical.
+
+\subsubsection{Qwen: Tool-Augmented Task Execution}
+
+\textbf{Model:} Qwen 20B (qwen3:latest) | \textbf{Size:} 5.2 GB 
+
+Qwen serves as the primary workhorse for tasks involving tool invocation and structured interaction with external systems. Its capabilities include:
+
+\begin{itemize}
+    
+    \item \textbf{Tool orchestration}: Coordinating multi-step workflows with Agno agents, including TavilyTools, ArxivTools, and DuckDuckGoTools for information retrieval.
+    
+\end{itemize}
+
+Qwen's 20B parameter size provides a good balance between reasoning capability and inference speed. Its design emphasizes structured output (JSON mode), making it well-suited for tasks requiring formatted, machine-parseable responses. The model has demonstrated strong performance in tool use scenarios through its integration with LangChain and Agno agents.
+
+\subsubsection{GPT-OSS: Large-Context Complex Reasoning}
+
+\textbf{Model:} GPT-OSS 20B (gpt-oss:20b) | \textbf{Size:} 13 GB 
+
+GPT-OSS is deployed for tasks requiring large context windows, complex multi-step reasoning, and generation of substantial outputs. Its primary applications include:
+
+\begin{itemize}
+    \item \textbf{Search query generation}: Generating diverse, specific search queries for web and academic literature retrieval (web research and academic search branches).
+        
+    \item \textbf{Query ranking}: Ranking generated queries by semantic relevance to the user's original question.
+    
+
+    \item \textbf{Code generation}: Producing complete, production-grade Python code for NNI configurations and snnTorch implementations. Code generation typically requires 3000--5000 tokens of context and substantial reasoning over multiple requirements.
+    
+    \item \textbf{Long-form document synthesis}: Generating detailed, comprehensive responses that integrate information from multiple retrieval sources.
+    
+    \item \textbf{Complex task decomposition}: Breaking down intricate user requests into component tasks and generating execution plans.
+\end{itemize}
+
+GPT-OSS's larger parameter count (20B) and increased model size (13 GB) accommodate longer context windows and deeper reasoning chains compared to smaller models. The enlarged context capacity is essential for code generation tasks where the model must track multiple files, imports, dependencies, and logical flow across hundreds of lines. While inference is slower than smaller models, the improved reasoning quality justifies the computational cost for complex tasks.
+
+\subsubsection{DeepSeek-R1: LLM-as-a-Judge Evaluation}
+
+\textbf{Model:} DeepSeek-R1 (deepseek-r1:latest) | \textbf{Size:} 5.2 GB 
+
+DeepSeek-R1 is specifically trained for chain-of-thought reasoning and is deployed as the evaluator in the DeepEval framework for automated quality assessment. Its role includes:
+
+\begin{itemize}
+    \item \textbf{RAG metric computation}: Computing faithfulness, answer relevancy, contextual relevancy, and hallucination detection scores for generated summaries.
+    
+    \item \textbf{Claim verification}: Analyzing generated statements against retrieval context to detect factual grounding and contradictions.
+    
+    \item \textbf{Reasoning articulation}: Providing interpretable explanations for each metric score, enabling users to understand evaluation decisions.
+\end{itemize}
+
+DeepSeek-R1's training emphasizes reasoning transparency through explicit thinking tokens, making it well-suited for the LLM-as-a-judge paradigm where explainability is paramount. Unlike other models optimized for speed or efficiency, DeepSeek-R1 prioritizes reasoning quality, which is essential for reliable evaluation of complex RAG outputs.
+
+\subsection{Model Selection Rationale}
+
+The multi-model architecture reflects a strategic specialization approach rather than a one-size-fits-all design:
+
+\begin{table}[h]
+\centering
+\caption{Task-Specific Model Selection and Rationale}
+\label{tab:model-selection}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Task Type} & \textbf{Complexity} & \textbf{Model} & \textbf{Rationale} \\
+\midrule
+Routing & Low & Mistral & Speed, efficiency \\
+Query generation & Medium & Qwen & Tool integration \\
+Code generation & High & GPT-OSS & Large context, reasoning \\
+Evaluation & High & DeepSeek-R1 & Chain-of-thought, transparency \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+This heterogeneous model selection optimizes the end-to-end pipeline by matching model capabilities to task requirements, avoiding wasteful over-provisioning (e.g., using a 20B model for binary routing decisions) while ensuring adequate capability for complex tasks.
+
+\subsection{Ollama Infrastructure}
+
+All models are served locally via Ollama, an open-source framework for deploying and running large language models on commodity hardware. Ollama provides:
+
+\begin{itemize}
+    \item \textbf{Local inference}: Models run on-device without external API calls, ensuring privacy, latency predictability, and independence from cloud service availability.
+    
+    \item \textbf{Resource management}: Ollama handles GPU/CPU allocation, model quantization, and memory management transparently.
+    
+    \item \textbf{API abstraction}: Standardized REST API enables uniform model invocation regardless of underlying model architecture.
+\end{itemize}
+
+The choice of local deployment via Ollama reflects the research context where reproducibility, privacy, and independence from external services are prioritized. The research system does not depend on commercial APIs, enabling full control over model behavior, context logging, and iteration without rate limits or usage restrictions.

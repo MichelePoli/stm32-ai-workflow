@@ -1,0 +1,10 @@
+
+\section{Open-Source Frameworks for LLMs Deployment}
+
+As the use of LLMs expands, open-source frameworks play a critical role in enabling transparency, flexibility of deployment, data privacy, and local inference. Deploying and running models locally (or under full infrastructure control) helps mitigate reliance on proprietary APIs and external services. In this section, Ollama is described, the one used in the thesis, as a practical framework for local model deployment, followed by a brief survey of open-source model ecosystems and their relevance to research and deployment.
+
+\subsection{Ollama.}  
+Ollama is an open-source framework designed to simplify the deployment and orchestration of LLMs in local or private environments. Rather than functioning as a cloud-based service, Ollama provides users with the ability to run models entirely on their own hardware, ensuring control over data privacy and system integration. According to its official documentation, Ollama enables model management, inference, and customization through an accessible \gls{api} and a lightweight runtime environment \cite{ollama_docs_quickstart}. The framework abstracts away low-level dependencies, such as model loading, quantization, and hardware optimization, so that users can focus on experimentation and workflow integration rather than infrastructure details. 
+
+Ollama supports a wide range of open-source models, including families derived from LLaMA, Mistral, and Gemma, and provides unified access to these models through both command-line and API interfaces \cite{ollama_github_repo}. This allows developers and researchers to integrate language, vision, and multimodal reasoning capabilities into local applications without relying on external APIs. Recent studies have used Ollama as a backend in privacy-preserving or on-premise systems. Such integrations highlight Ollama’s role as a bridge between open-source model research and practical, locally deployable applications, offering an increasingly viable alternative to proprietary cloud platforms.
+
