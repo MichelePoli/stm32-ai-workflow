@@ -104,11 +104,11 @@ Upon reaching the loop limit, the system enters an evaluation phase using four c
 
 \begin{enumerate}
     \item \textbf{Faithfulness} : Measures whether summary claims are grounded in retrieved documents, preventing hallucinated information not present in sources.
-    
+
     \item \textbf{Answer Relevancy} : Assesses whether summary content directly addresses the research topic, ensuring topical alignment with the original query.
-    
+
     \item \textbf{Contextual Relevancy}: Evaluates whether retrieved documents are genuinely relevant to the context, reducing noise from tangentially related search results.
-    
+
     \item \textbf{Hallucination Detection} : Identifies unsupported claims in the summary, flagging content fabrication risk.
 \end{enumerate}
 
@@ -262,7 +262,7 @@ The reflection phase ensures that the system doesn't re-query the same papers bu
 \subsubsection{Loop Control and Branch Termination}
 
 The system maintains a \texttt{research\char`_loop\char`_count}
- strictly limiting the number of academic exploration cycles:
+strictly limiting the number of academic exploration cycles:
 
 \begin{lstlisting}
 if research_loop_count <= max_academic_research_loops:
@@ -278,14 +278,14 @@ The conservative loop limit balances coverage depth with computational efficienc
 Upon reaching the loop limit, the system enters an evaluation phase using the same four complementary RAG quality metrics:
 
 \begin{enumerate}
-\item \textbf{Faithfulness} : Ensures summary claims are grounded in retrieved academic papers, preventing hallucinated citations.
+    \item \textbf{Faithfulness} : Ensures summary claims are grounded in retrieved academic papers, preventing hallucinated citations.
 
-text
-\item \textbf{Answer Relevancy} : Verifies that academic synthesis directly addresses the research topic.
+          text
+    \item \textbf{Answer Relevancy} : Verifies that academic synthesis directly addresses the research topic.
 
-\item \textbf{Contextual Relevancy} : Evaluates whether retrieved papers are genuinely topically relevant.
+    \item \textbf{Contextual Relevancy} : Evaluates whether retrieved papers are genuinely topically relevant.
 
-\item \textbf{Hallucination Detection} : Identifies unsupported claims or fabricated references.
+    \item \textbf{Hallucination Detection} : Identifies unsupported claims or fabricated references.
 \end{enumerate}
 
 The evaluation process executes as follows:
@@ -346,12 +346,12 @@ The Code Generation Branch is a specialized subsystem designed to orchestrate th
 The Code Generation Branch follows a modular, multi-agent architecture with distinct components:
 
 \begin{itemize}
-  \item \textbf{Orchestrator Agent}: Routes user queries to specialized agents based on semantic analysis
-  \item \textbf{Specialized Code Agents}: Domain-specific agents (snnTorch, NNI) that generate code with repository-specific context
-  \item \textbf{Vector Retrieval System}: Two dedicated vectorstores with CodeBERT embeddings
-  \item \textbf{Code Parser and Extractor}: Handles multi-file code generation using explicit file markers
-  \item \textbf{Sandbox Executor}: E2B-based secure execution environment for validation
-  \item \textbf{Feedback Processing}: User-guided refinement loop with decision classification
+    \item \textbf{Orchestrator Agent}: Routes user queries to specialized agents based on semantic analysis
+    \item \textbf{Specialized Code Agents}: Domain-specific agents (snnTorch, NNI) that generate code with repository-specific context
+    \item \textbf{Vector Retrieval System}: Two dedicated vectorstores with CodeBERT embeddings
+    \item \textbf{Code Parser and Extractor}: Handles multi-file code generation using explicit file markers
+    \item \textbf{Sandbox Executor}: E2B-based secure execution environment for validation
+    \item \textbf{Feedback Processing}: User-guided refinement loop with decision classification
 \end{itemize}
 
 The system enforces strict separation between code generation (via LLM) and code validation (via sandboxed execution), enabling error detection before delivery. Generated code uses explicit file markers (\texttt{\# FILE: filename.py}) for modular composition, with each file representing a logical component.
@@ -360,24 +360,24 @@ The system enforces strict separation between code generation (via LLM) and code
 Algorithm~\ref{alg:orchestrator} describes the orchestrator's decision logic for routing queries to specialized agents.
 
 \begin{algorithm}
-\caption{Orchestrator Agent Tool Selection}
-\label{alg:orchestrator}
-\begin{algorithmic}[1]
-\REQUIRE User query \(q\), available tools \(T = \{\text{snnTorch}, \text{NNI}\}\)
-\ENSURE Selected tools with focused queries
-\STATE \(prompt \gets \) Create tool selection prompt with query \(q\)
-\STATE \(response \gets \text{LLM}(prompt)\)
-\STATE \(toolCalls \gets \text{JSON.parse}(response)\)
-\FOR{each \(call \in toolCalls\)}
-    \STATE \(toolName \gets call.\text{name}\)
-    \STATE \(toolQuery \gets call.\text{query}\)
-    \STATE \(result \gets \text{ExecuteTool}(toolName, toolQuery)\)
-    \IF{\(result.\text{error} = \text{null}\) \AND \(|result.\text{code}| > 50\)}
+    \caption{Orchestrator Agent Tool Selection}
+    \label{alg:orchestrator}
+    \begin{algorithmic}[1]
+        \REQUIRE User query \(q\), available tools \(T = \{\text{snnTorch}, \text{NNI}\}\)
+        \ENSURE Selected tools with focused queries
+        \STATE \(prompt \gets \) Create tool selection prompt with query \(q\)
+        \STATE \(response \gets \text{LLM}(prompt)\)
+        \STATE \(toolCalls \gets \text{JSON.parse}(response)\)
+        \FOR{each \(call \in toolCalls\)}
+        \STATE \(toolName \gets call.\text{name}\)
+        \STATE \(toolQuery \gets call.\text{query}\)
+        \STATE \(result \gets \text{ExecuteTool}(toolName, toolQuery)\)
+        \IF{\(result.\text{error} = \text{null}\) \AND \(|result.\text{code}| > 50\)}
         \STATE \(validOutputs.\text{add}(toolName, result)\)
-    \ENDIF
-\ENDFOR
-\RETURN \(validOutputs\)
-\end{algorithmic}
+        \ENDIF
+        \ENDFOR
+        \RETURN \(validOutputs\)
+    \end{algorithmic}
 \end{algorithm}
 
 The orchestrator validates each tool output before acceptance by checking: (1) the error field is null, (2) code length exceeds 50 characters, and (3) file markers are present.
@@ -388,32 +388,32 @@ The orchestrator validates each tool output before acceptance by checking: (1) t
 The system maintains two specialized vectorstores implemented using Chromadb with persistent storage:
 
 \begin{itemize}
-  \item \textbf{snnTorch Vectorstore}: Online documentation from \texttt{snntorch.readthedocs.io}, recursive loading with custom depth limit, focuses on spiking neural networks, LIF neurons, training methods
-  \item \textbf{NNI Vectorstore}: Local examples from \texttt{esempi\_NNI/} directory plus API reference document, focuses on hyperparameter tuning configurations and experiment setup patterns
+    \item \textbf{snnTorch Vectorstore}: Online documentation from \texttt{snntorch.readthedocs.io}, recursive loading with custom depth limit, focuses on spiking neural networks, LIF neurons, training methods
+    \item \textbf{NNI Vectorstore}: Local examples from \texttt{esempi\_NNI/} directory plus API reference document, focuses on hyperparameter tuning configurations and experiment setup patterns
 \end{itemize}
 
 Both employ CodeBERT embeddings (\texttt{mchochlov/codebert-base-cd-ft}), optimized for code semantics with cosine similarity metric. The vectorstore initialization follows an equal pattern (Algorithm~\ref{alg:vectorstore-init}).
 
 \begin{algorithm}
-\caption{Vectorstore Initialization}
-\label{alg:vectorstore-init}
-\begin{algorithmic}[1]
-\REQUIRE Persist directories \(D_{snn}, D_{nni}\), source URLs/paths
-\ENSURE Initialized vectorstores
-\IF{\(D_{snn}\) exists \AND \(D_{nni}\) exists}
-    \STATE Load existing vectorstores from disk
-    \RETURN cached vectorstores
-\ENDIF
-\STATE \(docs_{snn} \gets \text{RecursiveURLLoader}(\text{snnTorch docs}, \text{depth}=7)\)
-\STATE \(docs_{nni} \gets \text{DirectoryLoader}(\text{esempi\_NNI}) + \text{APIRef}\)
-\STATE \(docs_{nni}.\text{insert}(0, \text{APIRef})\) \COMMENT{Priority insertion}
-\STATE \(chunks_{snn} \gets \text{TextSplitter}(docs_{snn}, \text{chunk}=512, \text{overlap}=50)\)
-\STATE \(chunks_{nni} \gets \text{TextSplitter}(docs_{nni}, \text{chunk}=512, \text{overlap}=50)\)
-\STATE \(V_{snn} \gets \text{Chroma.from\_documents}(chunks_{snn}, \text{CodeBERT})\)
-\STATE \(V_{nni} \gets \text{Chroma.from\_documents}(chunks_{nni}, \text{CodeBERT})\)
-\STATE Persist \(V_{snn}\) to \(D_{snn}\), \(V_{nni}\) to \(D_{nni}\)
-\RETURN \(V_{snn}, V_{nni}\)
-\end{algorithmic}
+    \caption{Vectorstore Initialization}
+    \label{alg:vectorstore-init}
+    \begin{algorithmic}[1]
+        \REQUIRE Persist directories \(D_{snn}, D_{nni}\), source URLs/paths
+        \ENSURE Initialized vectorstores
+        \IF{\(D_{snn}\) exists \AND \(D_{nni}\) exists}
+        \STATE Load existing vectorstores from disk
+        \RETURN cached vectorstores
+        \ENDIF
+        \STATE \(docs_{snn} \gets \text{RecursiveURLLoader}(\text{snnTorch docs}, \text{depth}=7)\)
+        \STATE \(docs_{nni} \gets \text{DirectoryLoader}(\text{esempi\_NNI}) + \text{APIRef}\)
+        \STATE \(docs_{nni}.\text{insert}(0, \text{APIRef})\) \COMMENT{Priority insertion}
+        \STATE \(chunks_{snn} \gets \text{TextSplitter}(docs_{snn}, \text{chunk}=512, \text{overlap}=50)\)
+        \STATE \(chunks_{nni} \gets \text{TextSplitter}(docs_{nni}, \text{chunk}=512, \text{overlap}=50)\)
+        \STATE \(V_{snn} \gets \text{Chroma.from\_documents}(chunks_{snn}, \text{CodeBERT})\)
+        \STATE \(V_{nni} \gets \text{Chroma.from\_documents}(chunks_{nni}, \text{CodeBERT})\)
+        \STATE Persist \(V_{snn}\) to \(D_{snn}\), \(V_{nni}\) to \(D_{nni}\)
+        \RETURN \(V_{snn}, V_{nni}\)
+    \end{algorithmic}
 \end{algorithm}
 
 \paragraph{CodeBERT Memory Optimization}
@@ -462,25 +462,25 @@ Ranked queries receive relevance weights: \(w_i = 1.0 - (i-1) \times 0.05\) for 
 Algorithm~\ref{alg:multipass-retrieval} implements the weighted multi-pass retrieval strategy.
 
 \begin{algorithm}
-\caption{Multi-Pass Weighted Retrieval}
-\label{alg:multipass-retrieval}
-\begin{algorithmic}[1]
-\REQUIRE Ranked queries \(Q = [q_1, q_2, \ldots, q_n]\), vectorstore \(V\), \(k=20\)
-\ENSURE Weighted context string
-\STATE \(context \gets \text{""}\)
-\STATE \(totalDocs \gets 0\)
-\FOR{\(i \gets 1\) to \(n\)}
-    \STATE \(w_i \gets 1.0 - (i-1) \times 0.05\)
-    \STATE \(docs \gets V.\text{retrieve}(q_i, k)\)
-    \STATE \(totalDocs \gets totalDocs + |docs|\)
-    \FOR{each \(doc \in docs\)}
+    \caption{Multi-Pass Weighted Retrieval}
+    \label{alg:multipass-retrieval}
+    \begin{algorithmic}[1]
+        \REQUIRE Ranked queries \(Q = [q_1, q_2, \ldots, q_n]\), vectorstore \(V\), \(k=20\)
+        \ENSURE Weighted context string
+        \STATE \(context \gets \text{""}\)
+        \STATE \(totalDocs \gets 0\)
+        \FOR{\(i \gets 1\) to \(n\)}
+        \STATE \(w_i \gets 1.0 - (i-1) \times 0.05\)
+        \STATE \(docs \gets V.\text{retrieve}(q_i, k)\)
+        \STATE \(totalDocs \gets totalDocs + |docs|\)
+        \FOR{each \(doc \in docs\)}
         \STATE \(source \gets doc.\text{metadata.source}\)
         \STATE \(content \gets doc.\text{page\_content}[0:600]\)
         \STATE \(context \gets context + \text{f"Query \{i\} - \{source\} - weight \{w\_i:.2f\}: \{content\}---"}\)
-    \ENDFOR
-\ENDFOR
-\RETURN \(context[0:8000]\) \COMMENT{Limit to 8k chars}
-\end{algorithmic}
+        \ENDFOR
+        \ENDFOR
+        \RETURN \(context[0:8000]\) \COMMENT{Limit to 8k chars}
+    \end{algorithmic}
 \end{algorithm}
 
 The weighted context enables the LLM to prioritize information from higher-ranked queries during code generation.
@@ -510,36 +510,36 @@ The NNI agent generates hyperparameter tuning configurations with strict JSON ou
 Algorithm~\ref{alg:unified-parser} implements a multi-strategy parsing approach with graceful degradation.
 
 \begin{algorithm}
-\caption{Unified Response Parser}
-\label{alg:unified-parser}
-\begin{algorithmic}[1]
-\REQUIRE LLM response text \(R\)
-\ENSURE Parsed result dict
-\STATE \(R \gets R.\text{strip}()\)
-\IF{\(R\) contains markdown code fences}
-    \STATE Remove fences: \(R \gets R.\text{remove\_fences}()\)
-\ENDIF
-\STATE \textbf{Strategy 1: JSON Parsing}
-\STATE \textbf{try}
-    \STATE \(data \gets \text{JSON.parse}(R)\)
-    \STATE Map alternative field names to canonical \texttt{code} field
-    \STATE Normalize escape sequences: \(data[\text{"code"}] \gets \text{normalize}(data[\text{"code"}])\)
-    \RETURN \(data\)
-\STATE \textbf{catch} {JSONDecodeError}
-    \STATE Continue to Strategy 2
-\STATE \textbf{end try}
-\STATE \textbf{Strategy 2: Markdown Code Block Extraction}
-\STATE \(blocks \gets \text{REGEX.findall}(\text{r'```[a-z]*\textbackslash n(.*?)```'}, R)\)
-\IF{\(|blocks| > 0\)}
-    \STATE Deduplicate and merge blocks
-    \RETURN \(\{\text{"code"}: \text{merged}, \text{"parse\_method"}: \text{"markdown"}\}\)
-\ENDIF
-\STATE \textbf{Strategy 3: Raw Text Fallback}
-\IF{\(|R| > 50\)}
-    \RETURN \(\{\text{"code"}: R, \text{"parse\_method"}: \text{"raw"}\}\)
-\ENDIF
-\RETURN \(\{\text{"error"}: \text{"Could not parse response"}\}\)
-\end{algorithmic}
+    \caption{Unified Response Parser}
+    \label{alg:unified-parser}
+    \begin{algorithmic}[1]
+        \REQUIRE LLM response text \(R\)
+        \ENSURE Parsed result dict
+        \STATE \(R \gets R.\text{strip}()\)
+        \IF{\(R\) contains markdown code fences}
+        \STATE Remove fences: \(R \gets R.\text{remove\_fences}()\)
+        \ENDIF
+        \STATE \textbf{Strategy 1: JSON Parsing}
+        \STATE \textbf{try}
+        \STATE \(data \gets \text{JSON.parse}(R)\)
+        \STATE Map alternative field names to canonical \texttt{code} field
+        \STATE Normalize escape sequences: \(data[\text{"code"}] \gets \text{normalize}(data[\text{"code"}])\)
+        \RETURN \(data\)
+        \STATE \textbf{catch} {JSONDecodeError}
+        \STATE Continue to Strategy 2
+        \STATE \textbf{end try}
+        \STATE \textbf{Strategy 2: Markdown Code Block Extraction}
+        \STATE \(blocks \gets \text{REGEX.findall}(\texttt{r'```[a-z]*\textbackslash n(.*?)```'}, R)\)
+        \IF{\(|blocks| > 0\)}
+        \STATE Deduplicate and merge blocks
+        \RETURN \(\{\text{"code"}: \text{merged}, \text{"parse\_method"}: \text{"markdown"}\}\)
+        \ENDIF
+        \STATE \textbf{Strategy 3: Raw Text Fallback}
+        \IF{\(|R| > 50\)}
+        \RETURN \(\{\text{"code"}: R, \text{"parse\_method"}: \text{"raw"}\}\)
+        \ENDIF
+        \RETURN \(\{\text{"error"}: \text{"Could not parse response"}\}\)
+    \end{algorithmic}
 \end{algorithm}
 
 \paragraph{Escape Sequence Normalization}
@@ -560,43 +560,43 @@ This ensures code readability and correct execution in the sandbox.
 Algorithm~\ref{alg:file-extraction} extracts individual files from the unified code string.
 
 \begin{algorithm}
-\caption{File Extraction with Regex Markers}
-\label{alg:file-extraction}
-\begin{algorithmic}[1]
-\REQUIRE Code string \(C\) with \texttt{\# FILE:} markers
-\ENSURE Dict mapping filename → content
-\STATE \(pattern \gets \text{r'\textasciicircum\# FILE:\textbackslash s*(\textbackslash S+\textbackslash .py)\textbackslash s*\$'}\)
-\STATE \(lines \gets C.\text{split}('\textbackslash n')\)
-\STATE \(files \gets \{\}\), \(currentFile \gets \text{null}\), \(currentContent \gets []\)
-\FOR{each \(line \in lines\)}
-    \STATE \(match \gets \text{REGEX.match}(pattern, line)\)
-    \IF{\(match \neq \text{null}\)}
+    \caption{File Extraction with Regex Markers}
+    \label{alg:file-extraction}
+    \begin{algorithmic}[1]
+        \REQUIRE Code string \(C\) with \texttt{\# FILE:} markers
+        \ENSURE Dict mapping filename → content
+        \STATE \(pattern \gets \texttt{r'\^{}\# FILE:\textbackslash s*(\textbackslash S+\textbackslash .py)\textbackslash s*\$'} \)
+        \STATE \(lines \gets C.\text{split}(\texttt{'\textbackslash n'})\)
+        \STATE \(files \gets \{\}\), \(currentFile \gets \text{null}\), \(currentContent \gets []\)
+        \FOR{each \(line \in lines\)}
+        \STATE \(match \gets \text{REGEX.match}(pattern, line)\)
+        \IF{\(match \neq \text{null}\)}
         \IF{\(currentFile \neq \text{null}\)}
-            \STATE \(files[currentFile] \gets \text{join}(currentContent)\)
+        \STATE \(files[currentFile] \gets \text{join}(currentContent)\)
         \ENDIF
         \STATE \(currentFile \gets match.\text{group}(1)\)
         \STATE \(currentContent \gets []\)
-    \ELSIF{\(currentFile \neq \text{null}\)}
+        \ELSIF{\(currentFile \neq \text{null}\)}
         \STATE \(currentContent.\text{append}(line)\)
-    \ENDIF
-\ENDFOR
-\IF{\(currentFile \neq \text{null}\)}
-    \STATE \(files[currentFile] \gets \text{join}(currentContent)\)
-\ENDIF
-\RETURN \(files\) if \(files \neq \{\}\) else \(\{\text{"main.py"}: C\}\)
-\end{algorithmic}
+        \ENDIF
+        \ENDFOR
+        \IF{\(currentFile \neq \text{null}\)}
+        \STATE \(files[currentFile] \gets \text{join}(currentContent)\)
+        \ENDIF
+        \RETURN \(files\) if \(files \neq \{\}\) else \(\{\text{"main.py"}: C\}\)
+    \end{algorithmic}
 \end{algorithm}
 
 \paragraph{Multi-Agent Code Integration}
 When multiple agents contribute code (e.g., snnTorch + NNI), intelligent merging applies a priority scheme:
 
 \begin{enumerate}
-  \item \textbf{Priority 1}: \texttt{config.py} (configuration)
-  \item \textbf{Priority 2}: \texttt{search\_space.json} (NNI search space)
-  \item \textbf{Priority 3}: \texttt{model.py} (architecture)
-  \item \textbf{Priority 4}: \texttt{utils.py} (helpers)
-  \item \textbf{Priority 5}: \texttt{train.py} (training loop)
-  \item \textbf{Priority 6}: \texttt{main.py} (entry point)
+    \item \textbf{Priority 1}: \texttt{config.py} (configuration)
+    \item \textbf{Priority 2}: \texttt{search\_space.json} (NNI search space)
+    \item \textbf{Priority 3}: \texttt{model.py} (architecture)
+    \item \textbf{Priority 4}: \texttt{utils.py} (helpers)
+    \item \textbf{Priority 5}: \texttt{train.py} (training loop)
+    \item \textbf{Priority 6}: \texttt{main.py} (entry point)
 \end{enumerate}
 
 Files are sorted by priority and concatenated with file markers. Duplicates are resolved by keeping the first occurrence (higher-priority agent).
@@ -607,27 +607,27 @@ Files are sorted by priority and concatenated with file markers. Duplicates are 
 Generated code is executed in an isolated E2B sandbox (\texttt{code-interpreter-v1} template) with 1GB memory and CPU-only execution. Algorithm~\ref{alg:sandbox-exec} describes the multi-file execution process.
 
 \begin{algorithm}
-\caption{Sandboxed Multi-File Execution}
-\label{alg:sandbox-exec}
-\begin{algorithmic}[1]
-\REQUIRE Code string \(C\) with file markers
-\ENSURE Execution results
-\STATE \(files \gets \text{parse\_multifile\_code}(C)\)
-\STATE \(mainFile \gets \text{detect\_main\_file}(files)\) \COMMENT{Priority: main.py > train.py > experiment.py}
-\STATE \(sandbox \gets \text{E2B.create}(\text{"code-interpreter-v1"})\)
-\STATE \(packages \gets \text{extract\_packages}(C)\) \COMMENT{Parse import statements}
-\STATE \(sandbox.\text{run}(\text{"pip install "} + \text{join}(packages))\)
-\FOR{each \((filename, content) \in files\)}
-    \STATE \(sandbox.\text{upload}(\text{"/home/user/"} + filename, content)\)
-\ENDFOR
-\STATE \(result \gets sandbox.\text{run}(\text{"python "} + mainFile)\)
-\STATE \(sandbox.\text{kill}()\)
-\RETURN \(\{
-    \text{"exit\_code"}: result.\text{exit\_code},
-    \text{"stdout"}: result.\text{stdout},
-    \text{"stderr"}: result.\text{stderr}
-\}\)
-\end{algorithmic}
+    \caption{Sandboxed Multi-File Execution}
+    \label{alg:sandbox-exec}
+    \begin{algorithmic}[1]
+        \REQUIRE Code string \(C\) with file markers
+        \ENSURE Execution results
+        \STATE \(files \gets \text{parse\_multifile\_code}(C)\)
+        \STATE \(mainFile \gets \text{detect\_main\_file}(files)\) \COMMENT{Priority: main.py > train.py > experiment.py}
+        \STATE \(sandbox \gets \text{E2B.create}(\text{"code-interpreter-v1"})\)
+        \STATE \(packages \gets \text{extract\_packages}(C)\) \COMMENT{Parse import statements}
+        \STATE \(sandbox.\text{run}(\text{"pip install "} + \text{join}(packages))\)
+        \FOR{each \((filename, content) \in files\)}
+        \STATE \(sandbox.\text{upload}(\text{"/home/user/"} + filename, content)\)
+        \ENDFOR
+        \STATE \(result \gets sandbox.\text{run}(\text{"python "} + mainFile)\)
+        \STATE \(sandbox.\text{kill}()\)
+        \RETURN \(\{
+        \text{"exit\_code"}: result.\text{exit\_code},
+        \text{"stdout"}: result.\text{stdout},
+        \text{"stderr"}: result.\text{stderr}
+        \}\)
+    \end{algorithmic}
 \end{algorithm}
 
 \paragraph{Dependency Auto-Detection and Installation}
@@ -658,27 +658,27 @@ Before execution, Pyright analysis detects type errors, undefined variables, and
 After code generation or sandbox execution, users select from four actions via an interrupt mechanism:
 
 \begin{itemize}
-  \item \textbf{approve}: Accept code and terminate
-  \item \textbf{regenerate}: Request modifications with feedback
-  \item \textbf{evaluate}: Compare against reference implementation
-  \item \textbf{execute}: Run specific file in sandbox
+    \item \textbf{approve}: Accept code and terminate
+    \item \textbf{regenerate}: Request modifications with feedback
+    \item \textbf{evaluate}: Compare against reference implementation
+    \item \textbf{execute}: Run specific file in sandbox
 \end{itemize}
 
 Algorithm~\ref{alg:feedback-classification} describes the LLM-based feedback classification.
 
 \begin{algorithm}
-\caption{Feedback Decision Classification}
-\label{alg:feedback-classification}
-\begin{algorithmic}[1]
-\REQUIRE User feedback text \(F\)
-\ENSURE Action and optional filename
-\STATE \(prompt \gets \text{Create classification prompt with examples}\)
-\STATE \(response \gets \text{LLM}(prompt + F)\)
-\STATE \(data \gets \text{JSON.parse}(response)\)
-\STATE \(action \gets data[\text{"response"}]\) \COMMENT{approve/regenerate/evaluate/execute}
-\STATE \(filename \gets data.\text{get}(\text{"file\_name"}, \text{null})\)
-\RETURN \((action, filename)\)
-\end{algorithmic}
+    \caption{Feedback Decision Classification}
+    \label{alg:feedback-classification}
+    \begin{algorithmic}[1]
+        \REQUIRE User feedback text \(F\)
+        \ENSURE Action and optional filename
+        \STATE \(prompt \gets \text{Create classification prompt with examples}\)
+        \STATE \(response \gets \text{LLM}(prompt + F)\)
+        \STATE \(data \gets \text{JSON.parse}(response)\)
+        \STATE \(action \gets data[\text{"response"}]\) \COMMENT{approve/regenerate/evaluate/execute}
+        \STATE \(filename \gets data.\text{get}(\text{"file\_name"}, \text{null})\)
+        \RETURN \((action, filename)\)
+    \end{algorithmic}
 \end{algorithm}
 
 Example feedback classifications:
@@ -737,9 +737,9 @@ Conditional edges enable dynamic routing based on state values. The feedback loo
 The system implements multi-level error recovery:
 
 \begin{enumerate}
-  \item \textbf{Parser Level}: JSON parse fails → markdown extraction → raw text fallback
-  \item \textbf{Agent Level}: Validate error field, code length, file markers before acceptance
-  \item \textbf{Sandbox Level}: Timeout handling, missing package fallback, import error reporting
+    \item \textbf{Parser Level}: JSON parse fails → markdown extraction → raw text fallback
+    \item \textbf{Agent Level}: Validate error field, code length, file markers before acceptance
+    \item \textbf{Sandbox Level}: Timeout handling, missing package fallback, import error reporting
 \end{enumerate}
 
 All errors return structured dictionaries (never raw exceptions), ensuring system stability. Failed agent outputs are logged but do not terminate the workflow: remaining agents continue execution.
