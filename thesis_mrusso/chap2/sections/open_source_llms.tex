@@ -1,10 +1,16 @@
+\section{Open-Source LLMs and Local Deployment}
+The democratization of large language models has been accelerated by the rise of open-source initiatives, allowing researchers and organizations to deploy high-performance models on their own infrastructure. Local deployment is particularly critical for industrial MLOps, where data privacy, latency, and operational cost are paramount concerns.
 
-\section{Open-Source Frameworks for LLMs Deployment}
+\subsection{The Rise of Open-Source Model Families}
+Models such as Meta’s \textbf{Llama 3} and \textbf{Mistral} have demonstrated that smaller, well-trained models can approach the performance of massive proprietary APIs on many reasoning and coding tasks \cite{mistral_7b, touvron2023llama}. These models are often distributed in quantized formats (e.g., GGUF), which compress the model weights from 16-bit floating point to 4-bit or 8-bit integers. This reduction in memory footprint allows state-of-the-art models (even those with 8B to 70B parameters) to run on consumer-grade hardware or local workstations without specialized GPU clusters.
 
-As the use of LLMs expands, open-source frameworks play a critical role in enabling transparency, flexibility of deployment, data privacy, and local inference. Deploying and running models locally (or under full infrastructure control) helps mitigate reliance on proprietary APIs and external services. In this section, Ollama is described, the one used in the thesis, as a practical framework for local model deployment, followed by a brief survey of open-source model ecosystems and their relevance to research and deployment.
+\subsection{Ollama: Streamlining Local Inference}
+\textbf{Ollama} is a lightweight, open-source framework designed to simplify the local deployment and management of LLMs. It packages model weights, configurations, and inference engines into a single, easy-to-use interface. By utilizing the \texttt{llama.cpp} backend, Ollama provides high-performance inference through hardware acceleration (Metal on macOS, CUDA on NVIDIA, and ROCm on AMD). 
 
-\subsection{Ollama.}  
-Ollama is an open-source framework designed to simplify the deployment and orchestration of LLMs in local or private environments. Rather than functioning as a cloud-based service, Ollama provides users with the ability to run models entirely on their own hardware, ensuring control over data privacy and system integration. According to its official documentation, Ollama enables model management, inference, and customization through an accessible \gls{api} and a lightweight runtime environment \cite{ollama_docs_quickstart}. The framework abstracts away low-level dependencies, such as model loading, quantization, and hardware optimization, so that users can focus on experimentation and workflow integration rather than infrastructure details. 
-
-Ollama supports a wide range of open-source models, including families derived from LLaMA, Mistral, and Gemma, and provides unified access to these models through both command-line and API interfaces \cite{ollama_github_repo}. This allows developers and researchers to integrate language, vision, and multimodal reasoning capabilities into local applications without relying on external APIs. Recent studies have used Ollama as a backend in privacy-preserving or on-premise systems. Such integrations highlight Ollama’s role as a bridge between open-source model research and practical, locally deployable applications, offering an increasingly viable alternative to proprietary cloud platforms.
-
+Key features of Ollama integrated into this work include:
+\begin{enumerate}
+    \item \textbf{Model Versioning:} Simple commands (e.g., \texttt{ollama pull mistral}) allow for quick swapping between different model variants during testing.
+    \item \textbf{Custom Modelfiles:} Developers can define specialized system prompts and parameters (e.g., temperature, context window) directly in a declarative Modelfile.
+    \item \textbf{REST API Integration:} Ollama exposes a standard local API, allowing LangChain and LangGraph to consume local models as if they were remote cloud endpoints, facilitating a "hybrid" architecture where sensitive code generation happens locally while non-sensitive research tasks can use larger cloud models.
+\end{enumerate}
+In the developed framework, Ollama serves as the primary inference backend, ensuring that all model "surgery" and firmware configuration logic remains within the user's local network, thereby preserving intellectual property and reducing external dependencies.
