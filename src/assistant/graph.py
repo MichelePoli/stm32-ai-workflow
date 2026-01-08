@@ -146,14 +146,17 @@ Il sistema ha quattro workflow principali:
 1. **firmware**: Generazione progetto firmware STM32
    - Keywords: firmware, cubemx, stm32, progetto, board, .ioc, toolchain, generazione
    
-2. **ai_analysis**: Analisi e generazione codice AI
-   - Keywords: ai, modello, network, neurale, stedgeai, analyze, validate, generate, .h5, quantizzazione
-   
+2. **ai_analysis**: ESEGUIRE analisi, selezione o download di modelli
+   - Usalo per: "Trova un modello per X", "Analizza Moiblenet", "Voglio scaricare YOLO"
+   - Keywords: ai, modello, network, neurale, stedgeai, analyze, validate, generate, .h5
+   - NON usare per domande tipo "Come converto...?", "Spiegami X" -> usa web_research
+
 3. **integration**: Integrazione codice AI nel firmware
    - Keywords: integra, copia, merge, combina, main.c, include, linking
    
-4. **web_research**: Ricerca online di informazioni
-   - Keywords: ricerca, informazioni, aiutami, quale, come, best practice, documentazione
+4. **web_research**: Ricerca online di informazioni, guide e tutorial
+   - Usalo per: "Come converto X in Y?", "Documentazione su Z", "Errori comuni", "Confronto teorico"
+   - Keywords: ricerca, informazioni, aiutami, quale, come, best practice, documentazione, convertire, spiegare
 
 Analizza la richiesta dell'utente e determina quale workflow è più appropriato.
 Se la richiesta è ambigua, scegli il workflow più generale.
