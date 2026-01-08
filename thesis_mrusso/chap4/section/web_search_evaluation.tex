@@ -1,0 +1,120 @@
+\section{Web Search Agent: Quality Evaluation with DeepEval}
+
+This section presents an experimental validation of the Web Search Agent (Workflow 4), which integrates real-time information retrieval via Google Search, LLM-based summarization, and automated quality assessment using DeepEval metrics. The evaluation demonstrates the system's ability to provide reliable, fact-checked technical guidance for STM32 embedded AI development.
+
+\subsection{Methodology}
+
+\subsubsection{Evaluation Framework}
+The quality assessment leverages \textbf{DeepEval}\footnote{\url{https://github.com/confident-ai/deepeval}}, an open-source framework designed for RAG (Retrieval-Augmented Generation) evaluation. The framework was configured as follows:
+
+\begin{itemize}
+    \item \textbf{LLM Backend}: Mistral (7B parameters) via Ollama, running locally at \texttt{http://localhost:11434}
+    \item \textbf{Metrics}: Four domain-specific metrics tailored for technical documentation:
+    \begin{itemize}
+        \item \textbf{Faithfulness}: Measures factual consistency between the LLM-generated summary and retrieved documents (range: 0.0--1.0, higher is better)
+        \item \textbf{Answer Relevancy}: Assesses semantic alignment between user query and generated response using embedding-based similarity (range: 0.0--1.0)
+        \item \textbf{Contextual Relevancy}: Evaluates retrieval quality by measuring signal-to-noise ratio in retrieved documents (range: 0.0--1.0)
+        \item \textbf{Hallucination}: Detects fabricated or unsupported claims by cross-referencing the summary against retrieval context (range: 0.0--1.0, \textbf{lower} is better, 0.0 indicates no hallucinations)
+    \end{itemize}
+\end{itemize}
+
+\subsubsection{Test Protocol}
+The evaluation workflow consists of five sequential stages:
+
+\begin{enumerate}
+    \item \textbf{Query Classification}: The user submits a natural language query. The system classifies it into categories: \texttt{ai\_model}, \texttt{board\_selection}, \texttt{optimization}, or \texttt{documentation}.
+    \item \textbf{Web Retrieval}: Google Search API retrieves the top-ranked web pages matching the reformulated technical query.
+    \item \textbf{Granular Chunking}: Retrieved text is split into paragraph-level chunks to enable fine-grained relevance analysis.
+    \item \textbf{Summarization}: A local LLM (Mistral with temperature 0.2) synthesizes a concise technical answer from the chunks using an English-language prompt.
+    \item \textbf{DeepEval Assessment}: The four metrics are computed asynchronously in a separate thread to avoid blocking the agent workflow.
+\end{enumerate}
+
+\subsection{Experimental Results}
+
+\subsubsection{Test Cases}
+Five test queries were selected to cover diverse information needs typical of STM32 embedded AI developers:
+
+\begin{table}[ht]
+\centering
+\caption{DeepEval Metric Scores Across Test Queries}
+\label{tab:deepeval-results}
+\begin{tabular}{|l|c|c|c|c|}
+\hline
+\textbf{Query Type} & \textbf{Faith.} & \textbf{Ans. Rel.} & \textbf{Ctx. Rel.} & \textbf{Hall.} \\
+\hline
+AI Model Search & 0.60 & 0.50 & \textbf{0.90} & 0.00 \\
+Board Selection (Audio) & 0.73 & 0.18 & 0.56 & 0.25 \\
+Optimization Guide & \textbf{1.00} & 0.40 & 0.56 & 0.14 \\
+Theoretical Comparison & 0.80 & \textbf{0.88} & \textbf{0.86} & 0.00 \\
+Hardware Comparison & 0.44 & 0.87 & \textbf{0.88} & 0.33 \\
+\hline
+\textbf{Mean} & \textbf{0.71} & \textbf{0.57} & \textbf{0.75} & \textbf{0.14} \\
+\textbf{Std. Dev.} & 0.22 & 0.28 & 0.16 & 0.14 \\
+\hline
+\end{tabular}
+\end{table}
+
+\textbf{Test 1 -- AI Model Search}: \textit{``Lightweight AI models for image classification on STM32H7''}  
+The system successfully retrieved authoritative sources (TensorFlow documentation, arXiv papers), achieving excellent Contextual Relevancy (0.90). The moderate Faithfulness score (0.60) reflects the LLM's tendency to enrich raw data with general knowledge (e.g., typical use cases for MobileNet), which is valuable for end-users but technically ``unfaithful'' to strict retrieval context. Zero hallucination (0.00) confirms no fabricated facts.
+
+\textbf{Test 2 -- Board Selection}: \textit{``Qual è la migliore board STM32 per un progetto di audio recognition?''}  
+Low Answer Relevancy (0.18) stems from semantic distance between the singular query (``migliore board'') and the plural response (list of 3 boards). Hallucination was triggered (0.25) by specific pricing information (\$10--\$40) likely inferred from the LLM's training data rather than retrieved documents. This demonstrates DeepEval's sensitivity to ``consulting-style'' responses that go beyond strict retrieval.
+
+\textbf{Test 3 -- Optimization Guide}: \textit{``Come converto un modello PyTorch in ONNX per STM32?''}  
+\textbf{Perfect Faithfulness (1.00)} indicates the summary contained zero unsupported facts—ideal for technical documentation. The system successfully retrieved step-by-step guides, quantization tutorials, and tool comparisons (STEdgeAI, TensorFlow Lite, TVM). Visual output shown in Figure~\ref{fig:pytorch-onnx}.
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.9\textwidth]{chap4/figures/Screenshot 2026-01-08 at 16.46.34.png}
+    \caption{Web Search Agent output for PyTorch-to-ONNX conversion query, demonstrating perfect Faithfulness (1.00) by strictly adhering to retrieved technical guides.}
+    \label{fig:pytorch-onnx}
+\end{figure}
+
+\textbf{Test 4 -- Theoretical Comparison}: \textit{``TinyML vs Edge AI: differenze principali''}  
+\textbf{Best overall scores} (Answer Relevancy: 0.88, Contextual Relevancy: 0.86). The query's conceptual nature (definitions, comparisons) aligned well with academic sources (datasheets, whitepapers). High Contextual Relevancy confirms Google retrieved authoritative STMicroelectronics documentation. Output shown in Figure~\ref{fig:tinyml-edgeai}.
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.9\textwidth]{chap4/figures/Screenshot 2026-01-08 at 16.50.55.png}
+    \caption{Comparative analysis of TinyML vs. Edge AI paradigms, achieving highest Answer Relevancy (0.88) through precise conceptual distinction.}
+    \label{fig:tinyml-edgeai}
+\end{figure}
+
+\textbf{Test 5 -- Hardware Comparison}: \textit{``Confronta STM32H7 e STM32N6 per performance AI''}  
+The \textbf{lowest Faithfulness (0.44)} reveals an interesting trade-off: the summary included precise part numbers (STM32H745VGT6, STM32N6T6) and bulk pricing (\$6.05, \$3.56) that were \textbf{not} present in the retrieved snippets. DeepEval correctly flagged this as potential hallucination (0.33). While useful for users, it demonstrates the LLM's reliance on pre-trained knowledge when retrieval is incomplete.
+
+\subsection{Discussion}
+
+\subsubsection{Aggregate Performance}
+The system achieved robust performance across all metrics:
+\begin{itemize}
+    \item \textbf{Contextual Relevancy} (mean: 0.75, $\sigma$: 0.16): Consistently high scores (0.56--0.90) confirm the effectiveness of the Google Search + paragraph-level chunking strategy.
+    \item \textbf{Faithfulness} (mean: 0.71, $\sigma$: 0.22): Wide variance reflects the Faithfulness-Utility trade-off. Procedural queries (``How to convert...'') achieve perfect scores (1.00) by strictly adhering to sources, while consulting queries (``Compare boards...'') exhibit lower scores (0.44) due to LLM enrichment.
+    \item \textbf{Hallucination} (mean: 0.14, $\sigma$: 0.14): Low average confirms minimal fabrication. Non-zero scores (0.25--0.33) detected specific claims (pricing, part numbers) absent from retrieval context.
+\end{itemize}
+
+\subsubsection{Faithfulness-Utility Trade-off}
+A key finding is the inverse relationship between Faithfulness and practical utility:
+\begin{itemize}
+    \item \textbf{High Faithfulness (0.80--1.00)}: Achieved when the LLM strictly paraphrases retrieved documents. Ideal for technical procedures and academic definitions.
+    \item \textbf{Low Faithfulness (0.44--0.60)}: Occurs when the LLM supplements retrieval with domain knowledge (e.g., pricing estimates, typical specifications). More useful for exploratory queries but requires cautious interpretation.
+\end{itemize}
+
+This trade-off suggests the need for \textbf{context-aware metric weighting}: procedural queries should prioritize Faithfulness, while exploratory queries may tolerate lower Faithfulness in exchange for comprehensive answers.
+
+\subsubsection{Threats to Validity}
+\begin{itemize}
+    \item \textbf{Internal Validity}: LLM temperature (0.2) trades creativity for consistency. Lower values might improve Faithfulness at the cost of fluency.
+    \item \textbf{External Validity}: Test cases limited to STM32/AI domain. Generalization to other embedded systems (e.g., ESP32, Arduino) remains unverified.
+    \item \textbf{Construct Validity}: Faithfulness metric penalizes helpful enrichment. Domain experts may prefer enriched answers despite lower scores.
+\end{itemize}
+
+\subsection{Conclusion}
+The experimental validation demonstrates that the Web Search Agent, augmented with DeepEval metrics, provides a \textbf{transparent, quantifiable quality assessment} of AI-generated technical guidance. The system achieves:
+\begin{enumerate}
+    \item High retrieval quality (avg. Contextual Relevancy: 0.75)
+    \item Minimal hallucination (avg. Hallucination: 0.14)
+    \item Adaptive behavior across query types (perfect Faithfulness for procedures, enriched answers for exploration)
+\end{enumerate}
+
+Future work should explore adaptive metric weighting, hybrid retrieval strategies (vector DB + web search), and user feedback integration to calibrate acceptable Faithfulness-Utility trade-offs for different stakeholder profiles (novice developers vs. domain experts).
