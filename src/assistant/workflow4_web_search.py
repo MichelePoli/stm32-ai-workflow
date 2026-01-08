@@ -93,8 +93,7 @@ def _evaluate_summary_sync(
         # Run evaluation with ALL metrics
         result = evaluate(
             [test_case],
-            [faithfulness, relevancy, contextual_relevancy, hallucination],
-            print_results=False
+            [faithfulness, relevancy, contextual_relevancy, hallucination]
         )
         
         return {
