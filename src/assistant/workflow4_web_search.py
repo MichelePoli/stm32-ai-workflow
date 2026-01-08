@@ -27,6 +27,89 @@ from src.assistant.state import MasterState
 
 from agno.tools.googlesearch import GoogleSearchTools
 from agno.models.ollama import Ollama
+import asyncio
+
+# ============================================================================
+# DEEPEVAL INTEGRATION
+# ============================================================================
+def _evaluate_summary_sync(
+    research_topic: str,
+    running_summary: str,
+    web_research_results: str
+) -> dict:
+    """
+    Evaluation Synchrone in thread separato.
+    Usa metriche compatibili con web search (Faithfulness, AnswerRelevancy).
+    """
+    print("\n🔍 Running DeepEval evaluation with Ollama (deepseek-r1:latest)...\n")
+    
+    try:
+        # ===== CRITICAL: SET ENVIRONMENT VARIABLES FIRST =====
+        import os
+        os.environ["DEEPEVAL_RESULTS_FOLDER"] = ""
+        os.environ["DEEPEVAL_DISABLE_TELEMETRY"] = "1"
+        os.environ["DEEPEVAL_SKIP_PROMPTS_CACHE"] = "1"
+        
+        from deepeval import evaluate
+        from deepeval.models import OllamaModel
+        from deepeval.metrics import (
+            FaithfulnessMetric,
+            AnswerRelevancyMetric,
+            ContextualRelevancyMetric,
+            HallucinationMetric
+        )
+        from deepeval.test_case import LLMTestCase
+        
+        # Initialize Ollama model
+        ollama_model = OllamaModel(
+            model="mistral", # O deepseek-r1:latest se disponibile
+            base_url="http://localhost:11434"
+        )
+        
+        # Define metrics 
+        faithfulness = FaithfulnessMetric(threshold=0.55, model=ollama_model) 
+        relevancy = AnswerRelevancyMetric(threshold=0.55, model=ollama_model)
+        # ContextualRelevancy e Hallucination ORA ATTIVI
+        contextual_relevancy = ContextualRelevancyMetric(threshold=0.55, model=ollama_model)
+        hallucination = HallucinationMetric(threshold=0.55, model=ollama_model)
+        
+        # Create test case
+        # retrieval_context must be a LIST of strings. 
+        # If input is a string, split it or wrap it. Ideally it comes as a list from the state.
+        if isinstance(web_research_results, str):
+             # Fallback if string: split by double newlines to simulate chunks
+             retrieval_ctx = [chunk for chunk in web_research_results.split("\n\n") if len(chunk.strip()) > 50]
+             if not retrieval_ctx: retrieval_ctx = [web_research_results[:2000]]
+        else:
+             retrieval_ctx = web_research_results # It's already a list
+
+        test_case = LLMTestCase(
+            input=research_topic,
+            actual_output=running_summary,
+            retrieval_context=retrieval_ctx, 
+            context=retrieval_ctx # Used by HallucinationMetric as "ground truth"
+        )
+        
+        # Run evaluation with ALL metrics
+        result = evaluate(
+            [test_case],
+            [faithfulness, relevancy, contextual_relevancy, hallucination],
+            print_results=False
+        )
+        
+        return {
+            "completed": True,
+            "metrics": {
+                "faithfulness": result[0].metrics_data[0].score,
+                "answer_relevancy": result[0].metrics_data[1].score,
+                "contextual_relevancy": result[0].metrics_data[2].score,
+                "hallucination": result[0].metrics_data[3].score
+            }
+        }
+        
+    except Exception as e:
+        print(f"\n❌ Evaluation error: {e}")
+        return {"completed": False, "error": str(e)}
 
 
 
@@ -312,32 +395,129 @@ def execute_web_search(state: MasterState, config: dict) -> MasterState:
 
         
         state.search_results = response.content if response else "Nessun risultato trovato"
+        
+        # Populate search_results_list for DeepEval
+        if state.search_results:
+            # Simple heuristic: Split by paragraphs/double newlines to create "chunks"
+            # In a real RAG with vector DB, these would be the retrieved docs.
+            state.search_results_list = [
+                chunk.strip() 
+                for chunk in state.search_results.split("\n\n") 
+                if len(chunk.strip()) > 20 # Filter out tiny noise
+            ]
+        
         state.web_research_success = True
         
-        logger.info(f"✓ Ricerca completata ({len(state.search_results)} caratteri)")
+        logger.info(f"✓ Ricerca completata ({len(state.search_results)} caratteri, {len(state.search_results_list)} chunks)")
         
     except Exception as e:
         logger.error(f"❌ Errore ricerca web: {str(e)}")
         logger.exception(e)
         state.search_results = f"Errore nella ricerca: {str(e)}"
+        state.search_results_list = []
         state.web_research_success = False
     
     return state
 
 
+def summarize_search_results(state: MasterState, config: dict) -> MasterState:
+    """
+    Nodo che riassume i risultati della ricerca web.
+    Input: state.search_results (RAW text)
+    Output: state.search_summary (Processed summary)
+    """
+    logger.info("📝 Summarizing search results...")
+    
+    if not state.web_research_success:
+        logger.warning("Skipping summary due to failed search.")
+        return state
+
+    try:
+        cfg = Configuration.from_runnable_config(config)
+        
+        # Prompt di validazione/riassunto (English for better performance)
+        summary_prompt = f"""
+        You are an expert technical writer for STM32 embedded systems.
+        
+        Objective: Summarize the web search results to answer the user's question perfectly.
+        
+        User Question: {state.search_query}
+        
+        Raw Web Results:
+        {state.search_results[:10000]}  # Limit context to avoid overflow
+        
+        Instructions:
+        1. Analyze the web results carefully.
+        2. Synthesize a clear, direct, and technical answer in English.
+        3. Cite sources (URLs) if present in the results.
+        4. If results are irrelevant to the query, state it clearly.
+        5. Use Bullet Points for readability.
+        
+        Answer:
+        """
+        
+        llm = ChatOllama(
+            model=cfg.local_llm,
+            temperature=0.2, # Low temp for factual summary
+        )
+        
+        response = llm.invoke(summary_prompt)
+        state.search_summary = response.content
+        logger.info(f"✓ Summary generato ({len(state.search_summary)} chars)")
+        
+    except Exception as e:
+        logger.error(f"❌ Errore summary: {e}")
+        state.search_summary = "Impossibile generare il riassunto. Consulta i risultati grezzi."
+        
+    return state
+
+
 def finalize_search(state: MasterState, config: dict) -> MasterState:
-    """Nodo finale che presenta i risultati della ricerca."""
+    """Nodo finale che presenta i risultati della ricerca (Riassunto + Eval)."""
     
     if state.web_research_success:
         print("\n" + "="*70)
         print(f"📊 RISULTATI RICERCA: {state.search_type.upper()}")
         print("="*70)
-        print(state.search_results)
+        # Mostra il riassunto, non i risultati grezzi
+        print(state.search_summary) 
         print("="*70 + "\n")
         logger.info("✓ Ricerca completata con successo")
     else:
         print(f"\n❌ Errore durante la ricerca:\n{state.search_results}\n")
         logger.error(f"Ricerca fallita: {state.search_results}")
     
+    # ===== DEEPEVAL EVALUATION =====
+    if state.web_research_success:
+        try:
+            print("\n" + "="*70)
+            print("⚖️  EVALUATING RESULT QUALITY (DeepEval)")
+            print("="*70)
+            
+            # Context Separation for DeepEval:
+            # Actual Output = Il riassunto generato (search_summary)
+            # Retrieval Context = LISTA dei chunks (search_results_list)
+            
+            eval_result = asyncio.run(asyncio.to_thread(
+                _evaluate_summary_sync,
+                state.search_query,      # Input (User Query)
+                state.search_summary,    # Actual Output (LLM Summary)
+                state.search_results_list if state.search_results_list else state.search_results # Fallback
+            ))
+            
+            if eval_result["completed"]:
+                metrics = eval_result["metrics"]
+                print(f"✅ Faithfulness Score:       {metrics.get('faithfulness', 0):.2f}")
+                print(f"✅ Answer Relevancy Score:    {metrics.get('answer_relevancy', 0):.2f}")
+                print(f"✅ Contextual Relevancy:      {metrics.get('contextual_relevancy', 0):.2f}")
+                print(f"✅ Hallucination Score:       {metrics.get('hallucination', 0):.2f}")
+            else:
+                print(f"⚠️ Evaluation skipped: {eval_result.get('error')}")
+                
+            print("="*70 + "\n")
+            
+        except Exception as e:
+            logger.warning(f"Evaluation failed: {e}")
+
     return state
 

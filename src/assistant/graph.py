@@ -68,6 +68,7 @@ from src.assistant.workflow4_web_search import (
     classify_search,
     search_type_decision,
     execute_web_search,
+    summarize_search_results, # NEW NODE
     finalize_search,
 )
 
@@ -567,6 +568,7 @@ def build_web_search_graph():
     
     workflow.add_node("classify_search", classify_search)
     workflow.add_node("execute_web_search", execute_web_search)
+    workflow.add_node("summarize_search_results", summarize_search_results) # NEW NODE
     workflow.add_node("finalize_search", finalize_search)
     
     workflow.add_edge(START, "classify_search")
@@ -580,7 +582,8 @@ def build_web_search_graph():
         }
     )
     
-    workflow.add_edge("execute_web_search", "finalize_search")
+    workflow.add_edge("execute_web_search", "summarize_search_results")
+    workflow.add_edge("summarize_search_results", "finalize_search")
     workflow.add_edge("finalize_search", END)
     
     return workflow.compile()
