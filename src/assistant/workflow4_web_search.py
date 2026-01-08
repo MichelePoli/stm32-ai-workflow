@@ -67,11 +67,11 @@ def _evaluate_summary_sync(
         )
         
         # Define metrics 
-        faithfulness = FaithfulnessMetric(threshold=0.55, model=ollama_model) 
-        relevancy = AnswerRelevancyMetric(threshold=0.55, model=ollama_model)
+        faithfulness = FaithfulnessMetric(threshold=0.55, model=ollama_model, async_mode=False) 
+        relevancy = AnswerRelevancyMetric(threshold=0.55, model=ollama_model, async_mode=False)
         # ContextualRelevancy e Hallucination ORA ATTIVI
-        contextual_relevancy = ContextualRelevancyMetric(threshold=0.55, model=ollama_model)
-        hallucination = HallucinationMetric(threshold=0.55, model=ollama_model)
+        contextual_relevancy = ContextualRelevancyMetric(threshold=0.55, model=ollama_model, async_mode=False)
+        hallucination = HallucinationMetric(threshold=0.55, model=ollama_model, async_mode=False)
         
         # Create test case
         # retrieval_context must be a LIST of strings. 
