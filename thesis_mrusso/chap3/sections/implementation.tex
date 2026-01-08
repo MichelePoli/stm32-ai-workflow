@@ -520,14 +520,14 @@ Algorithm~\ref{alg:unified-parser} implements a multi-strategy parsing approach 
     \STATE Remove fences: \(R \gets R.\text{remove\_fences}()\)
 \ENDIF
 \STATE \textbf{Strategy 1: JSON Parsing}
-\TRY
+\STATE \textbf{try}
     \STATE \(data \gets \text{JSON.parse}(R)\)
     \STATE Map alternative field names to canonical \texttt{code} field
     \STATE Normalize escape sequences: \(data[\text{"code"}] \gets \text{normalize}(data[\text{"code"}])\)
     \RETURN \(data\)
-\CATCH{JSONDecodeError}
+\STATE \textbf{catch} JSONDecodeError
     \STATE Continue to Strategy 2
-\ENDTRY
+\STATE \textbf{end try}
 \STATE \textbf{Strategy 2: Markdown Code Block Extraction}
 \STATE \(blocks \gets \text{REGEX.findall}(\text{r'```[a-z]*\textbackslash n(.*?)```'}, R)\)
 \IF{\(|blocks| > 0\)}

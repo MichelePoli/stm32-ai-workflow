@@ -28,7 +28,11 @@ Minimization is typically achieved via Gradient Descent, where weights are updat
 \begin{equation}
 \theta_{t+1} = \theta_t - \alpha \nabla J(\theta_t)
 \end{equation}
-The learning rate $\alpha$ is a critical hyperparameter that determines the step size. To handle large-scale datasets efficiently, researchers employ Stochastic Gradient Descent (SGD) and its variants, which estimate gradients using small batches of data. The efficiency of this process relies on the backpropagation algorithm (Fig. \ref{fig:back}), which leverages the chain rule of calculus to propagate errors from the output layer back to the input, enabling automated weight updates in complex computational graphs \cite{NNWork2025}.
+The learning rate $\alpha$ is a critical hyperparameter that determines the step size. To handle large-scale datasets efficiently, researchers employ Stochastic Gradient Descent (SGD) and its variants, which estimate gradients using small batches of data. While SGD is effective, it can struggle with local minima and saddle points. To address this, \textbf{Momentum} was introduced to accelerate gradients in the right direction, thus leading to faster converging.
+
+However, the current standard for training deep neural networks is \textbf{Adam (Adaptive Moment Estimation)} \cite{kingma2014adam}. Adam combines the advantages of two other extensions of stochastic gradient descent: Adaptive Gradient Algorithm (AdaGrad) and Root Mean Square Propagation (RMSProp). It computes adaptive learning rates for each parameter by maintaining exponentially decaying averages of past gradients ($m_t$, first moment) and squared gradients ($v_t$, second moment). This allows the algorithm to handle sparse gradients on noisy problems, making it highly suitable for large-scale data and parameter-heavy models like LLMs.
+
+The efficiency of this process relies on the backpropagation algorithm (Fig. \ref{fig:back}), which leverages the chain rule of calculus to propagate errors from the output layer back to the input, enabling automated weight updates in complex computational graphs \cite{NNWork2025}.
 
 \begin{figure}[ht]
     \centering
@@ -40,7 +44,15 @@ The learning rate $\alpha$ is a critical hyperparameter that determines the step
 \subsection{Specialized Architectures: CNNs and RNNs}
 Different data types require specialized neural architectures to capture relevant patterns efficiently.
 
-\textbf{Convolutional Neural Networks (CNNs):} Optimized for spatial data (e.g., images), CNNs use convolutional kernels to detect local features like edges and textures \cite{Li2020}. By sharing weights across the spatial domain, CNNs achieve translation invariance and significantly reduce the total number of parameters compared to fully connected layers. This is often followed by activation functions like ReLU and pooling layers to downsample feature maps (Fig. \ref{fig:conv}) \cite{OShea2015}.
+\textbf{Convolutional Neural Networks (CNNs):} Optimized for spatial data (e.g., images), CNNs use convolutional kernels to detect local features like edges and textures \cite{Li2020}. By sharing weights across the spatial domain, CNNs achieve translation invariance and significantly reduce the total number of parameters compared to fully connected layers.
+
+Mathematically, for a two-dimensional input image $I$ and a filter kernel $K$ of dimensions $k_1 \times k_2$, the discrete convolution operation at position $(i, j)$ is defined as:
+\begin{equation}
+(I * K)(i, j) = \sum_{m=0}^{k_1-1} \sum_{n=0}^{k_2-1} I(i-m, j-n) K(m, n)
+\end{equation}
+This sliding window operation computes the dot product between the kernel weights and local input regions, building feature maps that highlight spatial hierarchies.
+
+This is often followed by activation functions like ReLU and pooling layers to downsample feature maps (Fig. \ref{fig:conv}) \cite{OShea2015}.
 
 \begin{figure}[ht]
     \centering
@@ -49,7 +61,22 @@ Different data types require specialized neural architectures to capture relevan
     \label{fig:conv}
 \end{figure}
 
-\textbf{Recurrent Neural Networks (RNNs):} Tailored for sequential data, RNNs maintain a "hidden state" that preserves context from previous time steps \cite{Schmidt2019}. While basic RNNs suffer from vanishing gradients, more advanced variants like Long Short-Term Memory (LSTM) units use gating mechanisms (input, forget, and output gates) to manage long-term dependencies in sequences (Fig. \ref{fig:rnn}) \cite{Salehinejad2018, Lipton2015}.
+\textbf{Recurrent Neural Networks (RNNs):} Tailored for sequential data where the current output depends on previous inputs, RNNs maintain a "hidden state" that acts as a memory trace \cite{Schmidt2019}. The hidden state $h_t$ at time step $t$ is updated based on the previous hidden state $h_{t-1}$ and the current input $x_t$ via a non-linear activation function (typically $\tanh$ or ReLU):
+\begin{equation}
+h_t = \sigma(W_h h_{t-1} + W_x x_t + b)
+\end{equation}
+Despite their utility, vanilla RNNs struggle with long sequences due to the \textbf{vanishing gradient problem}, where gradients diminish exponentially during Backpropagation Through Time (BPTT).
+
+To mitigate this, \textbf{Long Short-Term Memory (LSTM)} networks introduce a more complex memory cell to regulate information flow \cite{Salehinejad2018}. An LSTM unit maintains a cell state $C_t$ controlled by three gating mechanisms: the forget gate ($f_t$), input gate ($i_t$), and output gate ($o_t$). The formal transition equations are:
+\begin{align}
+f_t &= \sigma(W_f \cdot [h_{t-1}, x_t] + b_f) \\
+i_t &= \sigma(W_i \cdot [h_{t-1}, x_t] + b_i) \\
+\tilde{C}_t &= \tanh(W_C \cdot [h_{t-1}, x_t] + b_C) \\
+C_t &= f_t \odot C_{t-1} + i_t \odot \tilde{C}_t \\
+o_t &= \sigma(W_o \cdot [h_{t-1}, x_t] + b_o) \\
+h_t &= o_t \odot \tanh(C_t)
+\end{align}
+where $\odot$ denotes element-wise multiplication. This architecture allows the network to effectively learn long-term dependencies (Fig. \ref{fig:rnn}) \cite{Lipton2015}.
 
 \begin{figure}[ht]
     \centering
