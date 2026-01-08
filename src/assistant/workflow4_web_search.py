@@ -90,21 +90,44 @@ def _evaluate_summary_sync(
             context=retrieval_ctx # Used by HallucinationMetric as "ground truth"
         )
         
-        # Run evaluation with ALL metrics
-        result = evaluate(
-            [test_case],
-            [faithfulness, relevancy, contextual_relevancy, hallucination],
-            run_async=False # Force synchronous execution
-        )
+        # Run evaluation manually to avoid 'evaluate()' blocking IO/cache overhead
+        metrics_results = {}
+        
+        # 1. Faithfulness
+        try:
+            faithfulness.measure(test_case)
+            metrics_results["faithfulness"] = faithfulness.score
+        except Exception as e:
+            print(f"Error measuring faithfulness: {e}")
+            metrics_results["faithfulness"] = 0
+
+        # 2. Answer Relevancy
+        try:
+            relevancy.measure(test_case)
+            metrics_results["answer_relevancy"] = relevancy.score
+        except Exception as e:
+            print(f"Error measuring relevancy: {e}")
+            metrics_results["answer_relevancy"] = 0
+
+        # 3. Contextual Relevancy
+        try:
+            contextual_relevancy.measure(test_case)
+            metrics_results["contextual_relevancy"] = contextual_relevancy.score
+        except Exception as e:
+            print(f"Error measuring contextual relevancy: {e}")
+            metrics_results["contextual_relevancy"] = 0
+
+        # 4. Hallucination
+        try:
+            hallucination.measure(test_case)
+            metrics_results["hallucination"] = hallucination.score
+        except Exception as e:
+            print(f"Error measuring hallucination: {e}")
+            metrics_results["hallucination"] = 0
         
         return {
             "completed": True,
-            "metrics": {
-                "faithfulness": result[0].metrics_data[0].score,
-                "answer_relevancy": result[0].metrics_data[1].score,
-                "contextual_relevancy": result[0].metrics_data[2].score,
-                "hallucination": result[0].metrics_data[3].score
-            }
+            "metrics": metrics_results
         }
         
     except Exception as e:
