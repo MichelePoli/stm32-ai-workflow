@@ -65,8 +65,8 @@
       \strng{authornamehash}{a09ad43d9334d08d7cff610c5b75508b}
       \strng{authorfullhash}{5bdaec7ac3aaf728116e057f65aa1dc1}
       \strng{authorfullhashraw}{5bdaec7ac3aaf728116e057f65aa1dc1}
-      \field{sortinit}{8}
-      \field{sortinithash}{a231b008ebf0ecbe0b4d96dcc159445f}
+      \field{sortinit}{1}
+      \field{sortinithash}{4f6aaa89bab872aa0999fec09ff8e98a}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
       \field{journaltitle}{arXiv preprint arXiv:2509.11079}
@@ -120,8 +120,8 @@
       \strng{authornamehash}{8b9c4341b1f2ffcbf6c6e45f21eb7bcf}
       \strng{authorfullhash}{bf86d002220683146374665fb3141c2f}
       \strng{authorfullhashraw}{bf86d002220683146374665fb3141c2f}
-      \field{sortinit}{8}
-      \field{sortinithash}{a231b008ebf0ecbe0b4d96dcc159445f}
+      \field{sortinit}{1}
+      \field{sortinithash}{4f6aaa89bab872aa0999fec09ff8e98a}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
       \field{journaltitle}{arXiv preprint arXiv:2411.05451}
@@ -153,8 +153,8 @@
       \strng{authornamehash}{3a1f1a0016bb4e33e52e9bd0f48cfd33}
       \strng{authorfullhash}{3a1f1a0016bb4e33e52e9bd0f48cfd33}
       \strng{authorfullhashraw}{3a1f1a0016bb4e33e52e9bd0f48cfd33}
-      \field{sortinit}{9}
-      \field{sortinithash}{0a5ebc79d83c96b6579069544c73c7d4}
+      \field{sortinit}{2}
+      \field{sortinithash}{8b555b3791beccb63322c22f3320aa9a}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
       \field{abstract}{This paper summarizes the century-long evolution of artificial intelligence, from rule-based systems to statistical and data-driven approaches, analyzing technical and philosophical underpinnings guiding AI development and its societal implications.}
@@ -189,8 +189,8 @@
       \strng{authornamehash}{cdc5da1ed08b2398be71b4c91f0c6064}
       \strng{authorfullhash}{cdc5da1ed08b2398be71b4c91f0c6064}
       \strng{authorfullhashraw}{cdc5da1ed08b2398be71b4c91f0c6064}
-      \field{sortinit}{1}
-      \field{sortinithash}{4f6aaa89bab872aa0999fec09ff8e98a}
+      \field{sortinit}{3}
+      \field{sortinithash}{ad6fe7482ffbd7b9f99c9e8b5dccd3d7}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
       \field{journaltitle}{arXiv preprint arXiv:2408.01747}
@@ -231,8 +231,8 @@
       \strng{authornamehash}{fc06b02e414a6b9417ad32974e174a38}
       \strng{authorfullhash}{fc06b02e414a6b9417ad32974e174a38}
       \strng{authorfullhashraw}{fc06b02e414a6b9417ad32974e174a38}
-      \field{sortinit}{1}
-      \field{sortinithash}{4f6aaa89bab872aa0999fec09ff8e98a}
+      \field{sortinit}{4}
+      \field{sortinithash}{9381316451d1b9788675a07e972a12a7}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
       \field{journaltitle}{arXiv preprint arXiv:2412.16188}
@@ -276,8 +276,8 @@
       \strng{authornamehash}{9184d5b7d50bc906e1ebe75ce0273d95}
       \strng{authorfullhash}{d1d37976480e921b8499fa91f56cc493}
       \strng{authorfullhashraw}{d1d37976480e921b8499fa91f56cc493}
-      \field{sortinit}{1}
-      \field{sortinithash}{4f6aaa89bab872aa0999fec09ff8e98a}
+      \field{sortinit}{5}
+      \field{sortinithash}{20e9b4b0b173788c5dace24730f47d8c}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
       \field{journaltitle}{arXiv preprint arXiv:2304.06636}
@@ -311,8 +311,8 @@
       \strng{authornamehash}{1aee642d64dc07e64493058b320ace8c}
       \strng{authorfullhash}{1aee642d64dc07e64493058b320ace8c}
       \strng{authorfullhashraw}{1aee642d64dc07e64493058b320ace8c}
-      \field{sortinit}{1}
-      \field{sortinithash}{4f6aaa89bab872aa0999fec09ff8e98a}
+      \field{sortinit}{6}
+      \field{sortinithash}{b33bc299efb3c36abec520a4c896a66d}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
       \field{journaltitle}{PMC Biophysics}
@@ -339,8 +339,8 @@
       \strng{authornamehash}{7079c72c21415131774625ba1d64f4b0}
       \strng{authorfullhash}{7079c72c21415131774625ba1d64f4b0}
       \strng{authorfullhashraw}{7079c72c21415131774625ba1d64f4b0}
-      \field{sortinit}{1}
-      \field{sortinithash}{4f6aaa89bab872aa0999fec09ff8e98a}
+      \field{sortinit}{6}
+      \field{sortinithash}{b33bc299efb3c36abec520a4c896a66d}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
       \field{journaltitle}{arXiv preprint arXiv:2211.14632}
@@ -367,8 +367,8 @@
       \strng{authornamehash}{ffb2e1f6d47fa06b63ab645a65d4144a}
       \strng{authorfullhash}{ffb2e1f6d47fa06b63ab645a65d4144a}
       \strng{authorfullhashraw}{ffb2e1f6d47fa06b63ab645a65d4144a}
-      \field{sortinit}{1}
-      \field{sortinithash}{4f6aaa89bab872aa0999fec09ff8e98a}
+      \field{sortinit}{7}
+      \field{sortinithash}{108d0be1b1bee9773a1173443802c0a3}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
       \field{title}{Perceptron}
@@ -382,6 +382,45 @@
       \endverb
       \verb{url}
       \verb https://deepai.org/machine-learning-glossary-and-terms/perceptron
+      \endverb
+    \endentry
+    \entry{kingma2014adam}{misc}{}{}
+      \name{author}{2}{}{%
+        {{hash=b6fbd171848aad4edf3925543f1f1522}{%
+           family={Kingma},
+           familyi={K\bibinitperiod},
+           given={Diederik\bibnamedelima P.},
+           giveni={D\bibinitperiod\bibinitdelim P\bibinitperiod}}}%
+        {{hash=8aa66e8231cc2fdbe67aa4f18ca970c6}{%
+           family={Ba},
+           familyi={B\bibinitperiod},
+           given={Jimmy},
+           giveni={J\bibinitperiod}}}%
+      }
+      \strng{namehash}{a09df9f123146b8e2c7f1134c9496932}
+      \strng{fullhash}{a09df9f123146b8e2c7f1134c9496932}
+      \strng{fullhashraw}{a09df9f123146b8e2c7f1134c9496932}
+      \strng{bibnamehash}{a09df9f123146b8e2c7f1134c9496932}
+      \strng{authorbibnamehash}{a09df9f123146b8e2c7f1134c9496932}
+      \strng{authornamehash}{a09df9f123146b8e2c7f1134c9496932}
+      \strng{authorfullhash}{a09df9f123146b8e2c7f1134c9496932}
+      \strng{authorfullhashraw}{a09df9f123146b8e2c7f1134c9496932}
+      \field{sortinit}{1}
+      \field{sortinithash}{4f6aaa89bab872aa0999fec09ff8e98a}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{eprintclass}{cs.LG}
+      \field{eprinttype}{arXiv}
+      \field{title}{Adam: A Method for Stochastic Optimization}
+      \field{year}{2014}
+      \verb{eprint}
+      \verb 1412.6980
+      \endverb
+      \verb{urlraw}
+      \verb https://arxiv.org/abs/1412.6980
+      \endverb
+      \verb{url}
+      \verb https://arxiv.org/abs/1412.6980
       \endverb
     \endentry
     \entry{botpenguin_backprop}{online}{}{}
@@ -445,8 +484,8 @@
       \strng{authornamehash}{dfca7af71a48767038fd003b5d7ac47a}
       \strng{authorfullhash}{0f376c290eb2df6dacce159d59d45a75}
       \strng{authorfullhashraw}{0f376c290eb2df6dacce159d59d45a75}
-      \field{sortinit}{2}
-      \field{sortinithash}{8b555b3791beccb63322c22f3320aa9a}
+      \field{sortinit}{1}
+      \field{sortinithash}{4f6aaa89bab872aa0999fec09ff8e98a}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
       \field{journaltitle}{arXiv preprint arXiv:2004.02806}
@@ -480,8 +519,8 @@
       \strng{authornamehash}{1e0b31097f3d41e61dd78e46b147642a}
       \strng{authorfullhash}{1e0b31097f3d41e61dd78e46b147642a}
       \strng{authorfullhashraw}{1e0b31097f3d41e61dd78e46b147642a}
-      \field{sortinit}{2}
-      \field{sortinithash}{8b555b3791beccb63322c22f3320aa9a}
+      \field{sortinit}{1}
+      \field{sortinithash}{4f6aaa89bab872aa0999fec09ff8e98a}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
       \field{journaltitle}{arXiv preprint arXiv:1511.08458}
@@ -508,8 +547,8 @@
       \strng{authornamehash}{7f2c4c3a0c4438931b7b47b87ca21606}
       \strng{authorfullhash}{7f2c4c3a0c4438931b7b47b87ca21606}
       \strng{authorfullhashraw}{7f2c4c3a0c4438931b7b47b87ca21606}
-      \field{sortinit}{2}
-      \field{sortinithash}{8b555b3791beccb63322c22f3320aa9a}
+      \field{sortinit}{1}
+      \field{sortinithash}{4f6aaa89bab872aa0999fec09ff8e98a}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
       \field{title}{Understanding Convolutional Neural Networks (CNN)}
@@ -540,8 +579,8 @@
       \strng{authornamehash}{3c434db5f6f20ddfc1806a8d873a4748}
       \strng{authorfullhash}{3c434db5f6f20ddfc1806a8d873a4748}
       \strng{authorfullhashraw}{3c434db5f6f20ddfc1806a8d873a4748}
-      \field{sortinit}{2}
-      \field{sortinithash}{8b555b3791beccb63322c22f3320aa9a}
+      \field{sortinit}{1}
+      \field{sortinithash}{4f6aaa89bab872aa0999fec09ff8e98a}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
       \field{journaltitle}{arXiv preprint arXiv:1912.05911}
@@ -595,8 +634,8 @@
       \strng{authornamehash}{ed53a526f69b39b3f47c4bff3c0d8aee}
       \strng{authorfullhash}{b54a28d7a931cf03be8c699d95cc43cc}
       \strng{authorfullhashraw}{b54a28d7a931cf03be8c699d95cc43cc}
-      \field{sortinit}{2}
-      \field{sortinithash}{8b555b3791beccb63322c22f3320aa9a}
+      \field{sortinit}{1}
+      \field{sortinithash}{4f6aaa89bab872aa0999fec09ff8e98a}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
       \field{journaltitle}{arXiv preprint arXiv:1801.01078}
@@ -681,6 +720,68 @@
       \verb https://medium.com/@nathaliejeans/how-i-classified-images-with-recurrent-neural-networks-28eb4b57fc79
       \endverb
     \endentry
+    \entry{warden2019tinyml}{book}{}{}
+      \name{author}{2}{}{%
+        {{hash=cfc28a19549f0d8ff117cf79be90d213}{%
+           family={Warden},
+           familyi={W\bibinitperiod},
+           given={Pete},
+           giveni={P\bibinitperiod}}}%
+        {{hash=131336c50827334ae58ae71b5107861a}{%
+           family={Situnayake},
+           familyi={S\bibinitperiod},
+           given={Daniel},
+           giveni={D\bibinitperiod}}}%
+      }
+      \list{publisher}{1}{%
+        {O'Reilly Media}%
+      }
+      \strng{namehash}{2db3b8d2efed89ff41fbb2993a3d4419}
+      \strng{fullhash}{2db3b8d2efed89ff41fbb2993a3d4419}
+      \strng{fullhashraw}{2db3b8d2efed89ff41fbb2993a3d4419}
+      \strng{bibnamehash}{2db3b8d2efed89ff41fbb2993a3d4419}
+      \strng{authorbibnamehash}{2db3b8d2efed89ff41fbb2993a3d4419}
+      \strng{authornamehash}{2db3b8d2efed89ff41fbb2993a3d4419}
+      \strng{authorfullhash}{2db3b8d2efed89ff41fbb2993a3d4419}
+      \strng{authorfullhashraw}{2db3b8d2efed89ff41fbb2993a3d4419}
+      \field{sortinit}{2}
+      \field{sortinithash}{8b555b3791beccb63322c22f3320aa9a}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{isbn}{9781492052043}
+      \field{title}{TinyML: Machine Learning with TensorFlow Lite on Arduino and Ultra-Low-Power Microcontrollers}
+      \field{year}{2019}
+    \endentry
+    \entry{st_cubeai_docs}{manual}{}{}
+      \name{author}{1}{}{%
+        {{hash=c38884ab3cf908c2798725960369391b}{%
+           family={STMicroelectronics},
+           familyi={S\bibinitperiod}}}%
+      }
+      \list{organization}{1}{%
+        {STMicroelectronics}%
+      }
+      \strng{namehash}{c38884ab3cf908c2798725960369391b}
+      \strng{fullhash}{c38884ab3cf908c2798725960369391b}
+      \strng{fullhashraw}{c38884ab3cf908c2798725960369391b}
+      \strng{bibnamehash}{c38884ab3cf908c2798725960369391b}
+      \strng{authorbibnamehash}{c38884ab3cf908c2798725960369391b}
+      \strng{authornamehash}{c38884ab3cf908c2798725960369391b}
+      \strng{authorfullhash}{c38884ab3cf908c2798725960369391b}
+      \strng{authorfullhashraw}{c38884ab3cf908c2798725960369391b}
+      \field{sortinit}{2}
+      \field{sortinithash}{8b555b3791beccb63322c22f3320aa9a}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{UM2526: Getting started with X-CUBE-AI Expansion Package for Artificial Intelligence (AI)}
+      \field{year}{2024}
+      \verb{urlraw}
+      \verb https://www.st.com/resource/en/user_manual/um2526-getting-started-with-xcubeai-expansion-package-for-artificial-intelligence-ai-stmicroelectronics.pdf
+      \endverb
+      \verb{url}
+      \verb https://www.st.com/resource/en/user_manual/um2526-getting-started-with-xcubeai-expansion-package-for-artificial-intelligence-ai-stmicroelectronics.pdf
+      \endverb
+    \endentry
     \entry{wang2024historydevelopmentprincipleslarge}{misc}{}{}
       \name{author}{6}{}{%
         {{hash=7cca10cee48e9c197439e4af610acfe5}{%
@@ -723,8 +824,8 @@
       \strng{authorfullhash}{391aec39c1c26e8d5e7517c1ab227456}
       \strng{authorfullhashraw}{391aec39c1c26e8d5e7517c1ab227456}
       \field{extraname}{1}
-      \field{sortinit}{3}
-      \field{sortinithash}{ad6fe7482ffbd7b9f99c9e8b5dccd3d7}
+      \field{sortinit}{2}
+      \field{sortinithash}{8b555b3791beccb63322c22f3320aa9a}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
       \field{eprintclass}{cs.CL}
@@ -792,8 +893,8 @@
       \strng{authornamehash}{ee273ab30cfb889666f8c4d806eb9ce7}
       \strng{authorfullhash}{f82970bbd2bdd7a002d2af62b743d5cc}
       \strng{authorfullhashraw}{f82970bbd2bdd7a002d2af62b743d5cc}
-      \field{sortinit}{3}
-      \field{sortinithash}{ad6fe7482ffbd7b9f99c9e8b5dccd3d7}
+      \field{sortinit}{2}
+      \field{sortinithash}{8b555b3791beccb63322c22f3320aa9a}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
       \field{eprintclass}{cs.CL}
@@ -851,8 +952,8 @@
       \strng{authornamehash}{ca3baa5a22057195db1c71be39b4c922}
       \strng{authorfullhash}{f577afbbbc5ae55cee9f0d9f79adcb02}
       \strng{authorfullhashraw}{f577afbbbc5ae55cee9f0d9f79adcb02}
-      \field{sortinit}{3}
-      \field{sortinithash}{ad6fe7482ffbd7b9f99c9e8b5dccd3d7}
+      \field{sortinit}{2}
+      \field{sortinithash}{8b555b3791beccb63322c22f3320aa9a}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
       \field{title}{Language Models are Unsupervised Multitask Learners}
@@ -910,8 +1011,8 @@
       \strng{authornamehash}{0884233a667161739ddd01569813457f}
       \strng{authorfullhash}{be888de4c81a01090305ba6b23a35f47}
       \strng{authorfullhashraw}{be888de4c81a01090305ba6b23a35f47}
-      \field{sortinit}{3}
-      \field{sortinithash}{ad6fe7482ffbd7b9f99c9e8b5dccd3d7}
+      \field{sortinit}{2}
+      \field{sortinithash}{8b555b3791beccb63322c22f3320aa9a}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
       \field{journaltitle}{NeurIPS}
@@ -1044,8 +1145,8 @@
       \strng{authornamehash}{8be79936575bb0d5b77c96da6d2a6d52}
       \strng{authorfullhash}{fb6d92421541c28738787855a47da527}
       \strng{authorfullhashraw}{fb6d92421541c28738787855a47da527}
-      \field{sortinit}{3}
-      \field{sortinithash}{ad6fe7482ffbd7b9f99c9e8b5dccd3d7}
+      \field{sortinit}{2}
+      \field{sortinithash}{8b555b3791beccb63322c22f3320aa9a}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
       \field{eprintclass}{cs.CL}
@@ -1570,8 +1671,8 @@
       \strng{authornamehash}{58b69b9ae407160ff413101579e8db4d}
       \strng{authorfullhash}{58b69b9ae407160ff413101579e8db4d}
       \strng{authorfullhashraw}{58b69b9ae407160ff413101579e8db4d}
-      \field{sortinit}{4}
-      \field{sortinithash}{9381316451d1b9788675a07e972a12a7}
+      \field{sortinit}{3}
+      \field{sortinithash}{ad6fe7482ffbd7b9f99c9e8b5dccd3d7}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
       \field{title}{Understanding Attention Mechanism in Deep Learning}
@@ -1607,8 +1708,8 @@
       \strng{authornamehash}{df1b4b5f8e4a31353368ead3c4bc04a0}
       \strng{authorfullhash}{df1b4b5f8e4a31353368ead3c4bc04a0}
       \strng{authorfullhashraw}{df1b4b5f8e4a31353368ead3c4bc04a0}
-      \field{sortinit}{4}
-      \field{sortinithash}{9381316451d1b9788675a07e972a12a7}
+      \field{sortinit}{3}
+      \field{sortinithash}{ad6fe7482ffbd7b9f99c9e8b5dccd3d7}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
       \field{eprintclass}{cs.CL}
@@ -1656,8 +1757,8 @@
       \strng{authornamehash}{8e3e5bf01d5c1ab99bd568a2c7e37e12}
       \strng{authorfullhash}{f28c911e6931861de5fba5ee26e1f09b}
       \strng{authorfullhashraw}{f28c911e6931861de5fba5ee26e1f09b}
-      \field{sortinit}{4}
-      \field{sortinithash}{9381316451d1b9788675a07e972a12a7}
+      \field{sortinit}{3}
+      \field{sortinithash}{ad6fe7482ffbd7b9f99c9e8b5dccd3d7}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
       \field{eprintclass}{cs.CL}
@@ -1780,8 +1881,8 @@
       \strng{authornamehash}{006828fa495f4443cc250059a7c04210}
       \strng{authorfullhash}{b14f4e82f359f567578393780c26e860}
       \strng{authorfullhashraw}{b14f4e82f359f567578393780c26e860}
-      \field{sortinit}{4}
-      \field{sortinithash}{9381316451d1b9788675a07e972a12a7}
+      \field{sortinit}{3}
+      \field{sortinithash}{ad6fe7482ffbd7b9f99c9e8b5dccd3d7}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
       \field{issn}{2504-2289}
@@ -1841,8 +1942,8 @@
       \strng{authornamehash}{e32aa89bcb596909cd88b7577c48bafa}
       \strng{authorfullhash}{7c331b69abdd8a9260323c3fd27d7706}
       \strng{authorfullhashraw}{7c331b69abdd8a9260323c3fd27d7706}
-      \field{sortinit}{4}
-      \field{sortinithash}{9381316451d1b9788675a07e972a12a7}
+      \field{sortinit}{3}
+      \field{sortinithash}{ad6fe7482ffbd7b9f99c9e8b5dccd3d7}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
       \field{issn}{1076-9757}
@@ -2168,8 +2269,8 @@
       \strng{authornamehash}{74ab53dbd2e72ef232c3c83fe9999c3a}
       \strng{authorfullhash}{74ab53dbd2e72ef232c3c83fe9999c3a}
       \strng{authorfullhashraw}{74ab53dbd2e72ef232c3c83fe9999c3a}
-      \field{sortinit}{5}
-      \field{sortinithash}{20e9b4b0b173788c5dace24730f47d8c}
+      \field{sortinit}{4}
+      \field{sortinithash}{9381316451d1b9788675a07e972a12a7}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
       \field{journaltitle}{arXiv preprint arXiv:2312.05516}
@@ -2245,8 +2346,8 @@
       \strng{authorfullhash}{c8ac903527a9f0b1a25632bcd159295e}
       \strng{authorfullhashraw}{c8ac903527a9f0b1a25632bcd159295e}
       \field{extraname}{2}
-      \field{sortinit}{5}
-      \field{sortinithash}{20e9b4b0b173788c5dace24730f47d8c}
+      \field{sortinit}{4}
+      \field{sortinithash}{9381316451d1b9788675a07e972a12a7}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
       \field{journaltitle}{arXiv preprint arXiv:2505.13328}
@@ -2258,6 +2359,185 @@
       \endverb
       \verb{url}
       \verb https://arxiv.org/abs/2505.13328
+      \endverb
+    \endentry
+    \entry{Manning2008Introduction}{book}{}{}
+      \name{author}{3}{}{%
+        {{hash=2214edb8305f7ccd7cdc310b3a8ae1b4}{%
+           family={Manning},
+           familyi={M\bibinitperiod},
+           given={Christopher\bibnamedelima D.},
+           giveni={C\bibinitperiod\bibinitdelim D\bibinitperiod}}}%
+        {{hash=68f523934985e2f967ab2b15f4ded07c}{%
+           family={Raghavan},
+           familyi={R\bibinitperiod},
+           given={Prabhakar},
+           giveni={P\bibinitperiod}}}%
+        {{hash=9a80de0e5ec6df57363aaf321a5d05be}{%
+           family={Schütze},
+           familyi={S\bibinitperiod},
+           given={Hinrich},
+           giveni={H\bibinitperiod}}}%
+      }
+      \list{location}{1}{%
+        {Cambridge, UK}%
+      }
+      \list{publisher}{1}{%
+        {Cambridge University Press}%
+      }
+      \strng{namehash}{56b44e50eec2e98e36ad6aa3a5e7af9b}
+      \strng{fullhash}{56b44e50eec2e98e36ad6aa3a5e7af9b}
+      \strng{fullhashraw}{56b44e50eec2e98e36ad6aa3a5e7af9b}
+      \strng{bibnamehash}{56b44e50eec2e98e36ad6aa3a5e7af9b}
+      \strng{authorbibnamehash}{56b44e50eec2e98e36ad6aa3a5e7af9b}
+      \strng{authornamehash}{56b44e50eec2e98e36ad6aa3a5e7af9b}
+      \strng{authorfullhash}{56b44e50eec2e98e36ad6aa3a5e7af9b}
+      \strng{authorfullhashraw}{56b44e50eec2e98e36ad6aa3a5e7af9b}
+      \field{sortinit}{4}
+      \field{sortinithash}{9381316451d1b9788675a07e972a12a7}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{isbn}{978-0521865715}
+      \field{title}{Introduction to Information Retrieval}
+      \field{year}{2008}
+      \verb{urlraw}
+      \verb https://nlp.stanford.edu/IR-book/
+      \endverb
+      \verb{url}
+      \verb https://nlp.stanford.edu/IR-book/
+      \endverb
+    \endentry
+    \entry{Gao2024RetrievalAugmentedGN}{article}{}{}
+      \name{author}{9}{}{%
+        {{hash=572def57560315de76cedfc3e17c2eb2}{%
+           family={Gao},
+           familyi={G\bibinitperiod},
+           given={Yunfan},
+           giveni={Y\bibinitperiod}}}%
+        {{hash=bdc1e50b7faa4f8d1a9844199179e6c2}{%
+           family={Xiong},
+           familyi={X\bibinitperiod},
+           given={Yun},
+           giveni={Y\bibinitperiod}}}%
+        {{hash=03e7985fe5e84b74e9f01c4cdbaaee9c}{%
+           family={Gao},
+           familyi={G\bibinitperiod},
+           given={Xinyu},
+           giveni={X\bibinitperiod}}}%
+        {{hash=16ccf3d9ea55a78a7d3dfea173515f1f}{%
+           family={Jia},
+           familyi={J\bibinitperiod},
+           given={Kangxiang},
+           giveni={K\bibinitperiod}}}%
+        {{hash=fd6e4a40c152c7e39a43964918a2c4a5}{%
+           family={Pan},
+           familyi={P\bibinitperiod},
+           given={Jinliu},
+           giveni={J\bibinitperiod}}}%
+        {{hash=efef66e4d4bad100544cfae4a2b3104b}{%
+           family={Bi},
+           familyi={B\bibinitperiod},
+           given={Yuxi},
+           giveni={Y\bibinitperiod}}}%
+        {{hash=f59ef2d4288d687c75882fd75c94cd09}{%
+           family={Dai},
+           familyi={D\bibinitperiod},
+           given={Yi},
+           giveni={Y\bibinitperiod}}}%
+        {{hash=5541cd69dde50ba09f8968212da6602c}{%
+           family={Sun},
+           familyi={S\bibinitperiod},
+           given={Jiawei},
+           giveni={J\bibinitperiod}}}%
+        {{hash=9cca37a322a37778f7e30f057e2c2f90}{%
+           family={Wang},
+           familyi={W\bibinitperiod},
+           given={Haofen},
+           giveni={H\bibinitperiod}}}%
+      }
+      \strng{namehash}{f1678cfa142d8029151d4faacf40f176}
+      \strng{fullhash}{d439bedbf62a8843c8be1e435742e6a3}
+      \strng{fullhashraw}{d439bedbf62a8843c8be1e435742e6a3}
+      \strng{bibnamehash}{f1678cfa142d8029151d4faacf40f176}
+      \strng{authorbibnamehash}{f1678cfa142d8029151d4faacf40f176}
+      \strng{authornamehash}{f1678cfa142d8029151d4faacf40f176}
+      \strng{authorfullhash}{d439bedbf62a8843c8be1e435742e6a3}
+      \strng{authorfullhashraw}{d439bedbf62a8843c8be1e435742e6a3}
+      \field{sortinit}{4}
+      \field{sortinithash}{9381316451d1b9788675a07e972a12a7}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{journaltitle}{arXiv preprint arXiv:2312.10997}
+      \field{title}{Retrieval-Augmented Generation for Large Language Models: A Survey}
+      \field{year}{2024}
+      \verb{urlraw}
+      \verb https://arxiv.org/abs/2312.10997
+      \endverb
+      \verb{url}
+      \verb https://arxiv.org/abs/2312.10997
+      \endverb
+    \endentry
+    \entry{medium_rag_workflow}{online}{}{}
+      \name{author}{1}{}{%
+        {{hash=2b789923ed021b043cfdfe4763d056d8}{%
+           family={Monigatti},
+           familyi={M\bibinitperiod},
+           given={Leonie},
+           giveni={L\bibinitperiod}}}%
+      }
+      \strng{namehash}{2b789923ed021b043cfdfe4763d056d8}
+      \strng{fullhash}{2b789923ed021b043cfdfe4763d056d8}
+      \strng{fullhashraw}{2b789923ed021b043cfdfe4763d056d8}
+      \strng{bibnamehash}{2b789923ed021b043cfdfe4763d056d8}
+      \strng{authorbibnamehash}{2b789923ed021b043cfdfe4763d056d8}
+      \strng{authornamehash}{2b789923ed021b043cfdfe4763d056d8}
+      \strng{authorfullhash}{2b789923ed021b043cfdfe4763d056d8}
+      \strng{authorfullhashraw}{2b789923ed021b043cfdfe4763d056d8}
+      \field{sortinit}{4}
+      \field{sortinithash}{9381316451d1b9788675a07e972a12a7}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{A Guide to the RAG Pipeline: Retrieval-Augmented Generation}
+      \field{urlday}{12}
+      \field{urlmonth}{11}
+      \field{urlyear}{2025}
+      \field{year}{2023}
+      \field{urldateera}{ce}
+      \verb{urlraw}
+      \verb https://towardsdatascience.com/a-guide-to-the-rag-pipeline-510006367332
+      \endverb
+      \verb{url}
+      \verb https://towardsdatascience.com/a-guide-to-the-rag-pipeline-510006367332
+      \endverb
+    \endentry
+    \entry{DeepEval2024}{misc}{}{}
+      \name{author}{1}{}{%
+        {{hash=03fcf74c7449cd37c3e69dda04a37d82}{%
+           family={AI},
+           familyi={A\bibinitperiod},
+           given={Confident},
+           giveni={C\bibinitperiod}}}%
+      }
+      \strng{namehash}{03fcf74c7449cd37c3e69dda04a37d82}
+      \strng{fullhash}{03fcf74c7449cd37c3e69dda04a37d82}
+      \strng{fullhashraw}{03fcf74c7449cd37c3e69dda04a37d82}
+      \strng{bibnamehash}{03fcf74c7449cd37c3e69dda04a37d82}
+      \strng{authorbibnamehash}{03fcf74c7449cd37c3e69dda04a37d82}
+      \strng{authornamehash}{03fcf74c7449cd37c3e69dda04a37d82}
+      \strng{authorfullhash}{03fcf74c7449cd37c3e69dda04a37d82}
+      \strng{authorfullhashraw}{03fcf74c7449cd37c3e69dda04a37d82}
+      \field{sortinit}{5}
+      \field{sortinithash}{20e9b4b0b173788c5dace24730f47d8c}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{note}{Accessed: 2025-11-12}
+      \field{title}{DeepEval: The Open-Source LLM Evaluation Framework}
+      \field{year}{2024}
+      \verb{urlraw}
+      \verb https://github.com/confident-ai/deepeval
+      \endverb
+      \verb{url}
+      \verb https://github.com/confident-ai/deepeval
       \endverb
     \endentry
     \entry{surveyOnStaticAnalysis}{article}{}{}
@@ -2443,8 +2723,8 @@
       \strng{authornamehash}{0fc725308ea37f79cbc37297b6950968}
       \strng{authorfullhash}{a242e0ea97474cef3f4be2f63737e647}
       \strng{authorfullhashraw}{a242e0ea97474cef3f4be2f63737e647}
-      \field{sortinit}{6}
-      \field{sortinithash}{b33bc299efb3c36abec520a4c896a66d}
+      \field{sortinit}{5}
+      \field{sortinithash}{20e9b4b0b173788c5dace24730f47d8c}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
       \field{issn}{1388-1957}
@@ -2490,8 +2770,8 @@
       \strng{authornamehash}{edd9c7f9069bb048b8c1eaeb1e0bef96}
       \strng{authorfullhash}{edd9c7f9069bb048b8c1eaeb1e0bef96}
       \strng{authorfullhashraw}{edd9c7f9069bb048b8c1eaeb1e0bef96}
-      \field{sortinit}{6}
-      \field{sortinithash}{b33bc299efb3c36abec520a4c896a66d}
+      \field{sortinit}{5}
+      \field{sortinithash}{20e9b4b0b173788c5dace24730f47d8c}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
       \field{journaltitle}{Artificial Intelligence Review}
@@ -2574,8 +2854,8 @@
       \strng{authornamehash}{f2d6bdb6a746f6f1855ff0b377e7960a}
       \strng{authorfullhash}{c90e5b889562fd720605ac1fd0862abf}
       \strng{authorfullhashraw}{c90e5b889562fd720605ac1fd0862abf}
-      \field{sortinit}{6}
-      \field{sortinithash}{b33bc299efb3c36abec520a4c896a66d}
+      \field{sortinit}{5}
+      \field{sortinithash}{20e9b4b0b173788c5dace24730f47d8c}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
       \field{journaltitle}{arXiv preprint arXiv:2303.17651}
@@ -2619,8 +2899,8 @@
       \strng{authornamehash}{66c8cfb40124e3b4dcb9d817ffce4c70}
       \strng{authorfullhash}{49e07e9fec0e74538e460317b1031dd6}
       \strng{authorfullhashraw}{49e07e9fec0e74538e460317b1031dd6}
-      \field{sortinit}{6}
-      \field{sortinithash}{b33bc299efb3c36abec520a4c896a66d}
+      \field{sortinit}{5}
+      \field{sortinithash}{20e9b4b0b173788c5dace24730f47d8c}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
       \field{journaltitle}{arXiv preprint arXiv:2502.18530}
@@ -2664,8 +2944,8 @@
       \strng{authornamehash}{f0ee6ac407ed1a63a53f6446e896f184}
       \strng{authorfullhash}{ac1c448a55683b93f0d89abb5145e810}
       \strng{authorfullhashraw}{ac1c448a55683b93f0d89abb5145e810}
-      \field{sortinit}{6}
-      \field{sortinithash}{b33bc299efb3c36abec520a4c896a66d}
+      \field{sortinit}{5}
+      \field{sortinithash}{20e9b4b0b173788c5dace24730f47d8c}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
       \field{journaltitle}{arXiv preprint arXiv:2505.00753}
@@ -2706,8 +2986,8 @@
       \strng{authornamehash}{c340846cdbe3d0f53d72dc78ef0d1480}
       \strng{authorfullhash}{c340846cdbe3d0f53d72dc78ef0d1480}
       \strng{authorfullhashraw}{c340846cdbe3d0f53d72dc78ef0d1480}
-      \field{sortinit}{6}
-      \field{sortinithash}{b33bc299efb3c36abec520a4c896a66d}
+      \field{sortinit}{5}
+      \field{sortinithash}{20e9b4b0b173788c5dace24730f47d8c}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
       \field{journaltitle}{NPJ Digital Medicine}
@@ -2871,13 +3151,6 @@
       \field{year}{2023}
     \endentry
   \enddatalist
-  \missing{DeepEval2024}
-  \missing{Gao2024RetrievalAugmentedGN}
-  \missing{Manning2008Introduction}
-  \missing{medium_rag_workflow}
-  \missing{nni_microsoft}
-  \missing{st_cubeai_docs}
-  \missing{warden2019tinyml}
 \endrefsection
 \endinput
 

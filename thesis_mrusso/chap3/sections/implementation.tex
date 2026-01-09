@@ -15,11 +15,11 @@ The implementation relies on several key frameworks and libraries: \textbf{LangG
 The workflow begins with a user-provided research topic. Rather than immediately executing a query, the system first generates a refined, structured search query through an LLM-guided process:
 
 \begin{lstlisting}
-1. Input: research_topic (string)
+1. Input: research\_topic (string)
 2. Format research topic with prompt template
 3. Invoke ChatOllama with JSON mode (temperature=0)
 4. Parse returned JSON to extract 'query' field
-5. Output: search_query (string)
+5. Output: search\_query (string)
 \end{lstlisting}
 
 This generation step provides three key benefits. First, setting temperature to 0 ensures deterministic query formulation, guaranteeing that the same research topic produces nearly identical search queries for reproducibility. Second, enforcing JSON mode constrains the LLM output to structured, parseable results rather than free-form text, preventing malformed queries. Third, the LLM leverages its domain knowledge to reformulate natural language research topics into effective search terminology that maximizes retrieval relevance.
@@ -44,8 +44,8 @@ The use of \texttt{asyncio.to\_thread()} is critical as it prevents blocking the
 After search execution, raw results are parsed into a structured format using a second LLM pass:
 
 \begin{lstlisting}
-1. Input: raw_search_result (unstructured text)
-2. Invoke ChatOllama with web_search_expected_output prompt
+1. Input: raw\_search\_result (unstructured text)
+2. Invoke ChatOllama with web\_search\_expected\_output prompt
 3. Extract JSON from response
 4. Validate and normalize source information
 \end{lstlisting}
@@ -77,20 +77,20 @@ After each summary generation, the system reflects on gaps in coverage to guide 
 
 \begin{lstlisting}
 1. Invoke ChatOllama with reflection_instructions prompt
-2. Input: current running_summary + research_topic
+2. Input: current running\_summary + research\_topic
 3. Use JSON mode to extract structured follow-up query
-4. Validate that follow-up_query is not null
+4. Validate that follow-up\_query is not null
 5. Fallback to generic query if generation fails
 \end{lstlisting}
 
-The reflection phase ensures that the system doesn't re-query the same information but instead targets unexplored dimensions of the research topic, enabling progressive exploration and preventing query stagnation. The LLM identifies knowledge gaps by analyzing the current summary against the original research topic, with the resulting follow-up query used in the next iteration of web search.
+The reflection phase ensures that the system doesn't re-query the same information but instead targets unexplored dimensions of the research topic, enabling progressive exploration and preventing query stagnation. The LLM identifies knowledge gaps by analyzing the current summary against the original research topic, with the resulting follow-up\_query used in the next iteration of web search.
 
 \subsubsection{Loop Control and Termination}
 
 The system maintains a \texttt{research\_loop\_count} to prevent infinite loops:
 
 \begin{lstlisting}
-if research_loop_count <= max_web_research_loops:
+if research\_loop\_count <= max\_web\_research\_loops:
     route = "web_research"  # Continue another iteration
 else:
     route = "finalize_summary"  # Proceed to evaluation
