@@ -2,7 +2,7 @@
 The concept of \gls{hitl} defines a design paradigm where human intelligence and machine learning are integrated to optimize performance, interpretability, and safety \cite{chaudhari2024rlhfdecipheredcriticalanalysis}. In an agentic MLOps framework, HITL is not merely an optional feature but a core safeguard. It recognizes that while LLMs can automate the majority of the development lifecycle, human experts possess the nuanced domain knowledge required to navigate edge cases, ethical dilemmas, and complex hardware trade-offs that purely statistical models might overlook \cite{HelpfulHarmlessHonest2025}.
 
 \subsection{Patterns of Human-Agent Interaction}
-Iterative refinement within HITL workflows typically follows a generate-evaluate-update cycle. In our orchestration framework, this interaction is structured through several specialized patterns:
+Iterative refinement within HITL workflows typically follows a generate-evaluate-update cycle. In my orchestration framework, this interaction is structured through several specialized patterns:
 \begin{enumerate}
     \item \textbf{Human-as-Gate:} The most common pattern for risky operations (e.g., rewriting MCU flash memory). The agent pauses execution and presents its plan for explicit approval before proceeding.
     \item \textbf{Human-as-Critic:} The user provides qualitative feedback on an agent's output (e.g., "the generated C code is too verbose"). The agent then uses this critique to re-generate the artifact in the next iteration \cite{wang2022hitl_survey, madaan2023selfrefine}.

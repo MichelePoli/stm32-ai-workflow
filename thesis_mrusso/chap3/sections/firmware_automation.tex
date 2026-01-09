@@ -4,7 +4,7 @@ The automation of the development cycle requires the ability to generate the bas
 
 \subsubsection{Workflow Automation and CLI Scripting}
 
-To enable deterministic and repeatable firmware generation, we developed a scripting strategy based on STM32CubeMX command files (typically \texttt{.txt} or \texttt{.script} files). This approach bypasses the GUI, loading a Micro-controller Unit (MCU) configuration or a pre-existing project file (\texttt{.ioc}), and executing the code generation process according to predefined parameters.
+To enable deterministic and repeatable firmware generation, I developed a scripting strategy based on STM32CubeMX command files (typically \texttt{.txt} or \texttt{.script} files). This approach bypasses the GUI, loading a Micro-controller Unit (MCU) configuration or a pre-existing project file (\texttt{.ioc}), and executing the code generation process according to predefined parameters.
 
 A typical automation script consists of several sequential commands as shown in Listing~\ref{lst:cubemx_script}.
 
@@ -33,7 +33,7 @@ During the implementation of this headless workflow, several environment-specifi
 \begin{itemize}
     \item \textbf{Residual GUI Dependencies}: On certain operating systems (such as macOS and Linux), the STM32CubeMX executable may still attempt to initiate graphical components even when running in script mode. This can lead to execution failures in headless environments (e.g., remote servers or Docker without X11). The issue was mitigated by ensuring appropriate environment variables were set or, where possible, using the \texttt{loadboard} command with specific parameters to avoid interactive peripheral configuration dialogs.
     
-    \item \textbf{Peripheral Configuration Conflicts}: When loading a specific MCU model (\texttt{load} command) versus a specific development board (\texttt{loadboard}), the CLI behaves differently regarding default peripheral states. In our workflow, we prioritized the \texttt{config load} transition to ensure that user-defined pinouts and clock trees are precisely preserved during the automated generation cycle.
+    \item \textbf{Peripheral Configuration Conflicts}: When loading a specific MCU model (\texttt{load} command) versus a specific development board (\texttt{loadboard}), the CLI behaves differently regarding default peripheral states. In my workflow, I prioritized the \texttt{config load} transition to ensure that user-defined pinouts and clock trees are precisely preserved during the automated generation cycle.
 \end{itemize}
 
 By abstracting the firmware generation into a CLI-driven process, the overall framework can treat the creation of the C project as an atomic step within the larger Agentic MLOps pipeline, enabling rapid transitions between model discovery, code generation, and physical deployment.

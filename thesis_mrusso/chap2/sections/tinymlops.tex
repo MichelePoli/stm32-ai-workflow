@@ -25,14 +25,14 @@ Metric Priority & Prediction Accuracy & Accuracy vs. Resource Footprint \\
 
 \subsubsection{Core Pillars of TinyMLOps}
 
-Our proposed framework implements three fundamental pillars of the TinyMLOps paradigm:
+My proposed framework implements three fundamental pillars of the TinyMLOps paradigm:
 
 \begin{itemize}
     \item \textbf{Hardware-Aware Optimization}: Unlike cloud models that can easily scale with more VRAM, embedded models must undergo structural transformations (e.g., quantization, pruning, and "neural surgery") to fit into specific MCU memory profiles.
     
     \item \textbf{Integrated Automation ("Plumbing")}: TinyMLOps requires the seamless connection of traditionally disjoint tools—Python-based training environments, C-based firmware toolchains (like STM32Cube), and binary flashing utilities.
     
-    \item \textbf{Reproducibility}: By defining the end-to-end workflow as a declarative graph (e.g., via LangGraph), we ensure that an optimized model can be reconstructed and re-verified consistently across different hardware revisions.
+    \item \textbf{Reproducibility}: By defining the end-to-end workflow as a declarative graph (e.g., via LangGraph), I ensure that an optimized model can be reconstructed and re-verified consistently across different hardware revisions.
 \end{itemize}
 
 By adopting a TinyMLOps approach, the development of embedded AI transitions from a manual, expert-intensive process to a systematic, automated engineering discipline.
