@@ -16,6 +16,13 @@ For the "knowledge" aspect—specifically the answers retrieved via RAG—verifi
     \item \textbf{Answer Relevancy:} penalizes verbose or evasive answers that do not directly address the user's prompt.
 \end{itemize}
 
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.9\textwidth]{chap2/figure/deepeval_metrics.png} % TODO: Insert DeepEval metrics diagram
+    \caption{The "RAG Triad" evaluation metrics used by DeepEval: Faithfulness, Answer Relevance, and Contextual Relevance \cite{DeepEval2024}.}
+    \label{fig:deepeval}
+\end{figure}
+
 \subsection{Sandbox Execution and Safety}
 Given the potential for generating unsafe or buggy code, execution must occur in a controlled environment. \textbf{Sandboxing} provides an isolated runtime where code can be executed without checking the host system's integrity \cite{hajipour2023codelmsec}.
 In the proposed framework, this is implemented as a "Safe Execution Loop." When the agent generates a script (e.g., for data preprocessing or model inspection), it is executed within a supervised subprocess. If the script fails due to syntax errors or runtime exceptions, the sandbox traps the failure and returns the standard error (stderr) trace to the agent. This allows for a self-healing loop where the agent reads the error, reasons about the fix, and re-generates the code—mimicking the iterative debugging process of a human developer \cite{EvaluatingCorrect-Consistency}.
