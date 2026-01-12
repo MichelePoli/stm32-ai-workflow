@@ -16,6 +16,13 @@ To address the limitations of linear execution, LangGraph extends the ecosystem 
 
 The core innovation of this framework lies in its support for \textbf{cycles}, enabling the definition of iterative loops crucial for sophisticated tasks. For example, in the "Neural Network Surgery" workflow, the system orchestrates an iterative refinement process where the model is optimized (e.g., leveraging the internal search loops of NNI) and validated against constraints until a viable configuration is selected. This "test-and-revise" capability, which may also involve Human-in-the-Loop feedback, is difficult to implement in linear chains but natural in a graph structure. LangGraph treats the agent's execution as a state machine, where decisions govern the transitions between states, allowing for dynamic branching and error recovery.
 
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.8\textwidth]{chap2/figure/langgraph_cycle.png}
+    \caption{Conceptual difference between a linear chain (left) and a cyclic graph (right) in agentic workflows. The cycle allows for iterative refinement and self-correction.}
+    \label{fig:langgraph_cycle}
+\end{figure}
+
 \subsection{State Management and Persistence}
 A defining characteristic of robust agentic systems is the ability to maintain context over extended horizons. Modern orchestration frameworks distinguish themselves through sophisticated state management mechanisms, moving away from stateless architectures where every interaction is independent \cite{yu2023stateful}.
 

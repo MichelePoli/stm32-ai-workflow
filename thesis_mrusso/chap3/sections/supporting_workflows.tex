@@ -1,0 +1,30 @@
+\section{Supporting Workflows}
+\label{sec:supporting}
+
+In addition to the four primary workflows, the framework includes two auxiliary workflows for dataset management and synthetic data generation.
+
+\subsection{Workflow 6: Synthetic Data Generation}
+
+This workflow generates synthetic training samples using generative AI when real-world datasets are unavailable or insufficient. Key features include:
+
+\begin{itemize}
+    \item \textbf{Requirement Collection}: Extracts data characteristics (domain, sample count, resolution) from user input
+    \item \textbf{Generation Strategy Selection}: Chooses between image synthesis (Stable Diffusion), sensor data simulation (statistical models), or augmentation pipelines
+    \item \textbf{Quality Validation}: Verifies generated samples meet distribution requirements
+\end{itemize}
+
+Generated data is saved in NumPy format compatible with Workflow 5 (customization) and Workflow 2 (model training).
+
+\subsection{Workflow 7: Dataset Selection and Format Conversion}
+
+This workflow curates and converts publicly available datasets for embedded AI tasks:
+
+\begin{itemize}
+    \item \textbf{Catalog Search}: Queries a predefined catalog (\texttt{DATASET\_CATALOG} dict) of embedded-friendly datasets (CIFAR-10, MNIST, UCI HAR, ESC-50)
+    \item \textbf{Download and Cache}: Fetches datasets from Kaggle, UCI ML Repository, or GitHub
+    \item \textbf{Format Standardization}: Converts to NumPy arrays with shape \texttt{(N, H, W, C)} for images or \texttt{(N, T, F)} for time series
+    \item \textbf{Train/Val/Test Splitting}: Applies stratified splits (default 70/15/15)
+    \item \textbf{Audio Preprocessing}: Converts audio datasets to spectrograms via STFT for vision model compatibility
+\end{itemize}
+
+The converted dataset is saved to \texttt{./dataset\_output/} and path is recorded in \texttt{MasterState} for consumption by Workflow 5.

@@ -1,0 +1,64 @@
+\section{STM32 Firmware Generation Workflow}
+\label{sec:firmware}
+
+Workflow 1 automates the initialization of STM32CubeMX projects through CLI-driven scripting, eliminating manual GUI interaction and ensuring reproducible firmware scaffolding.
+
+\subsection{Project Information Collection}
+
+The \texttt{collect\_project\_info()} node extracts hardware specifications from natural language using structured LLM extraction:
+
+\begin{lstlisting}[language=Python, caption={Firmware project info extraction}]
+# User: "Create a project for STM32F401 with STM32CubeIDE, name MyApp"
+
+llm_extractor = ChatOllama(model="mistral:latest").with_structured_output(ProjectInfoExtraction)
+result = llm_extractor.invoke([
+    SystemMessage(content=project_info_extraction_instructions),
+    HumanMessage(content=state.message)
+])
+
+# Parsed: {ioc_file_path: null, board_name: "STM32F401", mcu_series: "F4", 
+#          project_name: "MyApp", toolchain: "STM32CubeIDE"}
+\end{lstlisting}
+
+Alternatively, users can specify an existing \texttt{.ioc} configuration file path, bypassing project creation.
+
+\subsection{STM32Cube Package Installation}
+
+The \texttt{search\_and\_install\_stm32\_package()} function automates download of the required STM32Cube firmware package from GitHub:
+
+\begin{enumerate}
+    \item Constructs repository URL based on MCU series (e.g., \texttt{STM32CubeF4} for F4 series)
+    \item Clones repository to \texttt{\textasciitilde/STM32Cube/Repository/}
+    \item Verifies presence of required HAL files and device headers
+\end{enumerate}
+
+This eliminates the manual "STM32CubeMX Updater" workflow, directly provisioning the necessary firmware libraries.
+
+\subsection{CubeMX Script Generation and Execution}
+
+STM32CubeMX supports headless operation via \texttt{-s} (script mode). The \texttt{generate\_cubemx\_script()} node creates a \texttt{.script} file that:
+
+\begin{itemize}
+    \item Loads the \texttt{.ioc} file (if provided) or board template
+    \item Configures peripherals (GPIO, UART, I2C, etc.) based on user requirements
+    \item Sets code generation parameters (toolchain, output directory)
+    \item Triggers \texttt{generate code} command
+\end{itemize}
+
+The \texttt{execute\_generation()} node then invokes CubeMX:
+
+\begin{verbatim}
+<cubemx_path> -q <script_file.script>
+\end{verbatim}
+
+Generated output includes initialization code (\texttt{main.c}, \texttt{stm32f4xx\_hal\_msp.c}), linker scripts, and IDE project files.
+
+\subsection{Human-in-the-Loop Gate}
+
+After successful generation, the \texttt{decide\_continue\_to\_ai()} node presents an interrupt:
+
+\begin{quote}
+\textit{"Firmware project created. Do you want to proceed with AI model selection?"}
+\end{quote}
+
+The user's response is classified via LLM, allowing transitions between workflows (firmware $\rightarrow$ AI analysis) or workflow termination.

@@ -1,0 +1,83 @@
+\section{Tooling Infrastructure}
+\label{sec:tools}
+
+The framework integrates multiple specialized tools to enable end-to-end MLOps automation.
+
+\subsection{Agno Framework for Agent Orchestration}
+
+Agno (\url{https://github.com/agno-agi/agno}) provides a lightweight agent framework with first-class tool support. The system uses Agno's pre-built tool kits:
+
+\begin{itemize}
+    \item \textbf{TavilyTools}: Advanced web search optimized for LLM consumption
+    \item \textbf{ArxivTools}: Academic paper retrieval from arXiv repository
+    \item \textbf{GoogleSearchTools}: Google Custom Search Engine integration
+    \item \textbf{DuckDuckGoTools}: Privacy-focused web search
+\end{itemize}
+
+Agno agents execute tool-augmented reasoning loops transparently, logging all tool invocations for debugging.
+
+\subsection{DeepEval for RAG Quality Assessment}
+
+DeepEval (\url{https://github.com/confident-ai/deepeval}) implements the "LLM-as-a-Judge" paradigm for automated evaluation. The framework employs four core metrics:
+
+\begin{enumerate}
+    \item \textbf{Faithfulness}: $\frac{\text{Grounded Claims}}{\text{Total Claims}}$
+    \item \textbf{Answer Relevancy}: $\frac{\text{Relevant Statements}}{\text{Total Statements}}$
+    \item \textbf{Contextual Relevancy}: $\frac{\text{Useful Retrieved Docs}}{\text{Total Retrieved Docs}}$
+    \item \textbf{Hallucination}: $1 - \frac{\text{Contradicted/Unsupported Claims}}{\text{Total Claims}}$
+\end{enumerate}
+
+Evaluation is performed using DeepSeek-R1 (chain-of-thought reasoning model) to maximize interpretability.
+
+\subsection{ChromaDB for Vector Search}
+
+ChromaDB (\url{https://www.trychroma.com/}) stores embedded documentation for RAG retrieval. Two vectorstores are maintained:
+
+\begin{itemize}
+    \item \textbf{Architecture Best Practices}: Transfer learning guides, optimization techniques
+    \item \textbf{STM32 Documentation}: Hardware constraints, peripheral configurations
+\end{itemize}
+
+Embeddings are generated using \texttt{all-MiniLM-L6-v2} (384-dimensional vectors).
+
+\subsection{Ollama for Local LLM Serving}
+
+Ollama (\url{https://ollama.com}) hosts language models locally, ensuring:
+
+\begin{itemize}
+    \item \textbf{Privacy}: No external API calls for sensitive code/data
+    \item \textbf{Latency Predictability}: Local inference without network dependency
+    \item \textbf{Cost Control}: No per-token charges for experimentation
+\end{itemize}
+
+The framework uses model-specific selection:
+\begin{itemize}
+    \item \texttt{mistral:latest} (7B) for routing and classification (low latency)
+    \item \texttt{qwen3:latest} (20B) for tool orchestration and web search
+    \item \texttt{gpt-oss:20b} for code generation (large context window: 8192 tokens)
+    \item \texttt{deepseek-r1:latest} for RAG evaluation (chain-of-thought reasoning)
+\end{itemize}
+
+\subsection{STEdgeAI CLI}
+
+STMicroelectronics' official toolchain for neural network deployment:
+
+\begin{verbatim}
+stedgeai analyze --model <model.h5> --target <stm32h743>
+stedgeai validate --model <model.h5> --target <stm32h743>
+stedgeai generate --model <model.h5> --compression <high>
+\end{verbatim}
+
+Generates optimized C code compatible with X-CUBE-AI runtime library (v9.x).
+
+\subsection{NNI (Neural Network Intelligence)}
+
+Microsoft's hyperparameter optimization framework (\url{https://nni.readthedocs.io}). The framework generates NNI experiment code programmatically rather than using NNI's built-in YAML configuration, enabling:
+
+\begin{itemize}
+    \item Dynamic search space construction based on model architecture
+    \item Custom trial logic (memory optimization, adaptive layer replacement)
+    \item Programmatic best-trial extraction and auto-retrain
+\end{itemize}
+
+Supported tuners: TPE (Tree-structured Parzen Estimator), Random, Grid Search, SMAC.

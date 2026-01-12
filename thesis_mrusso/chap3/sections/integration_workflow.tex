@@ -1,0 +1,62 @@
+\section{Firmware-AI Integration Workflow}
+\label{sec:integration}
+
+After neural network code generation (Workflow 2) and firmware scaffolding (Workflow 1), Workflow 3 merges the AI inference code into the STM32 project structure.
+
+\subsection{File Placement and Build System Modification}
+
+The generated \texttt{network.c/h} files from STEdgeAI are copied into the firmware project:
+
+\begin{verbatim}
+<firmware_project>/
+├── Core/
+│   ├── Inc/
+│   │   └── network.h  ← AI model header
+│   └── Src/
+│       ├── main.c
+│       └── network.c  ← AI inference implementation
+├── Drivers/X-CUBE-AI/  ← X-CUBE-AI runtime library
+└── CMakeLists.txt  ← Modified to include AI sources
+\end{verbatim}
+
+The \texttt{CMakeLists.txt} is automatically updated to:
+\begin{enumerate}
+    \item Add \texttt{network.c} to \texttt{add\_executable()}
+    \item Include X-CUBE-AI header paths
+    \item Link against \texttt{libai\_runtime.a}
+\end{enumerate}
+
+\subsection{Application Code Template}
+
+A minimal \texttt{main.c} template is provided demonstrating:
+
+\begin{lstlisting}[language=C, caption={AI inference integration in main.c}]
+#include "network.h"
+
+int main(void) {
+    HAL_Init();
+    SystemClock_Config();
+    
+    // Initialize AI model
+    ai_network_create(&network);
+    ai_network_init(network, network_data);
+    
+    // Prepare input tensor
+    ai_float input_data[AI_NETWORK_IN_SIZE];
+    // ... populate input_data from sensor ...
+    
+    // Run inference
+    ai_network_run(network, input_data, output_data);
+    
+    // Process output
+    uint8_t predicted_class = argmax(output_data, AI_NETWORK_OUT_SIZE);
+    
+    while(1) { /* main loop */ }
+}
+\end{lstlisting}
+
+This allows users to immediately test the integrated AI model on hardware.
+
+\subsection{Build Verification}
+
+The workflow attempts to compile the integrated project using the configured toolchain (e.g., \texttt{arm-none-eabi-gcc}). If compilation fails, error logs are presented to the user for manual debugging.

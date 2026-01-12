@@ -1,0 +1,52 @@
+\section{Web Research Workflow for Technical Guidance}
+\label{sec:web_research}
+
+Workflow 4 implements a RAG-enhanced web research system for gathering technical documentation, troubleshooting guides, and best practices from online sources. This workflow augments the embedded AI development process with real-time information retrieval.
+
+\subsection{Query Generation and Iterative Refinement}
+
+The workflow uses LLM-driven query generation to produce diverse, specific search queries:
+
+\begin{lstlisting}[language=Python, caption={Multi-query generation for comprehensive coverage}]
+# Generate 6 diverse search queries covering different aspects
+queries = llm.generate_queries(user_question)
+# Example: "STM32 X-CUBE-AI deployment guide"
+#          "TensorFlow Lite quantization for embedded"
+#          "STM32H7 neural network performance optimization"
+\end{lstlisting}
+
+Queries are then ranked by relevance using a second LLM call, prioritizing the most pertinent searches.
+
+\subsection{Multi-Tool Web Search}
+
+The system employs Agno's tool ecosystem to access multiple search backends:
+
+\begin{itemize}
+    \item \textbf{TavilyTools}: Primary search engine optimized for LLM consumption (5 documents per query, full content)
+    \item \textbf{GoogleSearchTools}: Fallback for broader web coverage
+    \item \textbf{DuckDuckGoTools}: Privacy-focused alternative for redundancy
+\end{itemize}
+
+Search results are parsed, deduplicated, and chunked into paragraph-level segments.
+
+\subsection{Summarization and Quality Evaluation}
+
+Retrieved content is synthesized into a coherent summary using an LLM with the following stages:
+
+\begin{enumerate}
+    \item \textbf{Initial Summarization}: Generate summary from first search batch
+    \item \textbf{Reflection}: Identify knowledge gaps in current summary
+    \item \textbf{Follow-up Search}: Generate new queries targeting gaps
+    \item \textbf{Iterative Extension}: Expand summary with additional results (max 3 iterations)
+\end{enumerate}
+
+After the final iteration, DeepEval metrics assess summary quality:
+
+\begin{itemize}
+    \item \textbf{Faithfulness}: Are claims grounded in retrieved documents? (Target: \textgreater 0.7)
+    \item \textbf{Answer Relevancy}: Does summary address user question? (Target: \textgreater 0.7)
+    \item \textbf{Contextual Relevancy}: Are retrieved documents relevant? (Target: \textgreater 0.7)
+    \item \textbf{Hallucination}: Does summary contain fabricated information? (Target: \textless 0.2)
+\end{itemize}
+
+Results are presented to the user along with source citations, enabling verification of technical claims.

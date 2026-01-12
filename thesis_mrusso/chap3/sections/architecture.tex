@@ -1,0 +1,130 @@
+\section{System Architecture}
+\label{sec:architecture}
+
+The implemented framework follows a modular, graph-based architecture where autonomous agents orchestrate the entire MLOps pipeline through a stateful execution model. Unlike traditional linear scripts, the system leverages \textbf{LangGraph} to define workflows as directed graphs with conditional routing, enabling complex multi-step processes with human oversight at critical decision points.
+
+\subsection{Master Orchestrator and State Machine}
+
+The core orchestration logic resides in \texttt{graph.py}, which implements a \textbf{Master StateGraph} that routes user requests to specialized subgraphs based on intent classification. The system operates through a centralized state object (\texttt{MasterState}) that persists across all workflow nodes, ensuring coherence and traceability throughout the execution.
+
+\subsubsection{Four-Branch Workflow Architecture}
+
+User requests are classified into four primary workflow categories:
+
+\begin{enumerate}
+    \item \textbf{Firmware Generation} (\texttt{firmware\_flow}): Automates STM32CubeMX project initialization, package installation, and code generation via CLI scripting.
+    
+    \item \textbf{AI Model Discovery and Optimization} (\texttt{ai\_flow}): Implements a two-tier model discovery system (curated task-based models + iterative web search), followed by neural network customization and hyperparameter optimization with NNI.
+    
+    \item \textbf{Firmware-AI Integration} (\texttt{integration\_flow}): Merges generated C inference code into the STM32 project structure and verifies build compatibility.
+    
+    \item \textbf{Web Research} (\texttt{search\_flow}): Provides technical guidance through RAG-enhanced web search with quality evaluation metrics.
+\end{enumerate}
+
+The routing decision is performed by an LLM-based classifier that analyzes the user's natural language input and returns a structured decision object:
+
+\begin{lstlisting}[language=Python, caption={LLM-based routing logic from graph.py}, label={lst:routing}]
+# From src/assistant/graph.py - route_request()
+llm_router = ChatOllama(model="mistral:latest").with_structured_output(RouteDecision)
+
+result = llm_router.invoke([
+    SystemMessage(content=router_instructions),
+    HumanMessage(content=f"Richiesta: {state.message}")
+])
+
+state.route = result.route  # "firmware", "ai_analysis", "integration", or "web_research"
+
+if result.confidence < 0.6:
+    logger.warning(f"Low confidence ({result.confidence:.2f}), requesting clarification")
+    state.route = "unknown"
+\end{lstlisting}
+
+If the classifier's confidence falls below 0.6, the system enters a clarification loop where the user is prompted to explicitly select the desired workflow from a structured menu.
+
+\subsubsection{State Management and Persistence}
+
+All workflow data is stored in a single \texttt{MasterState} object defined in \texttt{state.py}. This Pydantic-based state class contains over 50 typed attributes covering:
+
+\begin{itemize}
+    \item \textbf{User Input}: Original message, intent classification, routing metadata
+    \item \textbf{Firmware Workflow}: Board name, MCU series, .ioc file path, CubeMX output directory
+    \item \textbf{AI Workflow}: Model path, task type, target MCU, compression level, search iteration count
+    \item \textbf{Customization}: Model layers, modification parameters, NNI experiment directory
+    \item \textbf{Integration}: Generated code paths, build status
+    \item \textbf{Web Research}: Query history, search results, evaluation scores
+\end{itemize}
+
+LangGraph automatically persists this state at every node transition through a checkpointing mechanism, enabling:
+
+\begin{enumerate}
+    \item \textbf{Fault Tolerance}: Resume execution from the last successful checkpoint after transient failures
+    \item \textbf{Human-in-the-Loop Gates}: Suspend execution for user approval without losing context
+    \item \textbf{Time-Travel Debugging}: Replay past executions to diagnose workflow errors
+\end{enumerate}
+
+The state is serialized as JSON and stored in a SQLite database (LangGraph's default backend for local deployments).
+
+\subsection{Configuration Management}
+
+Runtime parameters are managed through a dedicated \texttt{Configuration} class (\texttt{configuration.py}) that loads settings from:
+
+\begin{itemize}
+    \item \textbf{Environment Variables}: ST credentials (\texttt{ST\_EMAIL}, \texttt{ST\_PASSWORD}), API keys
+    \item \textbf{Config File}: \texttt{config.json} for paths (CubeMX binary, STM32Cube repository, AI output directories)
+    \item \textbf{LangGraph Runtime Config}: Passed via \texttt{config} parameter to each node
+\end{itemize}
+
+Critical configuration parameters include:
+
+\begin{itemize}
+    \item \texttt{local\_llm}: Language model ID (default: \texttt{mistral:latest})
+    \item \texttt{llm\_temperature}: Sampling temperature (0.0 for deterministic routing, 0.2 for code generation)
+    \item \texttt{llm\_context\_window}: Token limit (4096–8192 depending on task complexity)
+    \item \texttt{cubemx\_path}: Absolute path to STM32CubeMX CLI executable
+    \item \texttt{ai\_target}: Target MCU for STEdgeAI tooling (e.g., \texttt{stm32h743})
+    \item \texttt{ai\_compression}: Quantization level (\texttt{low}, \texttt{medium}, \texttt{high}, \texttt{very\_high})
+\end{itemize}
+
+The configuration is validated at runtime using Pydantic validators, ensuring all required paths exist and credentials are correctly formatted before workflow execution begins.
+
+\subsection{Graph Topology and Node Composition}
+
+Each of the four primary workflows is implemented as a \textbf{subgraph} with its own internal routing logic. The master graph connects these subgraphs through conditional edges that allow \textit{inter-workflow transitions} based on user decisions:
+
+\begin{itemize}
+    \item After completing firmware generation, the system offers to proceed to AI model discovery
+    \item After AI model optimization, the system offers to integrate the generated C code into the firmware project
+    \item At any point, users can invoke web research to gather technical documentation
+\end{itemize}
+
+This multi-stage pipeline mirrors the typical embedded AI development lifecycle:
+
+\begin{center}
+\texttt{Hardware Setup → Model Selection → Model Customization → Code Generation → Integration → Testing}
+\end{center}
+
+The graph construction logic resides in four builder functions:
+
+\begin{itemize}
+    \item \texttt{build\_firmware\_graph()}: Firmware workflow (Workflow 1)
+    \item \texttt{build\_ai\_analysis\_graph()}: AI discovery + customization (Workflows 2, 5, 6, 7)
+    \item \texttt{build\_integration\_graph()}: Firmware-AI integration (Workflow 3)
+    \item \texttt{build\_web\_search\_graph()}: Web research (Workflow 4)
+\end{itemize}
+
+Each builder function assembles nodes, defines conditional edges, and sets up interrupt points for human approval.
+
+\subsection{Logging and Observability}
+
+The system implements structured logging across all workflow nodes with severity levels:
+
+\begin{itemize}
+    \item \texttt{DEBUG}: Detailed execution traces (LLM prompts, API responses, state transitions)
+    \item \texttt{INFO}: High-level progress indicators (workflow entry, node completion)
+    \item \texttt{WARNING}: Non-fatal issues (low LLM confidence, fallback activations)
+    \item \texttt{ERROR}: Recoverable failures (API timeouts, invalid user input)
+\end{itemize}
+
+Log entries include contextual metadata such as workflow name, current node, and relevant state variables, enabling rapid debugging of complex multi-step executions.
+
+Additionally, the framework emits progress updates to the LangGraph API server, which can be consumed by frontend clients (e.g., Gradio UI, REST API consumers) for real-time status visualization.

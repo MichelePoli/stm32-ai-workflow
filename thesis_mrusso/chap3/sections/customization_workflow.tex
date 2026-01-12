@@ -1,0 +1,311 @@
+\section{Neural Network Customization and NNI Code Generation}
+\label{sec:customization}
+
+Once a base model has been discovered and profiled, users may require architectural modifications to meet specific project constraints or improve performance for their target task. Workflow 5 implements an autonomous customization pipeline that combines \textit{RAG-enhanced best practice retrieval}, \textit{natural language intent parsing}, and \textit{LLM-driven code generation} to produce executable NNI hyperparameter optimization experiments without manual scripting.
+
+\subsection{Model Architecture Inspection}
+
+The customization workflow begins with detailed introspection of the downloaded model file via the \texttt{inspect\_model\_architecture()} node. This analysis extracts:
+
+\begin{itemize}
+    \item \textbf{Layer-by-layer architecture}: Type (Conv2D, Dense, Dropout), parameters, output shapes
+    \item \textbf{Input/output specifications}: Expected tensor shapes and data types
+    \item \textbf{Trainable parameter count}: Used to estimate fine-tuning memory requirements
+    \item \textbf{Framework version}: Keras 2.x vs 3.x for compatibility routing
+\end{itemize}
+
+For Keras 2.x models incompatible with the primary environment, inspection is delegated to the legacy \texttt{stm32\_legacy} subprocess (see Section~\ref{sec:ai_workflow}).
+
+The extracted architecture is formatted as a human-readable summary and presented to the user, enabling informed decision-making on which layers to freeze, which to replace, and where to introduce regularization.
+
+\subsection{RAG-Enhanced Modification Planning}
+
+Before soliciting user modifications, the system proactively retrieves best practices tailored to the specific model architecture via the \texttt{retrieve\_best\_practices\_for\_architecture()} function:
+
+\subsubsection{Vectorstore Construction}
+
+The system maintains a ChromaDB vectorstore indexed with documentation from:
+
+\begin{itemize}
+    \item Official Keras/TensorFlow guides on transfer learning
+    \item Academic papers on efficient fine-tuning techniques (LoRA, adapter layers, etc.)
+    \item STMicroelectronics application notes on Edge AI optimization
+\end{itemize}
+
+Text is embedded using HuggingFace's \texttt{all-MiniLM-L6-v2} model and stored locally in \texttt{\textasciitilde/.cache/chroma\_db/architecture\_best\_practices}.
+
+\subsubsection{Web Search Augmentation}
+
+If the vectorstore lacks sufficient context for a specific architecture (e.g., uncommon CNNs like ShuffleNet), the system performs a time-limited web search (\texttt{\_fetch\_and\_cache\_with\_timeout()}) using Agno's GoogleSearchTools:
+
+\begin{lstlisting}[language=Python, caption={Web-augmented RAG for best practices}, label={lst:rag_web}]
+# From workflow5_customization.py
+query = f"{model_name} fine-tuning best practices transfer learning"
+
+def search_with_timeout():
+    agent = Agent(
+        model=Ollama(id="qwen3:latest"),
+        tools=[GoogleSearchTools()],
+        instructions="Find technical guides on fine-tuning this architecture"
+    )
+    return agent.run(query)
+
+# Timeout after 10 seconds to avoid workflow stalls
+results = execute_with_timeout(search_with_timeout, timeout=10)
+\end{lstlisting}
+
+Retrieved web pages are parsed with BeautifulSoup, chunked, and added to the vectorstore cache for future reuse.
+
+\subsubsection{LLM Synthesis}
+
+The top-5 most relevant documents (by cosine similarity) are passed to an LLM along with the user's architecture description. The LLM synthesizes a concise recommendation covering:
+
+\begin{itemize}
+    \item Which layers to freeze (e.g., "Freeze first 80\% of convolutional backbone for feature extraction stability")
+    \item Suitable dropout rates based on dataset size
+    \item Recommended learning rate ranges for the optimizer
+    \item Warnings about potential overfitting risks
+\end{itemize}
+
+This proactive guidance reduces user cognitive load and improves first-attempt success rate for fine-tuning.
+
+\subsection{Modification Intent Classification}
+
+The \texttt{ask\_modification\_intent()} node uses a two-stage LLM interaction:
+
+\subsubsection{Stage 1: Binary Decision}
+
+A structured classifier determines whether the user wants to modify the model at all:
+
+\begin{lstlisting}[language=Python, caption={Modification intent detection}, label={lst:intent}]
+llm_intent = ChatOllama(model="mistral:latest").with_structured_output(ModificationDecision)
+
+result = llm_intent.invoke([
+    SystemMessage(content=modification_decision_instructions),
+    HumanMessage(content=user_response)
+])
+
+# Output: {wants_modifications: true/false, reasoning: "...", confidence: 0.95}
+\end{lstlisting}
+
+If \texttt{wants\_modifications = false}, the workflow bypasses customization and proceeds directly to STEdgeAI code generation.
+
+\subsubsection{Stage 2: Parameter Extraction}
+
+If modifications are desired, a second LLM call extracts structured modification parameters using the \texttt{ModelModification} schema:
+
+\begin{lstlisting}[language=Python, caption={Natural language → structured modification params}, label={lst:mod_extraction}]
+# User: "Freeze all layers except the last 5, add 30% dropout, use learning rate 1e-4"
+
+llm_extractor = ChatOllama(model="gpt-oss:20b").with_structured_output(ModelModification)
+result = llm_extractor.invoke([
+    SystemMessage(content=model_modification_instructions),
+    HumanMessage(content=user_response)
+])
+
+# Parsed output:
+# {
+#   "freeze_layers": "all_except_last_5",
+#   "dropout_rate": 0.3,
+#   "learning_rate": 0.0001,
+#   "num_classes": null,
+#   "additional_layers": [],
+#   "confidence": 0.98
+# }
+\end{lstlisting}
+
+Supported modifications include:
+\begin{itemize}
+    \item \texttt{freeze\_layers}: "all", "none", "first\_N", "all\_except\_last\_N", "custom"
+    \item \texttt{num\_classes}: Replace output layer for different classification tasks
+    \item \texttt{dropout\_rate}: Add dropout regularization (0.0–0.8)
+    \item \texttt{learning\_rate}: Override default optimizer LR
+    \item \texttt{additional\_layers}: Specify custom layers (e.g., "BatchNormalization", "GlobalAveragePooling2D")
+\end{itemize}
+
+\subsection{NNI Code Generation: Architecture and Prompt Engineering}
+
+The core technical contribution of this workflow is the \textit{autonomous generation of complete NNI experiment code} from high-level specifications. Unlike template-based code generators that rely on rigid fill-in-the-blank patterns, this system employs a large language model (GPT-OSS:20b with 8192 context window) to synthesize production-ready Python scripts capable of handling edge cases such as:
+
+\begin{itemize}
+    \item Sparse vs. categorical label formats
+    \item Input shape mismatches requiring dynamic resizing
+    \item Class count discrepancies between model and dataset
+    \item Memory constraints on consumer hardware (dataset subsetting, mmap loading)
+    \item Port conflicts for NNI Web UI
+    \item Missing NNI API methods across versions (robust fallbacks)
+\end{itemize}
+
+\subsubsection{Prompt Engineering Strategy}
+
+The \texttt{generate\_nni\_experiment()} function in \texttt{nni\_optimization/generator.py} constructs a \textasciitilde480-line prompt that embeds:
+
+\begin{enumerate}
+    \item \textbf{Context Injection}: Model metadata (name, input/output shapes, layer count, file path) and dataset metadata (path, shape, num\_classes, source format)
+    \item \textbf{Explicit Constraints}: Prohibitions against placeholder paths, hallucinated API methods, and file omissions
+    \item \textbf{Working Code Templates}: Full \texttt{manager.py} and \texttt{trial.py} examples with inline comments explaining each critical section
+    \item \textbf{Error Prevention Rules}: Specific warnings about NNI API inconsistencies (e.g., \texttt{experiment.get\_best\_trial()} does not exist in some versions)
+    \item \textbf{Output Format Specification}: Enforced use of \texttt{\# FILE:} markers for multi-file generation
+\end{enumerate}
+
+A representative excerpt from the prompt:
+
+\begin{verbatim}
+CRITICAL REQUIREMENTS:
+🔴 YOU MUST GENERATE EXACTLY 2 FILES: manager.py AND trial.py
+🔴 Use the exact format shown below with # FILE: markers
+🔴 DO NOT use keras.datasets.load_data(). ALWAYS load data from {dataset_path}.
+🔴 IMPORTANT: If data labels (y_train) have shape (N, 1), they are SPARSE. 
+   Convert them to categorical (one-hot) before training.
+
+FILE 1: manager.py
+- Configure NNI experiment (TPE tuner, maximize mode)
+- Define search space (learning_rate, batch_size, optimizer, freeze_backbone)
+- Set trial_command = "python trial.py"
+- Launch experiment with experiment.run(port=8080, wait_completion=True)
+- AFTER experiment: Find the best trial USING ONLY experiment.list_trial_jobs()
+- Trigger RETRAIN: Run "trial.py" as subprocess with env RETRAIN_MODE='true'
+
+FILE 2: trial.py
+- Get parameters (from NNI_PARAMS if RETRAIN_MODE, else nni.get_next_parameter())
+- Load model and data from provided paths (USE EXACT PATHS: {model_path} and {dataset_path})
+- MEMORY OPTIMIZATION: Load data with mmap_mode='r' to avoid RAM overload
+- DATASET SUBSET: Use only 50% of the dataset to save RAM
+- Adapt model final layer if classes mismatch
+- Train model for 3 epochs
+- Report accuracy to NNI (if not retrain) or Save 'best_model.h5' (if retrain)
+
+⚠️ CRITICAL RULES:
+🔴 DO NOT USE experiment.export_top_trial() OR experiment.get_best_trial() - THEY DO NOT EXIST.
+🔴 ALWAYS USE experiment.list_trial_jobs() to find the best trial manually.
+🔴 Use exact paths from context: {dataset_path} and {model_path}
+\end{verbatim}
+
+The system temperature is set to 0 for deterministic code generation.
+
+\subsubsection{Multi-File Parser with Regex Markers}
+
+The LLM outputs a single concatenated string containing both files, delimited by \texttt{\# FILE: filename.py} markers. The \texttt{extract\_files\_from\_code()} function parses this using a permissive regex pattern:
+
+\begin{lstlisting}[language=Python, caption={Multi-file code extraction}, label={lst:file_extraction}]
+file_pattern = re.compile(r'^\#\s*FILE:\s*([a-zA-Z0-9_\-\.]+)', re.MULTILINE | re.IGNORECASE)
+file_matches = list(file_pattern.finditer(code))
+
+files = {}
+for i, match in enumerate(file_matches):
+    filename = match.group(1)
+    start = match.end()
+    
+    # Find next file marker or end of string
+    if i + 1 < len(file_matches):
+        end = file_matches[i + 1].start()
+    else:
+        end = len(code)
+    
+    file_content = code[start:end].strip()
+    files[filename] = file_content
+
+# Result: {"manager.py": "import nni\n...", "trial.py": "import sys\n..."}
+\end{lstlisting}
+
+The parser handles variations in LLM output:
+\begin{itemize}
+    \item Optional spaces after \texttt{\#} or \texttt{FILE:}
+    \item Markdown code fences inside file content (\texttt{```python ... ```})
+    \item Trailing comments after filename
+\end{itemize}
+
+If no markers are found, the entire output is saved as \texttt{main.py} (fallback for single-file tasks).
+
+\subsubsection{Generated File Structure}
+
+The typical output structure for an NNI experiment:
+
+\paragraph{\texttt{manager.py}}
+This file orchestrates the entire hyperparameter search:
+
+\begin{itemize}
+    \item \textbf{Environment Setup}: Fixes CUDA library paths for Conda environments (lines 192-196)
+    \item \textbf{Search Space Definition}: Defines hyperparameter ranges (learning\_rate, batch\_size, optimizer, freeze\_backbone)
+    \item \textbf{Experiment Configuration}: Sets tuner (TPE/Random), max trials, trial concurrency, GPU usage
+    \item \textbf{Port Hunting}: Scans for free ports (8080–8100) to avoid conflicts (lines 226-235)
+    \item \textbf{Experiment Execution}: Launches trials with \texttt{experiment.run(wait\_completion=True)}
+    \item \textbf{Best Trial Extraction}: Manually iterates \texttt{experiment.list\_trial\_jobs()} to find highest-accuracy trial (lines 244-253)
+    \item \textbf{Auto-Retrain}: Re-runs \texttt{trial.py} with best hyperparameters in \texttt{RETRAIN\_MODE} to save final model
+\end{itemize}
+
+\paragraph{\texttt{trial.py}}
+This file implements a single training trial:
+
+\begin{itemize}
+    \item \textbf{Mode Detection}: Checks \texttt{RETRAIN\_MODE} environment variable to determine behavior
+    \item \textbf{Parameter Loading}: Retrieves hyperparameters from NNI API or environment variable
+    \item \textbf{Data Loading}: Memory-mapped NumPy array loading (\texttt{mmap\_mode='r'}) to avoid RAM exhaustion
+    \item \textbf{Dataset Subsetting}: Uses only 50\% of data to fit in consumer RAM (lines 373-381)
+    \item \textbf{Label Format Fix}: Detects sparse labels (shape \texttt{(N, 1)}) and converts to categorical (one-hot)
+    \item \textbf{Adaptive Output Layer}: Replaces final Dense layer if class count mismatches (lines 400-408)
+    \item \textbf{Transfer Learning Logic}: Freezes backbone layers if \texttt{freeze\_backbone = True}
+    \item \textbf{Dynamic Preprocessing}: Resizes input images to match model's expected shape via TensorFlow Dataset API
+    \item \textbf{Data Augmentation}: Applies random flips, rotations, zoom during training
+    \item \textbf{Result Reporting}: Sends \texttt{val\_accuracy} to NNI or saves \texttt{best\_model.h5} (retrain mode)
+\end{itemize}
+
+\subsubsection{Memory Management and GPU Offloading}
+
+To prevent GPU OOM errors when transitioning from LLM inference to NNI training, the system implements explicit resource cleanup:
+
+\begin{lstlisting}[language=Python, caption={Ollama model unloading before NNI}, label={lst:gpu_cleanup}]
+def force_unload_ollama(model_name: str = "gpt-oss:20b"):
+    """
+    Force Ollama to unload the model from GPU to free up VRAM for TensorFlow/NNI.
+    Sends a request with keep_alive=0.
+    """
+    url = "http://localhost:11434/api/generate"
+    data = {"model": model_name, "keep_alive": 0}
+    
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(data).encode('utf-8'),
+        headers={'Content-Type': 'application/json'}
+    )
+    
+    with urllib.request.urlopen(req) as response:
+        logger.info(f"Ollama model '{model_name}' unloaded to free VRAM for NNI.")
+\end{lstlisting}
+
+This function is called in the \texttt{finally} block of \texttt{generate\_nni\_experiment()} to guarantee VRAM release even if code generation fails.
+
+\subsection{Hyperparameter Optimization Execution}
+
+Once the NNI scripts are generated and saved to \texttt{./nni\_experiment/}, the \texttt{optimize\_hyperparameters\_with\_nni()} function executes them:
+
+\begin{enumerate}
+    \item \textbf{Validation}: Checks that both \texttt{manager.py} and \texttt{trial.py} exist and are syntactically valid Python
+    \item \textbf{Subprocess Launch}: Spawns \texttt{python manager.py} in a separate process to avoid blocking the LangGraph event loop
+    \item \textbf{Output Streaming}: Captures stdout/stderr in real-time for user feedback
+    \item \textbf{Completion Detection}: Waits for subprocess termination (blocking until experiment finishes)
+    \item \textbf{Model Retrieval}: Locates \texttt{best\_model.h5} in the NNI output directory and stores path in state
+\end{enumerate}
+
+The subprocess execution isolates NNI's environment from the LangGraph runtime, preventing library conflicts and allowing independent GPU scheduling.
+
+\subsection{Validation and Model Persistence}
+
+After NNI completes, the \texttt{validate\_customized\_model()} node loads \texttt{best\_model.h5} and evaluates it on a held-out test set. If validation accuracy meets the user's threshold (configurable, default 0.7), the model is persisted with metadata:
+
+\begin{lstlisting}[language=Python, caption={Model persistence with metadata tracking}, label={lst:model_save}]
+metadata = {
+    "base_model": state.model_path,
+    "customization_date": datetime.now().isoformat(),
+    "nni_search_space": state.nni_search_space,
+    "best_hyperparameters": state.best_hyperparameters,
+    "validation_accuracy": final_accuracy,
+    "framework_version": "LangGraph-STM32-MLOps v1.0"
+}
+
+model.save(output_path)
+with open(output_path.replace('.h5', '_metadata.json'), 'w') as f:
+    json.dump(metadata, f, indent=2)
+\end{lstlisting}
+
+This metadata enables reproducibility and audit trails for deployed models.

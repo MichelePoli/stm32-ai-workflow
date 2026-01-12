@@ -1,0 +1,100 @@
+\section{Human-in-the-Loop Implementation}
+\label{sec:hitl_impl}
+
+The framework implements Human-in-the-Loop controls through LangGraph's \texttt{interrupt()} primitive, enabling workflow suspension at critical decision points.
+
+\subsection{Interrupt Mechanism}
+
+LangGraph checkpoints state after every node execution. When a node calls \texttt{interrupt()}, execution pauses and control returns to the API server:
+
+\begin{lstlisting}[language=Python, caption={Interrupt-based approval gate}]
+# From workflow1_firmware.py
+def decide_continue_to_ai(state, config):
+    # Suspend execution and request user input
+    user_response = interrupt({
+        "type": "decision_request",
+        "message": "Firmware generated. Continue with AI model selection?",
+        "options": ["yes", "no", "skip"]
+    })
+    
+    # User responses are classified via LLM
+    llm_parser = ChatOllama(model="mistral:latest").with_structured_output(DecisionExtraction)
+    result = llm_parser.invoke([
+        SystemMessage(content=decision_extraction_instructions),
+        HumanMessage(content=user_response)
+    ])
+    
+    if result.continue_to_ai:
+        state.route = "ai_flow"
+    else:
+        state.route = "END"
+    
+    return state
+\end{lstlisting}
+
+Upon receiving user input, the workflow resumes from the exact checkpoint where it suspended, preserving all state variables.
+
+\subsection{Approval Gates vs. Steering Inputs}
+
+The framework distinguishes two HITL patterns:
+
+\subsubsection{Human-as-Gate}
+Binary approval for risky operations (e.g., firmware flashing, model deployment):
+
+\begin{itemize}
+    \item Workflow suspends before action
+    \item User reviews proposed operation
+    \item Explicit "approve" or "reject" required to proceed
+\end{itemize}
+
+Example gates:
+\begin{itemize}
+    \item After firmware generation (proceed to AI workflow?)
+    \item After model selection (accept this model or search again?)
+    \item After NNI completion (deploy best model?)
+\end{itemize}
+
+\subsubsection{Human-as-Instructor}
+Natural language steering to modify workflow direction:
+
+\begin{quote}
+User: \textit{"Actually, I want a smaller model"}
+\end{quote}
+
+The system reclassifies this input using structured extraction and updates \texttt{MasterState}:
+
+\begin{lstlisting}[language=Python]
+result = llm_classifier.invoke(user_input)
+# result.intent = "change_model_size"
+# result.target_size = "small"
+
+state.model_size_preference = "small"
+state.route = "search_model"  # Return to model discovery
+\end{lstlisting}
+
+This enables flexible, conversational control over the MLOps pipeline without predefined menu options.
+
+\subsection{State Persistence and Resume Logic}
+
+LangGraph stores checkpoints in a SQLite database with schema:
+
+\begin{verbatim}
+checkpoints(
+    thread_id TEXT,
+    checkpoint_id TEXT,
+    parent_checkpoint_id TEXT,
+    state BLOB,  -- Serialized MasterState
+    timestamp DATETIME
+)
+\end{verbatim}
+
+When resuming after an interrupt:
+\begin{enumerate}
+    \item Client sends user input via API (\texttt{POST /threads/\{thread\_id\}/runs})
+    \item LangGraph loads latest checkpoint for \texttt{thread\_id}
+    \item Deserializes \texttt{MasterState}
+    \item Injects user input into state
+    \item Resumes execution from next node in graph
+\end{enumerate}
+
+This architecture supports multi-hour workflows (e.g., overnight NNI experiments) with seamless resume capability.

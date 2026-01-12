@@ -1,0 +1,230 @@
+\section{AI Model Discovery and Optimization Workflow}
+\label{sec:ai_workflow}
+
+The AI Model Discovery workflow (Workflow 2) automates the selection, profiling, and code generation of pre-trained neural networks optimized for STM32 microcontrollers. Unlike cloud-based MLOps pipelines that prioritize raw accuracy, embedded AI requires balancing model performance with stringent hardware constraints (RAM, Flash, MACC budget). This workflow implements a hybrid approach combining \textit{curated task-based recommendations} with \textit{iterative web search}, culminating in automated C code generation via STMicroelectronics' STEdgeAI CLI.
+
+\subsection{Analysis Parameters Collection}
+
+The workflow begins by extracting critical deployment parameters from the user's natural language input using structured LLM extraction. The \texttt{collect\_analysis\_info()} node invokes an Ollama-based model (Mistral 7B) with a Pydantic schema to parse:
+
+\begin{itemize}
+    \item \textbf{Target MCU}: The specific microcontroller family (e.g., \texttt{stm32h743}, \texttt{stm32f401}, \texttt{stm32u5}) that defines available hardware accelerators and memory profiles
+    \item \textbf{Compression Level}: Quantization aggressiveness (\texttt{low}, \texttt{medium}, \texttt{high}, \texttt{very\_high}) that trades accuracy for reduced model size
+\end{itemize}
+
+Example extraction:
+
+\begin{lstlisting}[language=Python, caption={Parameter extraction from user input}, label={lst:param_extraction}]
+# User: "I need a model for image classification on STM32H7 with high compression"
+
+llm_extractor = ChatOllama(model="mistral:latest").with_structured_output(AnalysisInfoExtraction)
+result = llm_extractor.invoke([
+    SystemMessage(content=analysis_info_instructions),
+    HumanMessage(content=state.message)
+])
+
+# Structured output:
+# result.target = "stm32h743"
+# result.compression = "high"
+\end{lstlisting}
+
+These parameters are stored in \texttt{MasterState} and propagate to all subsequent nodes, ensuring consistent configuration across model selection, profiling, and code generation.
+
+\subsection{Two-Tier Model Discovery Architecture}
+
+The model discovery system implements a hierarchical search strategy designed to maximize success rate while minimizing user interaction time:
+
+\subsubsection{Tier 1: Curated Task-Based Models}
+
+The first tier presents a curated catalog of models (\texttt{PREDEFINED\_MODELS} dictionary in \texttt{workflow2\_ai.py}) optimized for common embedded AI tasks:
+
+\begin{itemize}
+    \item \textbf{Image Classification}: MobileNetV1/V2 (96×96, 128×128, 224×224), EfficientNet-Lite, SqueezeNet
+    \item \textbf{Object Detection}: MobileNet-SSD, YOLO-Nano
+    \item \textbf{Human Activity Recognition (HAR)}: CNN-based models pretrained on accelerometer/gyroscope data
+\end{itemize}
+
+Each entry includes:
+\begin{itemize}
+    \item Download URL (GitHub Releases, Kaggle, STModelZoo)
+    \item Input shape and number of output classes
+    \item Estimated RAM/Flash footprint for reference MCUs
+    \item Preprocessing requirements
+\end{itemize}
+
+The \texttt{choose\_predefined\_taskbased\_model()} node:
+
+\begin{enumerate}
+    \item Classifies user task using LLM intent detection (\texttt{TaskSelectionExtraction} schema)
+    \item Filters \texttt{PREDEFINED\_MODELS} by task type
+    \item Presents options to user via interrupt with performance estimates
+    \item On acceptance, downloads model file and proceeds to profiling
+\end{enumerate}
+
+This tier achieves \textasciitilde 70\% user acceptance rate for standard tasks, bypassing web search complexity.
+
+\subsubsection{Tier 2: Iterative Web Search with Hybrid Retrieval}
+
+If the user rejects curated models or requests custom architectures, the system enters an \textit{iterative search loop} (max 3 attempts) combining:
+
+\paragraph{GitHub Repository Scanning}
+The \texttt{search\_h5\_file\_in\_repo\_hybrid()} function implements a depth-limited recursive search of public GitHub repositories (e.g., \texttt{keras-team/keras-applications}, \texttt{qubvel/segmentation\_models}) to locate compatible \texttt{.h5} model files:
+
+\begin{algorithm}[H]
+\caption{Hybrid GitHub Model Search}
+\label{alg:github_search}
+\begin{algorithmic}[1]
+\REQUIRE Task description \(T\), target MCU \(M\), max depth \(D = 5\)
+\ENSURE List of candidate \texttt{.h5} files with metadata
+\STATE \(candidates \gets []\)
+\STATE \(repo\_contents \gets \text{GitHub API}(\text{repo\_path})\)
+\FOR{each \(item \in repo\_contents\)}
+    \IF{\(item.\text{type} = \text{"file"}\) \AND \(item.\text{name}.\text{endswith}(\text{".h5"})\)}
+        \STATE \(candidates.\text{append}(\{path, url, size\})\)
+    \ELSIF{\(item.\text{type} = \text{"dir"}\) \AND \(depth < D\)}
+        \STATE \(candidates.\text{extend}(\text{scan\_repo}(item.\text{path}, depth + 1))\)
+    \ENDIF
+\ENDFOR
+\STATE \(best\_model \gets \text{LLM\_rank}(candidates, T, M)\) \COMMENT{Use LLM to select most relevant}
+\RETURN \(best\_model\)
+\end{algorithmic}
+\end{algorithm}
+
+The LLM ranking step (\texttt{llm\_select\_best\_model()}) uses structured output to evaluate candidates based on:
+\begin{itemize}
+    \item File name similarity to task keywords (e.g., "mobilenet" for image classification)
+    \item Repository README content (if available) describing model purpose
+    \item File size as proxy for model complexity (prefer smaller for embedded)
+\end{itemize}
+
+\paragraph{Google Search Fallback}
+If GitHub search yields no results (e.g., for domain-specific tasks like audio keyword spotting), the system invokes \texttt{search\_via\_google\_tools\_hybrid()} using Agno's GoogleSearchTools:
+
+\begin{lstlisting}[language=Python, caption={Google Search for pretrained models}, label={lst:google_search}]
+query = f"pretrained {task} model Keras .h5 STM32 edge AI"
+agent = Agent(
+    model=Ollama(id="qwen3:latest"),
+    tools=[GoogleSearchTools()],
+    instructions="Find downloadable .h5 Keras models suitable for embedded deployment"
+)
+results = agent.run(query)
+\end{lstlisting}
+
+The agent parses search results to extract direct download links, filtering out:
+\begin{itemize}
+    \item Tutorial pages without model artifacts
+    \item Commercial model marketplaces requiring payment
+    \item Incompatible formats (ONNX, TFLite without .h5 availability)
+\end{itemize}
+
+\paragraph{Iteration Control and Task-Based Default}
+The \texttt{model\_selection\_routing()} function tracks search attempts via \texttt{state.search\_iteration\_count}:
+
+\begin{itemize}
+    \item \textbf{Iterations 1-3}: User can reject results and trigger another search
+    \item \textbf{After 3 failed attempts}: System automatically selects the "Task-Based Default" from \texttt{PREDEFINED\_MODELS} corresponding to the classified task
+\end{itemize}
+
+This fallback ensures workflow termination even for obscure tasks, preventing infinite search loops.
+
+\subsection{STEdgeAI CLI Integration}
+
+Once a model is selected (either from Tier 1 or Tier 2), the workflow proceeds to profiling and code generation using STMicroelectronics' official STEdgeAI toolchain. This toolchain converts Keras/TFLite models into optimized C code compatible with the X-CUBE-AI runtime library.
+
+\subsubsection{Phase 1: Model Analysis}
+
+The \texttt{run\_analyze()} function invokes:
+
+\begin{verbatim}
+stedgeai analyze --model <model.h5> --target <stm32h743>
+\end{verbatim}
+
+This command performs static analysis without target hardware, generating a profiling report with:
+
+\begin{itemize}
+    \item \textbf{RAM Usage}: Tensor buffer sizes, activation memory, working memory
+    \item \textbf{Flash Usage}: Weight storage requirements after quantization
+    \item \textbf{MACC Count}: Million multiply-accumulate operations per inference (proxy for latency)
+    \item \textbf{Estimated Latency}: For reference MCU at typical clock speeds
+\end{itemize}
+
+If RAM/Flash exceeds MCU capabilities, the user is prompted to either:
+\begin{itemize}
+    \item Increase compression level (re-run analysis with higher quantization)
+    \item Select a different model architecture
+    \item Proceed to customization workflow (Workflow 5) to prune layers
+\end{itemize}
+
+\subsubsection{Phase 2: On-Target Validation}
+
+The \texttt{run\_validate()} function generates a validation binary and flashes it to connected hardware:
+
+\begin{verbatim}
+stedgeai validate --model <model.h5> --target <stm32h743> 
+                  --testdata <samples.npz>
+\end{verbatim}
+
+This step executes the model on actual MCU hardware to measure:
+\begin{itemize}
+    \item \textbf{Real-World Accuracy}: Percentage of correctly classified test samples
+    \item \textbf{Actual Latency}: Wall-clock inference time on target CPU/NPU
+    \item \textbf{Power Consumption}: Current draw during inference (if power profiling enabled)
+\end{itemize}
+
+Validation results are compared against software simulation from Phase 1 to detect quantization-induced accuracy loss or timing discrepancies.
+
+\subsubsection{Phase 3: C Code Generation}
+
+Upon successful validation, \texttt{run\_generate()} produces the final C inference code:
+
+\begin{verbatim}
+stedgeai generate --model <model.h5> --target <stm32h743> 
+                  --compression <high> --output <network_output/>
+\end{verbatim}
+
+Generated artifacts include:
+\begin{itemize}
+    \item \texttt{network.c/h}: Neural network implementation with fixed-point arithmetic
+    \item \texttt{network\_data.c}: Quantized weights and biases as const arrays
+    \item \texttt{network\_config.h}: MCU-specific memory layout and hardware acceleration flags
+\end{itemize}
+
+Crucially, \textbf{quantization is applied during this generation phase} (via the \texttt{--compression} flag), not during training. This allows the framework to:
+\begin{enumerate}
+    \item Discover and evaluate models in high-precision (FP32) format
+    \item Dynamically select quantization level based on target MCU constraints
+    \item Delegate low-level optimization (bit-width selection, activation scaling) to STMicroelectronics' tooling
+\end{enumerate}
+
+The \texttt{--compression} value is derived from the user's original input (parsed in \texttt{collect\_analysis\_info()}) or adjusted based on profiling results from Phase 1.
+
+\subsection{Legacy Model Handling with Dual-Environment Strategy}
+
+A significant challenge encountered during development was incompatibility between modern Keras 3.x (required for LangGraph/NNI) and legacy Keras 2.x models (prevalent in STModelZoo and academic repositories). To resolve this, the framework implements a \textbf{dual-environment architecture}:
+
+\begin{itemize}
+    \item \textbf{Primary Environment} (\texttt{stm32\_agent}): Hosts LLM agents, LangGraph, and NNI with latest dependencies
+    \item \textbf{Legacy Environment} (\texttt{stm32\_legacy}): Pinned to TensorFlow 2.15 + Keras 2.15 for model inspection
+\end{itemize}
+
+When the system detects a Keras 2.x model file (based on HDF5 metadata), the \texttt{download\_model\_to\_cache()} function spawns a subprocess in the legacy environment:
+
+\begin{lstlisting}[language=Python, caption={Subprocess-based model inspection}, label={lst:legacy_env}]
+# Spawn subprocess in legacy environment
+cmd = [
+    "/path/to/stm32_legacy/bin/python",  # Isolated Python interpreter
+    "inspect_model.py",
+    "--model", model_path
+]
+
+result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+
+if result.returncode != 0:
+    raise ModelInspectionError(result.stderr)
+
+# Parse JSON output with architecture metadata
+metadata = json.loads(result.stdout)
+# {"layers": 50, "input_shape": [224, 224, 3], "output_classes": 1000}
+\end{lstlisting}
+
+This approach avoids library conflicts while maintaining a unified LangGraph workflow, transparent to the end user.
