@@ -97,6 +97,36 @@ The LLM ranking step (\texttt{llm\_select\_best\_model()}) uses structured outpu
     \item File size as proxy for model complexity (prefer smaller for embedded)
 \end{itemize}
 
+Algorithm~\ref{alg:model_search} formalizes the complete iterative search strategy with human-in-the-loop approval gates and task-based fallback.
+
+\begin{algorithm}[H]
+\caption{Iterative Model Search with Task-Based Fallback}
+\label{alg:model_search}
+\begin{algorithmic}[1]
+\REQUIRE User task $T$, target MCU $M$, max iterations $N_{max} = 3$
+\ENSURE Selected model path or default model
+\STATE $iteration \gets 0$
+\WHILE{$iteration < N_{max}$}
+    \IF{$iteration = 0$}
+        \STATE $candidates \gets \text{GitHub\_Search}(T, M)$ \COMMENT{Primary search}
+    \ELSE
+        \STATE $candidates \gets \text{Google\_Search}(T, M)$ \COMMENT{Fallback}
+    \ENDIF
+    \STATE $best\_model \gets \text{LLM\_Rank}(candidates, T, M)$
+    \STATE \textbf{interrupt}() \COMMENT{Human approval gate}
+    \STATE $user\_response \gets \text{Get\_User\_Input}()$
+    \STATE $decision \gets \text{LLM\_Parse}(user\_response)$
+    \IF{$decision.\text{accepted} = \text{true}$}
+        \RETURN $best\_model$
+    \ENDIF
+    \STATE $iteration \gets iteration + 1$
+\ENDWHILE
+\STATE \COMMENT{After 3 failed attempts: use task-based default}
+\STATE $default\_model \gets \text{PREDEFINED\_MODELS}[T]$
+\RETURN $default\_model$
+\end{algorithmic}
+\end{algorithm}
+
 \paragraph{Google Search Fallback}
 If GitHub search yields no results (e.g., for domain-specific tasks like audio keyword spotting), the system invokes \texttt{search\_via\_google\_tools\_hybrid()} using Agno's GoogleSearchTools:
 

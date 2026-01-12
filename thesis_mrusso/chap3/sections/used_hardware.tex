@@ -1,0 +1,8 @@
+\section{Used Hardware}
+\label{sec:used_hardware}
+
+The experiments were conducted on a workstation equipped with an \textbf{NVIDIA RTX A4000 GPU}, featuring a total of 16~GB of dedicated VRAM (GDDR6 with ECC). The GPU operated with driver version 575.57.08 and CUDA version 12.9, providing the necessary hardware acceleration for deep learning workloads.
+
+\vspace{0.5cm}
+
+This hardware infrastructure played a pivotal role in the development of the Agentic Framework. Specifically, the 16~GB VRAM buffer allowed for the local deployment of quantized Large Language Models (such as Mistral-7B and Qwen-7B via \texttt{Ollama}) directly on the server, eliminating the latency and privacy concerns associated with cloud-based APIs. Furthermore, the GPU acceleration significantly reduced the inference time for each node in the \textit{LangGraph} workflow, enabling rapid iterative testing of complex agentic loops—a process that would have been prohibitively slow on a standard CPU-based environment.
