@@ -743,3 +743,67 @@ The system implements multi-level error recovery:
 \end{enumerate}
 
 All errors return structured dictionaries (never raw exceptions), ensuring system stability. Failed agent outputs are logged but do not terminate the workflow: remaining agents continue execution.
+
+\section{Orchestration Patterns and Code Verification}
+
+To ensure robustness and alignment with user intent, the implemented framework relies on two critical architectural patterns: explicit orchestration gates for Human-in-the-Loop decision making, and an automated verification loop for generated code.
+
+\subsection{Human-in-the-Loop Orchestration}
+
+The LangGraph architecture is designed to be \textit{interruptible}. Unlike a monolithic script that runs from start to finish, the graph execution is checkpointed at every step. This allows the system to implement the **Human-as-Gate** and **Human-as-Instructor** patterns described in theory:
+
+\subsubsection{Gate Implementation (Approval)}
+For critical operations like modifying the model architecture or flashing firmware, the graph transitions to a \texttt{human\_node}. This node utilizes the \texttt{interrupt} primitive to suspend execution and yield control to the API:
+
+\begin{lstlisting}[language=Python, caption={Implementation of an explicit approval gate using LangGraph interrupt.}, label={lst:alloc}]
+# From src/assistant/graph.py
+def human_approval_node(state: State):
+    # Suspend execution and wait for user input
+    user_response = interrupt({
+        "type": "approval_request",
+        "message": "Do you want to proceed with quantization?"
+    })
+    
+    if user_response.lower() in ["yes", "y", "approve"]:
+        return "continue"
+    else:
+        return "abort"
+\end{lstlisting}
+
+This mechanism ensures that no irreversible hardware operation occurs without explicit consent.
+
+\subsubsection{Steering Implementation (Intent Modification)}
+To support the **Human-as-Instructor** pattern, the interruption logic includes a natural language feedback channel. In the model customization workflow, the user can reject a proposed model and provide a "steering" command (e.g., "Use a lighter model"). The system parses this input using a classifier node (\texttt{ask\_modification\_intent}) which updates the global state before replanning the workflow.
+
+\subsection{Safe Execution Loop (Sandbox)}
+
+Given the non-deterministic nature of LLM-generated code, executing raw Python scripts poses reliability and security risks. To mitigate this, the framework implements a **Safe Execution Loop** (Fig. \ref{fig:sandbox_loop}) based on isolated subprocesses.
+
+\subsubsection{Isolation Strategy}
+Instead of running generated code directly in the main thread, the system spawns a dedicated subprocess. This is particularly crucial when handling legacy Keras models that require specific Python environments to avoid version conflicts (e.g., TensorFlow 1.x vs 2.x):
+
+\begin{lstlisting}[language=Python, caption={Subprocess execution wrapper for handling legacy environments.}, label={lst:subprocess}]
+# From src/assistant/workflow2_ai.py
+def run_in_legacy_env(script_path, model_path):
+    cmd = [
+        conda_python_path,  # Path to isolated environment python
+        script_path,
+        "--model", model_path
+    ]
+    
+    # Execute with timeout and stderr capture
+    result = subprocess.run(
+        cmd, 
+        capture_output=True, 
+        text=True, 
+        timeout=60
+    )
+    
+    if result.returncode != 0:
+        raise ExecutionError(result.stderr)
+        
+    return json.loads(result.stdout)
+\end{lstlisting}
+
+\subsubsection{Self-Correction Mechanism}
+If the subprocess returns a non-zero exit code (indicating a syntax error or runtime exception), the \texttt{stderr} trace is captured and fed back to the agent. A specialized "Refinement Node" analyzes the error, modifies the script to fix the likely cause (e.g., mismatched shapes, missing imports), and re-submits it to the sandbox. This loop continues for a maximum of 3 retries, mimicking the iterative debugging process of a human developer.

@@ -13,4 +13,4 @@ Key features of Ollama integrated into this work include:
     \item \textbf{Custom Modelfiles:} Developers can define specialized system prompts and parameters (e.g., temperature, context window) directly in a declarative Modelfile.
     \item \textbf{REST API Integration:} Ollama exposes a standard local API, allowing LangChain and LangGraph to consume local models as if they were remote cloud endpoints, facilitating a "hybrid" architecture where sensitive code generation happens locally while non-sensitive research tasks can use larger cloud models.
 \end{enumerate}
-In the developed framework, Ollama serves as the primary inference backend, ensuring that all model "surgery" and firmware configuration logic remains within the user's local network, thereby preserving intellectual property and reducing external dependencies.
+In local deployment scenarios, tools like Ollama serve as the primary inference backend, ensuring that all model "surgery" and firmware configuration logic remains within the user's local network, thereby preserving intellectual property and reducing external dependencies.

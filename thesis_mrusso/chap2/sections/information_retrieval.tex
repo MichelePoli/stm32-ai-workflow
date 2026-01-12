@@ -26,7 +26,7 @@ A robust RAG pipeline for engineering workflows typically involves:
 \end{figure}
 
 \subsection{Web Research and Hardware Knowledge Grounding}
-Beyond static documents, the proposed framework integrates an active "Web Research" component. By leveraging search APIs (e.g., Google Search), the agent can perform live lookups for real-time data, such as the latest software patches or pricing availability for components. This dynamic grounding is essential for making operational decisions that remain valid over time.
+Beyond static documents, modern retrieval frameworks integrate an active "Web Research" component. By leveraging search APIs (e.g., Google Search), the agent can perform live lookups for real-time data, such as the latest software patches or pricing availability for components. This dynamic grounding is essential for making operational decisions that remain valid over time.
 
 \subsection{Challenges and Bias Mitigation}
 Despite its utility, RAG introduces specific failure modes. "Retriever failure" can occur if the embeddings fail to align the query with the correct document, often due to domain mismatch (e.g., general English embeddings used on highly technical datasheets). Conversely, "Generator failure" happens when the LLM prioritizes its training data over the retrieved context—a phenomenon known as \textit{hallucination despite retrieval} \cite{Gao2024RetrievalAugmentedGN}. To mitigate these, systems often employ "Self-Correction" loops, where the agent critiques its own generated code against the documentation before searching again, ensuring that the final output is technically sound.

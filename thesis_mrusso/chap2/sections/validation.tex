@@ -11,7 +11,7 @@ Assessing the quality of AI-generated code, particularly for embedded systems, r
 \subsection{DeepEval: Quantitative RAG Evaluation}
 For the "knowledge" aspect—specifically the answers retrieved via RAG—verification protocols like the "LLM-as-a-Judge" paradigm are employed. \textit{DeepEval} serves as an automated judge that scores the system's reasoning on quantitative scales \cite{DeepEval2024}:
 \begin{itemize}
-    \item \textbf{Faithfulness:} Ensures the generated answer is strictly derived from the retrieved documentation, minimizing hallucinations.
+    \item \textbf{Faithfulness (or Groundedness):} Ensures the generated answer is strictly derived from the retrieved documentation, minimizing hallucinations. This metric checks if every claim in the response can be inferred from the source context.
     \item \textbf{Contextual Relevancy:} Measures whether the retrieval step actually fetched useful documents or just noise.
     \item \textbf{Answer Relevancy:} penalizes verbose or evasive answers that do not directly address the user's prompt.
 \end{itemize}
@@ -25,7 +25,7 @@ For the "knowledge" aspect—specifically the answers retrieved via RAG—verifi
 
 \subsection{Sandbox Execution and Safety}
 Given the potential for generating unsafe or buggy code, execution must occur in a controlled environment. \textbf{Sandboxing} provides an isolated runtime where code can be executed without checking the host system's integrity \cite{hajipour2023codelmsec}.
-In the proposed framework, this is implemented as a "Safe Execution Loop." When the agent generates a script (e.g., for data preprocessing or model inspection), it is executed within a supervised subprocess. If the script fails due to syntax errors or runtime exceptions, the sandbox traps the failure and returns the standard error (stderr) trace to the agent. This allows for a self-healing loop where the agent reads the error, reasons about the fix, and re-generates the code—mimicking the iterative debugging process of a human developer \cite{EvaluatingCorrect-Consistency}.
+In advanced agentic systems, this is often implemented as a "Safe Execution Loop." When the agent generates a script (e.g., for data preprocessing or model inspection), it is executed within a supervised subprocess. If the script fails due to syntax errors or runtime exceptions, the sandbox traps the failure and returns the standard error (stderr) trace to the agent. This allows for a self-healing loop where the agent reads the error, reasons about the fix, and re-generates the code—mimicking the iterative debugging process of a human developer \cite{EvaluatingCorrect-Consistency}.
 
 \subsection{Syntax and Logic Verification}
 Before runtime, implicit verification occurs. Since the generated code (typically Python) is interpreted, syntax errors are caught immediately by the interpreter in the sandbox. This "Syntax Check" acts as a first line of defense. Only if the code parses correctly does the logic verification (functional correctness) proceed, ensuring that resources are only consumed by valid scripts.
