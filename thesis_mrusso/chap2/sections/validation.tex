@@ -1,21 +1,24 @@
 \section{Knowledge Validation and Code Verification}
-The non-deterministic nature of Large Language Models introduces significant risks when they are used to generate critical software artifacts, such as microcontroller firmware or optimization scripts. To ensure the reliability of an agentic framework, outputs must be validated through systematic evaluation frameworks and automated verification loops.
+The deployment of Large Language Models in critical engineering workflows—such as generating firmware or optimizing neural networks—introduces non-trivial risks. LLMs are probabilistic by nature, and while they can generate syntactically correct code, they do not inherently guarantee functional correctness or adherence to strict hardware constraints. To mitigate these risks, a robust agentic framework must move beyond simple generation and incorporate layers of rigorous validation \cite{applicationEvaluationCodeGenerated}.
 
-\subsection{DeepEval: Quantitative RAG Evaluation}
-For systems relying on Retrieval-Augmented Generation, measuring the quality of the retrieved context and the generated response is essential. \textit{DeepEval} is an open-source framework that implements the "LLM-as-a-Judge" paradigm to provide quantitative metrics for RAG performance \cite{DeepEval2024}. Unlike traditional metrics (e.g., BLEU or ROUGE), DeepEval evaluates semantic alignment across four primary dimensions:
+\subsection{Evaluation of LLM-Generated Code}
+Assessing the quality of AI-generated code, particularly for embedded systems, requires evaluating logic and robustness:
 \begin{itemize}
-    \item \textbf{Faithfulness:} Measures whether the generated claims are factually supported by the retrieved context, preventing hallucinations.
-    \item \textbf{Answer Relevancy:} Evaluates how well the response addresses the original user query.
-    \item \textbf{Contextual Relevancy:} Assesses the quality of the retrieval process by measuring the actual utility of the fetched documents.
-    \item \textbf{Hallucination Detection:} Specifically flags claims that contradict the provided source material.
+    \item \textbf{Functional Correctness:} Is the code doing what was asked? This is measured through execution-based validation, where the generated script is run against a test case. If it crashes or produces the wrong output, it is marked as incorrect, triggering a retry loop.
+    \item \textbf{Execution Safety:} Unlike standard software, embedded AI code interacts with hardware resources. Ensuring that the generated code does not request invalid memory allocations or incompatible library versions is a key part of the verification process.
 \end{itemize}
 
-\subsection{Automated Code Verification}
-Complementary to semantic evaluation is the functional verification of generated code. In the context of STM32 development, this involves two layers of testing:
-\begin{enumerate}
-    \item \textbf{Syntactic and Static Analysis:} Static analysis examines source code without execution to identify potential vulnerabilities and coding standard violations. Tools like \texttt{flake8}, \texttt{mypy}, or \texttt{pylint} are integrated into the workflow to ensure that generated Python scripts (e.g., for dataset management or NNI optimization) are syntactically correct and follow consistent type annotations \cite{surveyOnStaticAnalysis}. This proactive layer detects errors like unused variables or null pointer risks before runtime.
-    \item \textbf{Execution Loops:} The agentic framework attempts to execute generated scripts in a controlled environment. If an execution error occurs—such as a missing dependency or an invalid model layer replacement—the error log is captured and fed back to the agent as a "feedback loop." This allows the agent to self-correct the code in an iterative cycle, simulating a human developer's "trial and error" process.
-\end{enumerate}
+\subsection{DeepEval: Quantitative RAG Evaluation}
+For the "knowledge" aspect—specifically the answers retrieved via RAG—verification protocols like the "LLM-as-a-Judge" paradigm are employed. \textit{DeepEval} serves as an automated judge that scores the system's reasoning on quantitative scales \cite{DeepEval2024}:
+\begin{itemize}
+    \item \textbf{Faithfulness:} Ensures the generated answer is strictly derived from the retrieved documentation, minimizing hallucinations.
+    \item \textbf{Contextual Relevancy:} Measures whether the retrieval step actually fetched useful documents or just noise.
+    \item \textbf{Answer Relevancy:} penalizes verbose or evasive answers that do not directly address the user's prompt.
+\end{itemize}
 
-\subsection{Human-in-the-Loop Validation}
-While automated loops handle many routine errors, complex architectural decisions often require human oversight. \textit{Human-in-the-loop (HITL)} patterns allow the framework to pause execution at critical junctures—such as before modifying a pre-trained model's layers or deploying a generated binary—enabling the user to approve, modify, or reject the proposed changes. This collaborative approach combines the speed of agentic automation with the safety of human expertise, ensuring that the final Edge AI solution is both optimized and trustworthy.
+\subsection{Sandbox Execution and Safety}
+Given the potential for generating unsafe or buggy code, execution must occur in a controlled environment. \textbf{Sandboxing} provides an isolated runtime where code can be executed without checking the host system's integrity \cite{hajipour2023codelmsec}.
+In the proposed framework, this is implemented as a "Safe Execution Loop." When the agent generates a script (e.g., for data preprocessing or model inspection), it is executed within a supervised subprocess. If the script fails due to syntax errors or runtime exceptions, the sandbox traps the failure and returns the standard error (stderr) trace to the agent. This allows for a self-healing loop where the agent reads the error, reasons about the fix, and re-generates the code—mimicking the iterative debugging process of a human developer \cite{EvaluatingCorrect-Consistency}.
+
+\subsection{Syntax and Logic Verification}
+Before runtime, implicit verification occurs. Since the generated code (typically Python) is interpreted, syntax errors are caught immediately by the interpreter in the sandbox. This "Syntax Check" acts as a first line of defense. Only if the code parses correctly does the logic verification (functional correctness) proceed, ensuring that resources are only consumed by valid scripts.

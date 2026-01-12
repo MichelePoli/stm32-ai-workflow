@@ -1,28 +1,32 @@
 \section{Information Retrieval and Retrieval-Augmented Generation}
-Information Retrieval (IR) is the science of searching for documents, information within documents, and metadata about documents. Traditionally, IR relied on exact keyword matching and statistical methods like TF-IDF or BM25. However, these methods often fail to capture semantic nuances, such as synonyms or the context in which a technical term is used \cite{Manning2008Introduction}. In the era of Edge AI, the ability to retrieve precise technical specifications from disparate sources—such as STM32 datasheets, user manuals, and community forums—is a prerequisite for automated model deployment.
+Information Retrieval (IR) constitutes the backbone of intelligent systems that require access to dynamic, domain-specific knowledge beyond their training data. While traditional IR relied heavily on lexical matching techniques—such as BM25, which ranks documents based on keyword frequency—these methods struggle to capture the semantic intent behind a technical query \cite{Manning2008Introduction}. In the context of Edge AI deployment on STM32, where specifications are scattered across datasheets, forum discussions, and evolving software documentation, the ability to retrieve information based on meaning rather than just syntax is non-negotiable.
 
-\subsection{From Keyword Search to Semantic Retrieval}
-The advent of deep learning transformed IR through the use of \textbf{Word and Document Embeddings}. By mapping text into a high-dimensional vector space where semantically similar concepts are clustered together, models can perform "semantic search." A query like "how to reduce RAM usage on STM32" can effectively retrieve documents discussing "memory optimization" or "flash-to-RAM mapping," even if the exact keywords do not overlap. Vector databases (e.g., Chroma, FAISS, Pinecone) are used to store these embeddings and perform efficient similarity searches using metrics like Cosine Similarity \cite{naveed2024comprehensiveoverviewlargelanguage}.
+\subsection{Semantic Search and Vector Embeddings}
+The shift from keyword-based to \textit{semantic} search is driven by the use of \textbf{Embeddings}—dense numerical vectors that map textual concepts into a high-dimensional geometric space. In this paradigm, "memory optimization" and "reducing RAM footprint" are placed close together, facilitating retrieval even in the absence of shared vocabulary.
+\begin{itemize}
+    \item \textbf{Embedding Models:} Large language models (e.g., Sentence Transformers) form the engine of this process, encoding input text into fixed-length vectors that preserve semantic relationships \cite{nie2025textembeddingmeetslarge}. 
+    \item \textbf{Vector Databases:} Specialized storage engines (such as Chroma or FAISS) are designed to index these embeddings efficiently. They enable "Nearest Neighbor" searches at scale, allowing an agent to scan millions of documentation chunks in milliseconds to find the most relevant context for a specific hardware constraint \cite{ma2025comprehensivesurveyvectordatabase}.
+\end{itemize}
 
 \subsection{Retrieval-Augmented Generation (RAG)}
-While LLMs possess significant internal knowledge, they suffer from "knowledge cutoffs" (inability to access information post-training) and "hallucinations" (generating plausible but false data). \textit{Retrieval-Augmented Generation (RAG)} addresses these gaps by grounding the LLM's response in external, verified facts \cite{Gao2024RetrievalAugmentedGN}. 
+Retrieval-Augmented Generation (RAG) is the architectural pattern that bridges the gap between a model's frozen weights and the need for up-to-date accuracy. It addresses the twin problems of "knowledge cutoff" and "hallucination" by effectively giving the LLM an "open-book" capability, where it can verify its answers against retrieved text \cite{gao2024retrieval}.
 
-As shown in Fig. \ref{fig:rag}, a standard RAG pipeline consists of three phases:
+A robust RAG pipeline for engineering workflows typically involves:
 \begin{enumerate}
-    \item \textbf{Retrieval:} Given a user query, the system retrieves relevant chunks of text from a knowledge base or via the web.
-    \item \textbf{Augmentation:} The retrieved context is appended to the original prompt, providing the LLM with the necessary background information.
-    \item \textbf{Generation:} The LLM generates a response based on both its internal weights and the provided external context.
+    \item \textbf{Indexing:} Technical documents are ingested, cleaned (e.g., removing HTML tags), and segmented into manageable "chunks." These chunks are then embedded and indexed. The granularity of chunking is critical to balance context preservation with retrieval precision.
+    \item \textbf{Retrieval:} Upon receiving a user query (e.g., "How to map float32 to INT8 on STM32H7?"), the system performs a similarity search against the index to retrieve the top-$k$ most relevant document segments.
+    \item \textbf{Generation:} The retrieved context is injected into the LLM's prompt via a structured template. The model then synthesizes a final answer, conditioned on both its internal parametric knowledge and the non-parametric external evidence \cite{lewis2020retrieval}.
 \end{enumerate}
 
 \begin{figure}[ht]
     \centering
     \includegraphics[width=1\textwidth]{chap2/figure/rag.png}
-    \caption{Operation cycle of a Retrieval-Augmented Generation system \cite{medium_rag_workflow}.}
+    \caption{Operation cycle of a Retrieval-Augmented Generation system: from Indexing to Generation \cite{medium_rag_workflow}.}
     \label{fig:rag}
 \end{figure}
 
 \subsection{Web Research and Hardware Knowledge Grounding}
-In the developed framework, RAG is extended beyond static document sets. The "Web Research" branch utilizes live search APIs (e.g., Google Search, Tavily) to fetch the latest information on STM32 boards, STEdgeAI tool versions, and cutting-edge optimization libraries. This dynamic retrieval ensures that the agent's decisions—such as recommending an MCU for a specific neural network architecture—are based on up-to-date benchmarks and hardware compatibility lists rather than outdated training data.
+Beyond static documents, the proposed framework integrates an active "Web Research" component. By leveraging search APIs (e.g., Google Search), the agent can perform live lookups for real-time data, such as the latest software patches or pricing availability for components. This dynamic grounding is essential for making operational decisions that remain valid over time.
 
-\subsection{Limitations and Mitigation Strategies}
-Despite its advantages, RAG inherits challenges related to retrieval quality and context management. "Retriever failure" occurs when the search engine fails to find relevant context, leading to grounded but irrelevant generation. "Generator failure" occurs when the LLM ignores the provided context or fails to resolve contradictions between its internal weights and the retrieved data \cite{Gao2024RetrievalAugmentedGN}. Advanced systems mitigate these through re-ranking (scoring retrieved chunks before generation) and self-correction loops, where the system evaluates its own output for faithfulness and relevancy.
+\subsection{Challenges and Bias Mitigation}
+Despite its utility, RAG introduces specific failure modes. "Retriever failure" can occur if the embeddings fail to align the query with the correct document, often due to domain mismatch (e.g., general English embeddings used on highly technical datasheets). Conversely, "Generator failure" happens when the LLM prioritizes its training data over the retrieved context—a phenomenon known as \textit{hallucination despite retrieval} \cite{Gao2024RetrievalAugmentedGN}. To mitigate these, systems often employ "Self-Correction" loops, where the agent critiques its own generated code against the documentation before searching again, ensuring that the final output is technically sound.
