@@ -186,10 +186,10 @@ A representative excerpt from the prompt:
 
 \begin{verbatim}
 CRITICAL REQUIREMENTS:
-🔴 YOU MUST GENERATE EXACTLY 2 FILES: manager.py AND trial.py
-🔴 Use the exact format shown below with # FILE: markers
-🔴 DO NOT use keras.datasets.load_data(). ALWAYS load data from {dataset_path}.
-🔴 IMPORTANT: If data labels (y_train) have shape (N, 1), they are SPARSE. 
+- YOU MUST GENERATE EXACTLY 2 FILES: manager.py AND trial.py
+- Use the exact format shown below with # FILE: markers
+- DO NOT use keras.datasets.load_data(). ALWAYS load data from {dataset_path}.
+- IMPORTANT: If data labels (y_train) have shape (N, 1), they are SPARSE. 
    Convert them to categorical (one-hot) before training.
 
 FILE 1: manager.py
@@ -209,10 +209,10 @@ FILE 2: trial.py
 - Train model for 3 epochs
 - Report accuracy to NNI (if not retrain) or Save 'best_model.h5' (if retrain)
 
-⚠️ CRITICAL RULES:
-🔴 DO NOT USE experiment.export_top_trial() OR experiment.get_best_trial() - THEY DO NOT EXIST.
-🔴 ALWAYS USE experiment.list_trial_jobs() to find the best trial manually.
-🔴 Use exact paths from context: {dataset_path} and {model_path}
+Critical Rules:
+- DO NOT USE experiment.export_top_trial() OR experiment.get_best_trial() - THEY DO NOT EXIST.
+- ALWAYS USE experiment.list_trial_jobs() to find the best trial manually.
+- Use exact paths from context: {dataset_path} and {model_path}
 \end{verbatim}
 
 The system temperature is set to 0 for deterministic code generation.

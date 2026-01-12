@@ -9,14 +9,14 @@ The generated \texttt{network.c/h} files from STEdgeAI are copied into the firmw
 
 \begin{verbatim}
 <firmware_project>/
-├── Core/
-│   ├── Inc/
-│   │   └── network.h  ← AI model header
-│   └── Src/
-│       ├── main.c
-│       └── network.c  ← AI inference implementation
-├── Drivers/X-CUBE-AI/  ← X-CUBE-AI runtime library
-└── CMakeLists.txt  ← Modified to include AI sources
+|-- Core/
+|   |-- Inc/
+|   |   |-- network.h  <- AI model header
+|   |-- Src/
+|   |   |-- main.c
+|   |   |-- network.c  <- AI inference implementation
+|-- Drivers/X-CUBE-AI/  <- X-CUBE-AI runtime library
+\-- CMakeLists.txt  <- Modified to include AI sources
 \end{verbatim}
 
 The \texttt{CMakeLists.txt} is automatically updated to:
