@@ -39,3 +39,6 @@ src/assistant/__pycache__/graph.cpython-313.pyc
 *.ps
 *.xdv
 *.pdfa.xmpi
+
+# Personal Notes (restano in locale, ma non vengono caricati su GIT)
+*.docx
