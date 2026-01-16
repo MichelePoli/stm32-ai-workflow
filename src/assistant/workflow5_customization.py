@@ -386,7 +386,8 @@ Cosa preferisci? (si/no)""",
     }
     
     # user_response = interrupt(prompt) # per adesso commentata per velocizzare 
-    user_response = "" # BYPASS
+    user_response = interrupt(prompt)
+    #user_response = "" # BYPASS, risposta di default. 
     if isinstance(user_response, dict):
         user_text = str(user_response.get("response", user_response.get("input", ""))).lower()
     else:
@@ -479,28 +480,27 @@ def retrieve_best_practices_for_architecture(state: MasterState, config: dict) -
         except Exception as e:
             logger.warning(f"  ⚠️  Cache lookup failed: {str(e)[:60]}")
     
-    # ===== STEP 2: Prova web fetch (MAX 10 SECONDI) =====
-    logger.info(f"  [Step 2/3] Attempting online fetch (max 10s)...")
+    # ===== STEP 2: Generazione LLM (MAX 20 SECONDI) =====
+    logger.info(f"  [Step 2/3] Generating practices with LLM...")
     
     import time
     start_time = time.time()
     
     try:
-        best_practices = _fetch_and_cache_with_timeout(
+        best_practices = _generate_and_cache_with_llm(
             model_name=model_name,
             arch_type=arch_type,
-            persist_dir=arch_persist_dir,
-            timeout_seconds=10  # ← TIMEOUT RIGOROSO
+            persist_dir=arch_persist_dir
         )
         
         if best_practices:
-            logger.info(f"  ✓ Fetched {len(best_practices)} docs in {time.time()-start_time:.1f}s")
-            state.best_practices_display = _format_practices(best_practices, source=f"ONLINE_{arch_type}")
+            logger.info(f"  ✓ Generated & Custom Cached {len(best_practices)} docs in {time.time()-start_time:.1f}s")
+            state.best_practices_display = _format_practices(best_practices, source=f"LLM_GEN_{arch_type}")
             state.best_practices_raw = [p.page_content for p in best_practices]
             return state
     
     except Exception as e:
-        logger.warning(f"  ⚠️  Online fetch failed ({time.time()-start_time:.1f}s): {str(e)[:40]}")
+        logger.warning(f"  ⚠️  LLM Generation failed ({time.time()-start_time:.1f}s): {str(e)[:40]}")
     
     # ===== STEP 3: Fallback =====
     logger.info(f"  [Step 3/3] Using fallback practices for {arch_type}...")
@@ -510,114 +510,100 @@ def retrieve_best_practices_for_architecture(state: MasterState, config: dict) -
     return state
 
 
-def _fetch_and_cache_with_timeout(
+def _generate_and_cache_with_llm(
     model_name: str,
     arch_type: str,
-    persist_dir: str,
-    timeout_seconds: int = 10
+    persist_dir: str
 ) -> Optional[List]:
-    """Web fetch CON TIMEOUT MASSIMO"""
-    
+    """
+    Genera best practices usando LLM locale (Ollama) e le salva su Chroma.
+    Sostituisce la ricerca web per maggiore affidabilità.
+    """
     import time
-    from threading import Thread
+    from langchain_core.documents import Document
+    from langchain_ollama import ChatOllama
     
     start_time = time.time()
+    logger.info(f"  Generating best practices for {arch_type} with LLM...")
     
-    logger.info(f"  Searching web for {arch_type} (max {timeout_seconds}s)...")
-    
-    queries = _get_search_queries_for_architecture(arch_type)
-    all_docs = []
-    
-    # ===== Search (max 5 secondi) =====
     try:
-        search_results = []
+        # 1. Configura LLM
+        # Usa mistral o il modello configurato localmente
+        llm = ChatOllama(
+            model="mistral",  
+            temperature=0.3, # Bassa temperature per risposte tecniche
+            keep_alive="5m"
+        )
         
-        def search():
-            nonlocal search_results
-            try:
-                agent = Agent(
-                    model=Ollama(id="mistral"),
-                    tools=[GoogleSearchTools()],
-                    show_tool_calls=False,
-                    markdown=True
-                )
-                
-                for query in queries[:2]:  # Max 2 query
-                    if time.time() - start_time > timeout_seconds - 5:
-                        break
-                    
-                    response = agent.run(f"Search: {query}\n\nReturn top 3 URLs only.")
-                    
-                    if response:
-                        urls = _extract_urls_from_response(str(response))
-                        search_results.extend(urls)
-                    
-                    if len(search_results) >= 3:
-                        break
-            
-            except Exception as e:
-                logger.debug(f"Search error: {str(e)[:30]}")
+        # 2. Prompt per Best Practices (CONCISO & SCHEMATICO)
+        prompt = f"""You are an expert embedded AI engineer.
+        Provide a **concise, bullet-point checklist** for fine-tuning {model_name} ({arch_type}) on STM32.
         
-        thread = Thread(target=search, daemon=True)
-        thread.start()
-        thread.join(timeout=5)
+        REQUIRED FORMAT (Strictly follow this):
+        
+        *   **Strategy**: [Freeze X% layers / Retrain all]
+        *   **Hyperparams**: [LR: 1e-X, Batch: N, Epochs: N]
+        *   **Quantization**: [INT8/float16]
+        *   **Constraints**: [Flash/RAM usage estimates]
+        
+        Keep it under 200 words. No intro/outro. Schematic only.
+        """
+        
+        # 3. Generazione
+        logger.info(f"  Invoking LLM (this may take 10-20s)...")
+        response = llm.invoke(prompt)
+        content = response.content
+        
+        logger.info(f"  ✓ Native LLM generation complete ({len(content)} chars)")
+        
+        # 4. Crea Documento LangChain
+        doc = Document(
+            page_content=content,
+            metadata={
+                "source": "LLM_GENERATED",
+                "architecture": arch_type,
+                "model": model_name,
+                "timestamp": str(datetime.now())
+            }
+        )
+        
+        all_docs = [doc]
         
     except Exception as e:
-        logger.debug(f"Search timeout: {str(e)[:30]}")
-        search_results = []
-    
-    if not search_results:
-        logger.warning(f"  No URLs found")
+        logger.error(f"❌ LLM Generation failed: {str(e)}")
         return None
-    
-    logger.info(f"  Found {len(search_results)} URLs")
-    
-    # ===== Load URLs (max 5 secondi rimanenti) =====
-    remaining = timeout_seconds - (time.time() - start_time)
-    
-    if remaining < 2:
-        logger.warning(f"  Time budget exhausted")
-        return None
-    
-    for i, result in enumerate(search_results[:2], 1):  # Max 2 URL
-        if time.time() - start_time > timeout_seconds:
-            logger.warning(f"  Overall timeout reached")
-            break
-        
-        url = result.get('url')
-        
-        if not url:
-            continue
-        
+
+    # ===== STEP 3: Save to Chroma ===== (Riutilizzo logica esistente)
+    if all_docs:
         try:
-            logger.debug(f"  Loading {i}/2: {url[:40]}")
+            logger.info(f"  Saving to Chroma ({arch_type})...")
             
-            loader = RecursiveUrlLoader(
-                url=url,
-                max_depth=1,
-                extractor=lambda x: BeautifulSoup(x, "html.parser").get_text(),
-                prevent_outside=True,
-                timeout=3  # ← 3 SECONDI PER URL
+            splitter = RecursiveCharacterTextSplitter(
+                chunk_size=1000,
+                chunk_overlap=200
+            )
+            chunks = splitter.split_documents(all_docs)
+            
+            embeddings = HuggingFaceEmbeddings(
+                model_name="sentence-transformers/all-MiniLM-L6-v2"
             )
             
-            docs = loader.load()
+            os.makedirs(persist_dir, exist_ok=True)
             
-            if docs:
-                for doc in docs:
-                    doc.metadata['architecture'] = arch_type
-                    doc.metadata['source_url'] = url
-                
-                all_docs.extend(docs)
-                logger.debug(f"    ✓ Loaded {len(docs)} sections")
+            # Save to vectorstore
+            Chroma.from_documents(
+                documents=chunks,
+                embedding=embeddings,
+                persist_directory=persist_dir,
+                collection_name=f"{arch_type}_best_practices"
+            )
+            
+            logger.info(f"  ✓ Saved {len(chunks)} chunks to {persist_dir}")
         
         except Exception as e:
-            logger.debug(f"    Failed: {str(e)[:20]}")
+            logger.warning(f"  Chroma save failed: {str(e)[:60]}")
     
-    if not all_docs:
-        logger.warning(f"  No documents loaded")
-        return None
-    
-    logger.info(f"  Loaded {len(all_docs)} docs in {time.time()-start_time:.1f}s")
+    return all_docs
 
     # ===== STEP 3: Save to Chroma =====
     if all_docs:
@@ -731,6 +717,33 @@ Return the top 5 most relevant results with URLs and brief descriptions."""
             logger.warning(f"  Query failed: {query} - {str(e)[:60]}")
             continue
     
+    # ===== FALLBACK SIMULATO (PER SVILUPPO/DEBUG) =====
+    if not all_results:
+        logger.warning("⚠️  Nessun URL trovato (o Rate Limit). Uso risultati SIMULATI per testare Chroma.")
+        
+        # Simulazione basata sulla query
+        simulated_data = []
+        q_str = " ".join(queries).lower()
+        
+        if "yolo" in q_str:
+            simulated_data = [
+                {"url": "https://docs.ultralytics.com/modes/export", "title": "YOLO Export Guide", "content": "Guide to exporting YOLO models to TFLite and other formats for embedded deployment."},
+                {"url": "https://wiki.st.com/stm32mcu/wiki/AI:Model_ZOO", "title": "STM32 Model Zoo - Object Detection", "content": "Official ST model zoo including YOLO derivatives optimized for STM32 series (H7, U5)."},
+                {"url": "https://github.com/STMicroelectronics/stm32ai-modelzoo", "title": "STM32AI Model Zoo GitHub", "content": "Code and pre-trained models for various STM32 boards including object detection examples."}
+            ]
+        elif "mobilenet" in q_str:
+             simulated_data = [
+                {"url": "https://www.tensorflow.org/lite/models/modify/model_maker/image_classification", "title": "TFLite Model Maker", "content": "Retraining MobileNetV2 with TensorFlow Lite Model Maker for custom datasets."},
+                {"url": "https://wiki.st.com/stm32mcu/wiki/AI:Getting_started", "title": "Getting Started with STM32Cube.AI", "content": "Step by step guide to importing MobileNet into STM32Cube.AI."}
+            ]
+        else:
+             simulated_data = [
+                {"url": "https://www.st.com/en/embedded-software/x-cube-ai.html", "title": "X-CUBE-AI Expansion Pack", "content": "Main page for the STM32 AI expansion pack, supporting multiple frameworks and models."}
+            ]
+            
+        all_results.extend(simulated_data)
+        logger.info(f"  ✓ Added {len(simulated_data)} simulated results")
+
     logger.info(f"✓ Total results: {len(all_results)} URLs")
     
     return all_results[:10]  # Ritorna top 10 risultati

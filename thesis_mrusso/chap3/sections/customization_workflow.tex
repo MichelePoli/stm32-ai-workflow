@@ -34,27 +34,42 @@ The system maintains a ChromaDB vectorstore indexed with documentation from:
 
 Text is embedded using HuggingFace's \texttt{all-MiniLM-L6-v2} model and stored locally in \texttt{\textasciitilde/.cache/chroma\_db/architecture\_best\_practices}.
 
-\subsubsection{Web Search Augmentation}
+\subsubsection{LLM-Generated Technical Guidance}
+\label{sec:llm_generation}
 
-If the vectorstore lacks sufficient context for a specific architecture (e.g., uncommon CNNs like ShuffleNet), the system performs a time-limited web search (\texttt{\_fetch\_and\_cache\_with\_timeout()}) using Agno's GoogleSearchTools:
+To ensure reliable access to best practices without dependence on external network connectivity or search engine rate limits, the system employs a generative approach using a local LLM (Mistral). Instead of scraping potentially unstable web URLs, the \texttt{\_generate\_and\_cache\_with\_llm()} function prompts an expert system to synthesize a tailored technical guide:
 
-\begin{lstlisting}[language=Python, caption={Web-augmented RAG for best practices}, label={lst:rag_web}]
+\begin{lstlisting}[language=Python, caption={Local LLM generation of architecture best practices}, label={lst:rag_gen}]
 # From workflow5_customization.py
-query = f"{model_name} fine-tuning best practices transfer learning"
 
-def search_with_timeout():
-    agent = Agent(
-        model=Ollama(id="qwen3:latest"),
-        tools=[GoogleSearchTools()],
-        instructions="Find technical guides on fine-tuning this architecture"
-    )
-    return agent.run(query)
-
-# Timeout after 10 seconds to avoid workflow stalls
-results = execute_with_timeout(search_with_timeout, timeout=10)
+def _generate_and_cache_with_llm(model_name, arch_type):
+    llm = ChatOllama(model="mistral", temperature=0.3)
+    
+    prompt = f"""
+    You are an expert embedded AI engineer.
+    Provide a concise, bullet-point checklist for fine-tuning 
+    {model_name} ({arch_type}) on STM32.
+    
+    REQUIRED FORMAT:
+    * Strategy: [Freeze layers / Retrain behavior]
+    * Hyperparams: [LR, Batch Size, Epochs]
+    * Quantization: [INT8/float16 recommendations]
+    * Constraints: [RAM/Flash usage estimates]
+    """
+    
+    # Generate authoritative guide
+    content = llm.invoke(prompt).content
+    
+    # Cache result in ChromaDB for future instant retrieval
+    save_to_vectorstore(content, arch_type)
 \end{lstlisting}
 
-Retrieved web pages are parsed with BeautifulSoup, chunked, and added to the vectorstore cache for future reuse.
+This approach provides three key advantages:
+\begin{enumerate}
+    \item \textbf{Deterministic Availability}: Eliminates ``403 Forbidden'' and timeout errors common with web scrapers.
+    \item \textbf{Structured Consistency}: Enforces a strict checklist format (Strategy, Hyperparameters, Quantization) that is easier for the user to parse than unstructured HTML.
+    \item \textbf{Search Efficiency}: First-run generation takes \textasciitilde15 seconds; subsequent retrievals are instantaneous via the vector cache.
+\end{enumerate}
 
 \subsubsection{LLM Synthesis}
 
