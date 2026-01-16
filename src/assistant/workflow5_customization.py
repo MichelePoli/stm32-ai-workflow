@@ -618,6 +618,36 @@ def _fetch_and_cache_with_timeout(
         return None
     
     logger.info(f"  Loaded {len(all_docs)} docs in {time.time()-start_time:.1f}s")
+
+    # ===== STEP 3: Save to Chroma =====
+    if all_docs:
+        try:
+            logger.info(f"  Saving to Chroma ({arch_type})...")
+            
+            splitter = RecursiveCharacterTextSplitter(
+                chunk_size=1000,
+                chunk_overlap=200
+            )
+            chunks = splitter.split_documents(all_docs)
+            
+            embeddings = HuggingFaceEmbeddings(
+                model_name="sentence-transformers/all-MiniLM-L6-v2"
+            )
+            
+            os.makedirs(persist_dir, exist_ok=True)
+            
+            # Save to vectorstore
+            Chroma.from_documents(
+                documents=chunks,
+                embedding=embeddings,
+                persist_directory=persist_dir,
+                collection_name=f"{arch_type}_best_practices"
+            )
+            
+            logger.info(f"  ✓ Saved {len(chunks)} chunks to {persist_dir}")
+        
+        except Exception as e:
+            logger.warning(f"  Chroma save failed: {str(e)[:60]}")
     
     return all_docs[:3]
 
