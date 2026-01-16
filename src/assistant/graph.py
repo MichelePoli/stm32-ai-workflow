@@ -530,9 +530,23 @@ def build_ai_analysis_graph():
     workflow.add_edge("validate_customized_model", "save_customized_model_final")
     workflow.add_edge("save_customized_model_final", "ask_continue_after_customization")
     
-    # 7. Resume Analysis Flow
-    # Assuming ask_continue just pauses or logs, we move to analyze
-    workflow.add_edge("ask_continue_after_customization", "run_analyze")
+    
+    # 7. Continue After Customization Routing
+    def continue_after_customization_routing(state: MasterState) -> Literal["run_analyze", END]:
+        """Route to AI analysis or end based on user choice"""
+        if state.continue_after_customization:
+            return "run_analyze"
+        else:
+            return END
+    
+    workflow.add_conditional_edges(
+        "ask_continue_after_customization",
+        continue_after_customization_routing,
+        {
+            "run_analyze": "run_analyze",
+            END: END
+        }
+    )
     
     # 8. STEdgeAI Analysis
     workflow.add_edge("run_analyze", "run_validate")

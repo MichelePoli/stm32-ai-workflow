@@ -107,6 +107,51 @@ class ModificationDecision(BaseModel):
         description="Confidenza della classificazione"
     )
 
+
+class ContinueDecision(BaseModel):
+    """Decisione se continuare con AI analysis dopo customization"""
+    wants_to_continue: bool = Field(
+        description="L'utente vuole continuare con l'analisi X-CUBE-AI?"
+    )
+    reasoning: str = Field(
+        description="Breve spiegazione della decisione"
+    )
+    confidence: float = Field(
+        ge=0.0, le=1.0,
+        description="Confidenza della classificazione"
+    )
+
+continue_decision_instructions = """Sei un classificatore di intenzioni per workflow X-CUBE-AI.
+
+Analizza la risposta dell'utente alla domanda: "Do you want to continue with X-CUBE-AI analysis?"
+
+RISPOSTE AFFERMATIVE (vuole continuare):
+- "sì", "si", "yes", "certo", "ok", "continua", "vai", "procedi", "avanti"
+- "continue", "continue_ai", "analyze", "yes please"
+- Qualsiasi conferma esplicita
+
+RISPOSTE NEGATIVE (termina):
+- "no", "nope", "stop", "end", "fine", "basta", "termina", "esci"
+- "end", "quit", "exit", "no thanks"
+
+Rispondi SEMPRE in JSON:
+- "wants_to_continue": true/false
+- "reasoning": breve spiegazione (max 50 caratteri)
+- "confidence": 0.0-1.0
+
+Esempi:
+
+Input: "si"
+Output: {"wants_to_continue": true, "reasoning": "Conferma esplicita", "confidence": 1.0}
+
+Input: "no grazie, ho finito"
+Output: {"wants_to_continue": false, "reasoning": "Rifiuto esplicito", "confidence": 1.0}
+
+Input: "analyze"
+Output: {"wants_to_continue": true, "reasoning": "Richiesta di analisi", "confidence": 0.95}
+"""
+
+
 modification_decision_instructions = """Sei un classificatore di intenzioni per la customizzazione di modelli AI.
 
 Analizza la risposta dell'utente alla domanda: "Vuoi apportare modifiche all'architettura del modello scaricato, oppure procedere direttamente con l'analisi STEdgeAI?"
@@ -3526,12 +3571,33 @@ Quantized: {state.should_quantize}
     }
     
     user_response = interrupt(prompt)
-    # user_response = "" # BYPASS
-    # Default: continue with AI analysis
+    
+    # Default: continue with AI analysis if empty
     if not user_response or str(user_response).strip() == "":
         user_response = "continue_ai"
     
-    state.continue_after_customization = (user_response == "continue_ai")
+    # ===== LLM CLASSIFICATION =====
+    logger.info(f"📝 User response: '{user_response}'")
+    
+    try:
+        llm_classifier = ChatOllama(model="mistral:latest").with_structured_output(ContinueDecision)
+        
+        decision = llm_classifier.invoke([
+            SystemMessage(content=continue_decision_instructions),
+            HumanMessage(content=str(user_response))
+        ])
+        
+        logger.info(f"✓ Decisione classificata:")
+        logger.info(f"  wants_to_continue: {decision.wants_to_continue}")
+        logger.info(f"  confidence: {decision.confidence:.2f}")
+        
+        state.continue_after_customization = decision.wants_to_continue
+    
+    except Exception as e:
+        logger.warning(f"⚠️  Classification failed, using fallback: {str(e)[:100]}")
+        # Fallback: se la risposta contiene "continue", "si", "yes" → continua
+        user_lower = str(user_response).lower()
+        state.continue_after_customization = any(kw in user_lower for kw in ["continue", "si", "yes", "ok", "analyze"])
     
     return state
 
