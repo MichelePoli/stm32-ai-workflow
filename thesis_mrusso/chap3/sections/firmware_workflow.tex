@@ -1,7 +1,7 @@
 \section{STM32 Firmware Generation Workflow}
 \label{sec:firmware}
 
-Workflow 1 automates the initialization of STM32CubeMX projects through CLI-driven scripting, eliminating manual GUI interaction and ensuring reproducible firmware scaffolding.
+Workflow 1 automates the initialization of STM32CubeMX projects through CLI-driven scripting, eliminating manual GUI interaction and ensuring reproducible firmware project structure.
 
 \subsection{Project Information Collection}
 
@@ -24,15 +24,15 @@ Alternatively, users can specify an existing \texttt{.ioc} configuration file pa
 
 \subsection{STM32Cube Package Installation}
 
-The \texttt{search\_and\_install\_stm32\_package()} function automates download of the required STM32Cube firmware package from GitHub:
+The \texttt{search\_and\_install\_stm32\_package()} function automates the download of the required STM32Cube firmware package from GitHub. This step is critical for headless operations: unlike the STM32CubeIDE/MX GUI, which interactively prompts the user to download missing packages, the CLI mode fails abruptly with a "Project loading error" if the required MCU package is missing from the repository. To resolve this:
 
 \begin{enumerate}
-    \item Constructs repository URL based on MCU series (e.g., \texttt{STM32CubeF4} for F4 series)
-    \item Clones repository to \texttt{\textasciitilde/STM32Cube/Repository/}
-    \item Verifies presence of required HAL files and device headers
+    \item The agent constructs the repository URL based on the MCU series (e.g., \texttt{STM32CubeF4} for F4 series).
+    \item It clones the repository directly to \texttt{\textasciitilde/STM32Cube/Repository/}.
+    \item It verifies the presence of required HAL files and device headers before proceeding.
 \end{enumerate}
 
-This eliminates the manual "STM32CubeMX Updater" workflow, directly provisioning the necessary firmware libraries.
+This proactive provisioning eliminates the manual "STM32CubeMX Updater" dependency and prevents blocking errors in the automated pipeline.
 
 \subsection{CubeMX Script Generation and Execution}
 
@@ -50,6 +50,8 @@ The \texttt{execute\_generation()} node then invokes CubeMX:
 \begin{verbatim}
 <cubemx_path> -q <script_file.script>
 \end{verbatim}
+
+\textbf{Note on Headless Licensing:} A significant deployment challenge verified in the testing environment (using X11 forwarding) is that STM32CubeMX CLI requires a one-time GUI acceptance of the license agreement on first run. Failure to perform this manual initialization (or using \texttt{xvfb-run} without prior acceptance) causes the generation to hang indefinitely. The orchestrated workflow assumes this pre-configuration has been satisfied on the server agent.
 
 Generated output includes initialization code (\texttt{main.c}, \texttt{stm32f4xx\_hal\_msp.c}), linker scripts, and IDE project files.
 

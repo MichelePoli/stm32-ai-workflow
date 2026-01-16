@@ -163,10 +163,11 @@ Once a model is selected (either from Tier 1 or Tier 2), the workflow proceeds t
 
 \subsubsection{Phase 1: Model Analysis}
 
-The \texttt{run\_analyze()} function invokes:
+The \texttt{run\_analyze()} function invokes the analysis engine to generate a static profile of the model's resource consumption:
 
 \begin{verbatim}
-stedgeai analyze --model <model.h5> --target <stm32h743>
+stedgeai analyze --model <model.h5> --target <stm32h743> 
+                 --output ./analisiAI/report_analyze
 \end{verbatim}
 
 This command performs static analysis without target hardware, generating a profiling report with:
@@ -187,21 +188,19 @@ If RAM/Flash exceeds MCU capabilities, the user is prompted to either:
 
 \subsubsection{Phase 2: On-Target Validation}
 
-The \texttt{run\_validate()} function generates a validation binary and flashes it to connected hardware:
+The \texttt{run\_validate()} function generates a validation binary to verify model execution on the target architecture:
 
 \begin{verbatim}
 stedgeai validate --model <model.h5> --target <stm32h743> 
-                  --testdata <samples.npz>
+                  --output ./analisiAI/network_validate_report.txt
 \end{verbatim}
 
-This step executes the model on actual MCU hardware to measure:
+This step executes the model validation cycle, producing a text report that confirms:
 \begin{itemize}
-    \item \textbf{Real-World Accuracy}: Percentage of correctly classified test samples
-    \item \textbf{Actual Latency}: Wall-clock inference time on target CPU/NPU
-    \item \textbf{Power Consumption}: Current draw during inference (if power profiling enabled)
+    \item \textbf{Model Integrity}: Verification that the model graph is correctly interpretable by the target runtime
+    \item \textbf{Memory Allocation}: Confirmation that activation buffers fit within the target RAM
+    \item \textbf{Execution Correctness}: Validation of operator support on the specific MCU series
 \end{itemize}
-
-Validation results are compared against software simulation from Phase 1 to detect quantization-induced accuracy loss or timing discrepancies.
 
 \subsubsection{Phase 3: C Code Generation}
 
@@ -209,7 +208,7 @@ Upon successful validation, \texttt{run\_generate()} produces the final C infere
 
 \begin{verbatim}
 stedgeai generate --model <model.h5> --target <stm32h743> 
-                  --compression <high> --output <network_output/>
+                  --compression <high> --output ./analisiAI/code_resnet
 \end{verbatim}
 
 Generated artifacts include:
