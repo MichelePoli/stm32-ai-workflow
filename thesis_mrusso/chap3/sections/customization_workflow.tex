@@ -32,7 +32,7 @@ The system maintains a ChromaDB vectorstore indexed with documentation from:
     \item STMicroelectronics application notes on Edge AI optimization
 \end{itemize}
 
-Text is embedded using HuggingFace's \texttt{all-MiniLM-L6-v2} model and stored locally in \texttt{\textasciitilde/.cache/chroma\_db/architecture\_best\_practices}.
+Text is embedded using \texttt{OllamaEmbeddings} with the local \texttt{mistral} model and stored locally in \texttt{\textasciitilde/.cache/chroma\_db/architecture\_best\_practices}.
 
 \subsubsection{LLM-Generated Technical Guidance}
 \label{sec:llm_generation}

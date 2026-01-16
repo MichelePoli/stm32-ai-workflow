@@ -68,7 +68,7 @@ from tensorflow.keras.layers import Dense, Dropout
 
 from langchain_community.document_loaders import RecursiveUrlLoader  # Web scraping & site crawling
 from langchain_community.vectorstores import Chroma                                   # Vector DB
-from langchain.embeddings.base import Embeddings    
+from langchain_core.embeddings import Embeddings
 
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
@@ -82,7 +82,7 @@ from langchain_huggingface import HuggingFaceEmbeddings
 # -------------------------
 # Sentence Transformers / Embeddings
 # -------------------------
-from langchain.schema import Document                   # Standard document container for LangChain
+from langchain_core.documents import Document                   # Standard document container for LangChain
 
 
 from src.assistant.configuration import Configuration
@@ -465,12 +465,13 @@ def retrieve_best_practices_for_architecture(state: MasterState, config: dict) -
     
     if arch_db_exists:
         try:
+            from langchain_ollama import OllamaEmbeddings
             best_practices = _retrieve_from_chroma(
                 query=f"best practices customization fine-tuning {arch_type}",
                 persist_dir=arch_persist_dir,
-                arch_type=arch_type
-            )
-            
+                arch_type=arch_type,
+                embeddings_override=OllamaEmbeddings(model="mistral")
+            )          
             if best_practices and len(best_practices) > 0:
                 logger.info(f"  ✓ Retrieved {len(best_practices)} docs from cache")
                 state.best_practices_display = _format_practices(best_practices, source=f"CACHE_{arch_type}")
@@ -584,8 +585,9 @@ def _generate_and_cache_with_llm(
             )
             chunks = splitter.split_documents(all_docs)
             
-            embeddings = HuggingFaceEmbeddings(
-                model_name="sentence-transformers/all-MiniLM-L6-v2"
+            from langchain_ollama import OllamaEmbeddings
+            embeddings = OllamaEmbeddings(
+                model="mistral"
             )
             
             os.makedirs(persist_dir, exist_ok=True)
@@ -966,13 +968,15 @@ def _get_search_queries_for_architecture(arch_type: str) -> List[str]:
 def _retrieve_from_chroma(
     query: str,
     persist_dir: str,
-    arch_type: str
+    arch_type: str,
+    embeddings_override: Any = None
 ) -> Optional[List]:
     """Recupera da Chroma DEDICATO per architettura"""
     
     try:
-        embeddings = HuggingFaceEmbeddings(
-            model_name="sentence-transformers/all-MiniLM-L6-v2"
+        from langchain_ollama import OllamaEmbeddings
+        embeddings = embeddings_override or OllamaEmbeddings(
+            model="mistral"
         )
         
         vectorstore = Chroma(
@@ -1024,11 +1028,11 @@ def _format_practices(docs: List, source: str = "UNKNOWN") -> str:
     formatted += f"📋 BEST PRACTICES ({source})\n"
     formatted += f"════════════════════════════════════════════════════════════\n\n"
     
-    for i, doc in enumerate(docs[:5], 1):
-        content = doc.page_content[:300] if hasattr(doc, 'page_content') else str(doc)[:300]
-        formatted += f"[{i}] {content}...\n\n"
+    for doc in docs[:1]: # Prendi solo il primo se ce ne sono tanti (di solito è 1)
+        content = doc.page_content if hasattr(doc, 'page_content') else str(doc)
+        formatted += f"{content.strip()}\n"
     
-    formatted += f"════════════════════════════════════════════════════════════\n"
+    formatted += f"\n════════════════════════════════════════════════════════════\n"
     
     return formatted
 
