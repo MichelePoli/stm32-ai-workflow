@@ -159,8 +159,8 @@ def decide_data_source(state: MasterState, config: dict) -> MasterState:
         }
     }
     
-    # user_response = interrupt(prompt) # per adesso commentata per velocizzare
-    user_response = "" # BYPASS
+    user_response = interrupt(prompt)
+    # user_response = "" # BYPASS
     if isinstance(user_response, dict):
         user_text = str(user_response.get("response", user_response.get("input", ""))).lower()
     else:
@@ -312,8 +312,8 @@ def select_predefined_dataset(state: MasterState, config: dict) -> MasterState:
     }
     
     # ===== STEP 7: Richiesta input utente =====
-    # user_response = interrupt(prompt) # per adesso commentata per velocizzare
-    user_response = "" # BYPASS
+    user_response = interrupt(prompt)
+    # user_response = "" # BYPASS
     if isinstance(user_response, dict):
         selection = str(user_response.get("response", user_response.get("input", ""))).lower().strip()
     else:

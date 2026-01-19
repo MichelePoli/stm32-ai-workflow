@@ -430,9 +430,8 @@ Opzioni:
 Cosa preferisci? (si/no)""",
     }
     
-    # user_response = interrupt(prompt) # per adesso commentata per velocizzare 
     user_response = interrupt(prompt)
-    #user_response = "" # BYPASS, risposta di default. 
+    # user_response = "" # BYPASS, risposta di default. 
     if isinstance(user_response, dict):
         user_text = str(user_response.get("response", user_response.get("input", ""))).lower()
     else:
@@ -1759,8 +1758,8 @@ Training Recommendation:{train_text}
     }
     
     # ⏸️ INTERRUPT: Attendi risposta utente
-    # user_response = interrupt(confirmation_prompt)
-    user_response = "" # BYPASS
+    user_response = interrupt(confirmation_prompt)
+    # user_response = "" # BYPASS
     
     # Log della risposta raw
     logger.info(f"📝 Risposta utente (raw): '{user_response}'")
@@ -3170,8 +3169,8 @@ def ask_optimization_preference(state: MasterState, config: dict) -> MasterState
     }
     
     logger.info("📝 Calling interrupt()...")
-    # user_response = interrupt(prompt) # per adesso commentata per velocizzare 
-    user_response = "" # BYPASS
+    user_response = interrupt(prompt)
+    # user_response = "" # BYPASS
     # logger.info(f"✓ Interrupt returned: {user_response}")
     
     if isinstance(user_response, dict):
