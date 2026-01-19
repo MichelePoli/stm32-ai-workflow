@@ -22,12 +22,12 @@ User requests are classified into four primary workflow categories:
 \end{enumerate}
 
 \clearpage
-\begin{sidewaysfigure}[p]
+\begin{figure}[p]
     \centering
-    \includegraphics[width=0.95\textheight]{PART1.png}
+    \includegraphics[width=0.9\textwidth]{PART1.png}
     \caption{Global system flowchart - Part 1: System initialization, routing, and AI/Firmware selection workflows.}
     \label{fig:global_flowchart_part1}
-\end{sidewaysfigure}
+\end{figure}
 \clearpage
 
 The routing decision is performed by an LLM-based classifier that analyzes the user's natural language input and returns a structured decision object:
@@ -124,12 +124,12 @@ The graph construction logic resides in four builder functions:
 Each builder function assembles nodes, defines conditional edges, and sets up interrupt points for human approval.
 
 \clearpage
-\begin{sidewaysfigure}[p]
+\begin{figure}[p]
     \centering
-    \includegraphics[width=0.95\textheight]{PART2.png}
+    \includegraphics[width=0.9\textwidth]{PART2.png}
     \caption{Global system flowchart - Part 2: Model customization, STEdgeAI analysis, and firmware integration workflows.}
     \label{fig:global_flowchart_part2}
-\end{sidewaysfigure}
+\end{figure}
 \clearpage
 
 \subsection{Logging and Observability}
