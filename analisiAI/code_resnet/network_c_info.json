@@ -7457,50 +7457,50 @@
   ],
   "environment": {
     "generated_model": {
-      "generated_time": "2026-01-04T20:30:08+0100",
+      "generated_time": "2026-01-20T17:55:48+0100",
       "model_files": [
         {
           "name": "network_data_params.h",
-          "signature": "0x74ad0cad4f1751fc6293694702cc2281"
+          "signature": "0x69396eee44c6e9b84ad77bee372e0998"
         },
         {
           "name": "network_data_params.c",
-          "signature": "0x1d4eb34b8ff6c09c97fe7eacdb68008a"
+          "signature": "0x7470add8132bca04f3a5ac4be46c823d"
         },
         {
           "name": "network_data.h",
-          "signature": "0xae9e6cc64bfc4447252cc74ccbb72cfd"
+          "signature": "0x8f35594545e7d364e2d5c4796524675e"
         },
         {
           "name": "network_data.c",
-          "signature": "0xfa629f0bf35d59dd2e0d28da4c7125d2"
+          "signature": "0xe7a4a9d3cb4d2a5ed055425485a208c9"
         },
         {
           "name": "network_config.h",
-          "signature": "0x6b6ff296d4adbecb8faf4b211c274bbd"
+          "signature": "0x51a638db0a50c51718a27830edc705ff"
         },
         {
           "name": "network.h",
-          "signature": "0xfc39beaa82b7cd3daa260fb2ec263789"
+          "signature": "0x023682f415c802e2234024933bea307d"
         },
         {
           "name": "network.c",
-          "signature": "0xbef146bcd95db90dd71dbb67be3237aa"
+          "signature": "0xac04726b308a66a64a9f3189eac3be7a"
         }
       ],
       "name": "network"
     },
-    "network_signature": "0xc4ffba89274a31a5",
+    "network_signature": "0x8601a2fe65962bac",
     "test_name": "",
     "tools": [
       {
-        "arguments": "generate --model /mnt/shared-storage/mrusso/Langgraph_General_v7_subnodes/nni_experiments/exp_20260104_200307/best_model.h5 --target stm32f4 --compression medium --output ./analisiAI/code_resnet",
+        "arguments": "generate --model /mnt/shared-storage/mrusso/Langgraph_General_v7_subnodes/nni_experiments/exp_20260120_172818/best_model.h5 --target stm32f4 --compression medium --output ./analisiAI/code_resnet",
         "environment": [],
         "input_model": {
           "model_files": [
             {
               "name": "best_model.h5",
-              "signature": "0x0c10d490e379825ce4518ad91e070202"
+              "signature": "0xa60ee3d07a815a91f203e310d8f8ddf0"
             }
           ],
           "n_params": 2236682,

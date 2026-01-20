@@ -1,10 +1,10 @@
 ST Edge AI Core v2.2.0-20266 2adc00962
-Created date          : 2026-01-04 20:29:39
-Parameters            : analyze --model /home/mrusso/.stm32_ai_models/customized/customized_final_20260104_202448.h5 --target stm32f4 --output ./analisiAI/report_analyze
+Created date          : 2026-01-20 17:55:18
+Parameters            : analyze --model /home/mrusso/.stm32_ai_models/customized/customized_final_20260120_175216.h5 --target stm32f4 --output ./analisiAI/report_analyze
 
 Exec/report summary (analyze)
 -----------------------------------------------------------------------------------------------------------
-model file         :   /home/mrusso/.stm32_ai_models/customized/customized_final_20260104_202448.h5        
+model file         :   /home/mrusso/.stm32_ai_models/customized/customized_final_20260120_175216.h5        
 type               :   keras                                                                               
 c_name             :   network                                                                             
 compression        :   lossless                                                                            
@@ -14,8 +14,8 @@ target/series      :   stm32f4
 workspace dir      :   /mnt/shared-storage/mrusso/Langgraph_General_v7_subnodes/st_ai_ws                   
 output dir         :   /mnt/shared-storage/mrusso/Langgraph_General_v7_subnodes/analisiAI/report_analyze   
 model_fmt          :   float                                                                               
-model_name         :   customized_final_20260104_202448                                                    
-model_hash         :   0x0c10d490e379825ce4518ad91e070202                                                  
+model_name         :   customized_final_20260120_175216                                                    
+model_hash         :   0xa60ee3d07a815a91f203e310d8f8ddf0                                                  
 params #           :   2,236,682 items (8.53 MiB)                                                          
 -----------------------------------------------------------------------------------------------------------
 input 1/1          :   'input_1', f32(1x224x224x3), 588.00 KBytes, activations                             
@@ -27,7 +27,7 @@ ram (total)        :   4,917,696 B (4.69 MiB) = 4,917,696 + 0 + 0
 -----------------------------------------------------------------------------------------------------------
 (*) 'input'/'output' buffers are allocated in the activations buffer
 
-Model name - customized_final_20260104_202448
+Model name - customized_final_20260120_175216
 ------ -------------------------------------------------------------- ------------------------ ------------------- ------------ ------------------------------- --- ----------------------- ------------------------ --------------------------------- 
 m_id   layer (type,original)                                          oshape                   param/size                  macc                    connected to   | c_size                  c_macc                   c_type                            
 ------ -------------------------------------------------------------- ------------------------ ------------------- ------------ ------------------------------- --- ----------------------- ------------------------ --------------------------------- 
@@ -361,7 +361,7 @@ model/c-model: macc=319,248,352/312,014,976 -7,233,376(-2.3%) weights=8,946,728/
 
 Generated C-graph summary
 ------------------------------------------------------------------------------------------------------------------------
-model name            : customized_final_20260104_202448
+model name            : customized_final_20260120_175216
 c-name                : network
 c-node #              : 100
 c-array #             : 242

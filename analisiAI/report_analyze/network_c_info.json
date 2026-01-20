@@ -7457,54 +7457,54 @@
   ],
   "environment": {
     "generated_model": {
-      "generated_time": "2026-01-04T20:29:37+0100",
+      "generated_time": "2026-01-20T17:55:16+0100",
       "model_files": [
         {
           "name": "network_data_params.h",
-          "signature": "0x8a40f5439889c30f409e8d123820f1cc"
+          "signature": "0x7e53bca73c1c42eda14feb00750c7ead"
         },
         {
           "name": "network_data_params.c",
-          "signature": "0x4d37ed39a498f73c4fb51af62528862e"
+          "signature": "0x4aaede0dba2c7bc269cdcd131b33a1bd"
         },
         {
           "name": "network_data.h",
-          "signature": "0x555b105d9cb802d529aacd9d3dc24b07"
+          "signature": "0x91d74307cfb45563c5e7eea5c2a83a4e"
         },
         {
           "name": "network_data.c",
-          "signature": "0xd2f1ee045e6913e3c480bcc787ff3b62"
+          "signature": "0x43fcddcd652869f9aca0b0593273b1e0"
         },
         {
           "name": "network_config.h",
-          "signature": "0xbce14db9b085df28c44b3031b2c2eae4"
+          "signature": "0x28ffd7594f1c4d61daea1b52d748c21a"
         },
         {
           "name": "network.h",
-          "signature": "0xe9052074d3024bb1a8eb175cc35320ec"
+          "signature": "0xbc162b2145cb2827a2257a4d80458d90"
         },
         {
           "name": "network.c",
-          "signature": "0x5a6ed980ad816481fc3fca91d7d0d5bd"
+          "signature": "0x8eebb159db5ad9c61c1ac6123af7b4fc"
         }
       ],
       "name": "network"
     },
-    "network_signature": "0x0c16787b4b8e0b15",
+    "network_signature": "0x7b222543a8e91d03",
     "test_name": "",
     "tools": [
       {
-        "arguments": "analyze --model /home/mrusso/.stm32_ai_models/customized/customized_final_20260104_202448.h5 --target stm32f4 --output ./analisiAI/report_analyze",
+        "arguments": "analyze --model /home/mrusso/.stm32_ai_models/customized/customized_final_20260120_175216.h5 --target stm32f4 --output ./analisiAI/report_analyze",
         "environment": [],
         "input_model": {
           "model_files": [
             {
-              "name": "customized_final_20260104_202448.h5",
-              "signature": "0x0c10d490e379825ce4518ad91e070202"
+              "name": "customized_final_20260120_175216.h5",
+              "signature": "0xa60ee3d07a815a91f203e310d8f8ddf0"
             }
           ],
           "n_params": 2236682,
-          "name": "customized_final_20260104_202448",
+          "name": "customized_final_20260120_175216",
           "size": 8946728,
           "type": "keras"
         },
@@ -9047,7 +9047,7 @@
       "inputs": [
         1361
       ],
-      "name": "customized_final_20260104_202448",
+      "name": "customized_final_20260120_175216",
       "nodes": [
         {
           "attributes": {
