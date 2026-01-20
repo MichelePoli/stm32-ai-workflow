@@ -51,6 +51,8 @@ from src.assistant.workflow2_ai import (
     finalize_analysis,
     search_recommendation_model,
     model_selection_routing,
+    check_resource_constraints,  # NEW
+    resource_check_routing       # NEW
 )
 
 # --- Workflow 3: Integration ---
@@ -428,6 +430,7 @@ def build_ai_analysis_graph():
     
     # === NODES: ANALYSIS & GENERATION ===
     workflow.add_node("run_analyze", run_analyze)
+    workflow.add_node("check_resource_constraints", check_resource_constraints) # NEW
     workflow.add_node("run_validate", run_validate)
     workflow.add_node("run_generate", run_generate)
     workflow.add_node("finalize_analysis", finalize_analysis)
@@ -548,8 +551,20 @@ def build_ai_analysis_graph():
         }
     )
     
-    # 8. STEdgeAI Analysis
-    workflow.add_edge("run_analyze", "run_validate")
+    
+    # 8. STEdgeAI Analysis & Resource Check
+    workflow.add_edge("run_analyze", "check_resource_constraints")
+    
+    workflow.add_conditional_edges(
+        "check_resource_constraints",
+        resource_check_routing,
+        {
+            "run_validate": "run_validate",
+            "run_generate": "run_generate",
+            "choose_predefined_taskbased_model": "choose_predefined_taskbased_model"
+        }
+    )
+    
     workflow.add_edge("run_validate", "run_generate")
     workflow.add_edge("run_generate", "finalize_analysis")
     workflow.add_edge("finalize_analysis", END)

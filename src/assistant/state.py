@@ -60,6 +60,11 @@ class MasterState:
     generate_success: bool = False
     ai_error_message: Optional[str] = None
 
+    # Resource Checks
+    ram_usage: int = 0
+    flash_usage: int = 0
+    resource_check_result: str = "ok" # "ok", "warning", "critical", "error"
+
     # === DISCOVERY FIELDS ===
     model_discovery_method: str = ""  # "default", "taskbased", "recommendation", "search"
     available_models: List[dict] = field(default_factory=list)  # Modelli suggeriti

@@ -2,7 +2,7 @@
   ******************************************************************************
   * @file    network.c
   * @author  AST Embedded Analytics Research Platform
-  * @date    2026-01-20T17:55:29+0100
+  * @date    2026-01-20T20:06:26+0100
   * @brief   AI Tool Automatic Code Generator for Embedded NN computing
   ******************************************************************************
   * @attention
@@ -35,14 +35,14 @@
 #define AI_NET_OBJ_INSTANCE g_network
  
 #undef AI_NETWORK_MODEL_SIGNATURE
-#define AI_NETWORK_MODEL_SIGNATURE     "0xa60ee3d07a815a91f203e310d8f8ddf0"
+#define AI_NETWORK_MODEL_SIGNATURE     "0x2bfb5392202c7a642f828f2ad7434894"
 
 #ifndef AI_TOOLS_REVISION_ID
 #define AI_TOOLS_REVISION_ID     ""
 #endif
 
 #undef AI_TOOLS_DATE_TIME
-#define AI_TOOLS_DATE_TIME   "2026-01-20T17:55:29+0100"
+#define AI_TOOLS_DATE_TIME   "2026-01-20T20:06:26+0100"
 
 #undef AI_TOOLS_COMPILE_TIME
 #define AI_TOOLS_COMPILE_TIME    __DATE__ " " __TIME__
@@ -553,13 +553,13 @@ AI_ARRAY_OBJ_DECLARE(
 
 /* Array#99 */
 AI_ARRAY_OBJ_DECLARE(
-  adaptive_output_dense_output_array, AI_ARRAY_FORMAT_FLOAT,
-  NULL, NULL, 10, AI_STATIC)
+  predictions_dense_output_array, AI_ARRAY_FORMAT_FLOAT,
+  NULL, NULL, 1000, AI_STATIC)
 
 /* Array#100 */
 AI_ARRAY_OBJ_DECLARE(
-  adaptive_output_output_array, AI_ARRAY_FORMAT_FLOAT|AI_FMT_FLAG_IS_IO,
-  NULL, NULL, 10, AI_STATIC)
+  predictions_output_array, AI_ARRAY_FORMAT_FLOAT|AI_FMT_FLAG_IS_IO,
+  NULL, NULL, 1000, AI_STATIC)
 
 /* Array#101 */
 AI_ARRAY_OBJ_DECLARE(
@@ -1083,13 +1083,13 @@ AI_ARRAY_OBJ_DECLARE(
 
 /* Array#205 */
 AI_ARRAY_OBJ_DECLARE(
-  adaptive_output_dense_weights_array, AI_ARRAY_FORMAT_FLOAT,
-  NULL, NULL, 12800, AI_STATIC)
+  predictions_dense_weights_array, AI_ARRAY_FORMAT_FLOAT,
+  NULL, NULL, 1280000, AI_STATIC)
 
 /* Array#206 */
 AI_ARRAY_OBJ_DECLARE(
-  adaptive_output_dense_bias_array, AI_ARRAY_FORMAT_FLOAT,
-  NULL, NULL, 10, AI_STATIC)
+  predictions_dense_bias_array, AI_ARRAY_FORMAT_FLOAT,
+  NULL, NULL, 1000, AI_STATIC)
 
 /* Array#207 */
 AI_ARRAY_OBJ_DECLARE(
@@ -1332,1634 +1332,1634 @@ AI_TENSOR_OBJ_DECLARE(
 
 /* Tensor #9 */
 AI_TENSOR_OBJ_DECLARE(
-  adaptive_output_dense_bias, AI_STATIC,
-  9, 0x0,
-  AI_SHAPE_INIT(4, 1, 10, 1, 1), AI_STRIDE_INIT(4, 4, 4, 40, 40),
-  1, &adaptive_output_dense_bias_array, NULL)
-
-/* Tensor #10 */
-AI_TENSOR_OBJ_DECLARE(
-  adaptive_output_dense_output, AI_STATIC,
-  10, 0x0,
-  AI_SHAPE_INIT(4, 1, 10, 1, 1), AI_STRIDE_INIT(4, 4, 4, 40, 40),
-  1, &adaptive_output_dense_output_array, NULL)
-
-/* Tensor #11 */
-AI_TENSOR_OBJ_DECLARE(
-  adaptive_output_dense_weights, AI_STATIC,
-  11, 0x0,
-  AI_SHAPE_INIT(4, 1280, 10, 1, 1), AI_STRIDE_INIT(4, 4, 5120, 51200, 51200),
-  1, &adaptive_output_dense_weights_array, NULL)
-
-/* Tensor #12 */
-AI_TENSOR_OBJ_DECLARE(
-  adaptive_output_output, AI_STATIC,
-  12, 0x0,
-  AI_SHAPE_INIT(4, 1, 10, 1, 1), AI_STRIDE_INIT(4, 4, 4, 40, 40),
-  1, &adaptive_output_output_array, NULL)
-
-/* Tensor #13 */
-AI_TENSOR_OBJ_DECLARE(
   block_10_depthwise_bias, AI_STATIC,
-  13, 0x0,
+  9, 0x0,
   AI_SHAPE_INIT(4, 1, 384, 1, 1), AI_STRIDE_INIT(4, 4, 4, 1536, 1536),
   1, &block_10_depthwise_bias_array, NULL)
 
-/* Tensor #14 */
+/* Tensor #10 */
 AI_TENSOR_OBJ_DECLARE(
   block_10_depthwise_output, AI_STATIC,
-  14, 0x0,
+  10, 0x0,
   AI_SHAPE_INIT(4, 1, 384, 14, 14), AI_STRIDE_INIT(4, 4, 4, 1536, 21504),
   1, &block_10_depthwise_output_array, NULL)
 
-/* Tensor #15 */
+/* Tensor #11 */
 AI_TENSOR_OBJ_DECLARE(
   block_10_depthwise_relu_output, AI_STATIC,
-  15, 0x0,
+  11, 0x0,
   AI_SHAPE_INIT(4, 1, 384, 14, 14), AI_STRIDE_INIT(4, 4, 4, 1536, 21504),
   1, &block_10_depthwise_relu_output_array, NULL)
 
-/* Tensor #16 */
+/* Tensor #12 */
 AI_TENSOR_OBJ_DECLARE(
   block_10_depthwise_weights, AI_STATIC,
-  16, 0x0,
+  12, 0x0,
   AI_SHAPE_INIT(4, 1, 3, 3, 384), AI_STRIDE_INIT(4, 1, 384, 384, 384),
   1, &block_10_depthwise_weights_array, NULL)
 
-/* Tensor #17 */
+/* Tensor #13 */
 AI_TENSOR_OBJ_DECLARE(
   block_10_expand_bias, AI_STATIC,
-  17, 0x0,
+  13, 0x0,
   AI_SHAPE_INIT(4, 1, 384, 1, 1), AI_STRIDE_INIT(4, 4, 4, 1536, 1536),
   1, &block_10_expand_bias_array, NULL)
 
-/* Tensor #18 */
+/* Tensor #14 */
 AI_TENSOR_OBJ_DECLARE(
   block_10_expand_output, AI_STATIC,
-  18, 0x0,
+  14, 0x0,
   AI_SHAPE_INIT(4, 1, 384, 14, 14), AI_STRIDE_INIT(4, 4, 4, 1536, 21504),
   1, &block_10_expand_output_array, NULL)
 
-/* Tensor #19 */
+/* Tensor #15 */
 AI_TENSOR_OBJ_DECLARE(
   block_10_expand_relu_output, AI_STATIC,
-  19, 0x0,
+  15, 0x0,
   AI_SHAPE_INIT(4, 1, 384, 14, 14), AI_STRIDE_INIT(4, 4, 4, 1536, 21504),
   1, &block_10_expand_relu_output_array, NULL)
 
-/* Tensor #20 */
+/* Tensor #16 */
 AI_TENSOR_OBJ_DECLARE(
   block_10_expand_scratch0, AI_STATIC,
-  20, 0x0,
+  16, 0x0,
   AI_SHAPE_INIT(4, 1, 64, 1, 1), AI_STRIDE_INIT(4, 4, 4, 256, 256),
   1, &block_10_expand_scratch0_array, NULL)
 
-/* Tensor #21 */
+/* Tensor #17 */
 AI_TENSOR_OBJ_DECLARE(
   block_10_expand_weights, AI_STATIC,
-  21, 0x0,
+  17, 0x0,
   AI_SHAPE_INIT(4, 64, 1, 1, 384), AI_STRIDE_INIT(4, 4, 256, 98304, 98304),
   1, &block_10_expand_weights_array, NULL)
 
-/* Tensor #22 */
+/* Tensor #18 */
 AI_TENSOR_OBJ_DECLARE(
   block_10_project_bias, AI_STATIC,
-  22, 0x0,
+  18, 0x0,
   AI_SHAPE_INIT(4, 1, 96, 1, 1), AI_STRIDE_INIT(4, 4, 4, 384, 384),
   1, &block_10_project_bias_array, NULL)
 
-/* Tensor #23 */
+/* Tensor #19 */
 AI_TENSOR_OBJ_DECLARE(
   block_10_project_output, AI_STATIC,
-  23, 0x0,
+  19, 0x0,
   AI_SHAPE_INIT(4, 1, 96, 14, 14), AI_STRIDE_INIT(4, 4, 4, 384, 5376),
   1, &block_10_project_output_array, NULL)
 
-/* Tensor #24 */
+/* Tensor #20 */
 AI_TENSOR_OBJ_DECLARE(
   block_10_project_scratch0, AI_STATIC,
-  24, 0x0,
+  20, 0x0,
   AI_SHAPE_INIT(4, 1, 384, 1, 1), AI_STRIDE_INIT(4, 4, 4, 1536, 1536),
   1, &block_10_project_scratch0_array, NULL)
 
-/* Tensor #25 */
+/* Tensor #21 */
 AI_TENSOR_OBJ_DECLARE(
   block_10_project_weights, AI_STATIC,
-  25, 0x0,
+  21, 0x0,
   AI_SHAPE_INIT(4, 384, 1, 1, 96), AI_STRIDE_INIT(4, 4, 1536, 147456, 147456),
   1, &block_10_project_weights_array, NULL)
 
-/* Tensor #26 */
+/* Tensor #22 */
 AI_TENSOR_OBJ_DECLARE(
   block_11_add_output, AI_STATIC,
-  26, 0x0,
+  22, 0x0,
   AI_SHAPE_INIT(4, 1, 96, 14, 14), AI_STRIDE_INIT(4, 4, 4, 384, 5376),
   1, &block_11_add_output_array, NULL)
 
-/* Tensor #27 */
+/* Tensor #23 */
 AI_TENSOR_OBJ_DECLARE(
   block_11_depthwise_bias, AI_STATIC,
-  27, 0x0,
+  23, 0x0,
   AI_SHAPE_INIT(4, 1, 576, 1, 1), AI_STRIDE_INIT(4, 4, 4, 2304, 2304),
   1, &block_11_depthwise_bias_array, NULL)
 
-/* Tensor #28 */
+/* Tensor #24 */
 AI_TENSOR_OBJ_DECLARE(
   block_11_depthwise_output, AI_STATIC,
-  28, 0x0,
+  24, 0x0,
   AI_SHAPE_INIT(4, 1, 576, 14, 14), AI_STRIDE_INIT(4, 4, 4, 2304, 32256),
   1, &block_11_depthwise_output_array, NULL)
 
-/* Tensor #29 */
+/* Tensor #25 */
 AI_TENSOR_OBJ_DECLARE(
   block_11_depthwise_relu_output, AI_STATIC,
-  29, 0x0,
+  25, 0x0,
   AI_SHAPE_INIT(4, 1, 576, 14, 14), AI_STRIDE_INIT(4, 4, 4, 2304, 32256),
   1, &block_11_depthwise_relu_output_array, NULL)
 
-/* Tensor #30 */
+/* Tensor #26 */
 AI_TENSOR_OBJ_DECLARE(
   block_11_depthwise_weights, AI_STATIC,
-  30, 0x0,
+  26, 0x0,
   AI_SHAPE_INIT(4, 1, 3, 3, 576), AI_STRIDE_INIT(4, 1, 576, 576, 576),
   1, &block_11_depthwise_weights_array, NULL)
 
-/* Tensor #31 */
+/* Tensor #27 */
 AI_TENSOR_OBJ_DECLARE(
   block_11_expand_bias, AI_STATIC,
-  31, 0x0,
+  27, 0x0,
   AI_SHAPE_INIT(4, 1, 576, 1, 1), AI_STRIDE_INIT(4, 4, 4, 2304, 2304),
   1, &block_11_expand_bias_array, NULL)
 
-/* Tensor #32 */
+/* Tensor #28 */
 AI_TENSOR_OBJ_DECLARE(
   block_11_expand_output, AI_STATIC,
-  32, 0x0,
+  28, 0x0,
   AI_SHAPE_INIT(4, 1, 576, 14, 14), AI_STRIDE_INIT(4, 4, 4, 2304, 32256),
   1, &block_11_expand_output_array, NULL)
 
-/* Tensor #33 */
+/* Tensor #29 */
 AI_TENSOR_OBJ_DECLARE(
   block_11_expand_relu_output, AI_STATIC,
-  33, 0x0,
+  29, 0x0,
   AI_SHAPE_INIT(4, 1, 576, 14, 14), AI_STRIDE_INIT(4, 4, 4, 2304, 32256),
   1, &block_11_expand_relu_output_array, NULL)
 
-/* Tensor #34 */
+/* Tensor #30 */
 AI_TENSOR_OBJ_DECLARE(
   block_11_expand_scratch0, AI_STATIC,
-  34, 0x0,
+  30, 0x0,
   AI_SHAPE_INIT(4, 1, 96, 1, 1), AI_STRIDE_INIT(4, 4, 4, 384, 384),
   1, &block_11_expand_scratch0_array, NULL)
 
-/* Tensor #35 */
+/* Tensor #31 */
 AI_TENSOR_OBJ_DECLARE(
   block_11_expand_weights, AI_STATIC,
-  35, 0x0,
+  31, 0x0,
   AI_SHAPE_INIT(4, 96, 1, 1, 576), AI_STRIDE_INIT(4, 4, 384, 221184, 221184),
   1, &block_11_expand_weights_array, NULL)
 
-/* Tensor #36 */
+/* Tensor #32 */
 AI_TENSOR_OBJ_DECLARE(
   block_11_project_bias, AI_STATIC,
-  36, 0x0,
+  32, 0x0,
   AI_SHAPE_INIT(4, 1, 96, 1, 1), AI_STRIDE_INIT(4, 4, 4, 384, 384),
   1, &block_11_project_bias_array, NULL)
 
-/* Tensor #37 */
+/* Tensor #33 */
 AI_TENSOR_OBJ_DECLARE(
   block_11_project_output, AI_STATIC,
-  37, 0x0,
+  33, 0x0,
   AI_SHAPE_INIT(4, 1, 96, 14, 14), AI_STRIDE_INIT(4, 4, 4, 384, 5376),
   1, &block_11_project_output_array, NULL)
 
-/* Tensor #38 */
+/* Tensor #34 */
 AI_TENSOR_OBJ_DECLARE(
   block_11_project_scratch0, AI_STATIC,
-  38, 0x0,
+  34, 0x0,
   AI_SHAPE_INIT(4, 1, 576, 1, 1), AI_STRIDE_INIT(4, 4, 4, 2304, 2304),
   1, &block_11_project_scratch0_array, NULL)
 
-/* Tensor #39 */
+/* Tensor #35 */
 AI_TENSOR_OBJ_DECLARE(
   block_11_project_weights, AI_STATIC,
-  39, 0x0,
+  35, 0x0,
   AI_SHAPE_INIT(4, 576, 1, 1, 96), AI_STRIDE_INIT(4, 4, 2304, 221184, 221184),
   1, &block_11_project_weights_array, NULL)
 
-/* Tensor #40 */
+/* Tensor #36 */
 AI_TENSOR_OBJ_DECLARE(
   block_12_add_output, AI_STATIC,
-  40, 0x0,
+  36, 0x0,
   AI_SHAPE_INIT(4, 1, 96, 14, 14), AI_STRIDE_INIT(4, 4, 4, 384, 5376),
   1, &block_12_add_output_array, NULL)
 
-/* Tensor #41 */
+/* Tensor #37 */
 AI_TENSOR_OBJ_DECLARE(
   block_12_depthwise_bias, AI_STATIC,
-  41, 0x0,
+  37, 0x0,
   AI_SHAPE_INIT(4, 1, 576, 1, 1), AI_STRIDE_INIT(4, 4, 4, 2304, 2304),
   1, &block_12_depthwise_bias_array, NULL)
 
-/* Tensor #42 */
+/* Tensor #38 */
 AI_TENSOR_OBJ_DECLARE(
   block_12_depthwise_output, AI_STATIC,
-  42, 0x0,
+  38, 0x0,
   AI_SHAPE_INIT(4, 1, 576, 14, 14), AI_STRIDE_INIT(4, 4, 4, 2304, 32256),
   1, &block_12_depthwise_output_array, NULL)
 
-/* Tensor #43 */
+/* Tensor #39 */
 AI_TENSOR_OBJ_DECLARE(
   block_12_depthwise_relu_output, AI_STATIC,
-  43, 0x0,
+  39, 0x0,
   AI_SHAPE_INIT(4, 1, 576, 14, 14), AI_STRIDE_INIT(4, 4, 4, 2304, 32256),
   1, &block_12_depthwise_relu_output_array, NULL)
 
-/* Tensor #44 */
+/* Tensor #40 */
 AI_TENSOR_OBJ_DECLARE(
   block_12_depthwise_weights, AI_STATIC,
-  44, 0x0,
+  40, 0x0,
   AI_SHAPE_INIT(4, 1, 3, 3, 576), AI_STRIDE_INIT(4, 1, 576, 576, 576),
   1, &block_12_depthwise_weights_array, NULL)
 
-/* Tensor #45 */
+/* Tensor #41 */
 AI_TENSOR_OBJ_DECLARE(
   block_12_expand_bias, AI_STATIC,
-  45, 0x0,
+  41, 0x0,
   AI_SHAPE_INIT(4, 1, 576, 1, 1), AI_STRIDE_INIT(4, 4, 4, 2304, 2304),
   1, &block_12_expand_bias_array, NULL)
 
-/* Tensor #46 */
+/* Tensor #42 */
 AI_TENSOR_OBJ_DECLARE(
   block_12_expand_output, AI_STATIC,
-  46, 0x0,
+  42, 0x0,
   AI_SHAPE_INIT(4, 1, 576, 14, 14), AI_STRIDE_INIT(4, 4, 4, 2304, 32256),
   1, &block_12_expand_output_array, NULL)
 
-/* Tensor #47 */
+/* Tensor #43 */
 AI_TENSOR_OBJ_DECLARE(
   block_12_expand_relu_output, AI_STATIC,
-  47, 0x0,
+  43, 0x0,
   AI_SHAPE_INIT(4, 1, 576, 14, 14), AI_STRIDE_INIT(4, 4, 4, 2304, 32256),
   1, &block_12_expand_relu_output_array, NULL)
 
-/* Tensor #48 */
+/* Tensor #44 */
 AI_TENSOR_OBJ_DECLARE(
   block_12_expand_scratch0, AI_STATIC,
-  48, 0x0,
+  44, 0x0,
   AI_SHAPE_INIT(4, 1, 96, 1, 1), AI_STRIDE_INIT(4, 4, 4, 384, 384),
   1, &block_12_expand_scratch0_array, NULL)
 
-/* Tensor #49 */
+/* Tensor #45 */
 AI_TENSOR_OBJ_DECLARE(
   block_12_expand_weights, AI_STATIC,
-  49, 0x0,
+  45, 0x0,
   AI_SHAPE_INIT(4, 96, 1, 1, 576), AI_STRIDE_INIT(4, 4, 384, 221184, 221184),
   1, &block_12_expand_weights_array, NULL)
 
-/* Tensor #50 */
+/* Tensor #46 */
 AI_TENSOR_OBJ_DECLARE(
   block_12_project_bias, AI_STATIC,
-  50, 0x0,
+  46, 0x0,
   AI_SHAPE_INIT(4, 1, 96, 1, 1), AI_STRIDE_INIT(4, 4, 4, 384, 384),
   1, &block_12_project_bias_array, NULL)
 
-/* Tensor #51 */
+/* Tensor #47 */
 AI_TENSOR_OBJ_DECLARE(
   block_12_project_output, AI_STATIC,
-  51, 0x0,
+  47, 0x0,
   AI_SHAPE_INIT(4, 1, 96, 14, 14), AI_STRIDE_INIT(4, 4, 4, 384, 5376),
   1, &block_12_project_output_array, NULL)
 
-/* Tensor #52 */
+/* Tensor #48 */
 AI_TENSOR_OBJ_DECLARE(
   block_12_project_scratch0, AI_STATIC,
-  52, 0x0,
+  48, 0x0,
   AI_SHAPE_INIT(4, 1, 576, 1, 1), AI_STRIDE_INIT(4, 4, 4, 2304, 2304),
   1, &block_12_project_scratch0_array, NULL)
 
-/* Tensor #53 */
+/* Tensor #49 */
 AI_TENSOR_OBJ_DECLARE(
   block_12_project_weights, AI_STATIC,
-  53, 0x0,
+  49, 0x0,
   AI_SHAPE_INIT(4, 576, 1, 1, 96), AI_STRIDE_INIT(4, 4, 2304, 221184, 221184),
   1, &block_12_project_weights_array, NULL)
 
-/* Tensor #54 */
+/* Tensor #50 */
 AI_TENSOR_OBJ_DECLARE(
   block_13_depthwise_bias, AI_STATIC,
-  54, 0x0,
+  50, 0x0,
   AI_SHAPE_INIT(4, 1, 576, 1, 1), AI_STRIDE_INIT(4, 4, 4, 2304, 2304),
   1, &block_13_depthwise_bias_array, NULL)
 
-/* Tensor #55 */
+/* Tensor #51 */
 AI_TENSOR_OBJ_DECLARE(
   block_13_depthwise_output, AI_STATIC,
-  55, 0x0,
+  51, 0x0,
   AI_SHAPE_INIT(4, 1, 576, 7, 7), AI_STRIDE_INIT(4, 4, 4, 2304, 16128),
   1, &block_13_depthwise_output_array, NULL)
 
-/* Tensor #56 */
+/* Tensor #52 */
 AI_TENSOR_OBJ_DECLARE(
   block_13_depthwise_relu_output, AI_STATIC,
-  56, 0x0,
+  52, 0x0,
   AI_SHAPE_INIT(4, 1, 576, 7, 7), AI_STRIDE_INIT(4, 4, 4, 2304, 16128),
   1, &block_13_depthwise_relu_output_array, NULL)
 
-/* Tensor #57 */
+/* Tensor #53 */
 AI_TENSOR_OBJ_DECLARE(
   block_13_depthwise_weights, AI_STATIC,
-  57, 0x0,
+  53, 0x0,
   AI_SHAPE_INIT(4, 1, 3, 3, 576), AI_STRIDE_INIT(4, 1, 576, 576, 576),
   1, &block_13_depthwise_weights_array, NULL)
 
-/* Tensor #58 */
+/* Tensor #54 */
 AI_TENSOR_OBJ_DECLARE(
   block_13_expand_bias, AI_STATIC,
-  58, 0x0,
+  54, 0x0,
   AI_SHAPE_INIT(4, 1, 576, 1, 1), AI_STRIDE_INIT(4, 4, 4, 2304, 2304),
   1, &block_13_expand_bias_array, NULL)
 
-/* Tensor #59 */
+/* Tensor #55 */
 AI_TENSOR_OBJ_DECLARE(
   block_13_expand_output, AI_STATIC,
-  59, 0x0,
+  55, 0x0,
   AI_SHAPE_INIT(4, 1, 576, 14, 14), AI_STRIDE_INIT(4, 4, 4, 2304, 32256),
   1, &block_13_expand_output_array, NULL)
 
-/* Tensor #60 */
+/* Tensor #56 */
 AI_TENSOR_OBJ_DECLARE(
   block_13_expand_relu_output, AI_STATIC,
-  60, 0x0,
+  56, 0x0,
   AI_SHAPE_INIT(4, 1, 576, 14, 14), AI_STRIDE_INIT(4, 4, 4, 2304, 32256),
   1, &block_13_expand_relu_output_array, NULL)
 
-/* Tensor #61 */
+/* Tensor #57 */
 AI_TENSOR_OBJ_DECLARE(
   block_13_expand_scratch0, AI_STATIC,
-  61, 0x0,
+  57, 0x0,
   AI_SHAPE_INIT(4, 1, 96, 1, 1), AI_STRIDE_INIT(4, 4, 4, 384, 384),
   1, &block_13_expand_scratch0_array, NULL)
 
-/* Tensor #62 */
+/* Tensor #58 */
 AI_TENSOR_OBJ_DECLARE(
   block_13_expand_weights, AI_STATIC,
-  62, 0x0,
+  58, 0x0,
   AI_SHAPE_INIT(4, 96, 1, 1, 576), AI_STRIDE_INIT(4, 4, 384, 221184, 221184),
   1, &block_13_expand_weights_array, NULL)
 
-/* Tensor #63 */
+/* Tensor #59 */
 AI_TENSOR_OBJ_DECLARE(
   block_13_project_bias, AI_STATIC,
-  63, 0x0,
+  59, 0x0,
   AI_SHAPE_INIT(4, 1, 160, 1, 1), AI_STRIDE_INIT(4, 4, 4, 640, 640),
   1, &block_13_project_bias_array, NULL)
 
-/* Tensor #64 */
+/* Tensor #60 */
 AI_TENSOR_OBJ_DECLARE(
   block_13_project_output, AI_STATIC,
-  64, 0x0,
+  60, 0x0,
   AI_SHAPE_INIT(4, 1, 160, 7, 7), AI_STRIDE_INIT(4, 4, 4, 640, 4480),
   1, &block_13_project_output_array, NULL)
 
-/* Tensor #65 */
+/* Tensor #61 */
 AI_TENSOR_OBJ_DECLARE(
   block_13_project_scratch0, AI_STATIC,
-  65, 0x0,
+  61, 0x0,
   AI_SHAPE_INIT(4, 1, 576, 1, 1), AI_STRIDE_INIT(4, 4, 4, 2304, 2304),
   1, &block_13_project_scratch0_array, NULL)
 
-/* Tensor #66 */
+/* Tensor #62 */
 AI_TENSOR_OBJ_DECLARE(
   block_13_project_weights, AI_STATIC,
-  66, 0x0,
+  62, 0x0,
   AI_SHAPE_INIT(4, 576, 1, 1, 160), AI_STRIDE_INIT(4, 4, 2304, 368640, 368640),
   1, &block_13_project_weights_array, NULL)
 
-/* Tensor #67 */
+/* Tensor #63 */
 AI_TENSOR_OBJ_DECLARE(
   block_14_add_output, AI_STATIC,
-  67, 0x0,
+  63, 0x0,
   AI_SHAPE_INIT(4, 1, 160, 7, 7), AI_STRIDE_INIT(4, 4, 4, 640, 4480),
   1, &block_14_add_output_array, NULL)
 
-/* Tensor #68 */
+/* Tensor #64 */
 AI_TENSOR_OBJ_DECLARE(
   block_14_depthwise_bias, AI_STATIC,
-  68, 0x0,
+  64, 0x0,
   AI_SHAPE_INIT(4, 1, 960, 1, 1), AI_STRIDE_INIT(4, 4, 4, 3840, 3840),
   1, &block_14_depthwise_bias_array, NULL)
 
-/* Tensor #69 */
+/* Tensor #65 */
 AI_TENSOR_OBJ_DECLARE(
   block_14_depthwise_output, AI_STATIC,
-  69, 0x0,
+  65, 0x0,
   AI_SHAPE_INIT(4, 1, 960, 7, 7), AI_STRIDE_INIT(4, 4, 4, 3840, 26880),
   1, &block_14_depthwise_output_array, NULL)
 
-/* Tensor #70 */
+/* Tensor #66 */
 AI_TENSOR_OBJ_DECLARE(
   block_14_depthwise_relu_output, AI_STATIC,
-  70, 0x0,
+  66, 0x0,
   AI_SHAPE_INIT(4, 1, 960, 7, 7), AI_STRIDE_INIT(4, 4, 4, 3840, 26880),
   1, &block_14_depthwise_relu_output_array, NULL)
 
-/* Tensor #71 */
+/* Tensor #67 */
 AI_TENSOR_OBJ_DECLARE(
   block_14_depthwise_weights, AI_STATIC,
-  71, 0x0,
+  67, 0x0,
   AI_SHAPE_INIT(4, 1, 3, 3, 960), AI_STRIDE_INIT(4, 1, 960, 960, 960),
   1, &block_14_depthwise_weights_array, NULL)
 
-/* Tensor #72 */
+/* Tensor #68 */
 AI_TENSOR_OBJ_DECLARE(
   block_14_expand_bias, AI_STATIC,
-  72, 0x0,
+  68, 0x0,
   AI_SHAPE_INIT(4, 1, 960, 1, 1), AI_STRIDE_INIT(4, 4, 4, 3840, 3840),
   1, &block_14_expand_bias_array, NULL)
 
-/* Tensor #73 */
+/* Tensor #69 */
 AI_TENSOR_OBJ_DECLARE(
   block_14_expand_output, AI_STATIC,
-  73, 0x0,
+  69, 0x0,
   AI_SHAPE_INIT(4, 1, 960, 7, 7), AI_STRIDE_INIT(4, 4, 4, 3840, 26880),
   1, &block_14_expand_output_array, NULL)
 
-/* Tensor #74 */
+/* Tensor #70 */
 AI_TENSOR_OBJ_DECLARE(
   block_14_expand_relu_output, AI_STATIC,
-  74, 0x0,
+  70, 0x0,
   AI_SHAPE_INIT(4, 1, 960, 7, 7), AI_STRIDE_INIT(4, 4, 4, 3840, 26880),
   1, &block_14_expand_relu_output_array, NULL)
 
-/* Tensor #75 */
+/* Tensor #71 */
 AI_TENSOR_OBJ_DECLARE(
   block_14_expand_scratch0, AI_STATIC,
-  75, 0x0,
+  71, 0x0,
   AI_SHAPE_INIT(4, 1, 160, 1, 1), AI_STRIDE_INIT(4, 4, 4, 640, 640),
   1, &block_14_expand_scratch0_array, NULL)
 
-/* Tensor #76 */
+/* Tensor #72 */
 AI_TENSOR_OBJ_DECLARE(
   block_14_expand_weights, AI_STATIC,
-  76, 0x0,
+  72, 0x0,
   AI_SHAPE_INIT(4, 160, 1, 1, 960), AI_STRIDE_INIT(4, 4, 640, 614400, 614400),
   1, &block_14_expand_weights_array, NULL)
 
-/* Tensor #77 */
+/* Tensor #73 */
 AI_TENSOR_OBJ_DECLARE(
   block_14_project_bias, AI_STATIC,
-  77, 0x0,
+  73, 0x0,
   AI_SHAPE_INIT(4, 1, 160, 1, 1), AI_STRIDE_INIT(4, 4, 4, 640, 640),
   1, &block_14_project_bias_array, NULL)
 
-/* Tensor #78 */
+/* Tensor #74 */
 AI_TENSOR_OBJ_DECLARE(
   block_14_project_output, AI_STATIC,
-  78, 0x0,
+  74, 0x0,
   AI_SHAPE_INIT(4, 1, 160, 7, 7), AI_STRIDE_INIT(4, 4, 4, 640, 4480),
   1, &block_14_project_output_array, NULL)
 
-/* Tensor #79 */
+/* Tensor #75 */
 AI_TENSOR_OBJ_DECLARE(
   block_14_project_scratch0, AI_STATIC,
-  79, 0x0,
+  75, 0x0,
   AI_SHAPE_INIT(4, 1, 960, 1, 1), AI_STRIDE_INIT(4, 4, 4, 3840, 3840),
   1, &block_14_project_scratch0_array, NULL)
 
-/* Tensor #80 */
+/* Tensor #76 */
 AI_TENSOR_OBJ_DECLARE(
   block_14_project_weights, AI_STATIC,
-  80, 0x0,
+  76, 0x0,
   AI_SHAPE_INIT(4, 960, 1, 1, 160), AI_STRIDE_INIT(4, 4, 3840, 614400, 614400),
   1, &block_14_project_weights_array, NULL)
 
-/* Tensor #81 */
+/* Tensor #77 */
 AI_TENSOR_OBJ_DECLARE(
   block_15_add_output, AI_STATIC,
-  81, 0x0,
+  77, 0x0,
   AI_SHAPE_INIT(4, 1, 160, 7, 7), AI_STRIDE_INIT(4, 4, 4, 640, 4480),
   1, &block_15_add_output_array, NULL)
 
-/* Tensor #82 */
+/* Tensor #78 */
 AI_TENSOR_OBJ_DECLARE(
   block_15_depthwise_bias, AI_STATIC,
-  82, 0x0,
+  78, 0x0,
   AI_SHAPE_INIT(4, 1, 960, 1, 1), AI_STRIDE_INIT(4, 4, 4, 3840, 3840),
   1, &block_15_depthwise_bias_array, NULL)
 
-/* Tensor #83 */
+/* Tensor #79 */
 AI_TENSOR_OBJ_DECLARE(
   block_15_depthwise_output, AI_STATIC,
-  83, 0x0,
+  79, 0x0,
   AI_SHAPE_INIT(4, 1, 960, 7, 7), AI_STRIDE_INIT(4, 4, 4, 3840, 26880),
   1, &block_15_depthwise_output_array, NULL)
 
-/* Tensor #84 */
+/* Tensor #80 */
 AI_TENSOR_OBJ_DECLARE(
   block_15_depthwise_relu_output, AI_STATIC,
-  84, 0x0,
+  80, 0x0,
   AI_SHAPE_INIT(4, 1, 960, 7, 7), AI_STRIDE_INIT(4, 4, 4, 3840, 26880),
   1, &block_15_depthwise_relu_output_array, NULL)
 
-/* Tensor #85 */
+/* Tensor #81 */
 AI_TENSOR_OBJ_DECLARE(
   block_15_depthwise_weights, AI_STATIC,
-  85, 0x0,
+  81, 0x0,
   AI_SHAPE_INIT(4, 1, 3, 3, 960), AI_STRIDE_INIT(4, 1, 960, 960, 960),
   1, &block_15_depthwise_weights_array, NULL)
 
-/* Tensor #86 */
+/* Tensor #82 */
 AI_TENSOR_OBJ_DECLARE(
   block_15_expand_bias, AI_STATIC,
-  86, 0x0,
+  82, 0x0,
   AI_SHAPE_INIT(4, 1, 960, 1, 1), AI_STRIDE_INIT(4, 4, 4, 3840, 3840),
   1, &block_15_expand_bias_array, NULL)
 
-/* Tensor #87 */
+/* Tensor #83 */
 AI_TENSOR_OBJ_DECLARE(
   block_15_expand_output, AI_STATIC,
-  87, 0x0,
+  83, 0x0,
   AI_SHAPE_INIT(4, 1, 960, 7, 7), AI_STRIDE_INIT(4, 4, 4, 3840, 26880),
   1, &block_15_expand_output_array, NULL)
 
-/* Tensor #88 */
+/* Tensor #84 */
 AI_TENSOR_OBJ_DECLARE(
   block_15_expand_relu_output, AI_STATIC,
-  88, 0x0,
+  84, 0x0,
   AI_SHAPE_INIT(4, 1, 960, 7, 7), AI_STRIDE_INIT(4, 4, 4, 3840, 26880),
   1, &block_15_expand_relu_output_array, NULL)
 
-/* Tensor #89 */
+/* Tensor #85 */
 AI_TENSOR_OBJ_DECLARE(
   block_15_expand_scratch0, AI_STATIC,
-  89, 0x0,
+  85, 0x0,
   AI_SHAPE_INIT(4, 1, 160, 1, 1), AI_STRIDE_INIT(4, 4, 4, 640, 640),
   1, &block_15_expand_scratch0_array, NULL)
 
-/* Tensor #90 */
+/* Tensor #86 */
 AI_TENSOR_OBJ_DECLARE(
   block_15_expand_weights, AI_STATIC,
-  90, 0x0,
+  86, 0x0,
   AI_SHAPE_INIT(4, 160, 1, 1, 960), AI_STRIDE_INIT(4, 4, 640, 614400, 614400),
   1, &block_15_expand_weights_array, NULL)
 
-/* Tensor #91 */
+/* Tensor #87 */
 AI_TENSOR_OBJ_DECLARE(
   block_15_project_bias, AI_STATIC,
-  91, 0x0,
+  87, 0x0,
   AI_SHAPE_INIT(4, 1, 160, 1, 1), AI_STRIDE_INIT(4, 4, 4, 640, 640),
   1, &block_15_project_bias_array, NULL)
 
-/* Tensor #92 */
+/* Tensor #88 */
 AI_TENSOR_OBJ_DECLARE(
   block_15_project_output, AI_STATIC,
-  92, 0x0,
+  88, 0x0,
   AI_SHAPE_INIT(4, 1, 160, 7, 7), AI_STRIDE_INIT(4, 4, 4, 640, 4480),
   1, &block_15_project_output_array, NULL)
 
-/* Tensor #93 */
+/* Tensor #89 */
 AI_TENSOR_OBJ_DECLARE(
   block_15_project_scratch0, AI_STATIC,
-  93, 0x0,
+  89, 0x0,
   AI_SHAPE_INIT(4, 1, 960, 1, 1), AI_STRIDE_INIT(4, 4, 4, 3840, 3840),
   1, &block_15_project_scratch0_array, NULL)
 
-/* Tensor #94 */
+/* Tensor #90 */
 AI_TENSOR_OBJ_DECLARE(
   block_15_project_weights, AI_STATIC,
-  94, 0x0,
+  90, 0x0,
   AI_SHAPE_INIT(4, 960, 1, 1, 160), AI_STRIDE_INIT(4, 4, 3840, 614400, 614400),
   1, &block_15_project_weights_array, NULL)
 
-/* Tensor #95 */
+/* Tensor #91 */
 AI_TENSOR_OBJ_DECLARE(
   block_16_depthwise_bias, AI_STATIC,
-  95, 0x0,
+  91, 0x0,
   AI_SHAPE_INIT(4, 1, 960, 1, 1), AI_STRIDE_INIT(4, 4, 4, 3840, 3840),
   1, &block_16_depthwise_bias_array, NULL)
 
-/* Tensor #96 */
+/* Tensor #92 */
 AI_TENSOR_OBJ_DECLARE(
   block_16_depthwise_output, AI_STATIC,
-  96, 0x0,
+  92, 0x0,
   AI_SHAPE_INIT(4, 1, 960, 7, 7), AI_STRIDE_INIT(4, 4, 4, 3840, 26880),
   1, &block_16_depthwise_output_array, NULL)
 
-/* Tensor #97 */
+/* Tensor #93 */
 AI_TENSOR_OBJ_DECLARE(
   block_16_depthwise_relu_output, AI_STATIC,
-  97, 0x0,
+  93, 0x0,
   AI_SHAPE_INIT(4, 1, 960, 7, 7), AI_STRIDE_INIT(4, 4, 4, 3840, 26880),
   1, &block_16_depthwise_relu_output_array, NULL)
 
-/* Tensor #98 */
+/* Tensor #94 */
 AI_TENSOR_OBJ_DECLARE(
   block_16_depthwise_weights, AI_STATIC,
-  98, 0x0,
+  94, 0x0,
   AI_SHAPE_INIT(4, 1, 3, 3, 960), AI_STRIDE_INIT(4, 1, 960, 960, 960),
   1, &block_16_depthwise_weights_array, NULL)
 
-/* Tensor #99 */
+/* Tensor #95 */
 AI_TENSOR_OBJ_DECLARE(
   block_16_expand_bias, AI_STATIC,
-  99, 0x0,
+  95, 0x0,
   AI_SHAPE_INIT(4, 1, 960, 1, 1), AI_STRIDE_INIT(4, 4, 4, 3840, 3840),
   1, &block_16_expand_bias_array, NULL)
 
-/* Tensor #100 */
+/* Tensor #96 */
 AI_TENSOR_OBJ_DECLARE(
   block_16_expand_output, AI_STATIC,
-  100, 0x0,
+  96, 0x0,
   AI_SHAPE_INIT(4, 1, 960, 7, 7), AI_STRIDE_INIT(4, 4, 4, 3840, 26880),
   1, &block_16_expand_output_array, NULL)
 
-/* Tensor #101 */
+/* Tensor #97 */
 AI_TENSOR_OBJ_DECLARE(
   block_16_expand_relu_output, AI_STATIC,
-  101, 0x0,
+  97, 0x0,
   AI_SHAPE_INIT(4, 1, 960, 7, 7), AI_STRIDE_INIT(4, 4, 4, 3840, 26880),
   1, &block_16_expand_relu_output_array, NULL)
 
-/* Tensor #102 */
+/* Tensor #98 */
 AI_TENSOR_OBJ_DECLARE(
   block_16_expand_scratch0, AI_STATIC,
-  102, 0x0,
+  98, 0x0,
   AI_SHAPE_INIT(4, 1, 160, 1, 1), AI_STRIDE_INIT(4, 4, 4, 640, 640),
   1, &block_16_expand_scratch0_array, NULL)
 
-/* Tensor #103 */
+/* Tensor #99 */
 AI_TENSOR_OBJ_DECLARE(
   block_16_expand_weights, AI_STATIC,
-  103, 0x0,
+  99, 0x0,
   AI_SHAPE_INIT(4, 160, 1, 1, 960), AI_STRIDE_INIT(4, 4, 640, 614400, 614400),
   1, &block_16_expand_weights_array, NULL)
 
-/* Tensor #104 */
+/* Tensor #100 */
 AI_TENSOR_OBJ_DECLARE(
   block_16_project_bias, AI_STATIC,
-  104, 0x0,
+  100, 0x0,
   AI_SHAPE_INIT(4, 1, 320, 1, 1), AI_STRIDE_INIT(4, 4, 4, 1280, 1280),
   1, &block_16_project_bias_array, NULL)
 
-/* Tensor #105 */
+/* Tensor #101 */
 AI_TENSOR_OBJ_DECLARE(
   block_16_project_output, AI_STATIC,
-  105, 0x0,
+  101, 0x0,
   AI_SHAPE_INIT(4, 1, 320, 7, 7), AI_STRIDE_INIT(4, 4, 4, 1280, 8960),
   1, &block_16_project_output_array, NULL)
 
-/* Tensor #106 */
+/* Tensor #102 */
 AI_TENSOR_OBJ_DECLARE(
   block_16_project_scratch0, AI_STATIC,
-  106, 0x0,
+  102, 0x0,
   AI_SHAPE_INIT(4, 1, 960, 1, 1), AI_STRIDE_INIT(4, 4, 4, 3840, 3840),
   1, &block_16_project_scratch0_array, NULL)
 
-/* Tensor #107 */
+/* Tensor #103 */
 AI_TENSOR_OBJ_DECLARE(
   block_16_project_weights, AI_STATIC,
-  107, 0x0,
+  103, 0x0,
   AI_SHAPE_INIT(4, 960, 1, 1, 320), AI_STRIDE_INIT(4, 4, 3840, 1228800, 1228800),
   1, &block_16_project_weights_array, NULL)
 
-/* Tensor #108 */
+/* Tensor #104 */
 AI_TENSOR_OBJ_DECLARE(
   block_1_depthwise_bias, AI_STATIC,
-  108, 0x0,
+  104, 0x0,
   AI_SHAPE_INIT(4, 1, 96, 1, 1), AI_STRIDE_INIT(4, 4, 4, 384, 384),
   1, &block_1_depthwise_bias_array, NULL)
 
-/* Tensor #109 */
+/* Tensor #105 */
 AI_TENSOR_OBJ_DECLARE(
   block_1_depthwise_output, AI_STATIC,
-  109, 0x0,
+  105, 0x0,
   AI_SHAPE_INIT(4, 1, 96, 56, 56), AI_STRIDE_INIT(4, 4, 4, 384, 21504),
   1, &block_1_depthwise_output_array, NULL)
 
-/* Tensor #110 */
+/* Tensor #106 */
 AI_TENSOR_OBJ_DECLARE(
   block_1_depthwise_relu_output, AI_STATIC,
-  110, 0x0,
+  106, 0x0,
   AI_SHAPE_INIT(4, 1, 96, 56, 56), AI_STRIDE_INIT(4, 4, 4, 384, 21504),
   1, &block_1_depthwise_relu_output_array, NULL)
 
-/* Tensor #111 */
+/* Tensor #107 */
 AI_TENSOR_OBJ_DECLARE(
   block_1_depthwise_weights, AI_STATIC,
-  111, 0x0,
+  107, 0x0,
   AI_SHAPE_INIT(4, 1, 3, 3, 96), AI_STRIDE_INIT(4, 1, 96, 96, 96),
   1, &block_1_depthwise_weights_array, NULL)
 
-/* Tensor #112 */
+/* Tensor #108 */
 AI_TENSOR_OBJ_DECLARE(
   block_1_expand_bias, AI_STATIC,
-  112, 0x0,
+  108, 0x0,
   AI_SHAPE_INIT(4, 1, 96, 1, 1), AI_STRIDE_INIT(4, 4, 4, 384, 384),
   1, &block_1_expand_bias_array, NULL)
 
-/* Tensor #113 */
+/* Tensor #109 */
 AI_TENSOR_OBJ_DECLARE(
   block_1_expand_output, AI_STATIC,
-  113, 0x0,
+  109, 0x0,
   AI_SHAPE_INIT(4, 1, 96, 112, 112), AI_STRIDE_INIT(4, 4, 4, 384, 43008),
   1, &block_1_expand_output_array, NULL)
 
-/* Tensor #114 */
+/* Tensor #110 */
 AI_TENSOR_OBJ_DECLARE(
   block_1_expand_relu_output, AI_STATIC,
-  114, 0x0,
+  110, 0x0,
   AI_SHAPE_INIT(4, 1, 96, 112, 112), AI_STRIDE_INIT(4, 4, 4, 384, 43008),
   1, &block_1_expand_relu_output_array, NULL)
 
-/* Tensor #115 */
+/* Tensor #111 */
 AI_TENSOR_OBJ_DECLARE(
   block_1_expand_scratch0, AI_STATIC,
-  115, 0x0,
+  111, 0x0,
   AI_SHAPE_INIT(4, 1, 16, 1, 1), AI_STRIDE_INIT(4, 4, 4, 64, 64),
   1, &block_1_expand_scratch0_array, NULL)
 
-/* Tensor #116 */
+/* Tensor #112 */
 AI_TENSOR_OBJ_DECLARE(
   block_1_expand_weights, AI_STATIC,
-  116, 0x0,
+  112, 0x0,
   AI_SHAPE_INIT(4, 16, 1, 1, 96), AI_STRIDE_INIT(4, 4, 64, 6144, 6144),
   1, &block_1_expand_weights_array, NULL)
 
-/* Tensor #117 */
+/* Tensor #113 */
 AI_TENSOR_OBJ_DECLARE(
   block_1_project_bias, AI_STATIC,
-  117, 0x0,
+  113, 0x0,
   AI_SHAPE_INIT(4, 1, 24, 1, 1), AI_STRIDE_INIT(4, 4, 4, 96, 96),
   1, &block_1_project_bias_array, NULL)
 
-/* Tensor #118 */
+/* Tensor #114 */
 AI_TENSOR_OBJ_DECLARE(
   block_1_project_output, AI_STATIC,
-  118, 0x0,
+  114, 0x0,
   AI_SHAPE_INIT(4, 1, 24, 56, 56), AI_STRIDE_INIT(4, 4, 4, 96, 5376),
   1, &block_1_project_output_array, NULL)
 
-/* Tensor #119 */
+/* Tensor #115 */
 AI_TENSOR_OBJ_DECLARE(
   block_1_project_scratch0, AI_STATIC,
-  119, 0x0,
+  115, 0x0,
   AI_SHAPE_INIT(4, 1, 96, 1, 1), AI_STRIDE_INIT(4, 4, 4, 384, 384),
   1, &block_1_project_scratch0_array, NULL)
 
-/* Tensor #120 */
+/* Tensor #116 */
 AI_TENSOR_OBJ_DECLARE(
   block_1_project_weights, AI_STATIC,
-  120, 0x0,
+  116, 0x0,
   AI_SHAPE_INIT(4, 96, 1, 1, 24), AI_STRIDE_INIT(4, 4, 384, 9216, 9216),
   1, &block_1_project_weights_array, NULL)
 
-/* Tensor #121 */
+/* Tensor #117 */
 AI_TENSOR_OBJ_DECLARE(
   block_2_add_output, AI_STATIC,
-  121, 0x0,
+  117, 0x0,
   AI_SHAPE_INIT(4, 1, 24, 56, 56), AI_STRIDE_INIT(4, 4, 4, 96, 5376),
   1, &block_2_add_output_array, NULL)
 
-/* Tensor #122 */
+/* Tensor #118 */
 AI_TENSOR_OBJ_DECLARE(
   block_2_depthwise_bias, AI_STATIC,
-  122, 0x0,
+  118, 0x0,
   AI_SHAPE_INIT(4, 1, 144, 1, 1), AI_STRIDE_INIT(4, 4, 4, 576, 576),
   1, &block_2_depthwise_bias_array, NULL)
 
-/* Tensor #123 */
+/* Tensor #119 */
 AI_TENSOR_OBJ_DECLARE(
   block_2_depthwise_output, AI_STATIC,
-  123, 0x0,
+  119, 0x0,
   AI_SHAPE_INIT(4, 1, 144, 56, 56), AI_STRIDE_INIT(4, 4, 4, 576, 32256),
   1, &block_2_depthwise_output_array, NULL)
 
-/* Tensor #124 */
+/* Tensor #120 */
 AI_TENSOR_OBJ_DECLARE(
   block_2_depthwise_relu_output, AI_STATIC,
-  124, 0x0,
+  120, 0x0,
   AI_SHAPE_INIT(4, 1, 144, 56, 56), AI_STRIDE_INIT(4, 4, 4, 576, 32256),
   1, &block_2_depthwise_relu_output_array, NULL)
 
-/* Tensor #125 */
+/* Tensor #121 */
 AI_TENSOR_OBJ_DECLARE(
   block_2_depthwise_weights, AI_STATIC,
-  125, 0x0,
+  121, 0x0,
   AI_SHAPE_INIT(4, 1, 3, 3, 144), AI_STRIDE_INIT(4, 1, 144, 144, 144),
   1, &block_2_depthwise_weights_array, NULL)
 
-/* Tensor #126 */
+/* Tensor #122 */
 AI_TENSOR_OBJ_DECLARE(
   block_2_expand_bias, AI_STATIC,
-  126, 0x0,
+  122, 0x0,
   AI_SHAPE_INIT(4, 1, 144, 1, 1), AI_STRIDE_INIT(4, 4, 4, 576, 576),
   1, &block_2_expand_bias_array, NULL)
 
-/* Tensor #127 */
+/* Tensor #123 */
 AI_TENSOR_OBJ_DECLARE(
   block_2_expand_output, AI_STATIC,
-  127, 0x0,
+  123, 0x0,
   AI_SHAPE_INIT(4, 1, 144, 56, 56), AI_STRIDE_INIT(4, 4, 4, 576, 32256),
   1, &block_2_expand_output_array, NULL)
 
-/* Tensor #128 */
+/* Tensor #124 */
 AI_TENSOR_OBJ_DECLARE(
   block_2_expand_relu_output, AI_STATIC,
-  128, 0x0,
+  124, 0x0,
   AI_SHAPE_INIT(4, 1, 144, 56, 56), AI_STRIDE_INIT(4, 4, 4, 576, 32256),
   1, &block_2_expand_relu_output_array, NULL)
 
-/* Tensor #129 */
+/* Tensor #125 */
 AI_TENSOR_OBJ_DECLARE(
   block_2_expand_scratch0, AI_STATIC,
-  129, 0x0,
+  125, 0x0,
   AI_SHAPE_INIT(4, 1, 24, 1, 1), AI_STRIDE_INIT(4, 4, 4, 96, 96),
   1, &block_2_expand_scratch0_array, NULL)
 
-/* Tensor #130 */
+/* Tensor #126 */
 AI_TENSOR_OBJ_DECLARE(
   block_2_expand_weights, AI_STATIC,
-  130, 0x0,
+  126, 0x0,
   AI_SHAPE_INIT(4, 24, 1, 1, 144), AI_STRIDE_INIT(4, 4, 96, 13824, 13824),
   1, &block_2_expand_weights_array, NULL)
 
-/* Tensor #131 */
+/* Tensor #127 */
 AI_TENSOR_OBJ_DECLARE(
   block_2_project_bias, AI_STATIC,
-  131, 0x0,
+  127, 0x0,
   AI_SHAPE_INIT(4, 1, 24, 1, 1), AI_STRIDE_INIT(4, 4, 4, 96, 96),
   1, &block_2_project_bias_array, NULL)
 
-/* Tensor #132 */
+/* Tensor #128 */
 AI_TENSOR_OBJ_DECLARE(
   block_2_project_output, AI_STATIC,
-  132, 0x0,
+  128, 0x0,
   AI_SHAPE_INIT(4, 1, 24, 56, 56), AI_STRIDE_INIT(4, 4, 4, 96, 5376),
   1, &block_2_project_output_array, NULL)
 
-/* Tensor #133 */
+/* Tensor #129 */
 AI_TENSOR_OBJ_DECLARE(
   block_2_project_scratch0, AI_STATIC,
-  133, 0x0,
+  129, 0x0,
   AI_SHAPE_INIT(4, 1, 144, 1, 1), AI_STRIDE_INIT(4, 4, 4, 576, 576),
   1, &block_2_project_scratch0_array, NULL)
 
-/* Tensor #134 */
+/* Tensor #130 */
 AI_TENSOR_OBJ_DECLARE(
   block_2_project_weights, AI_STATIC,
-  134, 0x0,
+  130, 0x0,
   AI_SHAPE_INIT(4, 144, 1, 1, 24), AI_STRIDE_INIT(4, 4, 576, 13824, 13824),
   1, &block_2_project_weights_array, NULL)
 
-/* Tensor #135 */
+/* Tensor #131 */
 AI_TENSOR_OBJ_DECLARE(
   block_3_depthwise_bias, AI_STATIC,
-  135, 0x0,
+  131, 0x0,
   AI_SHAPE_INIT(4, 1, 144, 1, 1), AI_STRIDE_INIT(4, 4, 4, 576, 576),
   1, &block_3_depthwise_bias_array, NULL)
 
-/* Tensor #136 */
+/* Tensor #132 */
 AI_TENSOR_OBJ_DECLARE(
   block_3_depthwise_output, AI_STATIC,
-  136, 0x0,
+  132, 0x0,
   AI_SHAPE_INIT(4, 1, 144, 28, 28), AI_STRIDE_INIT(4, 4, 4, 576, 16128),
   1, &block_3_depthwise_output_array, NULL)
 
-/* Tensor #137 */
+/* Tensor #133 */
 AI_TENSOR_OBJ_DECLARE(
   block_3_depthwise_relu_output, AI_STATIC,
-  137, 0x0,
+  133, 0x0,
   AI_SHAPE_INIT(4, 1, 144, 28, 28), AI_STRIDE_INIT(4, 4, 4, 576, 16128),
   1, &block_3_depthwise_relu_output_array, NULL)
 
-/* Tensor #138 */
+/* Tensor #134 */
 AI_TENSOR_OBJ_DECLARE(
   block_3_depthwise_weights, AI_STATIC,
-  138, 0x0,
+  134, 0x0,
   AI_SHAPE_INIT(4, 1, 3, 3, 144), AI_STRIDE_INIT(4, 1, 144, 144, 144),
   1, &block_3_depthwise_weights_array, NULL)
 
-/* Tensor #139 */
+/* Tensor #135 */
 AI_TENSOR_OBJ_DECLARE(
   block_3_expand_bias, AI_STATIC,
-  139, 0x0,
+  135, 0x0,
   AI_SHAPE_INIT(4, 1, 144, 1, 1), AI_STRIDE_INIT(4, 4, 4, 576, 576),
   1, &block_3_expand_bias_array, NULL)
 
-/* Tensor #140 */
+/* Tensor #136 */
 AI_TENSOR_OBJ_DECLARE(
   block_3_expand_output, AI_STATIC,
-  140, 0x0,
+  136, 0x0,
   AI_SHAPE_INIT(4, 1, 144, 56, 56), AI_STRIDE_INIT(4, 4, 4, 576, 32256),
   1, &block_3_expand_output_array, NULL)
 
-/* Tensor #141 */
+/* Tensor #137 */
 AI_TENSOR_OBJ_DECLARE(
   block_3_expand_relu_output, AI_STATIC,
-  141, 0x0,
+  137, 0x0,
   AI_SHAPE_INIT(4, 1, 144, 56, 56), AI_STRIDE_INIT(4, 4, 4, 576, 32256),
   1, &block_3_expand_relu_output_array, NULL)
 
-/* Tensor #142 */
+/* Tensor #138 */
 AI_TENSOR_OBJ_DECLARE(
   block_3_expand_scratch0, AI_STATIC,
-  142, 0x0,
+  138, 0x0,
   AI_SHAPE_INIT(4, 1, 24, 1, 1), AI_STRIDE_INIT(4, 4, 4, 96, 96),
   1, &block_3_expand_scratch0_array, NULL)
 
-/* Tensor #143 */
+/* Tensor #139 */
 AI_TENSOR_OBJ_DECLARE(
   block_3_expand_weights, AI_STATIC,
-  143, 0x0,
+  139, 0x0,
   AI_SHAPE_INIT(4, 24, 1, 1, 144), AI_STRIDE_INIT(4, 4, 96, 13824, 13824),
   1, &block_3_expand_weights_array, NULL)
 
-/* Tensor #144 */
+/* Tensor #140 */
 AI_TENSOR_OBJ_DECLARE(
   block_3_project_bias, AI_STATIC,
-  144, 0x0,
+  140, 0x0,
   AI_SHAPE_INIT(4, 1, 32, 1, 1), AI_STRIDE_INIT(4, 4, 4, 128, 128),
   1, &block_3_project_bias_array, NULL)
 
-/* Tensor #145 */
+/* Tensor #141 */
 AI_TENSOR_OBJ_DECLARE(
   block_3_project_output, AI_STATIC,
-  145, 0x0,
+  141, 0x0,
   AI_SHAPE_INIT(4, 1, 32, 28, 28), AI_STRIDE_INIT(4, 4, 4, 128, 3584),
   1, &block_3_project_output_array, NULL)
 
-/* Tensor #146 */
+/* Tensor #142 */
 AI_TENSOR_OBJ_DECLARE(
   block_3_project_scratch0, AI_STATIC,
-  146, 0x0,
+  142, 0x0,
   AI_SHAPE_INIT(4, 1, 144, 1, 1), AI_STRIDE_INIT(4, 4, 4, 576, 576),
   1, &block_3_project_scratch0_array, NULL)
 
-/* Tensor #147 */
+/* Tensor #143 */
 AI_TENSOR_OBJ_DECLARE(
   block_3_project_weights, AI_STATIC,
-  147, 0x0,
+  143, 0x0,
   AI_SHAPE_INIT(4, 144, 1, 1, 32), AI_STRIDE_INIT(4, 4, 576, 18432, 18432),
   1, &block_3_project_weights_array, NULL)
 
-/* Tensor #148 */
+/* Tensor #144 */
 AI_TENSOR_OBJ_DECLARE(
   block_4_add_output, AI_STATIC,
-  148, 0x0,
+  144, 0x0,
   AI_SHAPE_INIT(4, 1, 32, 28, 28), AI_STRIDE_INIT(4, 4, 4, 128, 3584),
   1, &block_4_add_output_array, NULL)
 
-/* Tensor #149 */
+/* Tensor #145 */
 AI_TENSOR_OBJ_DECLARE(
   block_4_depthwise_bias, AI_STATIC,
-  149, 0x0,
+  145, 0x0,
   AI_SHAPE_INIT(4, 1, 192, 1, 1), AI_STRIDE_INIT(4, 4, 4, 768, 768),
   1, &block_4_depthwise_bias_array, NULL)
 
-/* Tensor #150 */
+/* Tensor #146 */
 AI_TENSOR_OBJ_DECLARE(
   block_4_depthwise_output, AI_STATIC,
-  150, 0x0,
+  146, 0x0,
   AI_SHAPE_INIT(4, 1, 192, 28, 28), AI_STRIDE_INIT(4, 4, 4, 768, 21504),
   1, &block_4_depthwise_output_array, NULL)
 
-/* Tensor #151 */
+/* Tensor #147 */
 AI_TENSOR_OBJ_DECLARE(
   block_4_depthwise_relu_output, AI_STATIC,
-  151, 0x0,
+  147, 0x0,
   AI_SHAPE_INIT(4, 1, 192, 28, 28), AI_STRIDE_INIT(4, 4, 4, 768, 21504),
   1, &block_4_depthwise_relu_output_array, NULL)
 
-/* Tensor #152 */
+/* Tensor #148 */
 AI_TENSOR_OBJ_DECLARE(
   block_4_depthwise_weights, AI_STATIC,
-  152, 0x0,
+  148, 0x0,
   AI_SHAPE_INIT(4, 1, 3, 3, 192), AI_STRIDE_INIT(4, 1, 192, 192, 192),
   1, &block_4_depthwise_weights_array, NULL)
 
-/* Tensor #153 */
+/* Tensor #149 */
 AI_TENSOR_OBJ_DECLARE(
   block_4_expand_bias, AI_STATIC,
-  153, 0x0,
+  149, 0x0,
   AI_SHAPE_INIT(4, 1, 192, 1, 1), AI_STRIDE_INIT(4, 4, 4, 768, 768),
   1, &block_4_expand_bias_array, NULL)
 
-/* Tensor #154 */
+/* Tensor #150 */
 AI_TENSOR_OBJ_DECLARE(
   block_4_expand_output, AI_STATIC,
-  154, 0x0,
+  150, 0x0,
   AI_SHAPE_INIT(4, 1, 192, 28, 28), AI_STRIDE_INIT(4, 4, 4, 768, 21504),
   1, &block_4_expand_output_array, NULL)
 
-/* Tensor #155 */
+/* Tensor #151 */
 AI_TENSOR_OBJ_DECLARE(
   block_4_expand_relu_output, AI_STATIC,
-  155, 0x0,
+  151, 0x0,
   AI_SHAPE_INIT(4, 1, 192, 28, 28), AI_STRIDE_INIT(4, 4, 4, 768, 21504),
   1, &block_4_expand_relu_output_array, NULL)
 
-/* Tensor #156 */
+/* Tensor #152 */
 AI_TENSOR_OBJ_DECLARE(
   block_4_expand_scratch0, AI_STATIC,
-  156, 0x0,
+  152, 0x0,
   AI_SHAPE_INIT(4, 1, 32, 1, 1), AI_STRIDE_INIT(4, 4, 4, 128, 128),
   1, &block_4_expand_scratch0_array, NULL)
 
-/* Tensor #157 */
+/* Tensor #153 */
 AI_TENSOR_OBJ_DECLARE(
   block_4_expand_weights, AI_STATIC,
-  157, 0x0,
+  153, 0x0,
   AI_SHAPE_INIT(4, 32, 1, 1, 192), AI_STRIDE_INIT(4, 4, 128, 24576, 24576),
   1, &block_4_expand_weights_array, NULL)
 
-/* Tensor #158 */
+/* Tensor #154 */
 AI_TENSOR_OBJ_DECLARE(
   block_4_project_bias, AI_STATIC,
-  158, 0x0,
+  154, 0x0,
   AI_SHAPE_INIT(4, 1, 32, 1, 1), AI_STRIDE_INIT(4, 4, 4, 128, 128),
   1, &block_4_project_bias_array, NULL)
 
-/* Tensor #159 */
+/* Tensor #155 */
 AI_TENSOR_OBJ_DECLARE(
   block_4_project_output, AI_STATIC,
-  159, 0x0,
+  155, 0x0,
   AI_SHAPE_INIT(4, 1, 32, 28, 28), AI_STRIDE_INIT(4, 4, 4, 128, 3584),
   1, &block_4_project_output_array, NULL)
 
-/* Tensor #160 */
+/* Tensor #156 */
 AI_TENSOR_OBJ_DECLARE(
   block_4_project_scratch0, AI_STATIC,
-  160, 0x0,
+  156, 0x0,
   AI_SHAPE_INIT(4, 1, 192, 1, 1), AI_STRIDE_INIT(4, 4, 4, 768, 768),
   1, &block_4_project_scratch0_array, NULL)
 
-/* Tensor #161 */
+/* Tensor #157 */
 AI_TENSOR_OBJ_DECLARE(
   block_4_project_weights, AI_STATIC,
-  161, 0x0,
+  157, 0x0,
   AI_SHAPE_INIT(4, 192, 1, 1, 32), AI_STRIDE_INIT(4, 4, 768, 24576, 24576),
   1, &block_4_project_weights_array, NULL)
 
-/* Tensor #162 */
+/* Tensor #158 */
 AI_TENSOR_OBJ_DECLARE(
   block_5_add_output, AI_STATIC,
-  162, 0x0,
+  158, 0x0,
   AI_SHAPE_INIT(4, 1, 32, 28, 28), AI_STRIDE_INIT(4, 4, 4, 128, 3584),
   1, &block_5_add_output_array, NULL)
 
-/* Tensor #163 */
+/* Tensor #159 */
 AI_TENSOR_OBJ_DECLARE(
   block_5_depthwise_bias, AI_STATIC,
-  163, 0x0,
+  159, 0x0,
   AI_SHAPE_INIT(4, 1, 192, 1, 1), AI_STRIDE_INIT(4, 4, 4, 768, 768),
   1, &block_5_depthwise_bias_array, NULL)
 
-/* Tensor #164 */
+/* Tensor #160 */
 AI_TENSOR_OBJ_DECLARE(
   block_5_depthwise_output, AI_STATIC,
-  164, 0x0,
+  160, 0x0,
   AI_SHAPE_INIT(4, 1, 192, 28, 28), AI_STRIDE_INIT(4, 4, 4, 768, 21504),
   1, &block_5_depthwise_output_array, NULL)
 
-/* Tensor #165 */
+/* Tensor #161 */
 AI_TENSOR_OBJ_DECLARE(
   block_5_depthwise_relu_output, AI_STATIC,
-  165, 0x0,
+  161, 0x0,
   AI_SHAPE_INIT(4, 1, 192, 28, 28), AI_STRIDE_INIT(4, 4, 4, 768, 21504),
   1, &block_5_depthwise_relu_output_array, NULL)
 
-/* Tensor #166 */
+/* Tensor #162 */
 AI_TENSOR_OBJ_DECLARE(
   block_5_depthwise_weights, AI_STATIC,
-  166, 0x0,
+  162, 0x0,
   AI_SHAPE_INIT(4, 1, 3, 3, 192), AI_STRIDE_INIT(4, 1, 192, 192, 192),
   1, &block_5_depthwise_weights_array, NULL)
 
-/* Tensor #167 */
+/* Tensor #163 */
 AI_TENSOR_OBJ_DECLARE(
   block_5_expand_bias, AI_STATIC,
-  167, 0x0,
+  163, 0x0,
   AI_SHAPE_INIT(4, 1, 192, 1, 1), AI_STRIDE_INIT(4, 4, 4, 768, 768),
   1, &block_5_expand_bias_array, NULL)
 
-/* Tensor #168 */
+/* Tensor #164 */
 AI_TENSOR_OBJ_DECLARE(
   block_5_expand_output, AI_STATIC,
-  168, 0x0,
+  164, 0x0,
   AI_SHAPE_INIT(4, 1, 192, 28, 28), AI_STRIDE_INIT(4, 4, 4, 768, 21504),
   1, &block_5_expand_output_array, NULL)
 
-/* Tensor #169 */
+/* Tensor #165 */
 AI_TENSOR_OBJ_DECLARE(
   block_5_expand_relu_output, AI_STATIC,
-  169, 0x0,
+  165, 0x0,
   AI_SHAPE_INIT(4, 1, 192, 28, 28), AI_STRIDE_INIT(4, 4, 4, 768, 21504),
   1, &block_5_expand_relu_output_array, NULL)
 
-/* Tensor #170 */
+/* Tensor #166 */
 AI_TENSOR_OBJ_DECLARE(
   block_5_expand_scratch0, AI_STATIC,
-  170, 0x0,
+  166, 0x0,
   AI_SHAPE_INIT(4, 1, 32, 1, 1), AI_STRIDE_INIT(4, 4, 4, 128, 128),
   1, &block_5_expand_scratch0_array, NULL)
 
-/* Tensor #171 */
+/* Tensor #167 */
 AI_TENSOR_OBJ_DECLARE(
   block_5_expand_weights, AI_STATIC,
-  171, 0x0,
+  167, 0x0,
   AI_SHAPE_INIT(4, 32, 1, 1, 192), AI_STRIDE_INIT(4, 4, 128, 24576, 24576),
   1, &block_5_expand_weights_array, NULL)
 
-/* Tensor #172 */
+/* Tensor #168 */
 AI_TENSOR_OBJ_DECLARE(
   block_5_project_bias, AI_STATIC,
-  172, 0x0,
+  168, 0x0,
   AI_SHAPE_INIT(4, 1, 32, 1, 1), AI_STRIDE_INIT(4, 4, 4, 128, 128),
   1, &block_5_project_bias_array, NULL)
 
-/* Tensor #173 */
+/* Tensor #169 */
 AI_TENSOR_OBJ_DECLARE(
   block_5_project_output, AI_STATIC,
-  173, 0x0,
+  169, 0x0,
   AI_SHAPE_INIT(4, 1, 32, 28, 28), AI_STRIDE_INIT(4, 4, 4, 128, 3584),
   1, &block_5_project_output_array, NULL)
 
-/* Tensor #174 */
+/* Tensor #170 */
 AI_TENSOR_OBJ_DECLARE(
   block_5_project_scratch0, AI_STATIC,
-  174, 0x0,
+  170, 0x0,
   AI_SHAPE_INIT(4, 1, 192, 1, 1), AI_STRIDE_INIT(4, 4, 4, 768, 768),
   1, &block_5_project_scratch0_array, NULL)
 
-/* Tensor #175 */
+/* Tensor #171 */
 AI_TENSOR_OBJ_DECLARE(
   block_5_project_weights, AI_STATIC,
-  175, 0x0,
+  171, 0x0,
   AI_SHAPE_INIT(4, 192, 1, 1, 32), AI_STRIDE_INIT(4, 4, 768, 24576, 24576),
   1, &block_5_project_weights_array, NULL)
 
-/* Tensor #176 */
+/* Tensor #172 */
 AI_TENSOR_OBJ_DECLARE(
   block_6_depthwise_bias, AI_STATIC,
-  176, 0x0,
+  172, 0x0,
   AI_SHAPE_INIT(4, 1, 192, 1, 1), AI_STRIDE_INIT(4, 4, 4, 768, 768),
   1, &block_6_depthwise_bias_array, NULL)
 
-/* Tensor #177 */
+/* Tensor #173 */
 AI_TENSOR_OBJ_DECLARE(
   block_6_depthwise_output, AI_STATIC,
-  177, 0x0,
+  173, 0x0,
   AI_SHAPE_INIT(4, 1, 192, 14, 14), AI_STRIDE_INIT(4, 4, 4, 768, 10752),
   1, &block_6_depthwise_output_array, NULL)
 
-/* Tensor #178 */
+/* Tensor #174 */
 AI_TENSOR_OBJ_DECLARE(
   block_6_depthwise_relu_output, AI_STATIC,
-  178, 0x0,
+  174, 0x0,
   AI_SHAPE_INIT(4, 1, 192, 14, 14), AI_STRIDE_INIT(4, 4, 4, 768, 10752),
   1, &block_6_depthwise_relu_output_array, NULL)
 
-/* Tensor #179 */
+/* Tensor #175 */
 AI_TENSOR_OBJ_DECLARE(
   block_6_depthwise_weights, AI_STATIC,
-  179, 0x0,
+  175, 0x0,
   AI_SHAPE_INIT(4, 1, 3, 3, 192), AI_STRIDE_INIT(4, 1, 192, 192, 192),
   1, &block_6_depthwise_weights_array, NULL)
 
-/* Tensor #180 */
+/* Tensor #176 */
 AI_TENSOR_OBJ_DECLARE(
   block_6_expand_bias, AI_STATIC,
-  180, 0x0,
+  176, 0x0,
   AI_SHAPE_INIT(4, 1, 192, 1, 1), AI_STRIDE_INIT(4, 4, 4, 768, 768),
   1, &block_6_expand_bias_array, NULL)
 
-/* Tensor #181 */
+/* Tensor #177 */
 AI_TENSOR_OBJ_DECLARE(
   block_6_expand_output, AI_STATIC,
-  181, 0x0,
+  177, 0x0,
   AI_SHAPE_INIT(4, 1, 192, 28, 28), AI_STRIDE_INIT(4, 4, 4, 768, 21504),
   1, &block_6_expand_output_array, NULL)
 
-/* Tensor #182 */
+/* Tensor #178 */
 AI_TENSOR_OBJ_DECLARE(
   block_6_expand_relu_output, AI_STATIC,
-  182, 0x0,
+  178, 0x0,
   AI_SHAPE_INIT(4, 1, 192, 28, 28), AI_STRIDE_INIT(4, 4, 4, 768, 21504),
   1, &block_6_expand_relu_output_array, NULL)
 
-/* Tensor #183 */
+/* Tensor #179 */
 AI_TENSOR_OBJ_DECLARE(
   block_6_expand_scratch0, AI_STATIC,
-  183, 0x0,
+  179, 0x0,
   AI_SHAPE_INIT(4, 1, 32, 1, 1), AI_STRIDE_INIT(4, 4, 4, 128, 128),
   1, &block_6_expand_scratch0_array, NULL)
 
-/* Tensor #184 */
+/* Tensor #180 */
 AI_TENSOR_OBJ_DECLARE(
   block_6_expand_weights, AI_STATIC,
-  184, 0x0,
+  180, 0x0,
   AI_SHAPE_INIT(4, 32, 1, 1, 192), AI_STRIDE_INIT(4, 4, 128, 24576, 24576),
   1, &block_6_expand_weights_array, NULL)
 
-/* Tensor #185 */
+/* Tensor #181 */
 AI_TENSOR_OBJ_DECLARE(
   block_6_project_bias, AI_STATIC,
-  185, 0x0,
+  181, 0x0,
   AI_SHAPE_INIT(4, 1, 64, 1, 1), AI_STRIDE_INIT(4, 4, 4, 256, 256),
   1, &block_6_project_bias_array, NULL)
 
-/* Tensor #186 */
+/* Tensor #182 */
 AI_TENSOR_OBJ_DECLARE(
   block_6_project_output, AI_STATIC,
-  186, 0x0,
+  182, 0x0,
   AI_SHAPE_INIT(4, 1, 64, 14, 14), AI_STRIDE_INIT(4, 4, 4, 256, 3584),
   1, &block_6_project_output_array, NULL)
 
-/* Tensor #187 */
+/* Tensor #183 */
 AI_TENSOR_OBJ_DECLARE(
   block_6_project_scratch0, AI_STATIC,
-  187, 0x0,
+  183, 0x0,
   AI_SHAPE_INIT(4, 1, 192, 1, 1), AI_STRIDE_INIT(4, 4, 4, 768, 768),
   1, &block_6_project_scratch0_array, NULL)
 
-/* Tensor #188 */
+/* Tensor #184 */
 AI_TENSOR_OBJ_DECLARE(
   block_6_project_weights, AI_STATIC,
-  188, 0x0,
+  184, 0x0,
   AI_SHAPE_INIT(4, 192, 1, 1, 64), AI_STRIDE_INIT(4, 4, 768, 49152, 49152),
   1, &block_6_project_weights_array, NULL)
 
-/* Tensor #189 */
+/* Tensor #185 */
 AI_TENSOR_OBJ_DECLARE(
   block_7_add_output, AI_STATIC,
-  189, 0x0,
+  185, 0x0,
   AI_SHAPE_INIT(4, 1, 64, 14, 14), AI_STRIDE_INIT(4, 4, 4, 256, 3584),
   1, &block_7_add_output_array, NULL)
 
-/* Tensor #190 */
+/* Tensor #186 */
 AI_TENSOR_OBJ_DECLARE(
   block_7_depthwise_bias, AI_STATIC,
-  190, 0x0,
+  186, 0x0,
   AI_SHAPE_INIT(4, 1, 384, 1, 1), AI_STRIDE_INIT(4, 4, 4, 1536, 1536),
   1, &block_7_depthwise_bias_array, NULL)
 
-/* Tensor #191 */
+/* Tensor #187 */
 AI_TENSOR_OBJ_DECLARE(
   block_7_depthwise_output, AI_STATIC,
-  191, 0x0,
+  187, 0x0,
   AI_SHAPE_INIT(4, 1, 384, 14, 14), AI_STRIDE_INIT(4, 4, 4, 1536, 21504),
   1, &block_7_depthwise_output_array, NULL)
 
-/* Tensor #192 */
+/* Tensor #188 */
 AI_TENSOR_OBJ_DECLARE(
   block_7_depthwise_relu_output, AI_STATIC,
-  192, 0x0,
+  188, 0x0,
   AI_SHAPE_INIT(4, 1, 384, 14, 14), AI_STRIDE_INIT(4, 4, 4, 1536, 21504),
   1, &block_7_depthwise_relu_output_array, NULL)
 
-/* Tensor #193 */
+/* Tensor #189 */
 AI_TENSOR_OBJ_DECLARE(
   block_7_depthwise_weights, AI_STATIC,
-  193, 0x0,
+  189, 0x0,
   AI_SHAPE_INIT(4, 1, 3, 3, 384), AI_STRIDE_INIT(4, 1, 384, 384, 384),
   1, &block_7_depthwise_weights_array, NULL)
 
-/* Tensor #194 */
+/* Tensor #190 */
 AI_TENSOR_OBJ_DECLARE(
   block_7_expand_bias, AI_STATIC,
-  194, 0x0,
+  190, 0x0,
   AI_SHAPE_INIT(4, 1, 384, 1, 1), AI_STRIDE_INIT(4, 4, 4, 1536, 1536),
   1, &block_7_expand_bias_array, NULL)
 
-/* Tensor #195 */
+/* Tensor #191 */
 AI_TENSOR_OBJ_DECLARE(
   block_7_expand_output, AI_STATIC,
-  195, 0x0,
+  191, 0x0,
   AI_SHAPE_INIT(4, 1, 384, 14, 14), AI_STRIDE_INIT(4, 4, 4, 1536, 21504),
   1, &block_7_expand_output_array, NULL)
 
-/* Tensor #196 */
+/* Tensor #192 */
 AI_TENSOR_OBJ_DECLARE(
   block_7_expand_relu_output, AI_STATIC,
-  196, 0x0,
+  192, 0x0,
   AI_SHAPE_INIT(4, 1, 384, 14, 14), AI_STRIDE_INIT(4, 4, 4, 1536, 21504),
   1, &block_7_expand_relu_output_array, NULL)
 
-/* Tensor #197 */
+/* Tensor #193 */
 AI_TENSOR_OBJ_DECLARE(
   block_7_expand_scratch0, AI_STATIC,
-  197, 0x0,
+  193, 0x0,
   AI_SHAPE_INIT(4, 1, 64, 1, 1), AI_STRIDE_INIT(4, 4, 4, 256, 256),
   1, &block_7_expand_scratch0_array, NULL)
 
-/* Tensor #198 */
+/* Tensor #194 */
 AI_TENSOR_OBJ_DECLARE(
   block_7_expand_weights, AI_STATIC,
-  198, 0x0,
+  194, 0x0,
   AI_SHAPE_INIT(4, 64, 1, 1, 384), AI_STRIDE_INIT(4, 4, 256, 98304, 98304),
   1, &block_7_expand_weights_array, NULL)
 
-/* Tensor #199 */
+/* Tensor #195 */
 AI_TENSOR_OBJ_DECLARE(
   block_7_project_bias, AI_STATIC,
-  199, 0x0,
+  195, 0x0,
   AI_SHAPE_INIT(4, 1, 64, 1, 1), AI_STRIDE_INIT(4, 4, 4, 256, 256),
   1, &block_7_project_bias_array, NULL)
 
-/* Tensor #200 */
+/* Tensor #196 */
 AI_TENSOR_OBJ_DECLARE(
   block_7_project_output, AI_STATIC,
-  200, 0x0,
+  196, 0x0,
   AI_SHAPE_INIT(4, 1, 64, 14, 14), AI_STRIDE_INIT(4, 4, 4, 256, 3584),
   1, &block_7_project_output_array, NULL)
 
-/* Tensor #201 */
+/* Tensor #197 */
 AI_TENSOR_OBJ_DECLARE(
   block_7_project_scratch0, AI_STATIC,
-  201, 0x0,
+  197, 0x0,
   AI_SHAPE_INIT(4, 1, 384, 1, 1), AI_STRIDE_INIT(4, 4, 4, 1536, 1536),
   1, &block_7_project_scratch0_array, NULL)
 
-/* Tensor #202 */
+/* Tensor #198 */
 AI_TENSOR_OBJ_DECLARE(
   block_7_project_weights, AI_STATIC,
-  202, 0x0,
+  198, 0x0,
   AI_SHAPE_INIT(4, 384, 1, 1, 64), AI_STRIDE_INIT(4, 4, 1536, 98304, 98304),
   1, &block_7_project_weights_array, NULL)
 
-/* Tensor #203 */
+/* Tensor #199 */
 AI_TENSOR_OBJ_DECLARE(
   block_8_add_output, AI_STATIC,
-  203, 0x0,
+  199, 0x0,
   AI_SHAPE_INIT(4, 1, 64, 14, 14), AI_STRIDE_INIT(4, 4, 4, 256, 3584),
   1, &block_8_add_output_array, NULL)
 
-/* Tensor #204 */
+/* Tensor #200 */
 AI_TENSOR_OBJ_DECLARE(
   block_8_depthwise_bias, AI_STATIC,
-  204, 0x0,
+  200, 0x0,
   AI_SHAPE_INIT(4, 1, 384, 1, 1), AI_STRIDE_INIT(4, 4, 4, 1536, 1536),
   1, &block_8_depthwise_bias_array, NULL)
 
-/* Tensor #205 */
+/* Tensor #201 */
 AI_TENSOR_OBJ_DECLARE(
   block_8_depthwise_output, AI_STATIC,
-  205, 0x0,
+  201, 0x0,
   AI_SHAPE_INIT(4, 1, 384, 14, 14), AI_STRIDE_INIT(4, 4, 4, 1536, 21504),
   1, &block_8_depthwise_output_array, NULL)
 
-/* Tensor #206 */
+/* Tensor #202 */
 AI_TENSOR_OBJ_DECLARE(
   block_8_depthwise_relu_output, AI_STATIC,
-  206, 0x0,
+  202, 0x0,
   AI_SHAPE_INIT(4, 1, 384, 14, 14), AI_STRIDE_INIT(4, 4, 4, 1536, 21504),
   1, &block_8_depthwise_relu_output_array, NULL)
 
-/* Tensor #207 */
+/* Tensor #203 */
 AI_TENSOR_OBJ_DECLARE(
   block_8_depthwise_weights, AI_STATIC,
-  207, 0x0,
+  203, 0x0,
   AI_SHAPE_INIT(4, 1, 3, 3, 384), AI_STRIDE_INIT(4, 1, 384, 384, 384),
   1, &block_8_depthwise_weights_array, NULL)
 
-/* Tensor #208 */
+/* Tensor #204 */
 AI_TENSOR_OBJ_DECLARE(
   block_8_expand_bias, AI_STATIC,
-  208, 0x0,
+  204, 0x0,
   AI_SHAPE_INIT(4, 1, 384, 1, 1), AI_STRIDE_INIT(4, 4, 4, 1536, 1536),
   1, &block_8_expand_bias_array, NULL)
 
-/* Tensor #209 */
+/* Tensor #205 */
 AI_TENSOR_OBJ_DECLARE(
   block_8_expand_output, AI_STATIC,
-  209, 0x0,
+  205, 0x0,
   AI_SHAPE_INIT(4, 1, 384, 14, 14), AI_STRIDE_INIT(4, 4, 4, 1536, 21504),
   1, &block_8_expand_output_array, NULL)
 
-/* Tensor #210 */
+/* Tensor #206 */
 AI_TENSOR_OBJ_DECLARE(
   block_8_expand_relu_output, AI_STATIC,
-  210, 0x0,
+  206, 0x0,
   AI_SHAPE_INIT(4, 1, 384, 14, 14), AI_STRIDE_INIT(4, 4, 4, 1536, 21504),
   1, &block_8_expand_relu_output_array, NULL)
 
-/* Tensor #211 */
+/* Tensor #207 */
 AI_TENSOR_OBJ_DECLARE(
   block_8_expand_scratch0, AI_STATIC,
-  211, 0x0,
+  207, 0x0,
   AI_SHAPE_INIT(4, 1, 64, 1, 1), AI_STRIDE_INIT(4, 4, 4, 256, 256),
   1, &block_8_expand_scratch0_array, NULL)
 
-/* Tensor #212 */
+/* Tensor #208 */
 AI_TENSOR_OBJ_DECLARE(
   block_8_expand_weights, AI_STATIC,
-  212, 0x0,
+  208, 0x0,
   AI_SHAPE_INIT(4, 64, 1, 1, 384), AI_STRIDE_INIT(4, 4, 256, 98304, 98304),
   1, &block_8_expand_weights_array, NULL)
 
-/* Tensor #213 */
+/* Tensor #209 */
 AI_TENSOR_OBJ_DECLARE(
   block_8_project_bias, AI_STATIC,
-  213, 0x0,
+  209, 0x0,
   AI_SHAPE_INIT(4, 1, 64, 1, 1), AI_STRIDE_INIT(4, 4, 4, 256, 256),
   1, &block_8_project_bias_array, NULL)
 
-/* Tensor #214 */
+/* Tensor #210 */
 AI_TENSOR_OBJ_DECLARE(
   block_8_project_output, AI_STATIC,
-  214, 0x0,
+  210, 0x0,
   AI_SHAPE_INIT(4, 1, 64, 14, 14), AI_STRIDE_INIT(4, 4, 4, 256, 3584),
   1, &block_8_project_output_array, NULL)
 
-/* Tensor #215 */
+/* Tensor #211 */
 AI_TENSOR_OBJ_DECLARE(
   block_8_project_scratch0, AI_STATIC,
-  215, 0x0,
+  211, 0x0,
   AI_SHAPE_INIT(4, 1, 384, 1, 1), AI_STRIDE_INIT(4, 4, 4, 1536, 1536),
   1, &block_8_project_scratch0_array, NULL)
 
-/* Tensor #216 */
+/* Tensor #212 */
 AI_TENSOR_OBJ_DECLARE(
   block_8_project_weights, AI_STATIC,
-  216, 0x0,
+  212, 0x0,
   AI_SHAPE_INIT(4, 384, 1, 1, 64), AI_STRIDE_INIT(4, 4, 1536, 98304, 98304),
   1, &block_8_project_weights_array, NULL)
 
-/* Tensor #217 */
+/* Tensor #213 */
 AI_TENSOR_OBJ_DECLARE(
   block_9_add_output, AI_STATIC,
-  217, 0x0,
+  213, 0x0,
   AI_SHAPE_INIT(4, 1, 64, 14, 14), AI_STRIDE_INIT(4, 4, 4, 256, 3584),
   1, &block_9_add_output_array, NULL)
 
-/* Tensor #218 */
+/* Tensor #214 */
 AI_TENSOR_OBJ_DECLARE(
   block_9_depthwise_bias, AI_STATIC,
-  218, 0x0,
+  214, 0x0,
   AI_SHAPE_INIT(4, 1, 384, 1, 1), AI_STRIDE_INIT(4, 4, 4, 1536, 1536),
   1, &block_9_depthwise_bias_array, NULL)
 
-/* Tensor #219 */
+/* Tensor #215 */
 AI_TENSOR_OBJ_DECLARE(
   block_9_depthwise_output, AI_STATIC,
-  219, 0x0,
+  215, 0x0,
   AI_SHAPE_INIT(4, 1, 384, 14, 14), AI_STRIDE_INIT(4, 4, 4, 1536, 21504),
   1, &block_9_depthwise_output_array, NULL)
 
-/* Tensor #220 */
+/* Tensor #216 */
 AI_TENSOR_OBJ_DECLARE(
   block_9_depthwise_relu_output, AI_STATIC,
-  220, 0x0,
+  216, 0x0,
   AI_SHAPE_INIT(4, 1, 384, 14, 14), AI_STRIDE_INIT(4, 4, 4, 1536, 21504),
   1, &block_9_depthwise_relu_output_array, NULL)
 
-/* Tensor #221 */
+/* Tensor #217 */
 AI_TENSOR_OBJ_DECLARE(
   block_9_depthwise_weights, AI_STATIC,
-  221, 0x0,
+  217, 0x0,
   AI_SHAPE_INIT(4, 1, 3, 3, 384), AI_STRIDE_INIT(4, 1, 384, 384, 384),
   1, &block_9_depthwise_weights_array, NULL)
 
-/* Tensor #222 */
+/* Tensor #218 */
 AI_TENSOR_OBJ_DECLARE(
   block_9_expand_bias, AI_STATIC,
-  222, 0x0,
+  218, 0x0,
   AI_SHAPE_INIT(4, 1, 384, 1, 1), AI_STRIDE_INIT(4, 4, 4, 1536, 1536),
   1, &block_9_expand_bias_array, NULL)
 
-/* Tensor #223 */
+/* Tensor #219 */
 AI_TENSOR_OBJ_DECLARE(
   block_9_expand_output, AI_STATIC,
-  223, 0x0,
+  219, 0x0,
   AI_SHAPE_INIT(4, 1, 384, 14, 14), AI_STRIDE_INIT(4, 4, 4, 1536, 21504),
   1, &block_9_expand_output_array, NULL)
 
-/* Tensor #224 */
+/* Tensor #220 */
 AI_TENSOR_OBJ_DECLARE(
   block_9_expand_relu_output, AI_STATIC,
-  224, 0x0,
+  220, 0x0,
   AI_SHAPE_INIT(4, 1, 384, 14, 14), AI_STRIDE_INIT(4, 4, 4, 1536, 21504),
   1, &block_9_expand_relu_output_array, NULL)
 
-/* Tensor #225 */
+/* Tensor #221 */
 AI_TENSOR_OBJ_DECLARE(
   block_9_expand_scratch0, AI_STATIC,
-  225, 0x0,
+  221, 0x0,
   AI_SHAPE_INIT(4, 1, 64, 1, 1), AI_STRIDE_INIT(4, 4, 4, 256, 256),
   1, &block_9_expand_scratch0_array, NULL)
 
-/* Tensor #226 */
+/* Tensor #222 */
 AI_TENSOR_OBJ_DECLARE(
   block_9_expand_weights, AI_STATIC,
-  226, 0x0,
+  222, 0x0,
   AI_SHAPE_INIT(4, 64, 1, 1, 384), AI_STRIDE_INIT(4, 4, 256, 98304, 98304),
   1, &block_9_expand_weights_array, NULL)
 
-/* Tensor #227 */
+/* Tensor #223 */
 AI_TENSOR_OBJ_DECLARE(
   block_9_project_bias, AI_STATIC,
-  227, 0x0,
+  223, 0x0,
   AI_SHAPE_INIT(4, 1, 64, 1, 1), AI_STRIDE_INIT(4, 4, 4, 256, 256),
   1, &block_9_project_bias_array, NULL)
 
-/* Tensor #228 */
+/* Tensor #224 */
 AI_TENSOR_OBJ_DECLARE(
   block_9_project_output, AI_STATIC,
-  228, 0x0,
+  224, 0x0,
   AI_SHAPE_INIT(4, 1, 64, 14, 14), AI_STRIDE_INIT(4, 4, 4, 256, 3584),
   1, &block_9_project_output_array, NULL)
 
-/* Tensor #229 */
+/* Tensor #225 */
 AI_TENSOR_OBJ_DECLARE(
   block_9_project_scratch0, AI_STATIC,
-  229, 0x0,
+  225, 0x0,
   AI_SHAPE_INIT(4, 1, 384, 1, 1), AI_STRIDE_INIT(4, 4, 4, 1536, 1536),
   1, &block_9_project_scratch0_array, NULL)
 
-/* Tensor #230 */
+/* Tensor #226 */
 AI_TENSOR_OBJ_DECLARE(
   block_9_project_weights, AI_STATIC,
-  230, 0x0,
+  226, 0x0,
   AI_SHAPE_INIT(4, 384, 1, 1, 64), AI_STRIDE_INIT(4, 4, 1536, 98304, 98304),
   1, &block_9_project_weights_array, NULL)
 
-/* Tensor #231 */
+/* Tensor #227 */
 AI_TENSOR_OBJ_DECLARE(
   expanded_conv_depthwise_bias, AI_STATIC,
-  231, 0x0,
+  227, 0x0,
   AI_SHAPE_INIT(4, 1, 32, 1, 1), AI_STRIDE_INIT(4, 4, 4, 128, 128),
   1, &expanded_conv_depthwise_bias_array, NULL)
 
-/* Tensor #232 */
+/* Tensor #228 */
 AI_TENSOR_OBJ_DECLARE(
   expanded_conv_depthwise_output, AI_STATIC,
-  232, 0x0,
+  228, 0x0,
   AI_SHAPE_INIT(4, 1, 32, 112, 112), AI_STRIDE_INIT(4, 4, 4, 128, 14336),
   1, &expanded_conv_depthwise_output_array, NULL)
 
-/* Tensor #233 */
+/* Tensor #229 */
 AI_TENSOR_OBJ_DECLARE(
   expanded_conv_depthwise_relu_output, AI_STATIC,
-  233, 0x0,
+  229, 0x0,
   AI_SHAPE_INIT(4, 1, 32, 112, 112), AI_STRIDE_INIT(4, 4, 4, 128, 14336),
   1, &expanded_conv_depthwise_relu_output_array, NULL)
 
-/* Tensor #234 */
+/* Tensor #230 */
 AI_TENSOR_OBJ_DECLARE(
   expanded_conv_depthwise_weights, AI_STATIC,
-  234, 0x0,
+  230, 0x0,
   AI_SHAPE_INIT(4, 1, 3, 3, 32), AI_STRIDE_INIT(4, 1, 32, 32, 32),
   1, &expanded_conv_depthwise_weights_array, NULL)
 
-/* Tensor #235 */
+/* Tensor #231 */
 AI_TENSOR_OBJ_DECLARE(
   expanded_conv_project_bias, AI_STATIC,
-  235, 0x0,
+  231, 0x0,
   AI_SHAPE_INIT(4, 1, 16, 1, 1), AI_STRIDE_INIT(4, 4, 4, 64, 64),
   1, &expanded_conv_project_bias_array, NULL)
 
-/* Tensor #236 */
+/* Tensor #232 */
 AI_TENSOR_OBJ_DECLARE(
   expanded_conv_project_output, AI_STATIC,
-  236, 0x0,
+  232, 0x0,
   AI_SHAPE_INIT(4, 1, 16, 112, 112), AI_STRIDE_INIT(4, 4, 4, 64, 7168),
   1, &expanded_conv_project_output_array, NULL)
 
-/* Tensor #237 */
+/* Tensor #233 */
 AI_TENSOR_OBJ_DECLARE(
   expanded_conv_project_scratch0, AI_STATIC,
-  237, 0x0,
+  233, 0x0,
   AI_SHAPE_INIT(4, 1, 32, 1, 1), AI_STRIDE_INIT(4, 4, 4, 128, 128),
   1, &expanded_conv_project_scratch0_array, NULL)
 
-/* Tensor #238 */
+/* Tensor #234 */
 AI_TENSOR_OBJ_DECLARE(
   expanded_conv_project_weights, AI_STATIC,
-  238, 0x0,
+  234, 0x0,
   AI_SHAPE_INIT(4, 32, 1, 1, 16), AI_STRIDE_INIT(4, 4, 128, 2048, 2048),
   1, &expanded_conv_project_weights_array, NULL)
 
-/* Tensor #239 */
+/* Tensor #235 */
 AI_TENSOR_OBJ_DECLARE(
   global_average_pooling2d_pool_output, AI_STATIC,
-  239, 0x0,
+  235, 0x0,
   AI_SHAPE_INIT(4, 1, 1280, 1, 1), AI_STRIDE_INIT(4, 4, 4, 5120, 5120),
   1, &global_average_pooling2d_pool_output_array, NULL)
 
-/* Tensor #240 */
+/* Tensor #236 */
 AI_TENSOR_OBJ_DECLARE(
   input_1_output, AI_STATIC,
-  240, 0x0,
+  236, 0x0,
   AI_SHAPE_INIT(4, 1, 3, 224, 224), AI_STRIDE_INIT(4, 4, 4, 12, 2688),
   1, &input_1_output_array, NULL)
 
-/* Tensor #241 */
+/* Tensor #237 */
 AI_TENSOR_OBJ_DECLARE(
   out_relu_output, AI_STATIC,
-  241, 0x0,
+  237, 0x0,
   AI_SHAPE_INIT(4, 1, 1280, 7, 7), AI_STRIDE_INIT(4, 4, 4, 5120, 35840),
   1, &out_relu_output_array, NULL)
+
+/* Tensor #238 */
+AI_TENSOR_OBJ_DECLARE(
+  predictions_dense_bias, AI_STATIC,
+  238, 0x0,
+  AI_SHAPE_INIT(4, 1, 1000, 1, 1), AI_STRIDE_INIT(4, 4, 4, 4000, 4000),
+  1, &predictions_dense_bias_array, NULL)
+
+/* Tensor #239 */
+AI_TENSOR_OBJ_DECLARE(
+  predictions_dense_output, AI_STATIC,
+  239, 0x0,
+  AI_SHAPE_INIT(4, 1, 1000, 1, 1), AI_STRIDE_INIT(4, 4, 4, 4000, 4000),
+  1, &predictions_dense_output_array, NULL)
+
+/* Tensor #240 */
+AI_TENSOR_OBJ_DECLARE(
+  predictions_dense_weights, AI_STATIC,
+  240, 0x0,
+  AI_SHAPE_INIT(4, 1280, 1000, 1, 1), AI_STRIDE_INIT(4, 4, 5120, 5120000, 5120000),
+  1, &predictions_dense_weights_array, NULL)
+
+/* Tensor #241 */
+AI_TENSOR_OBJ_DECLARE(
+  predictions_output, AI_STATIC,
+  241, 0x0,
+  AI_SHAPE_INIT(4, 1, 1000, 1, 1), AI_STRIDE_INIT(4, 4, 4, 4000, 4000),
+  1, &predictions_output_array, NULL)
 
 
 
@@ -2967,37 +2967,37 @@ AI_TENSOR_OBJ_DECLARE(
 
 
 AI_TENSOR_CHAIN_OBJ_DECLARE(
-  adaptive_output_chain, AI_STATIC_CONST, 4,
-  AI_TENSOR_LIST_OBJ_INIT(AI_FLAG_NONE, 1, &adaptive_output_dense_output),
-  AI_TENSOR_LIST_OBJ_INIT(AI_FLAG_NONE, 1, &adaptive_output_output),
+  predictions_chain, AI_STATIC_CONST, 4,
+  AI_TENSOR_LIST_OBJ_INIT(AI_FLAG_NONE, 1, &predictions_dense_output),
+  AI_TENSOR_LIST_OBJ_INIT(AI_FLAG_NONE, 1, &predictions_output),
   AI_TENSOR_LIST_OBJ_EMPTY,
   AI_TENSOR_LIST_OBJ_EMPTY
 )
 
 AI_LAYER_OBJ_DECLARE(
-  adaptive_output_layer, 156,
+  predictions_layer, 155,
   SM_TYPE, 0x0, NULL,
   sm, forward_sm,
-  &adaptive_output_chain,
-  NULL, &adaptive_output_layer, AI_STATIC, 
+  &predictions_chain,
+  NULL, &predictions_layer, AI_STATIC, 
   .nl_params = NULL, 
   .axis = AI_SHAPE_CHANNEL, 
 )
 
 AI_TENSOR_CHAIN_OBJ_DECLARE(
-  adaptive_output_dense_chain, AI_STATIC_CONST, 4,
+  predictions_dense_chain, AI_STATIC_CONST, 4,
   AI_TENSOR_LIST_OBJ_INIT(AI_FLAG_NONE, 1, &global_average_pooling2d_pool_output),
-  AI_TENSOR_LIST_OBJ_INIT(AI_FLAG_NONE, 1, &adaptive_output_dense_output),
-  AI_TENSOR_LIST_OBJ_INIT(AI_FLAG_NONE, 2, &adaptive_output_dense_weights, &adaptive_output_dense_bias),
+  AI_TENSOR_LIST_OBJ_INIT(AI_FLAG_NONE, 1, &predictions_dense_output),
+  AI_TENSOR_LIST_OBJ_INIT(AI_FLAG_NONE, 2, &predictions_dense_weights, &predictions_dense_bias),
   AI_TENSOR_LIST_OBJ_EMPTY
 )
 
 AI_LAYER_OBJ_DECLARE(
-  adaptive_output_dense_layer, 156,
+  predictions_dense_layer, 155,
   DENSE_TYPE, 0x0, NULL,
   dense, forward_dense,
-  &adaptive_output_dense_chain,
-  NULL, &adaptive_output_layer, AI_STATIC, 
+  &predictions_dense_chain,
+  NULL, &predictions_layer, AI_STATIC, 
 )
 
 AI_TENSOR_CHAIN_OBJ_DECLARE(
@@ -3013,7 +3013,7 @@ AI_LAYER_OBJ_DECLARE(
   POOL_TYPE, 0x0, NULL,
   pool, forward_ap,
   &global_average_pooling2d_pool_chain,
-  NULL, &adaptive_output_dense_layer, AI_STATIC, 
+  NULL, &predictions_dense_layer, AI_STATIC, 
   .pool_size = AI_SHAPE_2D_INIT(7, 7), 
   .pool_stride = AI_SHAPE_2D_INIT(7, 7), 
   .pool_pad = AI_SHAPE_INIT(4, 0, 0, 0, 0), 
@@ -5119,14 +5119,14 @@ AI_LAYER_OBJ_DECLARE(
 AI_NETWORK_OBJ_DECLARE(
   AI_NET_OBJ_INSTANCE, AI_STATIC,
   AI_BUFFER_INIT(AI_FLAG_NONE,  AI_BUFFER_FORMAT_U8,
-    AI_BUFFER_SHAPE_INIT(AI_SHAPE_BCWH, 4, 1, 8878504, 1, 1),
-    8878504, NULL, NULL),
+    AI_BUFFER_SHAPE_INIT(AI_SHAPE_BCWH, 4, 1, 13951264, 1, 1),
+    13951264, NULL, NULL),
   AI_BUFFER_INIT(AI_FLAG_NONE,  AI_BUFFER_FORMAT_U8,
     AI_BUFFER_SHAPE_INIT(AI_SHAPE_BCWH, 4, 1, 4917696, 1, 1),
     4917696, NULL, NULL),
   AI_TENSOR_LIST_IO_OBJ_INIT(AI_FLAG_NONE, AI_NETWORK_IN_NUM, &input_1_output),
-  AI_TENSOR_LIST_IO_OBJ_INIT(AI_FLAG_NONE, AI_NETWORK_OUT_NUM, &adaptive_output_output),
-  &Conv1_layer, 0xc0e2a868, NULL)
+  AI_TENSOR_LIST_IO_OBJ_INIT(AI_FLAG_NONE, AI_NETWORK_OUT_NUM, &predictions_output),
+  &Conv1_layer, 0x689dc2ce, NULL)
 
 #else
 
@@ -5135,8 +5135,8 @@ AI_NETWORK_OBJ_DECLARE(
   AI_BUFFER_ARRAY_OBJ_INIT_STATIC(
   	AI_FLAG_NONE, 1,
     AI_BUFFER_INIT(AI_FLAG_NONE,  AI_BUFFER_FORMAT_U8,
-      AI_BUFFER_SHAPE_INIT(AI_SHAPE_BCWH, 4, 1, 8878504, 1, 1),
-      8878504, NULL, NULL)
+      AI_BUFFER_SHAPE_INIT(AI_SHAPE_BCWH, 4, 1, 13951264, 1, 1),
+      13951264, NULL, NULL)
   ),
   AI_BUFFER_ARRAY_OBJ_INIT_STATIC(
   	AI_FLAG_NONE, 1,
@@ -5145,8 +5145,8 @@ AI_NETWORK_OBJ_DECLARE(
       4917696, NULL, NULL)
   ),
   AI_TENSOR_LIST_IO_OBJ_INIT(AI_FLAG_NONE, AI_NETWORK_IN_NUM, &input_1_output),
-  AI_TENSOR_LIST_IO_OBJ_INIT(AI_FLAG_NONE, AI_NETWORK_OUT_NUM, &adaptive_output_output),
-  &Conv1_layer, 0xc0e2a868, NULL)
+  AI_TENSOR_LIST_IO_OBJ_INIT(AI_FLAG_NONE, AI_NETWORK_OUT_NUM, &predictions_output),
+  &Conv1_layer, 0x689dc2ce, NULL)
 
 #endif	/*(AI_TOOLS_API_VERSION < AI_TOOLS_API_VERSION_1_5)*/
 
@@ -5430,10 +5430,10 @@ ai_bool network_configure_activations(
     out_relu_output_array.data_start = AI_PTR(g_network_activations_map[0] + 317440);
     global_average_pooling2d_pool_output_array.data = AI_PTR(g_network_activations_map[0] + 0);
     global_average_pooling2d_pool_output_array.data_start = AI_PTR(g_network_activations_map[0] + 0);
-    adaptive_output_dense_output_array.data = AI_PTR(g_network_activations_map[0] + 5120);
-    adaptive_output_dense_output_array.data_start = AI_PTR(g_network_activations_map[0] + 5120);
-    adaptive_output_output_array.data = AI_PTR(g_network_activations_map[0] + 0);
-    adaptive_output_output_array.data_start = AI_PTR(g_network_activations_map[0] + 0);
+    predictions_dense_output_array.data = AI_PTR(g_network_activations_map[0] + 5120);
+    predictions_dense_output_array.data_start = AI_PTR(g_network_activations_map[0] + 5120);
+    predictions_output_array.data = AI_PTR(g_network_activations_map[0] + 0);
+    predictions_output_array.data_start = AI_PTR(g_network_activations_map[0] + 0);
     return true;
   }
   AI_ERROR_TRAP(net_ctx, INIT_FAILED, NETWORK_ACTIVATIONS);
@@ -5765,12 +5765,12 @@ ai_bool network_configure_weights(
     Conv_1_bias_array.format |= AI_FMT_FLAG_CONST;
     Conv_1_bias_array.data = AI_PTR(g_network_weights_map[0] + 8822144);
     Conv_1_bias_array.data_start = AI_PTR(g_network_weights_map[0] + 8822144);
-    adaptive_output_dense_weights_array.format |= AI_FMT_FLAG_CONST;
-    adaptive_output_dense_weights_array.data = AI_PTR(g_network_weights_map[0] + 8827264);
-    adaptive_output_dense_weights_array.data_start = AI_PTR(g_network_weights_map[0] + 8827264);
-    adaptive_output_dense_bias_array.format |= AI_FMT_FLAG_CONST;
-    adaptive_output_dense_bias_array.data = AI_PTR(g_network_weights_map[0] + 8878464);
-    adaptive_output_dense_bias_array.data_start = AI_PTR(g_network_weights_map[0] + 8878464);
+    predictions_dense_weights_array.format |= AI_FMT_FLAG_CONST;
+    predictions_dense_weights_array.data = AI_PTR(g_network_weights_map[0] + 8827264);
+    predictions_dense_weights_array.data_start = AI_PTR(g_network_weights_map[0] + 8827264);
+    predictions_dense_bias_array.format |= AI_FMT_FLAG_CONST;
+    predictions_dense_bias_array.data = AI_PTR(g_network_weights_map[0] + 13947264);
+    predictions_dense_bias_array.data_start = AI_PTR(g_network_weights_map[0] + 13947264);
     return true;
   }
   AI_ERROR_TRAP(net_ctx, INIT_FAILED, NETWORK_WEIGHTS);
@@ -5809,7 +5809,7 @@ ai_bool ai_network_get_info(
       .api_version            = ai_platform_api_get_version(),
       .interface_api_version  = ai_platform_interface_api_get_version(),
       
-      .n_macc            = 312014976,
+      .n_macc            = 313298016,
       .n_inputs          = 0,
       .inputs            = NULL,
       .n_outputs         = 0,
@@ -5817,7 +5817,7 @@ ai_bool ai_network_get_info(
       .params            = AI_STRUCT_INIT,
       .activations       = AI_STRUCT_INIT,
       .n_nodes           = 0,
-      .signature         = 0xc0e2a868,
+      .signature         = 0x689dc2ce,
     };
 
     if (!ai_platform_api_get_network_report(network, &r)) return false;
@@ -5856,7 +5856,7 @@ ai_bool ai_network_get_report(
       .api_version            = ai_platform_api_get_version(),
       .interface_api_version  = ai_platform_interface_api_get_version(),
       
-      .n_macc            = 312014976,
+      .n_macc            = 313298016,
       .n_inputs          = 0,
       .inputs            = NULL,
       .n_outputs         = 0,
@@ -5865,7 +5865,7 @@ ai_bool ai_network_get_report(
       .map_weights       = AI_STRUCT_INIT,
       .map_activations   = AI_STRUCT_INIT,
       .n_nodes           = 0,
-      .signature         = 0xc0e2a868,
+      .signature         = 0x689dc2ce,
     };
 
     if (!ai_platform_api_get_network_report(network, &r)) return false;

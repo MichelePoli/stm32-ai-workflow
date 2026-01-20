@@ -1,0 +1,25 @@
+2026-01-20 20:36:45.184311: I tensorflow/core/util/port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+2026-01-20 20:36:45.215200: I tensorflow/core/platform/cpu_feature_guard.cc:210] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
+To enable the following instructions: AVX2 AVX512F AVX512_VNNI FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+2026-01-20 20:36:45.913130: I tensorflow/core/util/port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+test_critical_scenario (__main__.TestResourceConstraints.test_critical_scenario) ... ❌ Resources CRITICAL (Overflow 16.0x) -> Model too big
+🚫 Model rejected due to hardware constraints.
+⛔ MODELLO TROPPO GRANDE PER stm32f401!
+            
+Dettagli Risorse:
+- RAM Richiesta: 30.0KB (Max: 64.0KB)
+- Flash Richiesta: 4.0MB (Max: 256.0KB)
+
+L'automazione torna alla selezione modello forzando una scelta più appropriata.
+ok
+test_limits_f4 (__main__.TestResourceConstraints.test_limits_f4) ... ok
+test_ok_scenario (__main__.TestResourceConstraints.test_ok_scenario) ... ok
+test_warning_scenario (__main__.TestResourceConstraints.test_warning_scenario) ... ⚠️  Resources Warning (Overflow 2.0x) -> Attempting Compression
+ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.001s
+
+OK
+DEBUG: Test script started
+DEBUG: Imports successful

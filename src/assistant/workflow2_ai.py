@@ -1946,3 +1946,179 @@ def finalize_analysis(state: MasterState, config: dict) -> MasterState:
         print(f"✗ Errore AI: {state.ai_error_message}")
     return state
 
+
+# ============================================================================
+# NEW RESOURCE CONSTRAINT CHECK LOGIC
+# ============================================================================
+
+
+def get_mcu_limits(target_mcu: str) -> tuple[int, int]:
+    """
+    Ritorna (flash_limit_bytes, ram_limit_bytes) per la MCU target.
+    Valori approssimativi ma sicuri (conservativi).
+    """
+    target = target_mcu.lower()
+    
+    if "stm32f4" in target or "f401" in target:
+        # STM32F401: 256KB Flash, 64KB RAM
+        return (256 * 1024, 64 * 1024)
+    elif "stm32h7" in target or "h743" in target:
+        # STM32H743: 2MB Flash, ~1MB RAM (per attivazioni contigue safe)
+        return (2 * 1024 * 1024, 1024 * 1024)
+    elif "stm32u5" in target:
+        # STM32U5: 2MB Flash, 786KB RAM
+        return (2 * 1024 * 1024, 768 * 1024)
+    elif "stm32l4" in target:
+         # STM32L4: 1MB Flash, 128KB RAM
+        return (1024 * 1024, 128 * 1024)
+    else:
+        # Default safe fallback (assumiamo F4)
+        logger.warning(f"⚠️ Target MCU non riconosciuto: {target_mcu}. Uso limiti default (F4).")
+        return (256 * 1024, 64 * 1024)
+
+
+def check_resource_constraints(state: MasterState, config: dict) -> MasterState:
+    """
+    Analizza il report STEdgeAI per verificare se il modello ci sta.
+    """
+    logger.info("⚖️  Checking Resource Constraints...")
+    
+    if not state.analyze_success:
+        logger.warning("⚠️  Analisi fallita, impossibile verificare constraints.")
+        state.resource_check_result = "error"
+        return state
+
+    report_path = os.path.join(state.analyze_report_dir, "network_analyze_report.txt")
+    if not os.path.exists(report_path):
+        # Fallback: cerca qualsiasi file .txt nella dir
+        try:
+            files = [f for f in os.listdir(state.analyze_report_dir) if f.endswith(".txt")]
+            if files:
+                report_path = os.path.join(state.analyze_report_dir, files[0])
+            else:
+                logger.error("❌ Report file non trovato.")
+                state.resource_check_result = "error"
+                return state
+        except Exception:
+             logger.error("❌ Report dir non trovata.")
+             state.resource_check_result = "error"
+             return state
+
+    # Parse Report
+    ram_usage = 0
+    flash_usage = 0
+    
+    try:
+        with open(report_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+            
+            # Cerca pattern tipo: "activations  : 4917696 bytes" o "weights      : 8833768 bytes"
+            # O pattern più complessi a seconda versioni. Cerchiamo "activations" e "weights" / "total"
+            
+            # Esempio report:
+            #  activations size   : 4917696 bytes (4802.44 KiB)
+            #  weights size       : 8833768 bytes (8626.73 KiB)
+            #  macc               : ...
+            
+            ram_match = re.search(r'(?i)activations\s*(?:size)?\s*:\s*(\d+)', content)
+            if ram_match:
+                ram_usage = int(ram_match.group(1))
+            
+            flash_match = re.search(r'(?i)weights\s*(?:size)?\s*:\s*(\d+)', content)
+            if flash_match:
+                flash_usage = int(flash_match.group(1))
+
+            # Se 0, prova pattern alternativi (totale ram/flash report table)
+            if ram_usage == 0:
+                 ram_match = re.search(r'(?i)ram\s*:\s*(\d+)', content)
+                 if ram_match: ram_usage = int(ram_match.group(1))
+
+            if flash_usage == 0:
+                 flash_match = re.search(r'(?i)flash\s*:\s*(\d+)', content)
+                 if flash_match: flash_usage = int(flash_match.group(1))
+
+    except Exception as e:
+        logger.error(f"❌ Errore parsing report: {e}")
+        state.resource_check_result = "error"
+        return state
+
+    state.ram_usage = ram_usage
+    state.flash_usage = flash_usage
+
+    # Check Limits
+    flash_limit, ram_limit = get_mcu_limits(state.target)
+    
+    logger.info(f"📊 Usage: RAM={format_bytes(ram_usage)} / {format_bytes(ram_limit)}")
+    logger.info(f"📊 Usage: Flash={format_bytes(flash_usage)} / {format_bytes(flash_limit)}")
+    
+    ram_ratio = ram_usage / ram_limit
+    flash_ratio = flash_usage / flash_limit
+    max_ratio = max(ram_ratio, flash_ratio)
+    
+    if max_ratio <= 1.0:
+        logger.info("✅ Resources OK (Fits in MCU)")
+        state.resource_check_result = "ok"
+    elif max_ratio <= 4.0:
+        # Max 4x overflow -> Prova compressione
+        logger.warning(f"⚠️  Resources Warning (Overflow {max_ratio:.1f}x) -> Attempting Compression")
+        
+        # Check logic move from router:
+        # Se già in high compression, non possiamo fare altro -> critical failure
+        if state.compression == "high" or state.compression == "very_high":
+             logger.error("❌ Overflow persisted even with HIGH compression.")
+             state.resource_check_result = "critical"
+        else:
+             state.resource_check_result = "warning"
+             logger.info("🔄 Activating HIGH compression logic...")
+             state.compression = "high"
+
+    else:
+        # > 4x overflow -> Impossibile anche con compressione
+        logger.error(f"❌ Resources CRITICAL (Overflow {max_ratio:.1f}x) -> Model too big")
+        state.resource_check_result = "critical"
+        
+    if state.resource_check_result == "critical":
+        state.ai_error_message = (
+            f"Model requires {format_bytes(ram_usage)} RAM / {format_bytes(flash_usage)} Flash. "
+            f"Target {state.target} has only {format_bytes(ram_limit)} RAM / {format_bytes(flash_limit)} Flash."
+        )
+        # Reset per nuova selezione (Loopback logic moved here)
+        state.model_discovery_method = "search" 
+        state.search_iterations = 0 
+
+    return state
+
+# Logica Intelligente:
+# -Fits: Procedi.
+# -Warning (<4x overflow): Attiva compression='high' e riprova.
+# -Critical (>4x overflow): Blocca tutto e chiede di scegliere un modello più piccolo (es. ResNet -> MobileNet)
+
+
+def resource_check_routing(state: MasterState) -> Literal["run_validate", "run_generate", "choose_predefined_taskbased_model"]:
+    """
+    Decide la route basata sui constraints.
+    """
+    res = getattr(state, "resource_check_result", "ok")
+    
+    if res == "ok":
+        return "run_validate"
+    
+    elif res == "warning":
+        return "run_generate"
+        
+    else: # critical or error
+        # Notifica utente e torna alla scelta
+        logger.error("🚫 Model rejected due to hardware constraints.")
+        
+        # LOG ONLY - NO INTERRUPT
+        logger.error(f"""⛔ MODELLO TROPPO GRANDE PER {state.target}!
+            
+Dettagli Risorse:
+- RAM Richiesta: {format_bytes(state.ram_usage)} (Max: {format_bytes(get_mcu_limits(state.target)[1])})
+- Flash Richiesta: {format_bytes(state.flash_usage)} (Max: {format_bytes(get_mcu_limits(state.target)[0])})
+
+L'automazione torna alla selezione modello forzando una scelta più appropriata.""")
+        
+        # return "choose_predefined_taskbased_model"
+        return "run_generate"
+
