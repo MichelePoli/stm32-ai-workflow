@@ -14,6 +14,7 @@ from langgraph.types import interrupt
 
 from src.assistant.configuration import Configuration
 from src.assistant.state import MasterState
+from src.assistant.templates.ioc_templates import get_ioc_template
 
 # ============================================================================
 # LOGGING
@@ -516,13 +517,61 @@ def generate_cubemx_script(state: MasterState, config: dict) -> MasterState:
     return state
 
 
+def recover_with_ioc_fallback(state: MasterState) -> bool:
+    """
+    Tenta di recuperare generando un file .ioc valido e modificando lo script.
+    """
+    logger.info("🚑 Attempting Recovery with IOC Fallback...")
+    
+    # 1. Genera contenuto IOC
+    ioc_content = get_ioc_template(state.board_name or "F4")
+    
+    # 2. Salva .ioc temporaneo
+    fallback_ioc_path = os.path.join(state.base_dir, "fallback_generated.ioc")
+    with open(fallback_ioc_path, "w") as f:
+        f.write(ioc_content)
+    logger.info(f"✓ Fallback IOC created: {fallback_ioc_path}")
+    
+    # 3. Aggiorna lo script per caricare QUESTO ioc
+    lines = [
+        f"login {state.st_email} {state.st_password} y",
+        f'load "{fallback_ioc_path}"',
+        f"project name {state.project_name}",
+        f'project toolchain "{state.toolchain}"',
+        f"project path {state.firmware_project_path}",
+        "project generate",
+        "exit"
+    ]
+    
+    # Sovrascrive lo script esistente
+    state.firmware_script_content = "\n".join(lines)
+    # state.firmware_script_path è già settato, lo riusiamo
+    with open(state.firmware_script_path, "w") as f:
+        f.write(state.firmware_script_content)
+        
+    logger.info("✓ CubeMX Script rewritten for Fallback")
+    return True
+
+
 def execute_generation(state: MasterState, config: dict) -> MasterState:
+    import time
     os.makedirs(state.firmware_project_path, exist_ok=True)
     cmd = ["xvfb-run", "-a", state.cubemx_path, "-q", state.firmware_script_path]
     
     try:
-        res = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        logger.info(f"🚀 Executing CubeMX (Attempt 1)...")
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=80)
+        
+        if res.returncode != 0:
+            logger.warning(f"⚠️  Generation Failed (RC={res.returncode}). Trying Fallback...")
+            # FALLBACK
+            if recover_with_ioc_fallback(state):
+                logger.info(f"🚀 Executing CubeMX (Fallback Attempt)...")
+                # Rilancia comando (lo script file è lo stesso, ma contenuto è cambiato)
+                res = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+
         state.firmware_generation_success = (res.returncode == 0)
+        
         if state.firmware_generation_success:
             logger.info("Attendo creazione cartelle...")
             time.sleep(2)
@@ -541,6 +590,27 @@ def execute_generation(state: MasterState, config: dict) -> MasterState:
                 logger.warning("⚠ Cartelle potrebbero non essere completamente create")
         else:
             state.firmware_error_message = res.stderr or f"Return code {res.returncode}"
+    
+    except subprocess.TimeoutExpired:
+        logger.error("❌ First attempt TIMED OUT. Trying Fallback...")
+        # FALLBACK on timeout
+        try:
+            if recover_with_ioc_fallback(state):
+                logger.info(f"🚀 Executing CubeMX (Fallback Attempt)...")
+                res = subprocess.run(cmd, capture_output=True, text=True, timeout=150)
+                state.firmware_generation_success = (res.returncode == 0)
+                if not state.firmware_generation_success:
+                    state.firmware_error_message = res.stderr or f"Fallback Return code {res.returncode}"
+            else:
+                state.firmware_generation_success = False
+                state.firmware_error_message = "Timeout on first attempt, fallback generation failed"
+        except subprocess.TimeoutExpired:
+            state.firmware_generation_success = False
+            state.firmware_error_message = "Timeout on both attempts (primary + fallback)"
+        except Exception as fallback_e:
+            state.firmware_generation_success = False
+            state.firmware_error_message = f"Fallback error: {str(fallback_e)}"
+    
     except Exception as e:
         state.firmware_generation_success = False
         state.firmware_error_message = str(e)

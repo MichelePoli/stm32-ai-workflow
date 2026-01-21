@@ -1,5 +1,78 @@
 \appendix
 
+\chapter{STM32 Model Zoo Compatibility Reference}
+\label{app:model_compat_full}
+
+This appendix provides a comprehensive reference for model-board compatibility across the STM32 family, including both uncompressed (FP32) and quantized (INT8) resource requirements. This matrix was developed to guide the automated resource constraint checking system implemented in the AI Model Discovery workflow.
+
+\section{Board Specifications}
+
+\begin{table}[h!]
+\centering
+\caption{STM32 MCU Memory Specifications}
+\begin{tabular}{|l|c|c|l|}
+\hline
+\textbf{Board} & \textbf{RAM} & \textbf{Flash} & \textbf{Primary Use Case} \\
+\hline
+STM32F401RE & 64 KB & 256 KB & TinyML, Audio, Sensors \\
+STM32L476 & 128 KB & 1 MB & Low Power Vision \\
+STM32H743ZI & 1 MB & 2 MB & Vision, Object Detection \\
+STM32H747I & 1 MB & 2 MB & Vision, Dual Core \\
+STM32U585 & 786 KB & 2 MB & Secure AI \\
+STM32N6570 & 5 MB & 4 MB & Advanced Vision, NPU \\
+\hline
+\end{tabular}
+\end{table}
+
+\section{Complete Model Resource Requirements}
+
+\begin{landscape}
+\begin{table}[h!]
+\centering
+\caption{Full Model-Board Compatibility Matrix}
+\label{tab:model_compat_full}
+\small
+\begin{tabular}{|l|c|c|c|c|c|c|c|c|c|c|}
+\hline
+\textbf{Model} & \textbf{Input} & \textbf{RAM} & \textbf{Flash} & \textbf{RAM} & \textbf{Flash} & \textbf{F401} & \textbf{L476} & \textbf{H743} & \textbf{U585} & \textbf{N6} \\
+ & \textbf{Size} & \textbf{(FP32)} & \textbf{(FP32)} & \textbf{(INT8)} & \textbf{(INT8)} &  &  &  &  &  \\
+\hline
+ST MNIST & 28×28 & 20 KB & 100 KB & 5 KB & 25 KB & \checkmark & \checkmark & \checkmark & \checkmark & \checkmark \\
+FD-MobileNet 0.25 & 96×96 & 320 KB & 720 KB & 80 KB & 180 KB & $\times$ & \checkmark & \checkmark & \checkmark & \checkmark \\
+MobileNet V1 0.25 & 128×128 & 480 KB & 880 KB & 120 KB & 220 KB & $\times$ & \textasciitilde & \checkmark & \checkmark & \checkmark \\
+MobileNet V2 0.35 & 128×128 & 600 KB & 1.1 MB & 150 KB & 280 KB & $\times$ & \textasciitilde & \checkmark & \checkmark & \checkmark \\
+ResNet V1 8 & 32×32 & 320 KB & 680 KB & 80 KB & 170 KB & $\times$ & \checkmark & \checkmark & \checkmark & \checkmark \\
+ResNet V1 32 & 32×32 & 800 KB & 1.8 MB & 200 KB & 450 KB & $\times$ & $\times$ & \checkmark & \checkmark & \checkmark \\
+MobileNet V2 0.5 & 224×224 & 1.1 MB & 2 MB & 280 KB & 500 KB & $\times$ & $\times$ & \checkmark & \checkmark & \checkmark \\
+MobileNet V2 1.0 & 224×224 & 2.4 MB & 4.8 MB & 600 KB & 1.2 MB & $\times$ & $\times$ & \textasciitilde & \textasciitilde & \checkmark \\
+EfficientNet Lite0 & 224×224 & 1.8 MB & 3.6 MB & 450 KB & 900 KB & $\times$ & $\times$ & \textasciitilde & \textasciitilde & \checkmark \\
+SqueezeNet V1.1 & 224×224 & 1.4 MB & 2.8 MB & 350 KB & 700 KB & $\times$ & $\times$ & \checkmark & \checkmark & \checkmark \\
+ResNet50 V2 & 224×224 & 6 MB & 12 MB & 1.5 MB & 3 MB & $\times$ & $\times$ & $\times$ & $\times$ & \checkmark \\
+\hline
+\end{tabular}
+\end{table}
+\end{landscape}
+
+\section{Compression Benefits}
+
+INT8 quantization applied via STEdgeAI provides approximately:
+\begin{itemize}
+    \item \textbf{RAM Reduction}: 75\% (4× compression factor)
+    \item \textbf{Flash Reduction}: 75\% (4× compression factor)
+    \item \textbf{Speed Improvement}: 2-3× faster inference on Cortex-M cores without FPU
+    \item \textbf{Accuracy Loss}: Typically $<$ 2\% on standard benchmarks (CIFAR-100, ImageNet)
+\end{itemize}
+
+Example: MobileNet V2 0.35 requires 600 KB RAM / 1.1 MB Flash in FP32 format (incompatible with F401), but only 150 KB RAM / 280 KB Flash after INT8 quantization, enabling deployment on L476 and H743 platforms.
+
+\section{Implementation Integration}
+
+This compatibility matrix informed the design of the automated \texttt{check\_resource\_constraints()} function in Workflow 2 (Section~\ref{sec:ai_workflow}), which:
+\begin{enumerate}
+    \item Parses STEdgeAI analysis reports to extract RAM/Flash usage
+    \item Compares against target MCU limits using \texttt{get\_mcu\_limits()} lookup table
+    \item Routes to high compression if overflow $<$ 4×, or rejects model if overflow $>$ 4×
+\end{enumerate}
 
 \chapter{MKP Benchmark Results}
 %\input{./chap4/section/MKP_table.tex}

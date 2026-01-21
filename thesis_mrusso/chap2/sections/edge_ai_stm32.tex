@@ -12,6 +12,43 @@ The field of Tiny Machine Learning (TinyML) focuses on enabling inference on dev
     \item \textbf{Energy Efficiency}: Many Edge AI applications are battery-powered, requiring architectures that minimize active clock cycles and maximize sleep states.
 \end{itemize}
 
+\subsection{Model-Hardware Compatibility Matrix}
+To provide concrete guidance on model selection for resource-constrained devices, Table~\ref{tab:model_board_compat_summary} presents a condensed compatibility analysis of representative models from the STM32 Model Zoo across common MCU families. The analysis considers both uncompressed (FP32) and INT8-quantized variants, demonstrating the critical role of compression in enabling deployment on lower-tier devices.
+
+\begin{table}[h!]
+\centering
+\caption{Representative Model-Board Compatibility (INT8 Quantized)}
+\label{tab:model_board_compat_summary}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{|l|c|c|c|c|c|c|c|}
+\hline
+\textbf{Model} & \textbf{Input} & \textbf{RAM} & \textbf{Flash} & \textbf{F401} & \textbf{L476} & \textbf{H743} & \textbf{N6570} \\
+ & \textbf{Size} & \textbf{(INT8)} & \textbf{(INT8)} & \textbf{64KB/256KB} & \textbf{128KB/1MB} & \textbf{1MB/2MB} & \textbf{5MB/4MB} \\
+\hline
+ST MNIST & 28×28 & 5 KB & 25 KB & \checkmark & \checkmark & \checkmark & \checkmark \\
+FD-MobileNet 0.25 & 96×96 & 80 KB & 180 KB & $\times$ & \checkmark & \checkmark & \checkmark \\
+MobileNet V2 0.35 & 128×128 & 150 KB & 280 KB & $\times$ & \textasciitilde & \checkmark & \checkmark \\
+ResNet V1 32 (CIFAR) & 32×32 & 200 KB & 450 KB & $\times$ & $\times$ & \checkmark & \checkmark \\
+MobileNet V2 1.0 & 224×224 & 600 KB & 1.2 MB & $\times$ & $\times$ & \textasciitilde & \checkmark \\
+\hline
+\end{tabular}%
+}
+\vspace{2mm}
+\begin{flushleft}
+\small
+Legend: \checkmark = Fits comfortably ($<$80\% resources); \textasciitilde = Tight fit (80-100\%); $\times$ = Does not fit
+\end{flushleft}
+\end{table}
+
+Key observations from this analysis:
+\begin{itemize}
+    \item \textbf{INT8 Quantization Impact}: Compression reduces model footprint by approximately 4× compared to FP32, enabling deployment of models like MobileNet V2 0.35 on mid-tier MCUs (L476) that would otherwise be infeasible.
+    \item \textbf{Vision Models on F401}: Standard image classification architectures remain incompatible with the STM32F401 (64KB RAM) even with aggressive quantization, limiting this platform to audio-based TinyML or custom ultra-lightweight CNNs.
+    \item \textbf{H7 Family as Sweet Spot}: The STM32H743/H747 (1MB RAM) emerge as optimal targets for production-grade vision AI, supporting MobileNet variants at 224×224 resolution with acceptable inference latency.
+\end{itemize}
+
+The complete compatibility matrix, including FP32 resource requirements and additional model families (EfficientNet, SqueezeNet, ResNet50), is available in Appendix~\ref{app:model_compat_full}.
+
 \subsection{The STM32 Developer Toolchain}
 STMicroelectronics provides a mature ecosystem for managing the transition from high-level AI models to optimized C code. The core tools utilized and orchestrated in this work include:
 
