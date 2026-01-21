@@ -74,5 +74,125 @@ This compatibility matrix informed the design of the automated \texttt{check\_re
     \item Routes to high compression if overflow $<$ 4×, or rejects model if overflow $>$ 4×
 \end{enumerate}
 
+\section{STM32 MCU Part Numbers Reference}
+\label{app:mcu_part_numbers}
+
+This section provides a comprehensive reference of STM32 microcontroller part numbers for direct use with STM32CubeMX CLI commands. Unlike board selectors (e.g., \texttt{NUCLEO-H743ZI}), which may not be available in all CubeMX database versions, part numbers directly reference the microcontroller chip and are universally recognized.
+
+\subsection{Part Number Naming Convention}
+
+STM32 part numbers follow the pattern: \texttt{STM32[Family][Series][Variant][Package]}, where:
+\begin{itemize}
+    \item \textbf{Family}: F (Foundation), L (Low Power), H (High Performance), U (Ultra-Low Power), N (NPU)
+    \item \textbf{Series}: Numeric identifier (e.g., 401, 476, 743)
+    \item \textbf{Variant}: Flash/RAM capacity code (e.g., R=64KB, Z=192KB)
+    \item \textbf{Package}: Physical package type with suffix (e.g., Tx=LQFP64, Hx=TFBGA)
+\end{itemize}
+
+\subsection{F4 Family (Foundation)}
+
+\begin{table}[h!]
+\centering
+\caption{STM32F4 MCU Part Numbers}
+\label{tab:f4_parts}
+\small
+\begin{tabular}{|l|c|c|c|l|}
+\hline
+\textbf{Part Number} & \textbf{RAM} & \textbf{Flash} & \textbf{Package} & \textbf{Notes} \\
+\hline
+STM32F401RETx & 96 KB & 512 KB & LQFP64 & Nucleo F401RE \\
+STM32F401VETx & 96 KB & 512 KB & LQFP100 & Extended GPIO \\
+STM32F411RETx & 128 KB & 512 KB & LQFP64 & Nucleo F411RE \\
+STM32F446RETx & 128 KB & 512 KB & LQFP64 & Nucleo F446RE \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{L4 Family (Low Power)}
+
+\begin{table}[h!]
+\centering
+\caption{STM32L4 MCU Part Numbers}
+\label{tab:l4_parts}
+\small
+\begin{tabular}{|l|c|c|c|l|}
+\hline
+\textbf{Part Number} & \textbf{RAM} & \textbf{Flash} & \textbf{Package} & \textbf{Notes} \\
+\hline
+STM32L476RGTx & 128 KB & 1 MB & LQFP64 & Nucleo L476RG \\
+STM32L476VGTx & 128 KB & 1 MB & LQFP100 & Discovery L476 \\
+STM32L4R5ZITx & 640 KB & 2 MB & LQFP144 & Extended RAM \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{H7 Family (High Performance)}
+
+\begin{table}[h!]
+\centering
+\caption{STM32H7 MCU Part Numbers}
+\label{tab:h7_parts}
+\small
+\begin{tabular}{|l|c|c|c|l|}
+\hline
+\textbf{Part Number} & \textbf{RAM} & \textbf{Flash} & \textbf{Package} & \textbf{Notes} \\
+\hline
+STM32H743ZITx & 1 MB & 2 MB & LQFP144 & Nucleo H743ZI \\
+STM32H743VITx & 1 MB & 2 MB & LQFP100 & Compact \\
+STM32H753ZITx & 1 MB & 2 MB & LQFP144 & With Crypto \\
+STM32H747XIHx & 1 MB & 2 MB & TFBGA240 & Dual Core (M7+M4) \\
+STM32H7A3ZITx & 1.4 MB & 2 MB & LQFP144 & Extended RAM \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{U5 Family (Secure Ultra-Low Power)}
+
+\begin{table}[h!]
+\centering
+\caption{STM32U5 MCU Part Numbers}
+\label{tab:u5_parts}
+\small
+\begin{tabular}{|l|c|c|c|l|}
+\hline
+\textbf{Part Number} & \textbf{RAM} & \textbf{Flash} & \textbf{Package} & \textbf{Notes} \\
+\hline
+STM32U575ZITxQ & 786 KB & 2 MB & LQFP144 & TrustZone \\
+STM32U585AIIxQ & 786 KB & 2 MB & UFBGA169 & IoT Discovery \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{N6 Family (Neural Processing Unit)}
+
+\begin{table}[h!]
+\centering
+\caption{STM32N6 MCU Part Numbers}
+\label{tab:n6_parts}
+\small
+\begin{tabular}{|l|c|c|c|l|}
+\hline
+\textbf{Part Number} & \textbf{RAM} & \textbf{Flash} & \textbf{Package} & \textbf{Notes} \\
+\hline
+STM32N657X0HxQ & $\sim$5 MB & $\sim$4 MB & BGA361 & Integrated NPU \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{CubeMX CLI Usage}
+
+Part numbers enable direct MCU loading in STM32CubeMX script mode, bypassing potential board database issues:
+
+\begin{verbatim}
+load STM32H743ZITx
+project name MyProject
+project toolchain "STM32CubeIDE"
+project path /tmp/project
+project generate
+exit
+\end{verbatim}
+
+This approach is particularly useful in automated workflows where board definitions may be missing or outdated in the installed CubeMX version. The automated fallback mechanism implemented in this work (Section~\ref{sec:firmware_workflow}) leverages part numbers when board-based initialization fails.
+
 \chapter{MKP Benchmark Results}
 %\input{./chap4/section/MKP_table.tex}
