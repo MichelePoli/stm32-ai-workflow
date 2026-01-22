@@ -7457,44 +7457,44 @@
   ],
   "environment": {
     "generated_model": {
-      "generated_time": "2026-01-22T16:38:30+0100",
+      "generated_time": "2026-01-22T17:40:13+0100",
       "model_files": [
         {
           "name": "network_data_params.h",
-          "signature": "0x74f2ae5139d148a8bbd537ee31f530c5"
+          "signature": "0x87dec980f0c27888de9c5fc22c69dee9"
         },
         {
           "name": "network_data_params.c",
-          "signature": "0xedb0a679a8dee1a5d9e3dd8ce915fed2"
+          "signature": "0x2c05adc2b664d32701da1dce15287426"
         },
         {
           "name": "network_data.h",
-          "signature": "0x296de0e5ec0620072d1d7812a9d0895d"
+          "signature": "0xe0e6b255153e83874712c2b8e2ac4ed1"
         },
         {
           "name": "network_data.c",
-          "signature": "0x2ebb0a21a75a1c72f3055ec344b7e4a9"
+          "signature": "0xff580fdc65a7baa95d8d961e93e33a23"
         },
         {
           "name": "network_config.h",
-          "signature": "0x173677156b86f1c7de24f6148287f62d"
+          "signature": "0x7a1ca49210465fde3bf0d57c8a1aa77f"
         },
         {
           "name": "network.h",
-          "signature": "0x0f7c733e673902ed82c03fdc0b55efa4"
+          "signature": "0x00b57fb9366d9e0df2be6af0b44ca35d"
         },
         {
           "name": "network.c",
-          "signature": "0x04a16a68c638f48b277b336538113613"
+          "signature": "0xeb5877304eaa6e4d3498d29a8e272ab9"
         }
       ],
       "name": "network"
     },
-    "network_signature": "0xf478bc46a69f1b85",
+    "network_signature": "0x5c6396e06d60f072",
     "test_name": "",
     "tools": [
       {
-        "arguments": "analyze --model /home/mrusso/.stm32_ai_models/mobilenetv2_224.h5 --target stm32f4 --output ./analisiAI/report_analyze",
+        "arguments": "analyze --model /home/mrusso/.stm32_ai_models/mobilenetv2_224.h5 --target stm32h7 --output ./analisiAI/report_analyze",
         "environment": [],
         "input_model": {
           "model_files": [

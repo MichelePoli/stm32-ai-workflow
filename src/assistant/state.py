@@ -63,7 +63,8 @@ class MasterState:
     # Resource Checks
     ram_usage: int = 0
     flash_usage: int = 0
-    resource_check_result: str = "ok" # "ok", "warning", "critical", "error"
+    resource_check_result: str = "ok" # "ok", "warning", "critical", "error", "retry"
+    needs_compression_retry: bool = False  # Flag for auto-retry with higher compression
 
     # === DISCOVERY FIELDS ===
     model_discovery_method: str = ""  # "default", "taskbased", "recommendation", "search"

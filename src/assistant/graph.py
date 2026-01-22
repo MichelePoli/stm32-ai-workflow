@@ -561,7 +561,8 @@ def build_ai_analysis_graph():
         {
             "run_validate": "run_validate",
             "run_generate": "run_generate",
-            "choose_predefined_taskbased_model": "choose_predefined_taskbased_model"
+            "choose_predefined_taskbased_model": "choose_predefined_taskbased_model",
+            "run_analyze": "run_analyze" # ✅ RETRY LOOP EDGE added
         }
     )
     

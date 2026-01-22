@@ -1908,6 +1908,11 @@ def run_analyze(state: MasterState, config: dict) -> MasterState:
             "--output", analyze_dir
         ]
         
+        # ✅ FIX: Aggiungi compressione se specificata. 
+        if state.compression: # fondamentale. X-CUBE-AI ha capacità di quantizzazione integrata. Se richiesto dall'utente, X-CUBE-AI usa questo parametro per applicare automaticamente tecniche di compressione/quantizzazione durante l'analisi e la generazione del codice C.
+             cmd.extend(["--compression", state.compression])
+             logger.info(f"  Compression: {state.compression}")
+        
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
         
         state.analyze_success = (result.returncode == 0)
@@ -1936,6 +1941,8 @@ def run_validate(state: MasterState, config: dict) -> MasterState:
         "--target", state.target,
         "--output", validate_file
     ]
+    if state.compression:
+        cmd.extend(["--compression", state.compression])
     res = subprocess.run(cmd, capture_output=True, text=True)
     state.validate_success = (res.returncode == 0)
     if not state.validate_success:
@@ -1952,9 +1959,11 @@ def run_generate(state: MasterState, config: dict) -> MasterState:
         "stedgeai", "generate",
         "--model", state.model_path,
         "--target", state.target,
-        "--compression", state.compression, # fondamentale. X-CUBE-AI ha capacità di quantizzazione integrata. Se richiesto dall'utente, X-CUBE-AI usa questo parametro per applicare automaticamente tecniche di compressione/quantizzazione durante l'analisi e la generazione del codice C.
         "--output", code_dir
     ]
+    
+    if state.compression:
+        cmd.extend(["--compression", state.compression])
     res = subprocess.run(cmd, capture_output=True, text=True)
     state.generate_success = (res.returncode == 0)
     if not state.generate_success:
@@ -2084,34 +2093,56 @@ def check_resource_constraints(state: MasterState, config: dict) -> MasterState:
     flash_ratio = flash_usage / flash_limit
     max_ratio = max(ram_ratio, flash_ratio)
     
+    # ✅ INTELLIGENT COMPRESSION ESCALATION LOGIC
+    COMPRESSION_LEVELS = ["low", "medium", "high", "very_high"]
+    
     if max_ratio <= 1.0:
+        # Model fits perfectly
         logger.info("✅ Resources OK (Fits in MCU)")
         state.resource_check_result = "ok"
-    elif max_ratio <= 4.0:
-        # Max 4x overflow -> Prova compressione
-        logger.warning(f"⚠️  Resources Warning (Overflow {max_ratio:.1f}x) -> Attempting Compression")
+        state.needs_compression_retry = False
         
-        # Check logic move from router:
-        # Se già in high compression, non possiamo fare altro -> critical failure
-        if state.compression == "high" or state.compression == "very_high":
-             logger.error("❌ Overflow persisted even with HIGH compression.")
-             state.resource_check_result = "critical"
+    elif max_ratio <= 8.0:
+        # Model doesn't fit, but compression might help (up to 8x overflow)
+        logger.warning(f"⚠️  Resources Overflow ({max_ratio:.1f}x)")
+        
+        # Try to escalate compression
+        try:
+            current_idx = COMPRESSION_LEVELS.index(state.compression)
+        except ValueError:
+            current_idx = 1  # Default to "medium" if unknown
+        
+        if current_idx < len(COMPRESSION_LEVELS) - 1:
+            # Can escalate to higher compression
+            next_compression = COMPRESSION_LEVELS[current_idx + 1]
+            logger.warning(f"🔄 Auto-retry with compression: {next_compression}")
+            logger.info(f"   Current: {state.compression} → Next: {next_compression}")
+            
+            state.compression = next_compression
+            state.needs_compression_retry = True
+            state.resource_check_result = "retry"
+            
         else:
-             state.resource_check_result = "warning"
-             logger.info("🔄 Activating HIGH compression logic...")
-             state.compression = "high"
-
+            # Already at maximum compression (very_high)
+            logger.error("❌ Still doesn't fit even with very_high compression")
+            logger.error(f"   Model requires {max_ratio:.1f}x more resources than available")
+            state.resource_check_result = "critical"
+            state.needs_compression_retry = False
+            
     else:
-        # > 4x overflow -> Impossibile anche con compressione
+        # Model is WAY too big (>8x overflow) - compression won't help
         logger.error(f"❌ Resources CRITICAL (Overflow {max_ratio:.1f}x) -> Model too big")
+        logger.error("   This model is too large even for maximum compression")
         state.resource_check_result = "critical"
+        state.needs_compression_retry = False
         
+    # Set error message for critical failures
     if state.resource_check_result == "critical":
         state.ai_error_message = (
             f"Model requires {format_bytes(ram_usage)} RAM / {format_bytes(flash_usage)} Flash. "
             f"Target {state.target} has only {format_bytes(ram_limit)} RAM / {format_bytes(flash_limit)} Flash."
         )
-        # Reset per nuova selezione (Loopback logic moved here)
+        # Reset for new model selection
         state.model_discovery_method = "search" 
         state.search_iterations = 0 
 
@@ -2123,11 +2154,17 @@ def check_resource_constraints(state: MasterState, config: dict) -> MasterState:
 # -Critical (>4x overflow): Blocca tutto e chiede di scegliere un modello più piccolo (es. ResNet -> MobileNet)
 
 
-def resource_check_routing(state: MasterState) -> Literal["run_validate", "run_generate", "choose_predefined_taskbased_model"]:
+def resource_check_routing(state: MasterState) -> Literal["run_analyze", "run_validate", "run_generate", "choose_predefined_taskbased_model"]:
     """
     Decide la route basata sui constraints.
+    Gestisce anche il retry automatico con compressione più alta.
     """
     res = getattr(state, "resource_check_result", "ok")
+    
+    # ✅ NEW: Check if we need to retry with higher compression
+    if state.needs_compression_retry and res == "retry":
+        logger.info(f"🔄 Routing back to analyze with compression: {state.compression}")
+        return "run_analyze"  # Re-analyze with new compression level
     
     if res == "ok":
         return "run_validate"

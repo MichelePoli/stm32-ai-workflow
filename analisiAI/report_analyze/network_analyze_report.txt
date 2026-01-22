@@ -1,6 +1,6 @@
 ST Edge AI Core v2.2.0-20266 2adc00962
-Created date          : 2026-01-22 16:38:33
-Parameters            : analyze --model /home/mrusso/.stm32_ai_models/mobilenetv2_224.h5 --target stm32f4 --output ./analisiAI/report_analyze
+Created date          : 2026-01-22 17:40:16
+Parameters            : analyze --model /home/mrusso/.stm32_ai_models/mobilenetv2_224.h5 --target stm32h7 --output ./analisiAI/report_analyze
 
 Exec/report summary (analyze)
 -----------------------------------------------------------------------------------------------------------
@@ -10,7 +10,7 @@ c_name             :   network
 compression        :   lossless                                                                            
 options            :   allocate-inputs, allocate-outputs                                                   
 optimization       :   balanced                                                                            
-target/series      :   stm32f4                                                                             
+target/series      :   stm32h7                                                                             
 workspace dir      :   /mnt/shared-storage/mrusso/Langgraph_General_v7_subnodes/st_ai_ws                   
 output dir         :   /mnt/shared-storage/mrusso/Langgraph_General_v7_subnodes/analisiAI/report_analyze   
 model_fmt          :   float                                                                               
