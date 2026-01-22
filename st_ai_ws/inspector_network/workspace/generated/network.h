@@ -2,7 +2,7 @@
   ******************************************************************************
   * @file    network.h
   * @author  AST Embedded Analytics Research Platform
-  * @date    2026-01-22T17:22:51+0100
+  * @date    2026-01-22T19:53:22+0100
   * @brief   AI Tool Automatic Code Generator for Embedded NN computing
   ******************************************************************************
   * @attention
@@ -23,7 +23,7 @@
 
 /******************************************************************************/
 #define AI_NETWORK_MODEL_NAME          "network"
-#define AI_NETWORK_ORIGIN_MODEL_NAME   "gmp_wl_24"
+#define AI_NETWORK_ORIGIN_MODEL_NAME   "mobilenetv1_128"
 
 /******************************************************************************/
 #define AI_NETWORK_ACTIVATIONS_ALIGNMENT   (4)
@@ -44,11 +44,11 @@ AI_DEPRECATED
   AI_NETWORK_IN_1_SIZE_BYTES, \
 }
 #define AI_NETWORK_IN_1_FORMAT      (AI_BUFFER_FORMAT_FLOAT)
-#define AI_NETWORK_IN_1_HEIGHT      (24)
-#define AI_NETWORK_IN_1_WIDTH       (3)
-#define AI_NETWORK_IN_1_CHANNEL     (1)
-#define AI_NETWORK_IN_1_SIZE        (72)
-#define AI_NETWORK_IN_1_SIZE_BYTES  (288)
+#define AI_NETWORK_IN_1_HEIGHT      (224)
+#define AI_NETWORK_IN_1_WIDTH       (224)
+#define AI_NETWORK_IN_1_CHANNEL     (3)
+#define AI_NETWORK_IN_1_SIZE        (150528)
+#define AI_NETWORK_IN_1_SIZE_BYTES  (602112)
 
 /******************************************************************************/
 #define AI_NETWORK_OUT_NUM       (1)
@@ -64,12 +64,12 @@ AI_DEPRECATED
   AI_NETWORK_OUT_1_SIZE_BYTES, \
 }
 #define AI_NETWORK_OUT_1_FORMAT      (AI_BUFFER_FORMAT_FLOAT)
-#define AI_NETWORK_OUT_1_CHANNEL     (4)
-#define AI_NETWORK_OUT_1_SIZE        (4)
-#define AI_NETWORK_OUT_1_SIZE_BYTES  (16)
+#define AI_NETWORK_OUT_1_CHANNEL     (1000)
+#define AI_NETWORK_OUT_1_SIZE        (1000)
+#define AI_NETWORK_OUT_1_SIZE_BYTES  (4000)
 
 /******************************************************************************/
-#define AI_NETWORK_N_NODES (5)
+#define AI_NETWORK_N_NODES (57)
 
 
 AI_API_DECLARE_BEGIN
