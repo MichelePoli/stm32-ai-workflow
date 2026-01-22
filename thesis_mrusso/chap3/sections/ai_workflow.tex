@@ -57,8 +57,14 @@ The \texttt{choose\_predefined\_taskbased\_model()} node:
 \begin{enumerate}
     \item Classifies user task using LLM intent detection (\texttt{TaskSelectionExtraction} schema)
     \item Filters \texttt{PREDEFINED\_MODELS} by task type
-    \item Presents options to user via interrupt with performance estimates
-    \item On acceptance, downloads model file and proceeds to profiling
+    \item \textbf{Proactive Compatibility Check}: Before presenting options, the system cross-references each model's uncompressed footprint against the target MCU's Flash memory. Models are dynamically labeled as:
+    \begin{itemize}
+        \item \textbf{Fits} (\checkmark): Model fits natively ($<1.0\times$ flash limit).
+        \item \textbf{Compressible} (\textwarning): Model requires quantization ($<4.0\times$ overflow).
+        \item \textbf{Too Large} (\texttimes): Model exceeds physical limits even with max compression ($>8.0\times$ overflow).
+    \end{itemize}
+    \item Presents the context-aware list to the user via interrupt.
+    \item On acceptance, downloads model file and proceeds to profiling.
 \end{enumerate}
 
 This tier achieves \textasciitilde 70\% user acceptance rate for standard tasks, bypassing web search complexity.
