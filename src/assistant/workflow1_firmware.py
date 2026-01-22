@@ -14,7 +14,6 @@ from langgraph.types import interrupt
 
 from src.assistant.configuration import Configuration
 from src.assistant.state import MasterState
-from src.assistant.templates.ioc_templates import get_ioc_template
 
 # ============================================================================
 # LOGGING
@@ -88,7 +87,48 @@ Esempi:
 
 - Input: "Voglio usare STM32N657Z0HxQ per questo"
   Output: {"ioc_file_path": null, "board_name": "STM32N657Z0HxQ", "mcu_series": "N6", "project_name": null, "toolchain": null}
-"""
+# ============================================================================
+# UTILITIES
+# ============================================================================
+
+def get_template_ioc_path(board_name: Optional[str], mcu_series: Optional[str]) -> Optional[str]:
+    """
+    Cerca un file .ioc pre-generato nella cartella templates/ioc_files.
+    Priorità: 
+    1. Nome esatto della board
+    2. Serie MCU (F4, H7, U5, N6)
+    """
+    template_dir = os.path.join(os.path.dirname(__file__), "templates", "ioc_files")
+    if not os.path.exists(template_dir):
+        logger.warning(f"⚠️  Cartella template non trovata: {template_dir}")
+        return None
+
+    # Tenta match esatto board
+    if board_name:
+        board_path = os.path.join(template_dir, f"{board_name}.ioc")
+        if os.path.exists(board_path):
+            logger.info(f"🎯 Template trovato per board: {board_name}")
+            return board_path
+
+    # Tenta match serie
+    if mcu_series:
+        # Mappa serie a file rappresentativo se non c'è match esatto
+        SERIES_MAP = {
+            "F4": "STM32F401VCHx.ioc",
+            "H7": "STM32H7A3ZITx.ioc",
+            "U5": "STM32U585AIIxQ.ioc",
+            "N6": "STM32N657X0HxQ.ioc"
+        }
+        filename = SERIES_MAP.get(mcu_series.upper())
+        if filename:
+            series_path = os.path.join(template_dir, filename)
+            if os.path.exists(series_path):
+                logger.info(f"🎯 Template trovato per serie: {mcu_series}")
+                return series_path
+
+    logger.warning(f"⚠️  Nessun template trovato per {board_name} ({mcu_series})")
+    return None
+
 
 
 # ============================================================================
@@ -493,11 +533,20 @@ def generate_cubemx_script(state: MasterState, config: dict) -> MasterState:
     state.firmware_project_path = os.path.join(state.base_dir, folder)
 
     lines = [f"login {state.st_email} {state.st_password} y"]
-    if state.ioc_file_path:
-        if state.board_name:
-            lines.append(f"load {state.board_name}")
-        lines.append(f'config load "{state.ioc_file_path}"')
+    
+    # Cerca un template pre-generato se l'utente non ha fornito un suo .ioc
+    effective_ioc = state.ioc_file_path
+    if not effective_ioc:
+        effective_ioc = get_template_ioc_path(state.board_name, state.mcu_series)
+
+    if effective_ioc:
+        # Se abbiamo un .ioc (utente o template), usiamo SOLO config load
+        # Questo bypassa tutti i pop-up interattivi di raccomandazione
+        logger.info(f"📂 Usando caricamento configurazione: {effective_ioc}")
+        lines.append(f'config load "{effective_ioc}"')
     else:
+        # Fallback estremo: load board (rischio pop-up)
+        logger.warning(f"⚠️  Nessun .ioc disponibile, fallback su caricamento board generico")
         lines.append(f"load {state.board_name}")
 
     lines += [
@@ -523,19 +572,17 @@ def recover_with_ioc_fallback(state: MasterState) -> bool:
     """
     logger.info("🚑 Attempting Recovery with IOC Fallback...")
     
-    # 1. Genera contenuto IOC
-    ioc_content = get_ioc_template(state.board_name or "F4")
+    # 1. Cerca il template più adatto
+    fallback_ioc = get_template_ioc_path(state.board_name, state.mcu_series)
     
-    # 2. Salva .ioc temporaneo
-    fallback_ioc_path = os.path.join(state.base_dir, "fallback_generated.ioc")
-    with open(fallback_ioc_path, "w") as f:
-        f.write(ioc_content)
-    logger.info(f"✓ Fallback IOC created: {fallback_ioc_path}")
-    
-    # 3. Aggiorna lo script per caricare QUESTO ioc
+    if not fallback_ioc:
+        logger.error("❌ Nessun template disponibile per il fallback!")
+        return False
+        
+    # 2. Aggiorna lo script per caricare il template
     lines = [
         f"login {state.st_email} {state.st_password} y",
-        f'load "{fallback_ioc_path}"',
+        f'config load "{fallback_ioc}"',
         f"project name {state.project_name}",
         f'project toolchain "{state.toolchain}"',
         f"project path {state.firmware_project_path}",

@@ -53,6 +53,20 @@ The \texttt{execute\_generation()} node then invokes CubeMX:
 
 \textbf{Note on Headless Licensing:} A significant deployment challenge verified in the testing environment (using X11 forwarding) is that STM32CubeMX CLI requires a one-time GUI acceptance of the license agreement on first run. Failure to perform this manual initialization (or using \texttt{xvfb-run} without prior acceptance) causes the generation to hang indefinitely. The orchestrated workflow assumes this pre-configuration has been satisfied on the server agent.
 
+\subsection{Overcoming GUI Dependencies: The Pre-seeded IOC Strategy}
+\label{subsec:preseeded_ioc}
+
+To resolve the interactive pop-up issues described in Section \ref{subsec:gui_locked_features}, the firmware workflow was refactored to move away from generic board-based loading (\texttt{load <MCU>}) towards a \textbf{Pre-seeded IOC Strategy}.
+
+The agent maintains a repository of pre-validated \texttt{.ioc} templates, one for each supported chip family (e.g., \texttt{STM32H7A3ZITx.ioc}, \texttt{STM32U585AIIxQ.ioc}). These files are configured manually once in the GUI to satisfy the "recommendation wizards" (e.g., MPU regions defined, TrustZone context set to Non-Secure).
+
+The automation logic was refined as follows:
+\begin{enumerate}
+    \item \textbf{Template-Based Injection}: Instead of initializing a raw project, the agent identifies the matching template for the user's board.
+    \item \textbf{Lean Scripting}: The generated CubeMX script uses the \texttt{config load "<template.ioc>"} command directly. Crucially, by omitting the \texttt{load <MCU>} command, the tool skips the architectural negotiation phase and its associated interactive dialogs.
+    \item \textbf{Project Decoupling}: The \texttt{project name} and \texttt{project path} commands are then used to dynamically re-target the template to the specific user directory, ensuring that the final output is a clean, unique project while benefiting from the pre-validated "silent" configuration.
+\end{enumerate}
+
 Generated output includes initialization code (\texttt{main.c}, \texttt{stm32f4xx\_hal\_msp.c}), linker scripts, and IDE project files.
 
 \subsection{Human-in-the-Loop Gate}
