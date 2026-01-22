@@ -544,17 +544,42 @@ Rispondi: 1, 2, 3, 4 oppure descrivi il task
     
     logger.info(f"✓ Caricati {len(available_models)} modelli per task '{selected_task}'")
     
-    # === STEP 3: MOSTRA MODELLI ===
+    # === STEP 3: MOSTRA MODELLI CON COMPATIBILITÀ ===
+    
+    # Recupera limiti MCU
+    flash_limit, ram_limit = get_mcu_limits(state.target)
     
     print("\n" + "="*70)
     print(f"📦 MODELLI DISPONIBILI: {task_info['description']}")
+    print(f"🎯 Target: {state.target} (Flash: {format_bytes(flash_limit)})")
     print("="*70)
     
+    model_options_text = []
+    
     for i, model in enumerate(available_models, 1):
-        print(f"\n{i}. {model['name']}")
-        print(f"   📏 Dimensione: {model['size']}")
+        # Calcola compatibilità
+        size_bytes = parse_size_str(model['size'])
+        flash_ratio = size_bytes / flash_limit
+        
+        status_icon = "❓"
+        status_note = ""
+        
+        if flash_ratio <= 1.0:
+            status_icon = "✅"
+            status_note = "Fits"
+        elif flash_ratio <= 8.0:
+            status_icon = "⚠️"
+            status_note = f"Compressible ({flash_ratio:.1f}x)"
+        else:
+            status_icon = "❌"
+            status_note = f"Too Large ({flash_ratio:.1f}x)"
+            
+        print(f"\n{i}. {model['name']} {status_icon}")
+        print(f"   📏 Dimensione: {model['size']} ({status_note})")
         print(f"   🎯 Accuratezza: {model['accuracy']}")
         print(f"   ⚡ Inferenza: {model['inference_time']}")
+        
+        model_options_text.append(f"{i}. {model['name']} {status_icon} ({model['size']} - {status_note})")
     
     print(f"\n{len(available_models)+1}. Nessuno di questi (ricerca online)")
     print("="*70 + "\n")
@@ -562,10 +587,7 @@ Rispondi: 1, 2, 3, 4 oppure descrivi il task
     # === STEP 4: CHIEDI MODELLO ===
     
     # Crea lista modelli per il prompt
-    models_list = "\n".join([
-        f"{i}. {model['name']} ({model['size']}, {model['accuracy']})"
-        for i, model in enumerate(available_models, 1)
-    ])
+    models_list = "\n".join(model_options_text)
     
     model_prompt = {
         "instruction": f"""Quale modello vuoi usare per {task_info['description']}?
@@ -1445,6 +1467,32 @@ def format_bytes(bytes_val: int) -> str:
         bytes_val /= 1024.0
     
     return f"{bytes_val:.1f}TB"
+
+
+def parse_size_str(size_str: str) -> int:
+    """
+    Converte stringa dimensione (es. "14.0MB") in bytes.
+    Gestisce KB, MB, GB.
+    """
+    s = size_str.strip().upper()
+    multiplier = 1
+    
+    if "KB" in s:
+        multiplier = 1024
+        s = s.replace("KB", "")
+    elif "MB" in s:
+        multiplier = 1024 * 1024
+        s = s.replace("MB", "")
+    elif "GB" in s:
+        multiplier = 1024 * 1024 * 1024
+        s = s.replace("GB", "")
+    elif "B" in s:
+        s = s.replace("B", "")
+        
+    try:
+        return int(float(s.strip()) * multiplier)
+    except ValueError:
+        return 0
 
 
 def get_task_based_default_model(task: str) -> Optional[dict]:
