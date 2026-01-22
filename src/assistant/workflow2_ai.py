@@ -241,15 +241,15 @@ PREDEFINED_MODELS = {
             {
                 "name": "MobileNetV2",
                 "local_filename": "mobilenetv2_224.h5",
-                "size": "8.4MB",
+                "size": "14.0MB", # Float32 size
                 "accuracy": "71%",
                 "inference_time": "50ms (STM32H7)",
                 "huggingface_repo": "STMicroelectronics/mobilenetv2",
                 "huggingface_filename": "mobilenetv2_224.h5",
-                "url": "https://github.com/STMicroelectronics/stm32ai-modelzoo/raw/main/image_classification/mobilenetv2/Public_pretrainedmodel_public_dataset/ImageNet/mobilenet_v2_1.0_224/mobilenet_v2_1.0_224.h5", # volendo si può aggiungere l'url per huggingface: "huggingface_url": "..."
+                "url": "https://github.com/STMicroelectronics/stm32ai-modelzoo/raw/main/image_classification/mobilenetv2/Public_pretrainedmodel_public_dataset/ImageNet/mobilenet_v2_1.0_224/mobilenet_v2_1.0_224.h5", 
             },
             {
-                "name": "MobileNetV1",
+                "name": "MobileNetV1 (0.25)",
                 "local_filename": "mobilenetv1_128.h5",
                 "size": "3.6MB",
                 "accuracy": "65%",
@@ -261,7 +261,7 @@ PREDEFINED_MODELS = {
             {
                 "name": "EfficientNetV2B0",
                 "local_filename": "efficientnet_v2B0_224.h5",
-                "size": "7.1MB",
+                "size": "29.0MB", # Est. Float32
                 "accuracy": "80%",
                 "inference_time": "140ms (STM32H7)",
                 "huggingface_repo": "STMicroelectronics/efficientnetv2",
@@ -271,7 +271,7 @@ PREDEFINED_MODELS = {
             {
                 "name": "MobileNetV2 alpha 0.35 (128x128)",
                 "local_filename": "mobilenetv2_0.35_128.h5",
-                "size": "1.7MB",
+                "size": "6.9MB", # Actual download size from logs
                 "accuracy": "60%",
                 "inference_time": "15ms (STM32F4)",
                 "huggingface_repo": "STMicroelectronics/mobilenetv2-small",
@@ -2094,7 +2094,8 @@ def check_resource_constraints(state: MasterState, config: dict) -> MasterState:
     max_ratio = max(ram_ratio, flash_ratio)
     
     # ✅ INTELLIGENT COMPRESSION ESCALATION LOGIC
-    COMPRESSION_LEVELS = ["low", "medium", "high", "very_high"]
+    # Removed "very_high" as it caused stedgeai crash (unsupported flag)
+    COMPRESSION_LEVELS = ["low", "medium", "high"]
     
     if max_ratio <= 1.0:
         # Model fits perfectly
@@ -2123,8 +2124,8 @@ def check_resource_constraints(state: MasterState, config: dict) -> MasterState:
             state.resource_check_result = "retry"
             
         else:
-            # Already at maximum compression (very_high)
-            logger.error("❌ Still doesn't fit even with very_high compression")
+            # Already at maximum compression (high)
+            logger.error(f"❌ Still doesn't fit even with max compression ({state.compression})")
             logger.error(f"   Model requires {max_ratio:.1f}x more resources than available")
             state.resource_check_result = "critical"
             state.needs_compression_retry = False

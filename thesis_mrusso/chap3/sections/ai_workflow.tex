@@ -179,12 +179,15 @@ This command performs static analysis without target hardware, generating a prof
     \item \textbf{Estimated Latency}: For reference MCU at typical clock speeds
 \end{itemize}
 
-If RAM/Flash exceeds MCU capabilities, the user is prompted to either:
-\begin{itemize}
-    \item Increase compression level (re-run analysis with higher quantization)
-    \item Select a different model architecture
-    \item Proceed to customization workflow (Workflow 5) to prune layers
-\end{itemize}
+If RAM/Flash usage exceeds the MCU capabilities, the system triggers an \textbf{Autonomous Resource Optimization Loop}. Instead of halting execution to request user intervention, the workflow intelligently attempts to rescue the model by escalating the compression level:
+
+\begin{enumerate}
+    \item \textbf{Escalation Strategy}: The agent automatically increments the quantization aggressiveness (e.g., \texttt{medium} $\rightarrow$ \texttt{high} $\rightarrow$ \texttt{very\_high}).
+    \item \textbf{Re-Analysis}: The \texttt{stedgeai analyze} command is re-executed with the new \texttt{--compression} flag to generate an updated resource profile.
+    \item \textbf{Evaluation}: The system re-evaluates the new memory footprint against the target MCU constraints.
+\end{enumerate}
+
+This autonomous behavior allows the pipeline to self-correct and maximize the success rate for deploying large models on constrained edge devices, falling back to manual model selection only if the model remains too large even at maximum compression (typically $>8\times$ overflow).
 
 \subsubsection{Phase 2: On-Target Validation}
 

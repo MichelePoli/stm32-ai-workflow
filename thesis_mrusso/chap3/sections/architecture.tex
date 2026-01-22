@@ -63,6 +63,8 @@ All workflow data is stored in a single \texttt{MasterState} object defined in \
     \item \textbf{Web Research}: Query history, search results, evaluation scores
 \end{itemize}
 
+This persistent state model enables \textbf{Context Chaining}, a critical architectural feature where outputs from upstream workflows (e.g., the specific MCU target selected during \texttt{firmware\_flow}) automatically populate the input context for downstream workflows (\texttt{ai\_flow}). This eliminates redundant user data entry and prevents configuration mismatches, such as selecting an AI model incompatible with the previously generated firmware board.
+
 LangGraph automatically persists this state at every node transition through a checkpointing mechanism, enabling:
 
 \begin{enumerate}
