@@ -396,9 +396,38 @@ Esempi:
     else:
         user_text = str(user_response)
     
-    # Default: STM32F4, medium compression
+    # ✅ FIX: Eredita board context dal firmware workflow se disponibile
     if not user_text or user_text.strip() == "":
-        user_text = "STM32F4, medium compression"
+        # Se firmware è stato generato, usa quella board
+        if state.mcu_series and state.mcu_series.strip():
+            # Mappa serie MCU a target string per STEdgeAI
+            series_to_target = {
+                "F0": "stm32f0",
+                "F1": "stm32f1",
+                "F2": "stm32f2",
+                "F3": "stm32f3",
+                "F4": "stm32f4",
+                "F7": "stm32f7",
+                "H5": "stm32h5",
+                "H7": "stm32h7",
+                "L0": "stm32l0",
+                "L1": "stm32l1",
+                "L4": "stm32l4",
+                "L5": "stm32l5",
+                "U5": "stm32u5",
+                "G0": "stm32g0",
+                "G4": "stm32g4",
+                "W5": "stm32w5",
+                "C0": "stm32c0",
+                "N6": "stm32n6"
+            }
+            target_mcu = series_to_target.get(state.mcu_series.upper(), "stm32f4")
+            user_text = f"{target_mcu}, medium compression"
+            logger.info(f"✓ Ereditato contesto firmware: board_name={state.board_name}, mcu_series={state.mcu_series} → target={target_mcu}")
+        else:
+            # Fallback se non c'è contesto firmware
+            user_text = "STM32F4, medium compression"
+            logger.info("ℹ️  Nessun contesto firmware, uso default STM32F4")
     
     logger.info(f"📝 User input RAW: '{user_text}'")
     
@@ -2119,6 +2148,6 @@ Dettagli Risorse:
 
 L'automazione torna alla selezione modello forzando una scelta più appropriata.""")
         
-        # return "choose_predefined_taskbased_model"
-        return "run_generate"
+        return "choose_predefined_taskbased_model"
+        # return "run_generate" # per alcuni test fatti la utilizzavo per forzare l'integrazione 
 
