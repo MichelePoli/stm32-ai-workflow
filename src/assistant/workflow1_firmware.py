@@ -87,6 +87,7 @@ Esempi:
 
 - Input: "Voglio usare STM32N657Z0HxQ per questo"
   Output: {"ioc_file_path": null, "board_name": "STM32N657Z0HxQ", "mcu_series": "N6", "project_name": null, "toolchain": null}
+"""
 # ============================================================================
 # UTILITIES
 # ============================================================================
@@ -624,11 +625,13 @@ def execute_generation(state: MasterState, config: dict) -> MasterState:
             time.sleep(2)
             
             for attempt in range(10):
-                src_dir = os.path.join(state.firmware_project_path, "Src")
-                inc_dir = os.path.join(state.firmware_project_path, "Inc")
+                # Verifica sia nella root che in eventuali sottocartelle (CubeMX spesso crea una cartella col nome progetto)
+                # Cerchiamo Src e Inc ovunque sotto firmware_project_path
+                src_exists = any(os.path.isdir(os.path.join(dp, "Src")) for dp, dn, filenames in os.walk(state.firmware_project_path))
+                inc_exists = any(os.path.isdir(os.path.join(dp, "Inc")) for dp, dn, filenames in os.walk(state.firmware_project_path))
                 
-                if os.path.exists(src_dir) and os.path.exists(inc_dir):
-                    logger.info("✓ Cartelle create con successo")
+                if src_exists and inc_exists:
+                    logger.info("✓ Cartelle verificate con successo (root o annidate)")
                     break
                 
                 logger.info(f"Attesa cartelle... attempt {attempt+1}/10")
