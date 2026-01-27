@@ -20,6 +20,21 @@ from langgraph.types import interrupt
 from langchain_ollama import ChatOllama
 from langchain_core.messages import SystemMessage, HumanMessage
 from pydantic import BaseModel, Field
+from typing import Literal, Optional, List, Dict, Any, Union
+
+class DatasetRegistration(BaseModel):
+    """Schema per la registrazione di un nuovo dataset via URL"""
+    name: str = Field(description="Nome leggibile del dataset")
+    key: str = Field(description="Chiave univoca (snake_case, es: my_custom_data)")
+    category: Literal["vision", "audio", "object_detection", "human_activity_recognition"] = Field(
+        description="Categoria del dataset"
+    )
+    url: str = Field(description="URL diretto per il download (zip, tar.gz)")
+    description: str = Field(description="Breve descrizione del dataset")
+    expected_shape: Optional[List[int]] = Field(
+        default=None, 
+        description="Shape atteso degli input (es: [224, 224, 3]). Opzionale."
+    )
 
 from src.assistant.configuration import Configuration
 from src.assistant.state import MasterState
@@ -35,112 +50,63 @@ import tensorflow as tf
 logger = logging.getLogger(__name__)
 
 # ============================================================================
-# DATASET CATALOG
+# RESOURCE HELPERS
 # ============================================================================
 
-DATASET_CATALOG = {
-    "audio": {
-        "speech_commands": {
-            "description": "Google Speech Commands (Keyword Spotting: Yes, No, Up, Down...)",
-            "url": "http://download.tensorflow.org/data/speech_commands_v0.02.tar.gz",
-            "type": "audio",
-            "size": "2.3 GB"
-        },
-        "esc50": {
-            "description": "ESC-50: 2000 Environmental Sounds (Rain, Chainsaw, Dog...)",
-            "url": "https://github.com/karolpiczak/ESC-50/archive/master.zip",
-            "type": "audio",
-            "size": "600 MB"
-        },
-        "fsdd": {
-            "description": "Free Spoken Digit Dataset (Spoken MNIST)",
-            "url": "https://github.com/Jakobovski/free-spoken-digit-dataset/archive/v1.0.10.zip",
-            "type": "audio",
-            "size": "15 MB"
-        }
-    },
-    "vision": {
-        "cifar10": {
-            "description": "CIFAR-10: 60k 32x32 color images (10 classes)",
-            "keras_name": "cifar10",
-            "type": "image",
-            "size": "170 MB"
-        },
-        "mnist": {
-            "description": "MNIST: Handwritten digits 28x28 grayscale",
-            "keras_name": "mnist",
-            "type": "image",
-            "size": "12 MB"
-        },
-        "fashion_mnist": {
-            "description": "Fashion-MNIST: Clothing items 28x28 grayscale",
-            "keras_name": "fashion_mnist",
-            "type": "image",
-            "size": "30 MB"
-        }
-    },
-    "object_detection": {
-        "roboflow_vehicles": {
-            "description": "Roboflow Vehicles: Cars, Trucks detection (COCO format)",
-            "url": "https://universe.roboflow.com/roboflow-100/vehicles-q0vsv/dataset/1/download",
-            "type": "image",
-            "size": "~500 MB",
-            "note": "Smaller, focused dataset with COCO-format annotations",
-            "kaggle_alternative": "https://www.kaggle.com/datasets/solesensei/coco-minitrain-2017"
-        },
-        "pascal_voc_2012": {
-            "description": "PASCAL VOC 2012: Object Detection (20 classes)",
-            "tfds_name": "voc/2012",  # Usa TensorFlow Datasets invece di URL
-            "type": "image",
-            "size": "~1.9 GB",
-            "note": "Downloaded via TensorFlow Datasets (tfds) - automatic"
-        }
-    },
-    "human_activity_recognition": {
-        "uci_har": {
-            "description": "UCI HAR: 30 subjects, 6 activities (accelerometer + gyroscope)",
-            "url": "https://archive.ics.uci.edu/ml/machine-learning-databases/00240/UCI%20HAR%20Dataset.zip",
-            "type": "sensor",
-            "size": "~60 MB",
-            "note": "Smartphone sensor data at 50Hz"
-        },
-        "wisdm": {
-            "description": "WISDM: 51 subjects, 18 activities (Accelerometer + Gyroscope)",
-            "url": "https://archive.ics.uci.edu/ml/machine-learning-databases/00507/wisdm-dataset.zip",
-            "type": "sensor",
-            "size": "~295 MB",
-            "note": "UCI ML Repository - Direct download ZIP (20Hz sensor data)"
-        }
-    }
-}
+def get_resource_path(filename: str) -> str:
+    """Ritorna il path assoluto di una risorsa nella cartella resources."""
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    res_path = os.path.join(base_dir, "resources", filename)
+    return res_path
 
-# ============================================================================
-# MODEL TO DATASET MAPPING
-# ============================================================================
-# Maps PREDEFINED_MODELS task types to compatible datasets
+def load_dataset_catalog() -> dict:
+    """Carica il catalogo dataset dal file JSON."""
+    path = get_resource_path("predefined_datasets.json")
+    if not os.path.exists(path):
+        logger.warning(f"⚠️ Catalogo dataset non trovato in {path}, ritorno vuoto.")
+        return {}
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception as e:
+        logger.error(f"❌ Errore caricamento catalogo dataset: {e}")
+        return {}
 
-MODEL_TO_DATASET_MAP = {
-    "image_classification": {
-        "preferred_datasets": ["cifar10", "mnist", "fashion_mnist"],
-        "task_type": "vision",
-        "notes": "Standard image classification datasets work well"
-    },
-    "object_detection": {
-        "preferred_datasets": ["roboflow_vehicles", "pascal_voc_2012"],
-        "task_type": "object_detection",
-        "notes": "Requires bounding box annotations; Roboflow Vehicles is smaller and faster"
-    },
-    "human_activity_recognition": {
-        "preferred_datasets": ["uci_har", "wisdm"],
-        "task_type": "human_activity_recognition",
-        "notes": "Sensor data (accelerometer/gyroscope); WISDM is simpler with fewer activities"
-    },
-    "audio_event_detection": {
-        "preferred_datasets": ["speech_commands", "esc50", "fsdd"],
-        "task_type": "audio",
-        "notes": "Audio converted to spectrograms for vision models"
-    }
-}
+def load_dataset_mapping() -> dict:
+    """Carica il mapping model-to-dataset dal file JSON."""
+    path = get_resource_path("dataset_mapping.json")
+    if not os.path.exists(path):
+        logger.warning(f"⚠️ Mapping dataset non trovato in {path}, ritorno vuoto.")
+        return {}
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception as e:
+        logger.error(f"❌ Errore caricamento mapping dataset: {e}")
+        return {}
+
+def save_dataset_catalog(catalog: dict):
+    """Salva il catalogo dataset nel file JSON."""
+    path = get_resource_path("predefined_datasets.json")
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(catalog, f, indent=4, ensure_ascii=False)
+    except Exception as e:
+        logger.error(f"❌ Errore salvataggio catalogo dataset: {e}")
+
+def validate_url(url: str) -> bool:
+    """Verifica se un URL è raggiungibile."""
+    try:
+        # User Agent per evitare blocchi
+        headers = {"User-Agent": "Mozilla/5.0 (STM32-Agent)"}
+        response = requests.head(url, timeout=5, allow_redirects=True, headers=headers)
+        if response.status_code >= 400:
+            # Fallback a GET se HEAD è bloccato (alcuni server lo fanno)
+            response = requests.get(url, timeout=5, stream=True, headers=headers)
+        return response.status_code < 400
+    except Exception:
+        return False
 
 # ============================================================================
 # NODES
@@ -154,8 +120,9 @@ def decide_data_source(state: MasterState, config: dict) -> MasterState:
     prompt = {
         "instruction": "Quale dataset vuoi utilizzare per il fine-tuning?",
         "options": {
-            "1": "Real Dataset (CIFAR-10, SpeechCommands, etc.)",
-            "2": "Synthetic Data (Generato ora)"
+            "1": "Real Dataset (Seleziona dai predefiniti)",
+            "2": "Register New Dataset (Aggiungi tramite URL)",
+            "3": "Synthetic Data (Generato ora)"
         }
     }
     
@@ -172,7 +139,9 @@ def decide_data_source(state: MasterState, config: dict) -> MasterState:
         
     if "1" in user_text or "real" in user_text:
         state.dataset_source = "real"
-    elif "2" in user_text or "synthetic" in user_text:
+    elif "2" in user_text or "register" in user_text or "aggiungi" in user_text:
+        state.dataset_source = "register"
+    elif "3" in user_text or "synthetic" in user_text:
         state.dataset_source = "synthetic"
     else:
         # Default fallback
@@ -183,10 +152,78 @@ def decide_data_source(state: MasterState, config: dict) -> MasterState:
     return state
 
 
+def register_custom_dataset(state: MasterState, config: dict) -> MasterState:
+    """Permette all'utente di registrare un nuovo dataset fornendo un URL"""
+    
+    logger.info("➕ Registrazione nuovo dataset...")
+    
+    prompt_text = """Fornisci le informazioni per il nuovo dataset.
+Format richiesto:
+- Nome: [Nome Dataset]
+- Chiave: [chiave_snake_case]
+- Categoria: [vision/audio/object_detection/human_activity_recognition]
+- URL: [URL diretto al file .zip o .tar.gz]
+- Descrizione: [Breve descrizione]
+"""
+    
+    user_response = interrupt({
+        "instruction": prompt_text,
+        "hint": "Puoi scrivere in linguaggio naturale, estrarrò io i dati."
+    })
+    
+    if isinstance(user_response, dict):
+        user_input = str(user_response.get("response", user_response.get("input", "")))
+    else:
+        user_input = str(user_response)
+        
+    # Estrazione strutturata
+    llm = ChatOllama(model="mistral:latest", temperature=0).with_structured_output(DatasetRegistration)
+    try:
+        info = llm.invoke([
+            SystemMessage(content="Sei un esperto di MLOps. Estrai le informazioni del dataset dall'input utente."),
+            HumanMessage(content=user_input)
+        ])
+        
+        logger.info(f"🧐 Validazione URL: {info.url}")
+        if not validate_url(info.url):
+            logger.warning(f"⚠️ URL non raggiungibile o non valido: {info.url}")
+            # Non blocchiamo, ma avvisiamo
+            
+        # Aggiornamento catalogo
+        catalog = load_dataset_catalog()
+        cat_key = info.category
+        if cat_key not in catalog:
+            catalog[cat_key] = {"description": cat_key.replace("_", " ").title(), "datasets": {}}
+        
+        catalog[cat_key]["datasets"][info.key] = {
+            "name": info.name,
+            "description": info.description,
+            "url": info.url,
+            "type": "audio" if cat_key == "audio" else "image" if cat_key != "human_activity_recognition" else "sensor",
+            "size": "N/A (Custom)",
+            "expected_shape": info.expected_shape,
+            "note": "Aggiunto dall'utente via URL"
+        }
+        
+        save_dataset_catalog(catalog)
+        logger.info(f"✅ Dataset '{info.name}' registrato con successo in '{cat_key}'")
+        
+        # Imposta come selezionato
+        state.real_dataset_name = info.key
+        state.dataset_source = "real" # Prosegui verso download
+        
+    except Exception as e:
+        logger.error(f"❌ Errore durante la registrazione: {e}")
+        state.ai_error_message = f"Registrazione fallita: {e}"
+        state.dataset_source = "synthetic" # Fallback
+        
+    return state
+
+
 def select_predefined_dataset(state: MasterState, config: dict) -> MasterState:
     """
     Mostra menu dataset basato sul task del modello selezionato.
-    Usa MODEL_TO_DATASET_MAP per determinare automaticamente il task_type più appropriato.
+    Determina automaticamente il task_type più appropriato.
     """
     
     logger.info("📊 Selezione dataset intelligente basata sul modello...")
@@ -196,9 +233,13 @@ def select_predefined_dataset(state: MasterState, config: dict) -> MasterState:
     preferred_datasets = []
     mapping_notes = ""
     
+    # Carica mapping e catalogo dinamici
+    mapping_catalog = load_dataset_mapping()
+    dataset_catalog = load_dataset_catalog()
+    
     # Cerca mapping dal last_task salvato (task selezionato dall'utente)
     if state.last_task:
-        mapping = MODEL_TO_DATASET_MAP.get(state.last_task)
+        mapping = mapping_catalog.get(state.last_task)
         if mapping:
             task_type = mapping["task_type"]
             preferred_datasets = mapping["preferred_datasets"]
@@ -224,7 +265,7 @@ def select_predefined_dataset(state: MasterState, config: dict) -> MasterState:
                 preferred_datasets = ["uci_har", "wisdm"]
             elif "detection" in state.last_task:
                 task_type = "object_detection"
-                preferred_datasets = ["roboflow_vehicles", "pascal_voc_2012"]  # FIX: coco_minitrain non esiste più
+                preferred_datasets = ["roboflow_vehicles", "pascal_voc_2012"]
         else:
             # Default se last_task è vuoto
             logger.warning("⚠️ state.last_task è vuoto, uso default vision")
@@ -253,13 +294,15 @@ def select_predefined_dataset(state: MasterState, config: dict) -> MasterState:
                     logger.info(f"  ⚠️ Input shape {input_shape} potrebbe essere per HAR (sensor data)")
     
     # ===== STEP 3: Seleziona dataset dal catalogo =====
-    options = DATASET_CATALOG.get(task_type, DATASET_CATALOG.get("vision", {}))
+    category_info = dataset_catalog.get(task_type, dataset_catalog.get("vision", {}))
+    options = category_info.get("datasets", {})
     
     if not options:
         logger.error(f"❌ Nessun dataset trovato per task_type '{task_type}'")
         # Fallback a vision
         task_type = "vision"
-        options = DATASET_CATALOG["vision"]
+        category_info = dataset_catalog.get("vision", {})
+        options = category_info.get("datasets", {"cifar10": {}})
         preferred_datasets = ["cifar10"]
     
     # ===== STEP 4: Ordina dataset (preferred prima) =====
@@ -275,7 +318,8 @@ def select_predefined_dataset(state: MasterState, config: dict) -> MasterState:
     # ===== STEP 5: Costruisci menu con badge per dataset consigliati =====
     menu_text = f"\n{'='*70}\n"
     menu_text += f"📊 DATASET REALI PER: {task_type.upper().replace('_', ' ')}\n"
-    menu_text += f"{'='*70}\n\n"
+    menu_text += f"{'='*70}\n"
+    logger.info(f"  Menu datasets: {valid_keys}") # Debug log
     
     if mapping_notes:
         menu_text += f"💡 Note: {mapping_notes}\n\n"
@@ -288,8 +332,9 @@ def select_predefined_dataset(state: MasterState, config: dict) -> MasterState:
         # Badge per dataset consigliati
         badge = "⭐ CONSIGLIATO" if key in valid_preferred else ""
         note = info.get('note', '')
+        name = info.get('name', key.replace('_', ' ').title())
         
-        menu_text += f"{idx}. {key}: {info['description']}\n"
+        menu_text += f"{idx}. {name} ({key}): {info['description']}\n"
         menu_text += f"   📦 Size: {info['size']}"
         if badge:
             menu_text += f"  {badge}"
@@ -371,42 +416,28 @@ def select_predefined_dataset(state: MasterState, config: dict) -> MasterState:
 def check_dataset_model_compatibility(model_input_shape, dataset_name: str, task_type: str) -> bool:
     """
     Verifica se il dataset è compatibile con l'input del modello.
-    
-    Args:
-        model_input_shape: Input shape del modello (es: [224, 224, 3])
-        dataset_name: Nome del dataset (es: 'cifar10')
-        task_type: Tipo di task (es: 'vision', 'audio', 'human_activity_recognition')
-    
-    Returns:
-        True se compatibile, False se serve preprocessing/resizing
+    Utilizza i metadata nel catalogo se presenti.
     """
+    
+    logger.info(f"🔍 Verifica compatibilità: {dataset_name} vs {model_input_shape}")
+    
+    # 1. Carica catalogo per trovare shape atteso
+    catalog = load_dataset_catalog()
+    dataset_info = None
+    for category in catalog.values():
+        if dataset_name in category.get("datasets", {}):
+            dataset_info = category["datasets"][dataset_name]
+            break
+            
+    if not dataset_info:
+        logger.warning(f"⚠️ Dataset '{dataset_name}' non trovato nel catalogo per check compatibilità.")
+        return True # Prosegui comunque
+        
+    expected_shape = dataset_info.get("expected_shape")
     
     if not model_input_shape:
         logger.info("  ℹ️  Input shape modello non disponibile, skip compatibilità check")
         return True
-    
-    # ===== Dimensioni standard dei dataset =====
-    dataset_shapes = {
-        # Vision
-        "cifar10": (32, 32, 3),
-        "mnist": (28, 28, 1),
-        "fashion_mnist": (28, 28, 1),
-        
-        # Audio (dopo conversione a spectrogram)
-        "speech_commands": (32, 32, 1),  # default processing
-        "esc50": (64, 64, 1),  # tipico per ESC-50
-        "fsdd": (28, 28, 1),  # small spectrograms
-        
-        # Object Detection (varia)
-        "roboflow_vehicles": None,  # Multiple sizes, requires resizing - FIX: aggiornato da coco_minitrain
-        "pascal_voc_2012": None,  # Multiple sizes, requires resizing
-        
-        # HAR (sensor data, varia molto)
-        "uci_har": None,  # Time series, shape depends on window size
-        "wisdm": None,  # Time series, shape depends on window size
-    }
-    
-    expected_shape = dataset_shapes.get(dataset_name)
     
     # ===== Se dataset ha shape variabile (None), sempre OK =====
     if expected_shape is None:
@@ -414,13 +445,24 @@ def check_dataset_model_compatibility(model_input_shape, dataset_name: str, task
         return True
     
     # ===== Converti model_input_shape in tuple per confronto =====
+    model_shape_tuple = None
     if isinstance(model_input_shape, list):
         model_shape_tuple = tuple(model_input_shape)
     elif isinstance(model_input_shape, tuple):
         model_shape_tuple = model_input_shape
-    else:
-        logger.warning(f"  ⚠️ Input shape formato non riconosciuto: {type(model_input_shape)}")
-        return True
+    elif isinstance(model_input_shape, str):
+        # Prova a parseare stringa tipo "(None, 224, 224, 3)"
+        try:
+            import ast
+            parsed = ast.literal_eval(model_input_shape)
+            if isinstance(parsed, (list, tuple)):
+                model_shape_tuple = tuple(parsed)
+        except:
+            pass
+            
+    if model_shape_tuple is None:
+        logger.warning(f"  ⚠️ Input shape formato non riconosciuto: {type(model_input_shape)} ({model_input_shape})")
+        return True # Prosegui comunque
     
     # ===== Confronta dimensioni =====
     if expected_shape == model_shape_tuple:
@@ -444,159 +486,60 @@ def check_dataset_model_compatibility(model_input_shape, dataset_name: str, task
 
 
 def download_dataset(state: MasterState, config: dict) -> MasterState:
-    """Scarica il dataset selezionato"""
+    """Scarica il dataset selezionato utilizzando il catalogo dinamico"""
     
     dataset_name = state.real_dataset_name
-    logger.info(f"📥 Downloading: {dataset_name}...")
+    logger.info(f"📥 Avvio download dataset: {dataset_name}...")
     
     # Setup dir
     dataset_dir = os.path.join(state.base_dir, "data", "real_datasets", dataset_name)
     os.makedirs(dataset_dir, exist_ok=True)
     state.real_dataset_path = dataset_dir
     
-    # Logica specifica per Keras Datasets (Vision)
-    if dataset_name in ["cifar10", "mnist", "fashion_mnist"]:
-        try:
-            import tensorflow as tf
+    # 1. Recupera info dal catalogo
+    catalog = load_dataset_catalog()
+    dataset_info = None
+    category_name = None
+    
+    for cat, info in catalog.items():
+        if dataset_name in info.get("datasets", {}):
+            dataset_info = info["datasets"][dataset_name]
+            category_name = cat
+            break
             
-            if dataset_name == "cifar10":
+    if not dataset_info:
+        logger.error(f"❌ Dataset '{dataset_name}' non trovato nel catalogo.")
+        state.ai_error_message = f"Dataset {dataset_name} non trovato."
+        return state
+
+    url = dataset_info.get("url")
+    keras_name = dataset_info.get("keras_name")
+    tfds_name = dataset_info.get("tfds_name")
+    
+    try:
+        # A. Keras Built-in
+        if keras_name:
+            logger.info(f"📦 Utilizzo Keras built-in dataset: {keras_name}")
+            import tensorflow as tf
+            if keras_name == "cifar10":
                 (x_train, y_train), (x_test, y_test) = tf.keras.datasets.cifar10.load_data()
-            elif dataset_name == "mnist":
+            elif keras_name == "mnist":
                 (x_train, y_train), (x_test, y_test) = tf.keras.datasets.mnist.load_data()
-            elif dataset_name == "fashion_mnist":
+            elif keras_name == "fashion_mnist":
                 (x_train, y_train), (x_test, y_test) = tf.keras.datasets.fashion_mnist.load_data()
+            else:
+                raise ValueError(f"Keras dataset {keras_name} non supportato direttamente.")
                 
-            # Salva in formato .npy per uniformità con il resto del sistema
             np.save(os.path.join(dataset_dir, "x_train.npy"), x_train)
             np.save(os.path.join(dataset_dir, "y_train.npy"), y_train)
             np.save(os.path.join(dataset_dir, "x_test.npy"), x_test)
             np.save(os.path.join(dataset_dir, "y_test.npy"), y_test)
-            
-            logger.info(f"✅ Dataset saved to {dataset_dir}")
-            
-        except Exception as e:
-            logger.error(f"❌ Download failed: {e}")
-            
-    # Logica per Audio (Download URL)
-    elif dataset_name in ["speech_commands", "esc50", "fsdd"]:
-        try:
-            # 1. Download
-            url = DATASET_CATALOG["audio"][dataset_name]["url"]
-            archive_name = url.split("/")[-1]
-            archive_path = os.path.join(dataset_dir, archive_name)
-            
-            if not os.path.exists(archive_path):
-                logger.info(f"⬇️  Downloading {url}...")
-                download_file(url, archive_path)
-            else:
-                logger.info(f"✅ Archive found: {archive_path}")
-                
-            # 2. Extract
-            extract_dir = os.path.join(dataset_dir, "extracted")
-            if not os.path.exists(extract_dir):
-                logger.info(f"📦 Extracting to {extract_dir}...")
-                extract_archive(archive_path, extract_dir)
-            else:
-                logger.info(f"✅ Extracted dir found")
-                
-            # 3. Process to Spectrograms (.npy)
-            logger.info("🎵 Processing audio to spectrograms...")
-            
-            # Parametri processing
-            target_shape = (32, 32) # Resize spectrogram to 32x32 image
-            
-            if dataset_name == "speech_commands":
-                process_speech_commands(extract_dir, dataset_dir, target_shape)
-            elif dataset_name == "esc50":
-                # TODO: Implement ESC-50 specific parsing
-                logger.warning("⚠️ ESC-50 processing not yet implemented")
-                pass
-            elif dataset_name == "fsdd":
-                # TODO: Implement FSDD specific parsing
-                logger.warning("⚠️ FSDD processing not yet implemented")
-                pass
-                
-            logger.info(f"✅ Audio dataset processed")
-            
-        except Exception as e:
-            logger.error(f"❌ Error processing audio dataset: {e}")
-            # Fallback dummy
-            with open(os.path.join(dataset_dir, "README.txt"), "w") as f:
-                f.write(f"Dataset {dataset_name} failed: {e}")
-    
-    # Logica per Object Detection (Download URL o TFDS)
-    elif dataset_name in ["roboflow_vehicles", "pascal_voc_2012"]:
-        try:
-            dataset_info = DATASET_CATALOG["object_detection"][dataset_name]
-            
-            # ===== PASCAL VOC 2012: Usa TensorFlow Datasets =====
-            if dataset_name == "pascal_voc_2012":
-                logger.info(f"📥 Downloading PASCAL VOC 2012 via TensorFlow Datasets...")
-                
-                try:
-                    import tensorflow_datasets as tfds
-                    
-                    # Download dataset con tfds (automatico)
-                    logger.info(f"⬇️  Loading from TFDS: {dataset_info['tfds_name']}")
-                    logger.info(f"   This may take a while for first download (~{dataset_info['size']})...")
-                    
-                    # Load dataset con info
-                    ds_train, ds_info = tfds.load(
-                        dataset_info['tfds_name'],
-                        split='train',
-                        with_info=True,
-                        data_dir=dataset_dir  # Salva in directory specifica
-                    )
-                    
-                    ds_validation = tfds.load(
-                        dataset_info['tfds_name'],
-                        split='validation',
-                        data_dir=dataset_dir
-                    )
-                    
-                    logger.info(f"✅ PASCAL VOC 2012 loaded successfully!")
-                    logger.info(f"   Train samples: {ds_info.splits['train'].num_examples}")
-                    logger.info(f"   Validation samples: {ds_info.splits['validation'].num_examples}")
-                    logger.info(f"   Features: {ds_info.features}")
-                    
-                    # Salva metadata
-                    metadata = {
-                        "dataset_name": dataset_name,
-                        "download_date": datetime.now().isoformat(),
-                        "source": "TensorFlow Datasets (tfds)",
-                        "tfds_name": dataset_info['tfds_name'],
-                        "num_train": int(ds_info.splits['train'].num_examples),
-                        "num_validation": int(ds_info.splits['validation'].num_examples),
-                        "features": str(ds_info.features),
-                        "note": dataset_info.get("note", "")
-                    }
-                    
-                    with open(os.path.join(dataset_dir, "metadata.json"), "w") as f:
-                        json.dump(metadata, f, indent=2)
-                    
-                    # Salva info su come usare il dataset
-                    with open(os.path.join(dataset_dir, "USAGE_INFO.txt"), "w") as f:
-                        f.write(f"PASCAL VOC 2012 Dataset (via TensorFlow Datasets)\n\n")
-                        f.write(f"To load this dataset in your code:\n\n")
-                        f.write(f"import tensorflow_datasets as tfds\n\n")
-                        f.write(f"# Load train split\n")
-                        f.write(f"ds_train = tfds.load('{dataset_info['tfds_name']}', split='train', data_dir='{dataset_dir}')\n\n")
-                        f.write(f"# Load validation split\n")
-                        f.write(f"ds_validation = tfds.load('{dataset_info['tfds_name']}', split='validation', data_dir='{dataset_dir}')\n\n")
-                        f.write(f"Features:\n{ds_info.features}\n")
-                    
-                    logger.info(f"✅ Object Detection dataset (TFDS) setup completato")
-                    logger.info(f"💡 Usage instructions saved in USAGE_INFO.txt")
-                    logger.info(f"⚠️  Note: Dataset includes bounding boxes and segmentation masks")
-                    
-                except ImportError:
-                    logger.error("❌ tensorflow_datasets not installed!")
-                    logger.info("   Install with: pip install tensorflow-datasets")
-                    raise
-                    
-            # ===== Roboflow Vehicles: Download manuale =====
-            elif "roboflow.com" in dataset_info.get("url", ""):
-                url = dataset_info["url"]
+            logger.info(f"✅ Dataset salvato in {dataset_dir}")
+
+        # B. URL Download (Generic Archive)
+        elif url:
+            if "roboflow.com" in url:
+                # Logica manuale per Roboflow (già esistente)
                 logger.info(f"📥 Dataset Roboflow rilevato")
                 logger.info(f"")
                 logger.info(f"⚠️  RICHIESTA AZIONE UTENTE:")
@@ -632,60 +575,138 @@ def download_dataset(state: MasterState, config: dict) -> MasterState:
                 }
                 with open(os.path.join(dataset_dir, "metadata.json"), "w") as f:
                     json.dump(metadata, f, indent=2)
-            
-        except Exception as e:
-            logger.error(f"❌ Error downloading object detection dataset: {e}")
-            with open(os.path.join(dataset_dir, "README.txt"), "w") as f:
-                f.write(f"Dataset {dataset_name} download failed: {e}")
-    
-    # Logica per Human Activity Recognition (Download URL)
-    elif dataset_name in ["uci_har", "wisdm"]:
-        try:
-            # 1. Download
-            url = DATASET_CATALOG["human_activity_recognition"][dataset_name]["url"]
-            archive_name = url.split("/")[-1].replace("%20", "_")  # Fix URL encoding
-            archive_path = os.path.join(dataset_dir, archive_name)
-            
-            if not os.path.exists(archive_path):
-                logger.info(f"⬇️  Downloading {url}...")
-                download_file(url, archive_path)
             else:
-                logger.info(f"✅ Archive found: {archive_path}")
+                logger.info(f"⬇️ Download via URL: {url}")
+                archive_name = url.split("/")[-1]
+                archive_path = os.path.join(dataset_dir, archive_name)
+                
+                if not os.path.exists(archive_path):
+                    download_file(url, archive_path)
+                else:
+                    logger.info(f"✅ Archive found: {archive_path}")
+                
+                extract_dir = os.path.join(dataset_dir, "extracted")
+                if not os.path.exists(extract_dir):
+                    logger.info(f"📦 Extracting to {extract_dir}...")
+                    extract_archive(archive_path, extract_dir)
+                else:
+                    logger.info(f"✅ Extracted dir found")
+                
+                # Processing specifico basato sulla categoria
+                if category_name == "audio":
+                    logger.info("🎵 Processing audio spectrograms...")
+                    # target_shape can be retrieved from dataset_info if needed, or use default
+                    process_speech_commands(extract_dir, dataset_dir)
+                    logger.info(f"✅ Audio dataset processed")
+                elif category_name == "human_activity_recognition":
+                    logger.info("⌚ HAR dataset pronto (estratto)")
+                    # Metadata salvataggio
+                    metadata = {
+                        "dataset_name": dataset_name,
+                        "download_date": datetime.now().isoformat(),
+                        "url": url,
+                        "type": "sensor_data",
+                        "note": dataset_info.get("note", "")
+                    }
+                    with open(os.path.join(dataset_dir, "metadata.json"), "w") as f:
+                        json.dump(metadata, f, indent=2)
+                    logger.info(f"✅ HAR dataset downloaded")
+                    logger.info(f"💡 Dataset contains raw sensor data (accelerometer/gyroscope)")
+                    logger.info(f"⚠️  Preprocessing required: windowing, feature extraction, normalization")
+                else:
+                    logger.info(f"✅ Generic dataset pronto in {extract_dir}")
+                    
+                    # Se la categoria è vision o object_detection (immagini), processa automaticamente
+                    if category_name in ["vision", "object_detection"]:
+                        logger.info(f"🖼️  Tentativo di processing automatico per dataset immagini...")
+                        process_generic_vision_dataset(extract_dir, dataset_dir)
+
+        # C. TFDS (TensorFlow Datasets)
+        elif tfds_name:
+            logger.info(f"📥 Loading via TFDS: {tfds_name}")
             
-            # 2. Extract
-            extract_dir = os.path.join(dataset_dir, "extracted")
-            if not os.path.exists(extract_dir):
-                logger.info(f"📦 Extracting to {extract_dir}...")
-                extract_archive(archive_path, extract_dir)
-            else:
-                logger.info(f"✅ Extracted dir found")
+            try:
+                import tensorflow_datasets as tfds
+                
+                # Download dataset con tfds (automatico)
+                logger.info(f"⬇️  Loading from TFDS: {tfds_name}")
+                logger.info(f"   This may take a while for first download (~{dataset_info.get('size', 'unknown size')})...")
+                
+                # Load dataset con info
+                ds_train, ds_info = tfds.load(
+                    tfds_name,
+                    split='train',
+                    with_info=True,
+                    data_dir=dataset_dir  # Salva in directory specifica
+                )
+                
+                # Check if validation split exists
+                splits = ds_info.splits
+                ds_validation = None
+                if 'validation' in splits:
+                    ds_validation = tfds.load(
+                        tfds_name,
+                        split='validation',
+                        data_dir=dataset_dir
+                    )
+                elif 'test' in splits: # Fallback to test if no validation
+                    ds_validation = tfds.load(
+                        tfds_name,
+                        split='test',
+                        data_dir=dataset_dir
+                    )
+                
+                logger.info(f"✅ TFDS {tfds_name} loaded successfully!")
+                logger.info(f"   Train samples: {ds_info.splits['train'].num_examples}")
+                if ds_validation:
+                    val_split_name = 'validation' if 'validation' in splits else 'test'
+                    logger.info(f"   {val_split_name.capitalize()} samples: {ds_info.splits[val_split_name].num_examples}")
+                logger.info(f"   Features: {ds_info.features}")
+                
+                # Salva metadata
+                metadata = {
+                    "dataset_name": dataset_name,
+                    "download_date": datetime.now().isoformat(),
+                    "source": "TensorFlow Datasets (tfds)",
+                    "tfds_name": tfds_name,
+                    "num_train": int(ds_info.splits['train'].num_examples),
+                    "num_validation": int(ds_info.splits.get('validation', ds_info.splits.get('test', {'num_examples': 0}))['num_examples']),
+                    "features": str(ds_info.features),
+                    "note": dataset_info.get("note", "")
+                }
+                
+                with open(os.path.join(dataset_dir, "metadata.json"), "w") as f:
+                    json.dump(metadata, f, indent=2)
+                
+                # Salva info su come usare il dataset
+                with open(os.path.join(dataset_dir, "USAGE_INFO.txt"), "w") as f:
+                    f.write(f"{dataset_name} Dataset (via TensorFlow Datasets)\n\n")
+                    f.write(f"To load this dataset in your code:\n\n")
+                    f.write(f"import tensorflow_datasets as tfds\n\n")
+                    f.write(f"# Load train split\n")
+                    f.write(f"ds_train = tfds.load('{tfds_name}', split='train', data_dir='{dataset_dir}')\n\n")
+                    if ds_validation:
+                        f.write(f"# Load {val_split_name} split\n")
+                        f.write(f"ds_validation = tfds.load('{tfds_name}', split='{val_split_name}', data_dir='{dataset_dir}')\n\n")
+                    f.write(f"Features:\n{ds_info.features}\n")
+                
+                logger.info(f"✅ TFDS {tfds_name} setup completato")
+                logger.info(f"💡 Usage instructions saved in USAGE_INFO.txt")
+                if category_name == "object_detection":
+                    logger.info(f"⚠️  Note: Dataset includes bounding boxes and segmentation masks")
+                    
+            except ImportError:
+                logger.error("❌ tensorflow_datasets not installed!")
+                logger.info("   Install with: pip install tensorflow-datasets")
+                raise
             
-            # 3. Save metadata
-            metadata = {
-                "dataset_name": dataset_name,
-                "download_date": datetime.now().isoformat(),
-                "url": url,
-                "type": "sensor_data",
-                "note": DATASET_CATALOG["human_activity_recognition"][dataset_name].get("note", "")
-            }
-            
-            with open(os.path.join(dataset_dir, "metadata.json"), "w") as f:
-                json.dump(metadata, f, indent=2)
-            
-            logger.info(f"✅ HAR dataset downloaded")
-            logger.info(f"💡 Dataset contains raw sensor data (accelerometer/gyroscope)")
-            logger.info(f"⚠️  Preprocessing required: windowing, feature extraction, normalization")
-            
-        except Exception as e:
-            logger.error(f"❌ Error downloading HAR dataset: {e}")
-            with open(os.path.join(dataset_dir, "README.txt"), "w") as f:
-                f.write(f"Dataset {dataset_name} download failed: {e}")
-            
-    else:
-        logger.warning(f"⚠️ Dataset '{dataset_name}' non supportato per download automatico")
+    except Exception as e:
+        logger.error(f"❌ Errore durante download/processing: {e}")
+        state.ai_error_message = str(e)
+        # Fallback dummy file
         with open(os.path.join(dataset_dir, "README.txt"), "w") as f:
-            f.write(f"Dataset {dataset_name} requires manual download and processing")
-            
+            f.write(f"Dataset {dataset_name} download/processing failed: {e}")
+        
     return state
 
 
@@ -841,3 +862,83 @@ def process_speech_commands(extract_dir: str, output_dir: str, target_shape=(32,
     # Save class names mapping
     with open(os.path.join(output_dir, "classes.json"), "w") as f:
         json.dump(class_to_idx, f)
+
+def process_generic_vision_dataset(extract_dir: str, output_dir: str, target_shape=(224, 224), max_samples=10000):
+    """
+    Scansiona una cartella estratta alla ricerca di immagini e le converte in .npy.
+    Inferisce le classi dalle sottocartelle.
+    """
+    logger.info(f"📁 Scansione generica immagini in {extract_dir}...")
+    
+    # Estensioni supportate
+    valid_exts = ('.jpg', '.jpeg', '.png', '.bmp')
+    
+    # 1. Trova tutte le immagini e mappa le classi
+    image_paths = []
+    for root, dirs, files in os.walk(extract_dir):
+        for f in files:
+            if f.lower().endswith(valid_exts):
+                image_paths.append(os.path.join(root, f))
+                
+    if not image_paths:
+        logger.warning("⚠️  Nessuna immagine trovata nell'archivio estratto.")
+        return
+
+    # 2. Inferenza classi dal nome della cartella genitore
+    # Assumiamo struttura: root/classe/immagine.jpg
+    path_to_class = {}
+    for p in image_paths:
+        cls_name = os.path.basename(os.path.dirname(p))
+        if not cls_name or cls_name == os.path.basename(extract_dir):
+            cls_name = "default_class"
+        path_to_class[p] = cls_name
+        
+    classes = sorted(list(set(path_to_class.values())))
+    class_to_idx = {cls: i for i, cls in enumerate(classes)}
+    
+    logger.info(f"✓ Trovate {len(image_paths)} immagini in {len(classes)} classi.")
+    logger.info(f"✓ Classi: {classes[:10]} {'...' if len(classes) > 10 else ''}")
+
+    # 3. Shuffle e Limite per performance/memoria
+    import random
+    random.shuffle(image_paths)
+    image_paths = image_paths[:max_samples]
+    
+    X = []
+    y = []
+    
+    logger.info(f"⚙️  Processing {len(image_paths)} campioni...")
+    
+    for p in image_paths:
+        try:
+            img = tf.io.read_file(p)
+            img = tf.image.decode_image(img, channels=3, expand_animations=False)
+            img = tf.image.resize(img, target_shape[:2])
+            img = img / 255.0  # Normalizzazione [0,1]
+            
+            X.append(img.numpy())
+            y.append(class_to_idx[path_to_class[p]])
+        except Exception as e:
+            # logger.debug(f"Salto file corrotto {p}: {e}")
+            continue
+            
+    if not X:
+        logger.error("❌ Errore: Nessuna immagine valida processata.")
+        return
+        
+    X = np.array(X, dtype='float32')
+    y = np.array(y, dtype='int32')
+    
+    # 4. Salvataggio
+    np.save(os.path.join(output_dir, "x_train.npy"), X)
+    np.save(os.path.join(output_dir, "y_train.npy"), y)
+    
+    # Split manuale per validazione (20%)
+    split_idx = int(len(X) * 0.8)
+    np.save(os.path.join(output_dir, "x_test.npy"), X[split_idx:])
+    np.save(os.path.join(output_dir, "y_test.npy"), y[split_idx:])
+    
+    with open(os.path.join(output_dir, "classes.json"), "w") as f:
+        json.dump(class_to_idx, f, indent=2)
+        
+    logger.info(f"✅ Processing completato. Salvati {len(X)} campioni in {output_dir}")

@@ -1,0 +1,44 @@
+{
+    "image_classification": {
+        "preferred_datasets": [
+            "cifar10",
+            "mnist",
+            "fashion_mnist"
+        ],
+        "task_type": "vision",
+        "notes": "Standard image classification datasets work well"
+    },
+    "object_detection": {
+        "preferred_datasets": [
+            "roboflow_vehicles",
+            "pascal_voc_2012"
+        ],
+        "task_type": "object_detection",
+        "notes": "Requires bounding box annotations; Roboflow Vehicles is smaller and faster"
+    },
+    "human_activity_recognition": {
+        "preferred_datasets": [
+            "uci_har",
+            "wisdm"
+        ],
+        "task_type": "human_activity_recognition",
+        "notes": "Sensor data (accelerometer/gyroscope); WISDM is simpler with fewer activities"
+    },
+    "audio_event_detection": {
+        "preferred_datasets": [
+            "speech_commands",
+            "esc50",
+            "fsdd"
+        ],
+        "task_type": "audio",
+        "notes": "Audio converted to spectrograms for vision models"
+    },
+    "pose_estimation": {
+        "preferred_datasets": [
+            "roboflow_vehicles",
+            "pascal_voc_2012"
+        ],
+        "task_type": "object_detection",
+        "notes": "Pose estimation often uses detection-like datasets for human context"
+    }
+}

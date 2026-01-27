@@ -106,6 +106,7 @@ from src.assistant.workflow6_synthetic_data import (
 from src.assistant.workflow7_dataset import (
     decide_data_source,
     select_predefined_dataset,
+    register_custom_dataset,
     download_dataset,
 )
 
@@ -421,6 +422,7 @@ def build_ai_analysis_graph():
     # Dataset & Synthetic
     workflow.add_node("decide_data_source", decide_data_source)
     workflow.add_node("select_predefined_dataset", select_predefined_dataset)
+    workflow.add_node("register_custom_dataset", register_custom_dataset)
     workflow.add_node("download_dataset", download_dataset)
     workflow.add_node("ask_synthetic_data_requirements", ask_synthetic_data_requirements)
     workflow.add_node("generate_synthetic_samples", generate_synthetic_samples)
@@ -510,23 +512,28 @@ def build_ai_analysis_graph():
     workflow.add_edge("apply_user_customization", "decide_data_source")
     
     # 5. Data Source Routing
-    def dataset_source_routing(state: MasterState) -> Literal["select_predefined_dataset", "ask_synthetic_data_requirements", "ask_optimization_preference"]:
+    def dataset_source_routing(state: MasterState) -> Literal["select_predefined_dataset", "register_custom_dataset", "ask_synthetic_data_requirements", "ask_optimization_preference"]:
         if state.dataset_source == "real":
             return "select_predefined_dataset"
+        elif state.dataset_source == "register":
+            return "register_custom_dataset"
         elif state.dataset_source == "synthetic":
             return "ask_synthetic_data_requirements"
         else:
-            return "ask_optimization_preference" # Fallback to optimization/training choice
+            return "ask_optimization_preference"
 
     workflow.add_conditional_edges(
         "decide_data_source",
         dataset_source_routing,
         {
             "select_predefined_dataset": "select_predefined_dataset",
+            "register_custom_dataset": "register_custom_dataset",
             "ask_synthetic_data_requirements": "ask_synthetic_data_requirements",
             "ask_optimization_preference": "ask_optimization_preference"
         }
     )
+    
+    workflow.add_edge("register_custom_dataset", "download_dataset")
     
     workflow.add_edge("select_predefined_dataset", "download_dataset")
     workflow.add_edge("download_dataset", "ask_optimization_preference") 

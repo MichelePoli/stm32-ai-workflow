@@ -54,6 +54,14 @@
                 "accuracy": "N/A",
                 "inference_time": "200ms (STM32H7)",
                 "url": "https://github.com/STMicroelectronics/stm32ai-modelzoo/raw/main/object_detection/yolo_v2_tiny/Public_pretrainedmodel_public_dataset/COCO/yolo_v2_tiny_224_224/yolo_v2_tiny_224_224.h5"
+            },
+            {
+                "name": "ssdlite_mobilenetv3small_pt",
+                "local_filename": "ssdlite_mobilenetv3small_pt.onnx",
+                "size": "7.2MB",
+                "accuracy": "N/A (User Provided)",
+                "inference_time": "N/A",
+                "url": "https://github.com/STMicroelectronics/stm32ai-modelzoo/raw/main/object_detection/ssdlite_mobilenetv3small_pt/Public_pretrainedmodel_public_dataset/coco/ssdlite_mobilenetv3small_pt_coco_300/ssdlite_mobilenetv3small_pt_coco_300.onnx"
             }
         ]
     },

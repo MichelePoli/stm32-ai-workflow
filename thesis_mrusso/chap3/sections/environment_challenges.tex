@@ -67,3 +67,17 @@ To overcome this without requiring the user to manually convert their models, I 
 \end{enumerate}
 
 This bridge "flattens" the model architecture into standard TFLite operators, which the ST toolchain interprets correctly, thus restoring the autonomous flow for the latest state-of-the-art models.
+
+\subsection{Architectural Constraints on Model Customization}
+While the discovery and profiling workflow (Workflow 2) achieves format-agnostic interoperability—successfully processing \texttt{.h5}, \texttt{.keras}, \texttt{.onnx}, and \texttt{.tflite} artifacts for resource estimation and firmware generation—the structural customization workflow (Workflow 5) introduces a strict dependency on native Keras formats.
+
+This distinction arises from the technical requirements of neural network "surgical" operations:
+\begin{itemize}
+    \item \textbf{High-Level Object Manipulation}: Features such as layer freezing, appending Dense/Dropout layers, or modifying activation functions require the orchestrator to load the model as a live Keras \texttt{Model} object.
+    \item \textbf{Deployment Format Limitations}: Formats like \texttt{.tflite} and \texttt{.onnx} are optimized for inference execution. They represent the model as a flat sequence of mathematical operators (flatbuffers) and lack the high-level symbolic information (Python class metadata) necessary for Keras to re-initialize an editable training graph.
+\end{itemize}
+
+\paragraph{The Irreversibility Trap}
+A common question in edge AI orchestration is whether these deployment formats can be back-converted into editable Keras artifacts. While bridge libraries like \texttt{onnx2keras} exist, they are often unreliable for complex architectures due to operator name mangling. For \texttt{.tflite} models, the conversion is fundamentally "destructive": the process of \textit{Operator Fusion} (merging convolution and activation layers) and \textit{Quantization} (converting FP32 to INT8) removes the structural and numerical resolution required for stable fine-tuning. Consequently, the framework adopts the best practice of requiring the original "source" formats for customization, treating deployment artifacts as a terminal stage in the MLOps pipeline.
+
+To maintain system robustness, a format-based validation gate was implemented in the customization node, ensuring that only native Keras artifacts enter the optimization pipeline, while guiding users towards Workflow 2 for non-editable binary formats.

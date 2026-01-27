@@ -2008,21 +2008,71 @@ def execute_in_environment(python_code: str, state: MasterState, timeout: int = 
     logger.info("🔧 Starting training subprocess...")
     logger.info(f"   • Environment: {conda_env}")
     logger.info(f"   • Python: {python_path}")
+    logger.info(f"   • Timeout: {timeout}s")
     
-    result = subprocess.run(
-        [python_path, '-c', python_code],
-        capture_output=True,
-        text=True,
-        timeout=timeout,
-        env={**os.environ, 'TF_CPP_MIN_LOG_LEVEL': '3'}
-    )
+    stdout_accumulator = []
+    stderr_accumulator = []
     
-    return {
-        'success': result.returncode == 0,
-        'stdout': result.stdout.strip(),
-        'stderr': result.stderr.strip(),
-        'returncode': result.returncode
-    }
+    try:
+        # Popen permette di leggere l'output in tempo reale
+        process = subprocess.Popen(
+            [python_path, '-c', python_code],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            env={**os.environ, 'TF_CPP_MIN_LOG_LEVEL': '3'},
+            bufsize=1, # Line buffering
+            universal_newlines=True
+        )
+        
+        # MONITORING OUTPUT
+        import select
+        import time
+        
+        start_time = time.time()
+        
+        while True:
+            # Check timeout
+            if time.time() - start_time > timeout:
+                process.terminate()
+                raise subprocess.TimeoutExpired(process.args, timeout)
+            
+            # Leggi stream pronti
+            reads = [process.stdout.fileno(), process.stderr.fileno()]
+            ret = select.select(reads, [], [], 0.1)
+            
+            for fd in ret[0]:
+                if fd == process.stdout.fileno():
+                    line = process.stdout.readline()
+                    if line:
+                        clean_line = line.strip()
+                        if clean_line:
+                            logger.info(f"  [Train] {clean_line}")
+                            stdout_accumulator.append(line)
+                if fd == process.stderr.fileno():
+                    line = process.stderr.readline()
+                    if line:
+                        stderr_accumulator.append(line)
+            
+            # Fine processo
+            if process.poll() is not None:
+                # Leggi ultimi rimasugli
+                remaining_out, remaining_err = process.communicate()
+                if remaining_out: stdout_accumulator.append(remaining_out)
+                if remaining_err: stderr_accumulator.append(remaining_err)
+                break
+                
+        return {
+            'success': process.returncode == 0,
+            'stdout': "".join(stdout_accumulator).strip(),
+            'stderr': "".join(stderr_accumulator).strip(),
+            'returncode': process.returncode
+        }
+    except Exception as e:
+        if isinstance(e, subprocess.TimeoutExpired):
+            raise e
+        logger.error(f"❌ Subprocess error: {e}")
+        return {'success': False, 'stdout': "", 'stderr': str(e), 'returncode': 1}
 
 def load_model_with_conda_env(model_path: str, architecture: str, state: MasterState) -> str:
     """
@@ -2140,6 +2190,17 @@ def load_stm32_model_safe(model_path: str, state: MasterState) -> str:
     if not os.path.exists(model_path):
         logger.error(f"❌ Model file not found: {model_path}")
         raise FileNotFoundError(f"Model not found: {model_path}")
+    
+    # ✅ FIX: Controllo estensione. 
+    # La customizzazione (Workflow 5) richiede formati nativi Keras (.h5, .keras)
+    # Formati come .onnx o .tflite sono ottimi per l'analisi (Workflow 2) ma non per l'editing strutturale.
+    ext = os.path.splitext(model_path)[1].lower()
+    if ext not in ['.h5', '.keras']:
+        error_msg = f"Il formato {ext} non supporta la customizzazione strutturale. " \
+                    "La manipolazione dei layer e il fine-tuning richiedono modelli nativi Keras (.h5 o .keras). " \
+                    "Puoi comunque procedere all'analisi e generazione del firmware (Workflow 2)."
+        logger.error(f"❌ {error_msg}")
+        raise ValueError(error_msg)
     
     try:
         # Detecta architettura
@@ -2548,11 +2609,17 @@ except Exception as e:
             for mod_desc in info['modifications_applied']:
                 logger.info(f"    {mod_desc}")
     
+    except ValueError as ve:
+        # Errore specifico per formato non supportato
+        state.customization_applied = False
+        state.ai_error_message = str(ve)
+        return state
     except Exception as e:
         logger.error(f"❌ Error: {str(e)}", exc_info=True)
         state.customization_applied = False
         state.customized_model_path = ""
-        state.error_message = str(e)
+        state.ai_error_message = str(e)
+        return state
     
     return state
 
@@ -2617,8 +2684,12 @@ def fine_tune_customized_model(state: MasterState, config: dict) -> MasterState:
         
         training_rec = state.parsed_modifications.get('training_recommendation', {})
         learning_rate = training_rec.get('learning_rate', state.custom_learning_rate or 0.001)
-        epochs = training_rec.get('epochs', state.custom_epochs or 5)
-        batch_size = training_rec.get('batch_size', state.custom_batch_size or 64)
+        # Force 10 epochs if not explicitly requested otherwise, and cap at 10 for standard runs
+        epochs = min(training_rec.get('epochs', state.custom_epochs or 10), 10)
+        batch_size = training_rec.get('batch_size', state.custom_batch_size or 32)
+        
+        # Determine dropout rate (prioritize user explicit request, then fallback to 0.3 anti-overfitting)
+        dropout_rate = state.parsed_modifications.get('dropout_rate') or 0.3
         
         logger.info(f"📌 Training config: {epochs} epochs, batch={batch_size}, LR={learning_rate}")
         
@@ -2730,8 +2801,8 @@ try:
             X_real = np.load(os.path.join(real_dataset_path, "x_train.npy"))
             y_real = np.load(os.path.join(real_dataset_path, "y_train.npy"))
             
-            # LIMIT: Use only first 1000 samples to avoid OOM and speed up testing
-            max_samples = 1000
+            # LIMIT: Use only first 10000 samples to avoid OOM and speed up testing
+            max_samples = 10000
             if len(X_real) > max_samples:
                 print(f"  ⚠️  Limiting dataset to {{max_samples}} samples (OOM prevention)")
                 X_real = X_real[:max_samples]
@@ -2903,12 +2974,16 @@ try:
                 # Get output before final layer
                 base_output = model.layers[-2].output
                 
+                # Add Dropout for regularization (reduce overfitting)
+                # Using dynamic rate: {dropout_rate}
+                dropout = tf.keras.layers.Dropout({dropout_rate}, name='dropout_finetuned')(base_output)
+                
                 # Add new Dense layer with correct number of classes
                 new_output = tf.keras.layers.Dense(
                     dataset_num_classes, 
                     activation='softmax', 
                     name='predictions_finetuned'
-                )(base_output)
+                )(dropout)
                 
                 # Create new model
                 model = tf.keras.Model(inputs=model.input, outputs=new_output)
@@ -3028,7 +3103,7 @@ try:
                   f"loss: {{logs.get('loss'):.4f}} - "
                   f"accuracy: {{logs.get('accuracy'):.4f}} - "
                   f"val_loss: {{logs.get('val_loss'):.4f}} - "
-                  f"val_accuracy: {{logs.get('val_accuracy'):.4f}}")
+                  f"val_accuracy: {{logs.get('val_accuracy'):.4f}}", flush=True)
 
     callbacks_list = [
         PrintEpochProgress(),
@@ -3089,7 +3164,7 @@ except Exception as e:
         logger.info(f"  [Subprocess] Executing fine-tuning...")
         
         # ===== USA execute_in_environment =====
-        result = execute_in_environment(python_code, state, timeout=600)
+        result = execute_in_environment(python_code, state, timeout=1200)
         
         stdout = result['stdout']
         stderr = result['stderr']

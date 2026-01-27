@@ -172,6 +172,31 @@ Supported modifications include:
     \item \texttt{additional\_layers}: Specify custom layers (e.g., "BatchNormalization", "GlobalAveragePooling2D")
 \end{itemize}
 
+\subsection{Standard Fine-Tuning Path}
+\label{sec:standard_fine_tuning}
+
+While NNI provides comprehensive hyperparameter optimization, users often require a faster, single-trial training session for rapid verification. Workflow 5 implements a ``Standard Fine-Tuning'' path (\texttt{fine\_tune\_customized\_model}) that prioritizes rapid feedback and resource-aware stability.
+
+\subsubsection{Anti-Overfitting Logic}
+
+Large pre-trained models (e.g., MobileNetV2) are prone to catastrophic forgetting and overfitting when applied to small or specialized datasets like Fruit-360. To mitigate this, the system applies three automated strategies:
+
+\begin{itemize}
+    \item \textbf{Dynamic Sampling Escalation}: Instead of training on the full dataset (which might lead to OOM or excessive latency), the system employs a capped sampling strategy (10,000 images). This ensures a balanced representation across classes while maintaining execution speed.
+    \item \textbf{Proactive Regularization}: The system automatically inserts a \texttt{Dropout} layer (default rate 0.3) during the final layer replacement phase. This rate is dynamic; if the user specifies a custom value (e.g., 0.4) in their natural language intent, the system prioritizes the explicit instruction over the safety default.
+    \item \textbf{Epoch Capping}: Standard runs are capped at 10 epochs to provide a quick ``sanity check'' before expensive optimization loops are triggered.
+\end{itemize}
+
+\subsubsection{Real-time Observability and Fault Tolerance}
+
+To bridge the gap between headless subprocesses and the interactive agent web UI, the fine-tuning execution engine provides high-fidelity logging:
+
+\begin{itemize}
+    \item \textbf{Asynchronous Log Streaming}: Using \texttt{subprocess.Popen} with non-blocking pipe selection, training logs (epochs, loss, accuracy) are streamed in real-time to the user's console.
+    \item \textbf{Adaptive Timeouts}: The execution window is dynamically adjusted (e.g., 1200s) based on the estimated dataset size and model complexity to prevent premature termination.
+    \item \textbf{Class Mismatch Rescue}: If the dataset contains a different number of classes than the pre-trained model (e.g., 132 vs 1000), the system automatically performs an architectural surgery by replacing the final \texttt{Dense} layer and adjusting the output tensor shape before commencing training.
+\end{itemize}
+
 \subsection{NNI Code Generation: Architecture and Prompt Engineering}
 
 The core technical contribution of this workflow is the \textit{autonomous generation of complete NNI experiment code} from high-level specifications. Unlike template-based code generators that rely on rigid fill-in-the-blank patterns, this system employs a large language model (GPT-OSS:20b with 8192 context window) to synthesize production-ready Python scripts capable of handling edge cases such as:

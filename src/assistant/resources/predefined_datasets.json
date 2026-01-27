@@ -1,0 +1,148 @@
+{
+    "audio": {
+        "description": "Dataset Audio",
+        "datasets": {
+            "speech_commands": {
+                "name": "Speech Commands",
+                "description": "Google Speech Commands (Keyword Spotting: Yes, No, Up, Down...)",
+                "url": "http://download.tensorflow.org/data/speech_commands_v0.02.tar.gz",
+                "type": "audio",
+                "size": "2.3 GB",
+                "expected_shape": [
+                    32,
+                    32,
+                    1
+                ]
+            },
+            "esc50": {
+                "name": "ESC-50",
+                "description": "ESC-50: 2000 Environmental Sounds (Rain, Chainsaw, Dog...)",
+                "url": "https://github.com/karolpiczak/ESC-50/archive/master.zip",
+                "type": "audio",
+                "size": "600 MB",
+                "expected_shape": [
+                    32,
+                    32,
+                    1
+                ]
+            },
+            "fsdd": {
+                "name": "FSDD",
+                "description": "Free Spoken Digit Dataset (Spoken MNIST)",
+                "url": "https://github.com/Jakobovski/free-spoken-digit-dataset/archive/v1.0.10.zip",
+                "type": "audio",
+                "size": "15 MB",
+                "expected_shape": [
+                    32,
+                    32,
+                    1
+                ]
+            }
+        }
+    },
+    "vision": {
+        "description": "Dataset Visione Artificiale",
+        "datasets": {
+            "cifar10": {
+                "name": "CIFAR-10",
+                "description": "CIFAR-10: 60k 32x32 color images (10 classes)",
+                "keras_name": "cifar10",
+                "type": "image",
+                "size": "170 MB",
+                "expected_shape": [
+                    32,
+                    32,
+                    3
+                ]
+            },
+            "mnist": {
+                "name": "MNIST",
+                "description": "MNIST: Handwritten digits 28x28 grayscale",
+                "keras_name": "mnist",
+                "type": "image",
+                "size": "12 MB",
+                "expected_shape": [
+                    28,
+                    28,
+                    1
+                ]
+            },
+            "fashion_mnist": {
+                "name": "Fashion-MNIST",
+                "description": "Fashion-MNIST: Clothing items 28x28 grayscale",
+                "keras_name": "fashion_mnist",
+                "type": "image",
+                "size": "30 MB",
+                "expected_shape": [
+                    28,
+                    28,
+                    1
+                ]
+            },
+            "fruit_360": {
+                "name": "Fruit-360",
+                "description": "La collezione di immagini Fruit-360 contiene 100x100 dimensioni immagini di frutta e verdura. Il dataset è utilizzato per la classificazione di immagini.",
+                "url": "https://github.com/Horea94/Fruit-Images-Dataset/archive/master.zip",
+                "type": "image",
+                "size": "N/A (Custom)",
+                "expected_shape": [
+                    100,
+                    100,
+                    3
+                ],
+                "note": "Aggiunto dall'utente via URL"
+            }
+        }
+    },
+    "object_detection": {
+        "description": "Rilevamento Oggetti",
+        "datasets": {
+            "roboflow_vehicles": {
+                "name": "Roboflow Vehicles",
+                "description": "Roboflow Vehicles: Cars, Trucks detection (COCO format)",
+                "url": "https://universe.roboflow.com/roboflow-100/vehicles-q0vsv/dataset/1/download",
+                "type": "image",
+                "size": "~500 MB",
+                "note": "Smaller, focused dataset with COCO-format annotations",
+                "kaggle_alternative": "https://www.kaggle.com/datasets/solesensei/coco-minitrain-2017",
+                "expected_shape": [
+                    224,
+                    224,
+                    3
+                ]
+            },
+            "pascal_voc_2012": {
+                "name": "PASCAL VOC 2012",
+                "description": "PASCAL VOC 2012: Object Detection (20 classes)",
+                "tfds_name": "voc/2012",
+                "type": "image",
+                "size": "~1.9 GB",
+                "note": "Downloaded via TensorFlow Datasets (tfds) - automatic",
+                "expected_shape": null
+            }
+        }
+    },
+    "human_activity_recognition": {
+        "description": "Human Activity Recognition",
+        "datasets": {
+            "uci_har": {
+                "name": "UCI HAR",
+                "description": "UCI HAR: 30 subjects, 6 activities (accelerometer + gyroscope)",
+                "url": "https://archive.ics.uci.edu/ml/machine-learning-databases/00240/UCI%20HAR%20Dataset.zip",
+                "type": "sensor",
+                "size": "~60 MB",
+                "note": "Smartphone sensor data at 50Hz",
+                "expected_shape": null
+            },
+            "wisdm": {
+                "name": "WISDM",
+                "description": "WISDM: 51 subjects, 18 activities (Accelerometer + Gyroscope)",
+                "url": "https://archive.ics.uci.edu/ml/machine-learning-databases/00507/wisdm-dataset.zip",
+                "type": "sensor",
+                "size": "~295 MB",
+                "note": "UCI ML Repository - Direct download ZIP (20Hz sensor data)",
+                "expected_shape": null
+            }
+        }
+    }
+}

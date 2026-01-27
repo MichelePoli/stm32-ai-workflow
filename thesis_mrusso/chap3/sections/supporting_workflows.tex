@@ -20,11 +20,12 @@ Generated data is saved in NumPy format compatible with Workflow 5 (customizatio
 This workflow curates and converts publicly available datasets for embedded AI tasks:
 
 \begin{itemize}
-    \item \textbf{Catalog Search}: Queries a predefined catalog (\texttt{DATASET\_CATALOG} dict) of embedded-friendly datasets (CIFAR-10, MNIST, UCI HAR, ESC-50)
+    \item \textbf{Dynamic Dataset Registry}: Queries a multi-tier catalog managed through external JSON files (\texttt{predefined\_datasets.json} and \texttt{dataset\_mapping.json}). This architecture decouples the knowledge base from the logic, enabling runtime updates of available datasets and their task-based recommendations.
     \item \textbf{Download and Cache}: Fetches datasets from Kaggle, UCI ML Repository, or GitHub
-    \item \textbf{Format Standardization}: Converts to NumPy arrays with shape \texttt{(N, H, W, C)} for images or \texttt{(N, T, F)} for time series
-    \item \textbf{Train/Val/Test Splitting}: Applies stratified splits (default 70/15/15)
-    \item \textbf{Audio Preprocessing}: Converts audio datasets to spectrograms via STFT for vision model compatibility
+    \item \textbf{Format Standardization}: Converts to NumPy arrays with shape \texttt{(N, H, W, C)} for images or \texttt{(N, T, F)} for time series.
+    \item \textbf{Generic Vision Processor}: Automatically discovers image files within heterogeneous directory structures, inferring labels from parent subdirectories. This feature enables zero-configuration processing of arbitrary vision datasets (e.g., Fruit-360) by handling archive extraction and automatic conversion to memory-efficient \texttt{.npy} formats with a capped sampling limit (up to 10,000 images) to prevent RAM exhaustion.
+    \item \textbf{Train/Val/Test Splitting}: Applies stratified splits (default 70/15/15).
+    \item \textbf{Audio Preprocessing}: Converts audio datasets to spectrograms via STFT for vision model compatibility.
 \end{itemize}
 
 The converted dataset is saved to \texttt{./dataset\_output/} and path is recorded in \texttt{MasterState} for consumption by Workflow 5.
