@@ -56,5 +56,31 @@
                 "url": "https://github.com/STMicroelectronics/stm32ai-modelzoo/raw/main/object_detection/yolo_v2_tiny/Public_pretrainedmodel_public_dataset/COCO/yolo_v2_tiny_224_224/yolo_v2_tiny_224_224.h5"
             }
         ]
+    },
+    "pose_estimation": {
+        "description": "Pose Estimation",
+        "models": [
+            {
+                "name": "st_movenet_lightning_a100_heatmaps_192",
+                "local_filename": "st_movenet_lightning_a100_heatmaps_192.keras",
+                "size": "18.6MB",
+                "accuracy": "N/A (User Provided)",
+                "inference_time": "N/A",
+                "url": "https://github.com/STMicroelectronics/stm32ai-modelzoo/raw/main/pose_estimation/movenet/ST_pretrainedmodel_custom_dataset/custom_coco_person_17kpts/st_movenet_lightning_a100_heatmaps_192/st_movenet_lightning_a100_heatmaps_192.keras"
+            }
+        ]
+    },
+    "neural_style_transfer": {
+        "description": "Neural Style Transfer",
+        "models": [
+            {
+                "name": "xinet_a75_picasso_muse_160",
+                "local_filename": "xinet_a75_picasso_muse_160.tflite",
+                "size": "878.3KB",
+                "accuracy": "N/A (User Provided)",
+                "inference_time": "N/A",
+                "url": "https://github.com/STMicroelectronics/stm32ai-modelzoo/raw/main/neural_style_transfer/xinet_picasso_muse/Public_pretrainedmodel_public_dataset/coco_2017_80_classes_picasso/xinet_a75_picasso_muse_160/xinet_a75_picasso_muse_160_nomp.tflite"
+            }
+        ]
     }
 }

@@ -407,6 +407,7 @@ def build_ai_analysis_graph():
     workflow.add_node("collect_analysis_info", collect_analysis_info)
     workflow.add_node("choose_predefined_taskbased_model", choose_predefined_taskbased_model)
     workflow.add_node("search_recommendation_model", search_recommendation_model)
+    workflow.add_node("add_custom_model_procedure", add_custom_model_procedure)
     workflow.add_node("download_model", download_model)
     
     # === NODES: CUSTOMIZATION & NNI ===
@@ -480,7 +481,6 @@ def build_ai_analysis_graph():
     # 2. Connection to Customization
     workflow.add_edge("download_model", "inspect_model_architecture")
     workflow.add_edge("add_custom_model_procedure", "download_model")
-    workflow.add_edge("search_recommendation_model", "download_model")
     workflow.add_edge("inspect_model_architecture", "ask_modification_intent")
     
     # 3. Decision: Modify or Skip to Analyze?

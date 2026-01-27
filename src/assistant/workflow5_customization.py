@@ -291,6 +291,28 @@ def inspect_model_architecture(state: MasterState, config: dict) -> MasterState:
         logger.info("✓ Info architettura già presenti, skip analisi.")
         return state
 
+    # === GESTIONE FORMATI NON-KERAS (ONNX, TFLITE) ===
+    ext = os.path.splitext(state.model_path)[1].lower()
+    if ext in ['.onnx', '.tflite']:
+        logger.info(f"ℹ️  Formato {ext} rilevato. Fornisco metadati generici.")
+        file_size = os.path.getsize(state.model_path)
+        state.model_architecture = {
+            "input_shape": "Variable (External Format)",
+            "output_shape": "Variable (External Format)",
+            "n_layers": 0,
+            "layer_types": [],
+            "layer_names": [],
+            "total_params": 0,
+            "trainable_params": 0,
+            "model_size_mb": round(file_size / (1024*1024), 2),
+            "has_batchnorm": False,
+            "has_dropout": False,
+            "output_classes": 0,
+            "format": ext
+        }
+        state.model_summary_text = f"Modello in formato {ext.upper()}.\nL'ispezione dettagliata dei layer è supportata nativamente solo per H5/Keras.\nSTEdgeAI gestirà la conversione e l'ottimizzazione."
+        return state
+
     try:
         # ✅ Primo tentativo: load_model standard
         logger.info("   Tentativo 1: load_model() standard...")
@@ -311,6 +333,7 @@ def inspect_model_architecture(state: MasterState, config: dict) -> MasterState:
             "has_batchnorm": any(isinstance(l, tf.keras.layers.BatchNormalization) for l in model.layers),
             "has_dropout": any(isinstance(l, tf.keras.layers.Dropout) for l in model.layers),
             "output_classes": model.output_shape[-1] if len(model.output_shape) > 1 else 1,
+            "format": ext
         }
         
         import io
@@ -326,89 +349,76 @@ def inspect_model_architecture(state: MasterState, config: dict) -> MasterState:
         return state
     
     except Exception as e:
-        # ❌ load_model fallisce, prova fallback HDF5 raw
+        # ❌ load_model fallisce, prova fallback HDF5 raw (solo se .h5 o .keras)
         logger.warning(f"⚠️  load_model() fallito: {str(e)[:100]}")
-        logger.info("   Tentativo 2: Analisi HDF5 raw...")
         
-        try:
-            # ✅ Fallback: Estrai info direttamente dal file HDF5
-            with h5py.File(state.model_path, 'r') as f:
-                
-                # Estrai layer info
-                if 'model_config' in f.attrs:
-                    config = json.loads(f.attrs['model_config'])
-                    n_layers = len(config.get('config', {}).get('layers', []))
-                    layer_names = [l.get('name', 'unknown') for l in config.get('config', {}).get('layers', [])]
-                    layer_types = [l.get('class_name', 'unknown') for l in config.get('config', {}).get('layers', [])]
-                else:
-                    # Fallback: estrai da model_weights
-                    layer_names = list(f.get('model_weights', {}).keys()) if 'model_weights' in f else []
-                    n_layers = len(layer_names)
-                    layer_types = ['Unknown'] * n_layers
-                
-                # Estrai shape info
-                if 'model_weights' in f:
-                    weights_group = f['model_weights']
-                    # Prova a estrarre primo layer (input)
-                    first_layer_weights = list(weights_group.values())[0] if len(weights_group) > 0 else None
-                    
-                    if first_layer_weights:
-                        input_shape = first_layer_weights.shape if hasattr(first_layer_weights, 'shape') else "Unknown"
+        if ext in ['.h5', '.keras']:
+            logger.info("   Tentativo 2: Analisi HDF5 raw...")
+            try:
+                # ✅ Fallback: Estrai info direttamente dal file HDF5
+                with h5py.File(state.model_path, 'r') as f:
+                    # Estrai layer info
+                    if 'model_config' in f.attrs:
+                        config_data = json.loads(f.attrs['model_config'])
+                        if isinstance(config_data, str): # Keras 3 might store it differently
+                             config_data = json.loads(config_data)
+                        
+                        layers_list = config_data.get('config', {}).get('layers', [])
+                        n_layers = len(layers_list)
+                        layer_names = [l.get('name', 'unknown') for l in layers_list]
+                        layer_types = [l.get('class_name', 'unknown') for l in layers_list]
                     else:
-                        input_shape = "Unknown"
-                else:
+                        # Fallback: estrai da model_weights
+                        layer_names = list(f.get('model_weights', {}).keys()) if 'model_weights' in f else []
+                        n_layers = len(layer_names)
+                        layer_types = ['Unknown'] * n_layers
+                    
+                    # Estrai shape info
                     input_shape = "Unknown"
-                
-                # Calcola totale parametri da file size (stima)
-                file_size = os.path.getsize(state.model_path)
-                # Stima: 1 parametro ≈ 4 bytes (float32)
-                estimated_params = (file_size - 1024) / 4  # Sottrai overhead
-                
-                state.model_architecture = {
-                    "input_shape": str(input_shape),
-                    "output_shape": "Unknown (raw HDF5)",
-                    "n_layers": n_layers,
-                    "layer_types": layer_types,
-                    "layer_names": layer_names,
-                    "total_params": int(estimated_params) if estimated_params > 0 else 0,
-                    # ✅ PROTEZIONE: sempre intero, mai None
-                    "trainable_params": 0,  # ✅ Default a 0, non None
-                    "model_size_mb": round(file_size / (1024*1024), 2),
-                    "has_batchnorm": any('batch' in name.lower() for name in layer_names),
-                    "has_dropout": any('dropout' in name.lower() for name in layer_names),
-                    "output_classes": 0,  # ✅ Default a 0, non None
-                }
-                
-                logger.info(f"✓ Architettura estratta (HDF5 raw):")
-                logger.info(f"  - Layers: {state.model_architecture['n_layers']}")
-                logger.info(f"  - Total params (stimati): {state.model_architecture['total_params']:,}")
-                logger.info(f"  - Model size: {state.model_architecture['model_size_mb']:.2f} MB")
-                logger.warning(f"⚠️  Analisi parziale: informazioni complete richiedono tf.keras.models.load_model()")
-                
-                return state
+                    if 'model_weights' in f:
+                        weights_group = f['model_weights']
+                        first_layer_weights = list(weights_group.values())[0] if len(weights_group) > 0 else None
+                        if first_layer_weights:
+                            input_shape = first_layer_weights.shape if hasattr(first_layer_weights, 'shape') else "Unknown"
+                    
+                    file_size = os.path.getsize(state.model_path)
+                    estimated_params = (file_size - 1024) / 4 
+                    
+                    state.model_architecture = {
+                        "input_shape": str(input_shape),
+                        "output_shape": "Unknown (raw HDF5)",
+                        "n_layers": n_layers,
+                        "layer_types": layer_types,
+                        "layer_names": layer_names,
+                        "total_params": int(estimated_params) if estimated_params > 0 else 0,
+                        "trainable_params": 0,
+                        "model_size_mb": round(file_size / (1024*1024), 2),
+                        "has_batchnorm": any('batch' in name.lower() for name in layer_names),
+                        "has_dropout": any('dropout' in name.lower() for name in layer_names),
+                        "output_classes": 0,
+                        "format": ext
+                    }
+                    return state
+            except Exception as e2:
+                logger.error(f"❌ HDF5 raw fallito: {str(e2)[:100]}")
         
-        except Exception as e2:
-            # ❌ Anche HDF5 raw fallisce, usa default minimo
-            logger.error(f"❌ HDF5 raw fallito: {str(e2)[:100]}")
-            logger.warning("⚠️  Usando default minimale per continuare il workflow")
-            
-            state.model_architecture = {
-                "input_shape": "Unknown",
-                "output_shape": "Unknown",
-                "n_layers": 0,
-                "layer_types": [],
-                "layer_names": [],
-                "total_params": 0,      # ✅ SEMPRE intero
-                "trainable_params": 0,  # ✅ SEMPRE intero
-                "model_size_mb": os.path.getsize(state.model_path) / (1024*1024),
-                "has_batchnorm": False,
-                "has_dropout": False,
-                "output_classes": 0,    # ✅ SEMPRE intero
-            }
-            
-            logger.error(f"❌ Impossibile analizzare modello: {str(e)[:100]}")
-            
-            return state
+        # ❌ Fallback finale: default minimo
+        logger.warning("⚠️  Usando default minimale per continuare il workflow")
+        state.model_architecture = {
+            "input_shape": "Unknown",
+            "output_shape": "Unknown",
+            "n_layers": 0,
+            "layer_types": [],
+            "layer_names": [],
+            "total_params": 0,
+            "trainable_params": 0,
+            "model_size_mb": os.path.getsize(state.model_path) / (1024*1024),
+            "has_batchnorm": False,
+            "has_dropout": False,
+            "output_classes": 0,
+            "format": ext
+        }
+        return state
 
 
 def ask_modification_intent(state, config: dict):

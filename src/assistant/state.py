@@ -74,6 +74,8 @@ class MasterState:
     model_accepted: bool = False  # Utente ha accettato il modello?
     last_task: str = ""  # image_classification, object_detection, human_activity_recognition
     custom_use_case: str = ""  # Nuovo: use case specifico utente
+    is_new_registration: bool = False  # True se è un modello appena registrato dall'utente
+    pending_model_entry: Optional[dict] = None  # Dati del modello in attesa di validazione tecnica
 
     # === WORKFLOW 3: INTEGRATION ===
     ai_code_dir: str = ""

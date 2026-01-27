@@ -36,23 +36,15 @@ The model discovery system implements a hierarchical search strategy designed to
 
 \subsubsection{Tier 1: Curated Task-Based Models}
 
-The first tier presents a curated catalog of models (\texttt{PREDEFINED\_MODELS} dictionary in \texttt{workflow2\_ai.py}) optimized for common embedded AI tasks:
+The first tier presents a curated catalog of models managed through a dynamic JSON registry (\texttt{predefined\_models.json}). This registry decouples the model implementation from the discovery logic, allowing the knowledge base to be updated without code modifications. Models are optimized for common embedded AI tasks such as Image Classification (MobileNet family, EfficientNet-Lite), Object Detection (SSD, YOLO-Nano), and Human Activity Recognition.
 
-\begin{itemize}
-    \item \textbf{Image Classification}: MobileNetV1/V2 (96×96, 128×128, 224×224), EfficientNet-Lite, SqueezeNet
-    \item \textbf{Object Detection}: MobileNet-SSD, YOLO-Nano
-    \item \textbf{Human Activity Recognition (HAR)}: CNN-based models pretrained on accelerometer/gyroscope data
-\end{itemize}
+Each entry includes a technical description, a validated download URL, and metadata regarding the model's footprint. The \texttt{choose\_predefined\_taskbased\_model()} node:
 
-Each entry includes:
-\begin{itemize}
-    \item Download URL (GitHub Releases, Kaggle, STModelZoo)
-    \item Input shape and number of output classes
-    \item Estimated RAM/Flash footprint for reference MCUs
-    \item Preprocessing requirements
-\end{itemize}
-
-The \texttt{choose\_predefined\_taskbased\_model()} node:
+\begin{enumerate}
+    \item \textbf{Dynamic Menu Generation}: Dynamically builds the task selection menu from the categories available in the registry.
+    \item \textbf{LLM Intent Parsing}: Classifies user task using dynamic instructions passed to the LLM.
+    \item \textbf{Proactive Compatibility Check}: Cross-references each model's footprint against the target MCU's limits.
+\end{enumerate}
 
 \begin{enumerate}
     \item Classifies user task using LLM intent detection (\texttt{TaskSelectionExtraction} schema)
@@ -185,15 +177,15 @@ This command performs static analysis without target hardware, generating a prof
     \item \textbf{Estimated Latency}: For reference MCU at typical clock speeds
 \end{itemize}
 
-If RAM/Flash usage exceeds the MCU capabilities, the system triggers an \textbf{Autonomous Resource Optimization Loop}. Instead of halting execution to request user intervention, the workflow intelligently attempts to rescue the model by escalating the compression level:
+If RAM/Flash usage exceeds the MCU capabilities, the system triggers an \textbf{Autonomous Resource Optimization Loop}. Instead of halting execution to request user intervention, the workflow intelligently attempts to "rescue" the model by escalating the compression level:
 
 \begin{enumerate}
-    \item \textbf{Escalation Strategy}: The agent automatically increments the quantization aggressiveness (e.g., \texttt{medium} $\rightarrow$ \texttt{high} $\rightarrow$ \texttt{very\_high}).
-    \item \textbf{Re-Analysis}: The \texttt{stedgeai analyze} command is re-executed with the new \texttt{--compression} flag to generate an updated resource profile.
-    \item \textbf{Evaluation}: The system re-evaluates the new memory footprint against the target MCU constraints.
+    \item \textbf{Escalation Strategy}: The agent automatically increments the quantization aggressiveness (\texttt{medium} $\rightarrow$ \texttt{high} $\rightarrow$ \texttt{very\_high}).
+    \item \textbf{Re-Analysis}: The \texttt{stedgeai analyze} command is re-executed with the new \texttt{--compression} flag.
+    \item \textbf{Self-Evaluation}: The system re-evaluates the updated memory footprint. If the model now fits, the workflow proceeds autonomously; otherwise, it attempts a further escalation until the physical limit of the board is reached.
 \end{enumerate}
 
-This autonomous behavior allows the pipeline to self-correct and maximize the success rate for deploying large models on constrained edge devices, falling back to manual model selection only if the model remains too large even at maximum compression (typically $>8\times$ overflow).
+This autonomous behavior highlights the transition from a traditional toolchain to an \textit{agentic framework}, where the AI orchestrator takes independent responsibility for solving technical deployment constraints.
 
 \subsubsection{Phase 2: On-Target Validation}
 

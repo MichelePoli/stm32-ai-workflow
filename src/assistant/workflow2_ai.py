@@ -64,7 +64,7 @@ class TaskSelectionExtraction(BaseModel):
     """Estrae la scelta del task da risposta naturale"""
     task: Optional[str] = Field(
         default=None,
-        description="Task selezionato: image_classification, object_detection, human_activity_recognition, register_new, other"
+        description="Task selezionato (chiave tecnica della categoria)"
     )
     confidence: float = Field(
         ge=0.0, le=1.0,
@@ -105,6 +105,17 @@ class ModelFeedbackExtraction(BaseModel):
     confidence: float = Field(
         ge=0.0, le=1.0,
         description="Confidenza della classificazione (0-1)"
+    )
+
+
+class ResolutionExtraction(BaseModel):
+    """Estrae la decisione post-fallimento risorse"""
+    decision: str = Field(
+        description="Azione da intraprendere: change_board o change_model"
+    )
+    confidence: float = Field(
+        ge=0.0, le=1.0,
+        description="Confidenza della scelta"
     )
 
 
@@ -150,26 +161,7 @@ Esempi:
 Rispondi SEMPRE in formato JSON valido.
 """
 
-task_selection_instructions = """Analizza la risposta dell'utente e determina il task AI richiesto.
-
-Classi disponibili:
-- image_classification: classificare immagini (es: cifar10, mobilenet, resnet)
-- object_detection: identificare oggetti e posizioni (es: yolo, ssd)
-- human_activity_recognition: analizzare dati di sensori per attività (es: har)
-- register_new: l'utente vuole aggiungere/registrare un nuovo modello o link GitHub al catalogo
-- other: task non contemplati (audio, custom, ricerca generica)
-
-Esempi:
-- "1" -> image_classification
-- "Voglio fare object detection" -> object_detection
-- "Aggiungi un nuovo link GitHub" -> register_new
-- "Registra modello" -> register_new
-- "Cerchiamo qualcosa su internet" -> other
-
-Rispondi sempre in formato JSON con:
-- "task": uno tra image_classification, object_detection, human_activity_recognition, register_new, other
-- "confidence": 0.0-1.0 (quanto sei sicuro)
-"""
+# Istruzioni estratte dinamicamente
 
 model_selection_instructions = """Analizza la risposta dell'utente sulla selezione del modello.
 
@@ -395,20 +387,32 @@ def choose_predefined_taskbased_model(state: MasterState, config: dict) -> Maste
         num_ctx=cfg.llm_context_window
     )
     
-    # === STEP 1: CHIEDI TASK ===
+    # === STEP 1: COSTRUZIONE PROMPT DINAMICO ===
+    categories = list(PREDEFINED_MODELS.keys())
     
-    prompt = {
-        "instruction": """Seleziona il task che vuoi fare:
-
-1. Classificazione immagini (immagini → categoria)
-2. Rilevamento oggetti (immagini → posizione oggetti)
-3. Human Activity Recognition (sensori → attività fisica)
-4. 🆕 Registra un NUOVO modello (Link GitHub)
-5. Nessuno di questi (ricerca online)
-
-Rispondi: 1, 2, 3, 4, 5 oppure descrivi il task
-        """
-    }
+    prompt_lines = ["Seleziona il task che vuoi fare:\n"]
+    idx = 1
+    mapping = {}
+    
+    for cat in categories:
+        desc = PREDEFINED_MODELS[cat].get("description", cat)
+        prompt_lines.append(f"{idx}. {desc}")
+        mapping[str(idx)] = cat
+        idx += 1
+    
+    # Opzioni fisse alla fine
+    reg_idx = idx
+    prompt_lines.append(f"{reg_idx}. Registra un NUOVO modello (fornisci dettagli nel prossimo step)")
+    mapping[str(reg_idx)] = "register_new"
+    
+    other_idx = idx + 1
+    prompt_lines.append(f"{other_idx}. Nessuno di questi (ricerca online)")
+    mapping[str(other_idx)] = "other"
+    
+    prompt_text = "\n".join(prompt_lines)
+    prompt_text += f"\n\nRispondi: 1-{other_idx} oppure descrivi il task"
+    
+    prompt = {"instruction": prompt_text}
     
     user_response = interrupt(prompt) # per adesso commentata per velocizzare
     #user_response = "" # BYPASS
@@ -425,10 +429,26 @@ Rispondi: 1, 2, 3, 4, 5 oppure descrivi il task
     
     # === ESTRAI TASK CON LLM ===
     
+    # Costruisci istruzioni dinamiche per l'LLM
+    dynamic_instructions = f"""Analizza la risposta dell'utente e determina il task AI richiesto.
+Il sistema presenta un menu dinamico:
+{prompt_text}
+
+MAPPING CRITICO:
+"""
+    for k, v in mapping.items():
+        dynamic_instructions += f'- "{k}" -> {v}\n'
+    
+    dynamic_instructions += """
+Rispondi sempre in formato JSON con:
+- "task": la chiave tecnica del task (es: image_classification, register_new, etc.)
+- "confidence": 0.0-1.0
+"""
+
     llm_extractor = llm.with_structured_output(TaskSelectionExtraction)
     
     task_result = llm_extractor.invoke([
-        SystemMessage(content=task_selection_instructions),
+        SystemMessage(content=dynamic_instructions),
         HumanMessage(content=f"Risposta utente: {user_text}")
     ])
     
@@ -1207,19 +1227,18 @@ def search_via_google_tools_hybrid(
     try:
         logger.info(f"🔍 Ricerca Google (fallback, NO iter++)...")
         
-        google_prompt = f"""Ricerca file .h5 per STM32 AI
+        google_prompt = f"""Ricerca modelli AI (.h5, .keras, .onnx, .tflite) per STM32
+Target: {state.target}
+Task: {state.last_task}
 
-TASK: {state.last_task}
-MCU: {state.target}
+Criteri:
+1. Link GitHub Raw o Hugging Face
+2. Download diretto
+3. File compatibile con STM32 X-CUBE-AI
 
-RICERCA:
-1. Cerca nel repository STMicroelectronics stm32ai-modelzoo
-2. Priorità: link GitHub /raw/ diretti
-3. File .h5 per questa task
-
-FORNISCI RISULTATO CON:
-- Name: [modello]
-- URL: [link_scaricabile_.h5]
+Ritorna esattamente questo formato JSON:
+- Nome: [titolo_modello]
+- URL: [link_scaricabile]
 - Size: [MB]
 - Accuracy: [%]
 - Inference: [ms]
@@ -1298,7 +1317,7 @@ FORNISCI RISULTATO CON:
                 'model': {
                     'name': search_extraction.model_name,
                     'url': search_extraction.download_url,
-                    'local_filename': search_extraction.model_name.replace(" ", "_") + ".h5",
+                    'local_filename': search_extraction.model_name.replace(" ", "_") + os.path.splitext(search_extraction.download_url)[1],
                     'size': search_extraction.model_size,
                     'accuracy': search_extraction.accuracy,
                     'inference_time': search_extraction.inference_time,
@@ -1323,8 +1342,8 @@ FORNISCI RISULTATO CON:
 def validate_model_url_quick(url: str, timeout: int = 5) -> bool:
     """Validazione rapida via HEAD request"""
     
-    if not url or not url.endswith('.h5'):
-        logger.warning(f"⚠️  URL non .h5: {url[:50]}")
+    if not url or not any(url.endswith(ext) for ext in ['.h5', '.keras', '.onnx', '.tflite']):
+        logger.warning(f"⚠️  URL non supportato: {url[:50]}")
         return False
     
     try:
@@ -1369,7 +1388,8 @@ def extract_description(filename: str, path: str) -> str:
     Esempio: "mobilenet_v2_224_224.h5" → "Mobilenet V2 224 224"
     """
     
-    name = filename.replace(".h5", "")
+    # Rimuovi estensione comune
+    name = re.sub(r'\.(h5|keras|onnx|tflite)$', '', filename, flags=re.IGNORECASE)
     name = re.sub(r'_+', ' ', name)
     name = name.title()
     
@@ -1521,7 +1541,13 @@ def inspect_model_via_legacy_env(model_path: str) -> Optional[dict]:
 
     try:
         arch = detect_architecture_from_model(model_path)
-        env_name = ARCHITECTURE_ENV_MAP.get(arch, 'stm32_legacy')
+        
+        # Scegli environment: .keras -> stm32 (Keras 3), .h5 -> stm32_legacy (Keras 2) o stm32
+        if model_path.endswith('.keras'):
+            env_name = 'stm32'
+        else:
+            env_name = ARCHITECTURE_ENV_MAP.get(arch, 'stm32_legacy')
+        
         python_path = CONDA_PYTHON_PATHS.get(env_name)
         
         if not python_path or not os.path.exists(python_path):
@@ -1550,7 +1576,8 @@ try:
         'trainable_params': trainable,
         'model_size_mb': os.path.getsize(r'{model_path}') / (1024*1024),
         'has_batchnorm': any(['BatchNormalization' in l.__class__.__name__ for l in model.layers]),
-        'has_dropout': any(['Dropout' in l.__class__.__name__ for l in model.layers])
+        'has_dropout': any(['Dropout' in l.__class__.__name__ for l in model.layers]),
+        'env_used': '{env_name}'
     }}
     print("JSON_START" + json.dumps(info) + "JSON_END")
 except Exception as e:
@@ -1692,13 +1719,16 @@ def download_model_to_cache(state: MasterState, config: dict, model: dict) -> Ma
                 
                 with open(cached_path, 'wb') as f:
                     downloaded = 0
+                    last_log = 0
                     for chunk in response.iter_content(chunk_size=8192):
                         if chunk:
                             f.write(chunk)
                             downloaded += len(chunk)
                             if total_size:
                                 pct = (downloaded / total_size) * 100
-                                logger.info(f"  ⬇️  {pct:.1f}%")
+                                if pct >= last_log + 20:
+                                    last_log = (int(pct / 20)) * 20
+                                    logger.info(f"  ⬇️  {last_log}%")
                 
                 logger.info(f"✓ Download completato! Size: {os.path.getsize(cached_path) / (1024*1024):.1f} MB")
                 
@@ -1712,7 +1742,7 @@ def download_model_to_cache(state: MasterState, config: dict, model: dict) -> Ma
                 legacy_info = inspect_model_via_legacy_env(cached_path)
                 
                 if legacy_info:
-                    logger.info(f"✓ Analisi riuscita (via stm32_legacy)!")
+                    logger.info(f"✓ Analisi riuscita (via {legacy_info.get('env_used', 'unknown')})!")
                     logger.info(f"  Input: {legacy_info['input_shape']}")
                     state.model_info = legacy_info
                     state.model_architecture = legacy_info # Sync for workflow5 compatibility
@@ -1761,13 +1791,16 @@ def download_model_to_cache(state: MasterState, config: dict, model: dict) -> Ma
                         
                         with open(fallback_path, 'wb') as f:
                             downloaded = 0
+                            last_log = 0
                             for chunk in response.iter_content(chunk_size=8192):
                                 if chunk:
                                     f.write(chunk)
                                     downloaded += len(chunk)
                                     if total_size:
                                         pct = (downloaded / total_size) * 100
-                                        logger.info(f"  ⬇️  {pct:.1f}%")
+                                        if pct >= last_log + 20:
+                                            last_log = (int(pct / 20)) * 20
+                                            logger.info(f"  ⬇️  {last_log}%")
                         
                         logger.info(f"✓ Fallback download completato!")
                         state.model_path = fallback_path
@@ -1885,6 +1918,41 @@ def run_analyze(state: MasterState, config: dict) -> MasterState:
             state.ai_error_message = f"Model not found: {model_path}"
             return state
         
+        # ✅ FIX PER .keras (Keras 3): Converti in TFLite se necessario
+        # stedgeai v2.x ha bug con Keras 3 (es: Concatenate object has no attribute 'get_input_shape_at')
+        if model_path.endswith('.keras'):
+            logger.info("⚡ Rilevato modello Keras 3 (.keras). Avvio conversione TFLite per compatibilità stedgeai...")
+            tflite_path = model_path.replace('.keras', '.tflite')
+            
+            if not os.path.exists(tflite_path): # Se il file è già presente, il sistema salta tutto il blocco di conversione. Significa che la conversione è già stata eseguita in precedenza.
+                conversion_script = f"""
+import tensorflow as tf
+import os
+try:
+    model = tf.keras.models.load_model(r'{model_path}', compile=False)
+    converter = tf.lite.TFLiteConverter.from_keras_model(model)
+    tflite_model = converter.convert()
+    with open(r'{tflite_path}', 'wb') as f:
+        f.write(tflite_model)
+    print("CONVERSION_OK")
+except Exception as e:
+    print(f"CONVERSION_ERROR:{{e}}")
+"""
+                python_path = CONDA_PYTHON_PATHS.get('stm32') # Usa env Keras 3
+                res = execute_in_environment(conversion_script, python_path)
+                
+                if not res['success'] or "CONVERSION_OK" not in res['stdout']:
+                    logger.error(f"❌ Conversione TFLite fallita: {res['stdout']} {res['stderr']}")
+                    state.analyze_success = False
+                    state.ai_error_message = f"TFLite conversion failed for Keras 3 model."
+                    return state
+                
+                logger.info(f"✅ Conversione completata: {tflite_path}")
+            
+            # Usa il TFLite per l'analisi
+            model_path = tflite_path
+            state.model_path = tflite_path # Aggiorna lo stato così i nodi successivi lo usano
+        
         logger.info(f"  Model ({model_type}): {model_path}")
         
         # ===== OUTPUT DIR =====
@@ -1911,6 +1979,37 @@ def run_analyze(state: MasterState, config: dict) -> MasterState:
         if state.analyze_success:
             logger.info(f"✓ Analyze completato")
             state.analyze_report_dir = analyze_dir
+            
+            # ✅ COMMIT REGISTRAZIONE: Salva il modello nel catalogo permanente solo se l'analisi tecnica ha avuto successo.
+            # Questo evita di registrare link rotti o modelli non supportati dagli strumenti ST.
+            if state.is_new_registration and state.pending_model_entry:
+                try:
+                    # Carica il catalogo attuale dal file JSON
+                    models = load_predefined_models()
+                    new_entry = state.pending_model_entry.copy()
+                    
+                    # Estrae la categoria (es: image_classification) e la rimuove dai dati del modello
+                    category = new_entry.pop("category", "other")
+                    
+                    # Crea la categoria nel catalogo se non esiste ancora
+                    if category not in models:
+                        models[category] = {
+                            "description": category.replace("_", " ").title(),
+                            "models": []
+                        }
+                    
+                    # Controllo anti-duplicati: salva solo se l'URL non è già presente nella categoria
+                    if not any(m['url'] == new_entry['url'] for m in models[category]['models']):
+                        models[category]["models"].append(new_entry)
+                        save_predefined_models(models) # Scrittura fisica su disco (predefined_models.json)
+                        logger.info(f"💾 Modello '{new_entry['name']}' salvato nel catalogo permanente.")
+                    
+                    # Reset dello stato: la registrazione è conclusa con successo
+                    state.is_new_registration = False # Reset flag
+                    state.pending_model_entry = None  # Pulisci
+                    
+                except Exception as ex:
+                    logger.error(f"⚠️ Errore durante il salvataggio nel catalogo: {ex}")
         else:
             state.ai_error_message = result.stderr.strip() or f"Return code {result.returncode}"
             logger.error(f"✗ Analyze fallito: {state.ai_error_message[:500]}")
@@ -2210,26 +2309,38 @@ def handle_resource_failure(state: MasterState, config: dict) -> MasterState:
         num_ctx=cfg.llm_context_window
     )
     
-    analysis_prompt = f"""Analizza la risposta dell'utente e determina l'azione da intraprendere.
+    # === ESTRAI DECISIONE CON LLM (Robusto con Structured Output) ===
+    llm_extractor = llm.with_structured_output(ResolutionExtraction)
     
-Risposta: "{user_text}"
+    analysis_prompt = f"""Analizza la risposta dell'utente e determina l'azione da intraprendere.
+L'utente ha visto queste opzioni:
+0. Cambia Microcontrollore (Board)
+1. Scegli un altro modello AI
 
-Opzioni:
-- Se l'utente vuole cambiare scheda, board, microcontrollore, MCU -> rispondi: CHANGE_BOARD
-- Se l'utente vuole cambiare modello, rete neurale, AI, o riprovare la scelta -> rispondi: CHANGE_MODEL
+Risposta utente: "{user_text}"
 
-Rispondi SOLO con una parola (senza commenti): CHANGE_BOARD o CHANGE_MODEL
+MAPPING:
+- "0" o "board" o "scheda" -> change_board
+- "1" o "modello" o "model" o "scelta" -> change_model
+
+Rispondi con un JSON che contiene:
+- "decision": "change_board" o "change_model"
+- "confidence": 0.0-1.0
 """
     
-    response = llm.invoke([
-        SystemMessage(content="Sei un classificatore di intenti. Rispondi solo con la keyword richiesta."),
-        HumanMessage(content=analysis_prompt)
-    ])
+    try:
+        result = llm_extractor.invoke([
+            SystemMessage(content="Sei un classificatore di intenti tecnico."),
+            HumanMessage(content=analysis_prompt)
+        ])
+        
+        decision = result.decision.lower()
+        logger.info(f"🤖 Decisione LLM: {decision} (confidence: {result.confidence:.2f})")
+    except Exception as e:
+        logger.error(f"⚠️ Errore estrazione decisione: {e}. Fallback su change_model.")
+        decision = "change_model"
     
-    decision = response.content.strip().upper()
-    logger.info(f"🤖 Decisione LLM: {decision}")
-    
-    if "BOARD" in decision:
+    if "board" in decision:
         state.route = "change_board"
     else:
         state.route = "change_model"
@@ -2321,16 +2432,17 @@ Rispondi in formato JSON con questi campi:
         "size": size_str,
         "accuracy": "N/A (User Provided)",
         "inference_time": "N/A",
-        "url": url
+        "url": url,
+        "category": category # Temporaneo per salvarlo dopo
     }
     
-    models[category]["models"].append(new_entry)
-    save_predefined_models(models)
-    
-    logger.info(f"✅ Modello '{data['name']}' aggiunto con successo alla categoria '{category}'!")
+    logger.info(f"⏳ Modello '{data['name']}' in attesa di validazione tecnica...")
     
     # Imposta il nuovo modello come selezionato per procedere subito
     state.selected_model = new_entry
+    state.pending_model_entry = new_entry
+    state.is_new_registration = True
+    
     state.model_path = "" # Verrà scaricato nel nodo download_model
     state.model_discovery_method = "default" # Fai finta che sia predefinito ora
     

@@ -54,3 +54,16 @@ A significant "Toolchain Maturity Gap" was identified during the automation of t
 \end{figure}
 
 These prompts represent a fundamental challenge for MLOps pipelines, as they require a "human-in-the-loop" interaction for features that could otherwise be programmatically derived. To achieve full autonomy, a "Pre-seeded IOC" strategy was developed, which is further detailed in Section \ref{subsec:preseeded_ioc}.
+
+\subsection{The Keras 3 Compatibility Gap and the TFLite Bridge}
+
+With the transition to Keras 3.x, a significant regression was observed in the STMicroelectronics STEdgeAI 2.2 toolchain. Modern models serialized with the native Keras 3 format (\texttt{.keras}) often trigger internal errors in the ST parser (e.g., \texttt{INTERNAL ERROR: 'Concatenate' object has no attribute 'get\_input\_shape\_at'}). This issue is caused by the shift in the internal Keras API that the ST tool expects for graph traversal.
+
+To overcome this without requiring the user to manually convert their models, I engineered an \textbf{Autonomous TFLite Bridge}. When the orchestrator detects a Keras 3 model, it automatically:
+\begin{enumerate}
+    \item Spawns a dedicated subprocess in the \texttt{stm32\_agent} environment.
+    \item Uses the \texttt{TFLiteConverter} API to transform the Keras model into a TensorFlow Lite flatbuffer.
+    \item Redirects the STEdgeAI analysis engine to target the generated TFLite artifact instead of the original Keras file.
+\end{enumerate}
+
+This bridge "flattens" the model architecture into standard TFLite operators, which the ST toolchain interprets correctly, thus restoring the autonomous flow for the latest state-of-the-art models.

@@ -63,7 +63,7 @@ All workflow data is stored in a single \texttt{MasterState} object defined in \
     \item \textbf{Web Research}: Query history, search results, evaluation scores
 \end{itemize}
 
-This persistent state model enables \textbf{Context Chaining}, a critical architectural feature where outputs from upstream workflows (e.g., the specific MCU target selected during \texttt{firmware\_flow}) automatically populate the input context for downstream workflows (\texttt{ai\_flow}). This eliminates redundant user data entry and prevents configuration mismatches, such as selecting an AI model incompatible with the previously generated firmware board.
+This persistent state model enables \textbf{Context Chaining}, a critical architectural feature where outputs from upstream workflows (e.g., the specific MCU target selected during \texttt{firmware\_flow}) automatically populate the input context for downstream workflows (\texttt{ai\_flow}). This eliminates redundant user data entry and prevents configuration mismatches, such as selecting an AI model incompatible with the previously generated firmware board. The state object acts as a \textit{single source of truth}, synchronizing project parameters across heterogeneous toolchains (CubeMX, STEdgeAI, TensorFlow).
 
 LangGraph automatically persists this state at every node transition through a checkpointing mechanism, enabling:
 
@@ -74,6 +74,10 @@ LangGraph automatically persists this state at every node transition through a c
 \end{enumerate}
 
 The state is serialized as JSON and stored in a SQLite database (LangGraph's default backend for local deployments).
+
+\subsubsection{System Integrity and Transactional Registration}
+
+To maintain the stability of the model registry, the framework implements a \textbf{Transactional Registration Flow} for user-provided models. When a user submits a new model URL, the entry is first held in a \textit{Pending} state within the \texttt{MasterState}. The system then performs an autonomous validation via the STEdgeAI analysis engine. Only upon successful technical profiling (\texttt{analyze\_success = true}) is the model permanently committed to the \texttt{predefined\_models.json} registry. This transactional behavior ensures that the system's knowledge base remains free from broken links, malformed architectures, or incompatible file formats.
 
 \subsection{Configuration Management}
 
