@@ -2,7 +2,7 @@
   ******************************************************************************
   * @file    network_data.c
   * @author  AST Embedded Analytics Research Platform
-  * @date    2026-01-27T15:53:16+0100
+  * @date    2026-01-27T16:46:53+0100
   * @brief   AI Tool Automatic Code Generator for Embedded NN computing
   ******************************************************************************
   * @attention
@@ -21,13 +21,13 @@
 AI_API_DECLARE_BEGIN
 ai_buffer g_network_data_map_activations[AI_NETWORK_DATA_ACTIVATIONS_COUNT] = {
   AI_BUFFER_INIT(AI_FLAG_NONE,  AI_BUFFER_FORMAT_U8,
-    AI_BUFFER_SHAPE_INIT(AI_SHAPE_BCWH, 4, 1, 817248, 1, 1),
-    817248, NULL, NULL),    /* heap_overlay_pool */
+    AI_BUFFER_SHAPE_INIT(AI_SHAPE_BCWH, 4, 1, 815328, 1, 1),
+    815328, NULL, NULL),    /* heap_overlay_pool */
   };
 ai_buffer g_network_data_map_weights[AI_NETWORK_DATA_WEIGHTS_COUNT] = {
   AI_BUFFER_INIT(AI_FLAG_NONE,  AI_BUFFER_FORMAT_U8,
-    AI_BUFFER_SHAPE_INIT(AI_SHAPE_BCWH, 4, 1, 1869344, 1, 1),
-    1869344, NULL, NULL),   /* weights_array */
+    AI_BUFFER_SHAPE_INIT(AI_SHAPE_BCWH, 4, 1, 2200416, 1, 1),
+    2200416, NULL, s_network_weights_array_u64),   /* weights_array */
   };
 
 
@@ -77,7 +77,8 @@ AI_DEPRECATED
 AI_API_ENTRY
 ai_handle ai_network_data_weights_get(void)
 {
-  return AI_HANDLE_PTR(NULL);
+  return AI_HANDLE_PTR(g_network_weights_table);
+
 }
 
 

@@ -1,5 +1,5 @@
 ST Edge AI Core v2.2.0-20266 2adc00962
-Created date          : 2026-01-22 19:53:35
+Created date          : 2026-01-27 15:53:28
 Parameters            : generate --model /home/mrusso/.stm32_ai_models/mobilenetv1_128.h5 --target stm32h7 --output ./analisiAI/code_resnet --compression medium
 
 Exec/report summary (generate)

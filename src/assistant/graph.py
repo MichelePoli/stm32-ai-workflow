@@ -51,8 +51,10 @@ from src.assistant.workflow2_ai import (
     finalize_analysis,
     search_recommendation_model,
     model_selection_routing,
-    check_resource_constraints,  # NEW
-    resource_check_routing       # NEW
+    check_resource_constraints,
+    resource_check_routing,
+    handle_resource_failure,
+    add_custom_model_procedure
 )
 
 # --- Workflow 3: Integration ---
@@ -348,6 +350,9 @@ def decision_continue_routing(state: MasterState) -> Literal["ai_flow", "integra
     elif state.route == "continue_to_integration":
         logger.info("→ Routing verso: integration_flow")
         return "integration_flow"
+    elif state.route == "change_board":
+        logger.info("→ Routing verso: firmware_flow (BACK)")
+        return "firmware_flow"
     else:
         logger.info("→ Routing verso: END")
         return "end"
@@ -430,7 +435,8 @@ def build_ai_analysis_graph():
     
     # === NODES: ANALYSIS & GENERATION ===
     workflow.add_node("run_analyze", run_analyze)
-    workflow.add_node("check_resource_constraints", check_resource_constraints) # NEW
+    workflow.add_node("check_resource_constraints", check_resource_constraints)
+    workflow.add_node("handle_resource_failure", handle_resource_failure)
     workflow.add_node("run_validate", run_validate)
     workflow.add_node("run_generate", run_generate)
     workflow.add_node("finalize_analysis", finalize_analysis)
@@ -443,12 +449,21 @@ def build_ai_analysis_graph():
     workflow.add_edge("collect_analysis_info", "choose_predefined_taskbased_model")
     
     # 1. Model Discovery Routing
+    def model_selection_routing(state: MasterState) -> Literal["download_model", "search_recommendation_model", "add_custom_model_procedure"]:
+        """Decide se procedere al download o alla ricerca avanzata o registrazione"""
+        if state.model_discovery_method == "register_new":
+            return "add_custom_model_procedure"
+        if state.model_discovery_method == "search":
+            return "search_recommendation_model"
+        return "download_model"
+    
     workflow.add_conditional_edges(
         "choose_predefined_taskbased_model",
         model_selection_routing,
         {
+            "download_model": "download_model",
             "search_recommendation_model": "search_recommendation_model",
-            "download_model": "download_model"
+            "add_custom_model_procedure": "add_custom_model_procedure"
         }
     )
     
@@ -457,12 +472,15 @@ def build_ai_analysis_graph():
         model_selection_routing,
         {
             "search_recommendation_model": "search_recommendation_model",
-            "download_model": "download_model"
+            "download_model": "download_model",
+            "add_custom_model_procedure": "add_custom_model_procedure"
         }
     )
     
     # 2. Connection to Customization
     workflow.add_edge("download_model", "inspect_model_architecture")
+    workflow.add_edge("add_custom_model_procedure", "download_model")
+    workflow.add_edge("search_recommendation_model", "download_model")
     workflow.add_edge("inspect_model_architecture", "ask_modification_intent")
     
     # 3. Decision: Modify or Skip to Analyze?
@@ -562,7 +580,17 @@ def build_ai_analysis_graph():
             "run_validate": "run_validate",
             "run_generate": "run_generate",
             "choose_predefined_taskbased_model": "choose_predefined_taskbased_model",
-            "run_analyze": "run_analyze" # ✅ RETRY LOOP EDGE added
+            "run_analyze": "run_analyze",
+            "handle_resource_failure": "handle_resource_failure"
+        }
+    )
+    
+    workflow.add_conditional_edges(
+        "handle_resource_failure",
+        lambda state: state.route,
+        {
+            "change_model": "choose_predefined_taskbased_model",
+            "change_board": END
         }
     )
     
@@ -681,7 +709,14 @@ builder.add_conditional_edges(
 )
 
 # === AI BRANCH CONNECTION ===
-builder.add_edge("ai_flow", "decide_continue_to_integration")
+builder.add_conditional_edges(
+    "ai_flow",
+    lambda state: "firmware_flow" if state.route == "change_board" else "decide_continue_to_integration",
+    {
+        "firmware_flow": "firmware_flow",
+        "decide_continue_to_integration": "decide_continue_to_integration"
+    }
+)
 
 builder.add_conditional_edges(
     "decide_continue_to_integration",

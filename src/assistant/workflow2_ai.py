@@ -64,7 +64,7 @@ class TaskSelectionExtraction(BaseModel):
     """Estrae la scelta del task da risposta naturale"""
     task: Optional[str] = Field(
         default=None,
-        description="Task selezionato: image_classification, object_detection, human_activity_recognition, other"
+        description="Task selezionato: image_classification, object_detection, human_activity_recognition, register_new, other"
     )
     confidence: float = Field(
         ge=0.0, le=1.0,
@@ -109,11 +109,11 @@ class ModelFeedbackExtraction(BaseModel):
 
 
 class SearchResultExtraction(BaseModel):
-    """Estrae SOLO modelli .h5 scaricabili"""
+    """Estrae modelli AI scaricabili (.h5, .keras, .onnx, .tflite)"""
     model_name: str = Field(description="Nome modello (es: MobileNetV2 128)")
     download_url: Optional[str] = Field(
         default=None,
-        description="URL diretto a file .h5"
+        description="URL diretto a file .h5, .keras, .onnx o .tflite"
     )
     model_size: Optional[str] = Field(default=None, description="Size (es: 5.7MB)")
     accuracy: Optional[str] = Field(default=None, description="Accuracy (es: 64%)")
@@ -150,22 +150,24 @@ Esempi:
 Rispondi SEMPRE in formato JSON valido.
 """
 
-task_selection_instructions = """Analizza la risposta dell'utente e classifica quale task vuole fare:
+task_selection_instructions = """Analizza la risposta dell'utente e determina il task AI richiesto.
 
-1. image_classification: Classificazione immagini (immagini → categoria)
-2. object_detection: Rilevamento oggetti (immagini → posizione oggetti)
-3. human_activity_recognition: Riconoscimento delle attività umane (dati → attività)
-4. other: Nessuno di questi / ricerca online
+Classi disponibili:
+- image_classification: classificare immagini (es: cifar10, mobilenet, resnet)
+- object_detection: identificare oggetti e posizioni (es: yolo, ssd)
+- human_activity_recognition: analizzare dati di sensori per attività (es: har)
+- register_new: l'utente vuole aggiungere/registrare un nuovo modello o link GitHub al catalogo
+- other: task non contemplati (audio, custom, ricerca generica)
 
 Esempi:
-- "Classificazione" → image_classification
-- "Oggetti" → object_detection
-- "Attività" → human_activity_recognition
-- "1" → image_classification
-- "Non so" → other
+- "1" -> image_classification
+- "Voglio fare object detection" -> object_detection
+- "Aggiungi un nuovo link GitHub" -> register_new
+- "Registra modello" -> register_new
+- "Cerchiamo qualcosa su internet" -> other
 
-Rispondi SEMPRE in formato JSON con:
-- "task": uno tra image_classification, object_detection, human_activity_recognition, other
+Rispondi sempre in formato JSON con:
+- "task": uno tra image_classification, object_detection, human_activity_recognition, register_new, other
 - "confidence": 0.0-1.0 (quanto sei sicuro)
 """
 
@@ -210,12 +212,13 @@ IMPORTANTE: Solo UNO dei tre può essere true!
 search_result_extraction_instructions = """Estrai SOLO questi 5 campi dal risultato della ricerca:
 
 1. **model_name**: Il nome del modello (es: MobileNetV2 128)
-2. **download_url**: L'URL per scaricare il file .h5 (estrarre dalle parentesi tonde se Markdown)
+2. **download_url**: L'URL per scaricare il file (.h5, .keras, .onnx, .tflite) (estrarre dalle parentesi tonde se Markdown)
 3. **model_size**: La dimensione del file (es: 5.7MB)
 4. **accuracy**: L'accuratezza del modello (es: 64%)
 5. **inference_time**: Il tempo di inferenza (es: 40ms (STM32H7))
 
-IMPORTANTE: Se vedi [testo](https://...) estrai l'URL dalle parentesi tonde (il secondo)
+IMPORTANTE: Cerca link che finiscono con .h5, .keras, .onnx o .tflite.
+Se vedi [testo](https://...) estrai l'URL dalle parentesi tonde (il secondo)
 
 Rispondi SEMPRE in formato JSON con esattamente questi campi:
 {
@@ -234,131 +237,41 @@ Rispondi SEMPRE in formato JSON con esattamente questi campi:
 # PREDEFINED_MODELS - URL REALI (Verificati)
 # ============================================================================
 
-PREDEFINED_MODELS = {
-    "image_classification": {
-        "description": "Classificazione immagini",
-        "models": [
-            {
-                "name": "MobileNetV2",
-                "local_filename": "mobilenetv2_224.h5",
-                "size": "14.0MB", # Float32 size
-                "accuracy": "71%",
-                "inference_time": "50ms (STM32H7)",
-                "huggingface_repo": "STMicroelectronics/mobilenetv2",
-                "huggingface_filename": "mobilenetv2_224.h5",
-                "url": "https://github.com/STMicroelectronics/stm32ai-modelzoo/raw/main/image_classification/mobilenetv2/Public_pretrainedmodel_public_dataset/ImageNet/mobilenet_v2_1.0_224/mobilenet_v2_1.0_224.h5", 
-            },
-            {
-                "name": "MobileNetV1 (0.25)",
-                "local_filename": "mobilenetv1_128.h5",
-                "size": "3.6MB",
-                "accuracy": "65%",
-                "inference_time": "30ms (STM32F4)",
-                "huggingface_repo": "STMicroelectronics/mobilenetv1",
-                "huggingface_filename": "mobilenetv1_128.h5",
-                "url": "https://github.com/STMicroelectronics/stm32ai-modelzoo/raw/main/image_classification/mobilenetv1/Public_pretrainedmodel_public_dataset/ImageNet/mobilenet_v1_0.25_224/mobilenet_v1_0.25_224.h5",
-            },
-            {
-                "name": "EfficientNetV2B0",
-                "local_filename": "efficientnet_v2B0_224.h5",
-                "size": "29.0MB", # Est. Float32
-                "accuracy": "80%",
-                "inference_time": "140ms (STM32H7)",
-                "huggingface_repo": "STMicroelectronics/efficientnetv2",
-                "huggingface_filename": "efficientnet_v2B0_224.h5",
-                "url": "https://github.com/STMicroelectronics/stm32ai-modelzoo/raw/main/image_classification/efficientnetv2/Public_pretrainedmodel_public_dataset/ImageNet/efficientnet_v2B0_224/efficientnet_v2B0_224.h5"
-            },
-            {
-                "name": "MobileNetV2 alpha 0.35 (128x128)",
-                "local_filename": "mobilenetv2_0.35_128.h5",
-                "size": "6.9MB", # Actual download size from logs
-                "accuracy": "60%",
-                "inference_time": "15ms (STM32F4)",
-                "huggingface_repo": "STMicroelectronics/mobilenetv2-small",
-                "huggingface_filename": "mobilenetv2_0.35_128.h5",
-                "url": "https://github.com/STMicroelectronics/stm32ai-modelzoo/raw/main/image_classification/mobilenetv2/Public_pretrainedmodel_public_dataset/ImageNet/mobilenet_v2_0.35_128/mobilenet_v2_0.35_128.h5",
-            }
 
-        ]
-    },
-    "object_detection": {
-        "description": "Rilevamento oggetti",
-        "models": [
-            {
-                "name": "Tiny YOLOv2",
-                "local_filename": "yolov2_tiny_416.h5",
-                "size": "19.2MB",
-                "accuracy": "35 mAP",
-                "inference_time": "180ms (STM32H7)",
-                "huggingface_repo": "STMicroelectronics/yolov2-tiny",
-                "huggingface_filename": "yolov2_tiny_416.h5",
-                "url": "https://github.com/STMicroelectronics/stm32ai-modelzoo/raw/main/object_detection/tiny_yolo_v2/ST_pretrainedmodel_public_dataset/coco_2017_person/tiny_yolo_v2_416/tiny_yolo_v2_416.h5"
-            },
-            {
-                "name": "ST SSD MobileNet v1",
-                "local_filename": "st_ssd_mobilenet_v1_256.h5",
-                "size": "24.5MB",
-                "accuracy": "35 mAP",
-                "inference_time": "220ms (STM32H7)",
-                "huggingface_repo": "STMicroelectronics/st-ssd-mobilenet-v1",
-                "huggingface_filename": "st_ssd_mobilenet_v1_256.h5",
-                "url": "https://github.com/STMicroelectronics/stm32ai-modelzoo/raw/main/object_detection/st_ssd_mobilenet_v1/ST_pretrainedmodel_public_dataset/coco_2017_person/st_ssd_mobilenet_v1_025_256/st_ssd_mobilenet_v1_025_256.h5"
-            }
-        ]
-    },
-    "human_activity_recognition": {
-        "description": "Human Activity Recognition",
-        "models": [
-            {
-                "name": "GMP_WL (24)",
-                "local_filename": "gmp_wl_24.h5",
-                "size": "2.1MB",
-                "accuracy": "95%",
-                "inference_time": "20ms (STM32F4)",
-                "huggingface_repo": "STMicroelectronics/har-wisdm",
-                "huggingface_filename": "gmp_wl_24.h5",
-                "url": "https://github.com/STMicroelectronics/stm32ai-modelzoo/raw/main/human_activity_recognition/gmp/ST_pretrainedmodel_public_dataset/WISDM/gmp_wl_24/gmp_wl_24.h5"
-            },
-            {
-                "name": "GMP_WL (48)",
-                "local_filename": "gmp_wl_48.h5",
-                "size": "3.8MB",
-                "accuracy": "96%",
-                "inference_time": "25ms (STM32H7)",
-                "huggingface_repo": "STMicroelectronics/har-wisdm",
-                "huggingface_filename": "gmp_wl_48.h5",
-                "url": "https://github.com/STMicroelectronics/stm32ai-modelzoo/raw/main/human_activity_recognition/gmp/ST_pretrainedmodel_public_dataset/WISDM/gmp_wl_48/gmp_wl_48.h5"
-            }
-        ]
-    },
-    "audio_event_detection": {
-        "description": "Audio Event Detection (Spectrograms)",
-        "models": [
-            {
-                "name": "MiniResnet",
-                "local_filename": "miniresnet_64x50.h5",
-                "size": "1.2MB",
-                "accuracy": "85%",
-                "inference_time": "18ms (STM32H7)",
-                "huggingface_repo": "STMicroelectronics/miniresnet-aed",
-                "huggingface_filename": "miniresnet_64x50.h5",
-                "url": "https://github.com/STMicroelectronics/stm32ai-modelzoo/raw/main/audio_event_detection/miniresnet/ST_pretrainedmodel_public_dataset/esc10/miniresnet_1stacks_64x50_tl/miniresnet_1stacks_64x50_tl.h5"
-            },
-            {
-                "name": "MiniResnetV2",
-                "local_filename": "miniresnetv2_64x50.h5",
-                "size": "1.5MB",
-                "accuracy": "88%",
-                "inference_time": "22ms (STM32H7)",
-                "huggingface_repo": "STMicroelectronics/miniresnetv2-aed",
-                "huggingface_filename": "miniresnetv2_64x50.h5",
-                "url": "https://github.com/STMicroelectronics/stm32ai-modelzoo/raw/main/audio_event_detection/miniresnet/ST_pretrainedmodel_public_dataset/esc10/miniresnet_2stacks_64x50_tl/miniresnet_2stacks_64x50_tl.h5"
-            }
-        ]
-    }
+def get_resource_path(filename: str) -> str:
+    """Restituisce il path assoluto di una risorsa nella cartella resources."""
+    # Cerchiamo prima in src/assistant/resources relativo a questo file
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    res_path = os.path.join(base_dir, "resources", filename)
+    return res_path
 
+def load_predefined_models() -> dict:
+    """Carica i modelli predefiniti dal file JSON."""
+    path = get_resource_path("predefined_models.json")
+    if not os.path.exists(path):
+        logger.warning(f"⚠️ Registro modelli non trovato in {path}, ritorno vuoto.")
+        return {}
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception as e:
+        logger.error(f"❌ Errore caricamento modelli: {e}")
+        return {}
 
-}
+def save_predefined_models(models: dict):
+    """Salva i modelli nel file JSON."""
+    path = get_resource_path("predefined_models.json")
+    try:
+        # Assicurati che la cartella esista
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(models, f, indent=4, ensure_ascii=False)
+        logger.info(f"✅ Registro modelli aggiornato: {path}")
+    except Exception as e:
+        logger.error(f"❌ Errore salvataggio modelli: {e}")
+
+# Inizializza PREDEFINED_MODELS dinamicamente (ma caricalo ogni volta se vogliamo essere dinamici al runtime)
+PREDEFINED_MODELS = load_predefined_models()
 # <- con .h5 e non .tflite
 
 
@@ -471,6 +384,10 @@ def choose_predefined_taskbased_model(state: MasterState, config: dict) -> Maste
     
     logger.info("📋 Scelta modello da catalogo predefinito...")
     
+    # Ricarica modelli dal JSON per essere sicuri che siano aggiornati
+    global PREDEFINED_MODELS
+    PREDEFINED_MODELS = load_predefined_models()
+    
     cfg = Configuration.from_runnable_config(config)
     llm = ChatOllama(
         model=cfg.local_llm,
@@ -486,9 +403,10 @@ def choose_predefined_taskbased_model(state: MasterState, config: dict) -> Maste
 1. Classificazione immagini (immagini → categoria)
 2. Rilevamento oggetti (immagini → posizione oggetti)
 3. Human Activity Recognition (sensori → attività fisica)
-4. Nessuno di questi (ricerca online)
+4. 🆕 Registra un NUOVO modello (Link GitHub)
+5. Nessuno di questi (ricerca online)
 
-Rispondi: 1, 2, 3, 4 oppure descrivi il task
+Rispondi: 1, 2, 3, 4, 5 oppure descrivi il task
         """
     }
     
@@ -522,6 +440,11 @@ Rispondi: 1, 2, 3, 4 oppure descrivi il task
     state.last_task = selected_task
     logger.info(f"✓ Task salvato per fallback: {selected_task}")
     
+    if selected_task == "register_new":
+        logger.info("🆕 Utente vuole registrare un nuovo modello")
+        state.model_discovery_method = "register_new"
+        return state
+        
     if selected_task == "other" or task_result.confidence < 0.5:
         logger.info("✓ Task non riconosciuto, va a ricerca online")
         state.model_discovery_method = "search"
@@ -935,10 +858,10 @@ Dopo 3 tentativi di ricerca, ecco il modello di fallback:
         return state
 
 
-def model_selection_routing(state: MasterState) -> Literal["run_analyze", "download_model", "search_recommendation_model"]:
+def model_selection_routing(state: MasterState) -> Literal["run_analyze", "download_model", "search_recommendation_model", "add_custom_model_procedure"]:
     """
     Routing intelligente dopo selezione modello.
-    Gestisce il loop di ricerca fino a max 3 tentativi.
+    Gestisce il loop di ricerca fino a max 3 tentativi e la registrazione di nuovi modelli.
     """
     
     logger.info(f"\n🔄 ROUTING DECISION:")
@@ -946,11 +869,18 @@ def model_selection_routing(state: MasterState) -> Literal["run_analyze", "downl
     logger.info(f"   search_iterations: {state.search_iterations}")
     
     # ====================================================================
+    # CASO 0: Registrazione nuovo modello
+    # ====================================================================
+    if state.model_discovery_method == "register_new":
+        logger.info("   → Registrazione nuovo modello, va a add_custom_model_procedure")
+        return "add_custom_model_procedure"
+
+    # ====================================================================
     # CASO 1: Default model (niente ricerca)
     # ====================================================================
     if state.model_discovery_method == "default":
-        logger.info("   → Modello di default, va a run_analyze")
-        return "run_analyze"
+        logger.info("   → Modello pronto/selezionato, va a download_model per ispezione")
+        return "download_model"
     
     # ====================================================================
     # CASO 2: Ricerca attiva (ritorna al loop se rifiutato)
@@ -960,7 +890,7 @@ def model_selection_routing(state: MasterState) -> Literal["run_analyze", "downl
             logger.info(f"   → Ricerca in corso ({state.search_iterations}/3), ritorno a search_recommendation_model")
             return "search_recommendation_model"
         else:
-            logger.info(f"   → Max iterazioni (3/3) raggiunto, vai a run_analyze")
+            logger.info(f"   → Max iterazioni (3/3) raggiunto, vai a run_analyze (default)")
             return "run_analyze"
     
     # ====================================================================
@@ -1054,7 +984,7 @@ def search_h5_file_in_repo_hybrid( #fondamentale
                                 logger.debug(f"  {'  ' * depth}⚠️  Errore lettura {item.path}: {type(e).__name__}")
                                 continue
                         
-                        elif item.type == "file" and item.name.endswith(".h5"):
+                        elif item.type == "file" and any(item.name.endswith(ext) for ext in [".h5", ".keras", ".onnx", ".tflite"]):
                             description = extract_description(item.name, item.path)
                             h5_files.append({
                                 'name': item.name,
@@ -1063,7 +993,7 @@ def search_h5_file_in_repo_hybrid( #fondamentale
                                 'description': description,
                                 'folder': item.path.rsplit('/', 1)[0] if '/' in item.path else folder
                             })
-                            logger.debug(f"  {'  ' * depth}✅ File .h5: {item.name}")
+                            logger.debug(f"  {'  ' * depth}✅ File trovato: {item.name}")
                             
                             # ✅ EARLY EXIT se trovi abbastanza file
                             if len(h5_files) >= 20:  # Limite pratico
@@ -1187,7 +1117,7 @@ FILE DISPONIBILI NEL REPO:
 {h5_list_text}
 
 ⚠️ ISTRUZIONI CRITICHE:
-1. Analizza TUTTI i modelli
+1. Analizza TUTTI i modelli (.h5, .keras, .onnx, .tflite)
 2. Scegli il MIGLIORE per la task (considera: compatibilità, dimensione, architettura)
 3. Ritorna SOLO il numero dell'indice (1-{len(h5_files)})
 4. NON aggiungere altro testo
@@ -1575,6 +1505,20 @@ def inspect_model_via_legacy_env(model_path: str) -> Optional[dict]:
     Ispeziona modello usando env legacy (per evitare crash Keras 3 con modelli vecchi)
     Ritorna dict con info architettura o None se fallisce.
     """
+    if not model_path.endswith(('.h5', '.keras')):
+        logger.info(f"ℹ️  Skip legacy inspection for non-Keras format: {os.path.basename(model_path)}")
+        return {
+            'input_shape': 'Unknown',
+            'output_shape': 'Unknown',
+            'n_layers': 0,
+            'total_params': 0,
+            'trainable_params': 0,
+            'model_size_mb': os.path.getsize(model_path) / (1024*1024),
+            'has_batchnorm': False,
+            'has_dropout': False,
+            'format': os.path.splitext(model_path)[1]
+        }
+
     try:
         arch = detect_architecture_from_model(model_path)
         env_name = ARCHITECTURE_ENV_MAP.get(arch, 'stm32_legacy')
@@ -1701,10 +1645,11 @@ def download_model_to_cache(state: MasterState, config: dict, model: dict) -> Ma
         else:
             logger.warning(f"⚠️  Legacy subprocess fallito, provo fallback HDF5...")
             
-            # ← SECONDO TENTATIVO: lettura raw HDF5 (più robusta)
+        # ← SECONDO TENTATIVO: lettura raw HDF5 (più robusta, solo se .h5 o .keras)
+        if cached_path.endswith(('.h5', '.keras')):
             try:
                 with h5py.File(cached_path, 'r') as f:
-                    logger.info(f"\n📋 ANALISI HDF5 (raw)")
+                    logger.info(f"\n📋 ANALISI INTERNA (HDF5/Keras)")
                     logger.info(f"  Keys nel file: {list(f.keys())}")
                     
                     if 'model_config' in f.attrs:
@@ -1719,14 +1664,12 @@ def download_model_to_cache(state: MasterState, config: dict, model: dict) -> Ma
                         weights_group = f['model_weights']
                         n_layers = len(list(weights_group.keys()))
                         logger.info(f"  Number of layer groups: {n_layers}")
-                        logger.info(f"  Layers: {list(weights_group.keys())[:20]}{'...' if n_layers > 20 else ''}") # stampa i primi 20 layers
                     
                     logger.info("=" * 80 + "\n")
-                    
-                    # Comunque continua - il file è caricabile per inferenza
-                    
             except Exception as e2:
                 logger.warning(f"⚠️  Analisi HDF5 fallita: {str(e2)[:100]}")
+        else:
+            logger.info(f"📋 Formato {os.path.splitext(cached_path)[1]} rilevato. Analisi strutturale saltata.")
         
         return state
     
@@ -2181,7 +2124,8 @@ def check_resource_constraints(state: MasterState, config: dict) -> MasterState:
     else:
         # Model is WAY too big (>8x overflow) - compression won't help
         logger.error(f"❌ Resources CRITICAL (Overflow {max_ratio:.1f}x) -> Model too big")
-        logger.error("   This model is too large even for maximum compression")
+        logger.error(f"   The overflow is {max_ratio:.1f}x, which is beyond the capacity of even maximum compression (~8-10x).")
+        logger.warning(f"   Skipping auto-retry to avoid wasting processing time on an impossible fit.")
         state.resource_check_result = "critical"
         state.needs_compression_retry = False
         
@@ -2234,6 +2178,160 @@ Dettagli Risorse:
 
 L'automazione torna alla selezione modello forzando una scelta più appropriata.""")
         
-        return "choose_predefined_taskbased_model"
+        return "handle_resource_failure"
         # return "run_generate" # per alcuni test fatti la utilizzavo per forzare l'integrazione 
 
+
+def handle_resource_failure(state: MasterState, config: dict) -> MasterState:
+    """
+    Chiede all'utente se vuole cambiare board o modello dopo un fallimento di risorse.
+    """
+    logger.info("📋 Decisione post-errore risorse: Cambio Board o Cambio Modello?")
+    
+    prompt = {
+        "instruction": "Il modello è troppo grande per l'attuale MCU. Cosa vuoi fare?",
+        "options": [
+            "Cambia Microcontrollore (Board)",
+            "Scegli un altro modello AI"
+        ]
+    }
+    
+    user_response = interrupt(prompt)
+    
+    if isinstance(user_response, dict):
+        user_text = user_response.get("response", user_response.get("input", str(user_response)))
+    else:
+        user_text = str(user_response)
+        
+    cfg = Configuration.from_runnable_config(config)
+    llm = ChatOllama(
+        model=cfg.local_llm,
+        temperature=0,
+        num_ctx=cfg.llm_context_window
+    )
+    
+    analysis_prompt = f"""Analizza la risposta dell'utente e determina l'azione da intraprendere.
+    
+Risposta: "{user_text}"
+
+Opzioni:
+- Se l'utente vuole cambiare scheda, board, microcontrollore, MCU -> rispondi: CHANGE_BOARD
+- Se l'utente vuole cambiare modello, rete neurale, AI, o riprovare la scelta -> rispondi: CHANGE_MODEL
+
+Rispondi SOLO con una parola (senza commenti): CHANGE_BOARD o CHANGE_MODEL
+"""
+    
+    response = llm.invoke([
+        SystemMessage(content="Sei un classificatore di intenti. Rispondi solo con la keyword richiesta."),
+        HumanMessage(content=analysis_prompt)
+    ])
+    
+    decision = response.content.strip().upper()
+    logger.info(f"🤖 Decisione LLM: {decision}")
+    
+    if "BOARD" in decision:
+        state.route = "change_board"
+    else:
+        state.route = "change_model"
+        
+    return state
+
+def add_custom_model_procedure(state: MasterState, config: dict) -> MasterState:
+    """
+    Procedura per aggiungere un nuovo modello al catalogo.
+    """
+    logger.info("🆕 Inizio procedura registrazione nuovo modello...")
+    
+    # 1. Chiedi i dettagli all'utente
+    prompt = {
+        "instruction": """Registrazione Nuovo Modello AI
+
+Fornisci i seguenti dettagli Separati da virgola:
+1. Categoria (es: image_classification, object_detection, audio)
+2. Nome Modello (es: MobileNetV3 Small)
+3. Link GitHub (URL Raw .h5, .onnx, .tflite, .keras)
+
+Esempio:
+"image_classification, MobileNetV3, https://github.com/.../model.keras"
+        """
+    }
+    
+    user_response = interrupt(prompt)
+    if isinstance(user_response, dict):
+        user_text = user_response.get("response", user_response.get("input", str(user_response)))
+    else:
+        user_text = str(user_response)
+        
+    # 2. Parsing con LLM
+    cfg = Configuration.from_runnable_config(config)
+    llm = ChatOllama(model=cfg.local_llm, temperature=0)
+    
+    extraction_prompt = f"""Estrai i dettagli del nuovo modello dalla seguente risposta dell'utente:
+"{user_text}"
+
+Rispondi in formato JSON con questi campi:
+- "category": categoria (in minuscolo, snake_case)
+- "name": nome del modello
+- "url": link GitHub Raw completo
+- "is_valid": true se i dati sembrano sensati
+"""
+    
+    response = llm.invoke(extraction_prompt)
+    try:
+        # Pulisci risposta se LLM mette markdown
+        clean_content = response.content.replace("```json", "").replace("```", "").strip()
+        data = json.loads(clean_content)
+    except Exception as e:
+        logger.error(f"❌ Errore parsing dati nuovo modello: {e}")
+        return state
+
+    if not data.get("is_valid") or not data.get("url"):
+        logger.error("❌ Dati modello non validi o URL mancante.")
+        return state
+
+    # 3. Validazione URL e Metadati
+    url = data["url"]
+    logger.info(f"🔍 Validando URL: {url}")
+    
+    try:
+        res = requests.head(url, timeout=5, allow_redirects=True)
+        if res.status_code == 200:
+            size_bytes = int(res.headers.get('Content-Length', 0))
+            size_str = format_bytes(size_bytes) if size_bytes > 0 else "N/A"
+        else:
+            logger.warning(f"⚠️ URL risponde con status {res.status_code}. Procedo comunque?")
+            size_str = "N/A"
+    except Exception as e:
+        logger.warning(f"⚠️ Errore connessione URL: {e}")
+        size_str = "N/A"
+
+    # 4. Aggiorna Registro
+    models = load_predefined_models()
+    category = data["category"]
+    
+    if category not in models:
+        models[category] = {
+            "description": category.replace("_", " ").title(),
+            "models": []
+        }
+    
+    new_entry = {
+        "name": data["name"],
+        "local_filename": data["name"].lower().replace(" ", "_") + os.path.splitext(url)[1],
+        "size": size_str,
+        "accuracy": "N/A (User Provided)",
+        "inference_time": "N/A",
+        "url": url
+    }
+    
+    models[category]["models"].append(new_entry)
+    save_predefined_models(models)
+    
+    logger.info(f"✅ Modello '{data['name']}' aggiunto con successo alla categoria '{category}'!")
+    
+    # Imposta il nuovo modello come selezionato per procedere subito
+    state.selected_model = new_entry
+    state.model_path = "" # Verrà scaricato nel nodo download_model
+    state.model_discovery_method = "default" # Fai finta che sia predefinito ora
+    
+    return state

@@ -1,5 +1,5 @@
 ST Edge AI Core v2.2.0-20266 2adc00962
-Created date          : 2026-01-22 19:53:27
+Created date          : 2026-01-27 15:53:21
 Parameters            : validate --model /home/mrusso/.stm32_ai_models/mobilenetv1_128.h5 --target stm32h7 --output ./analisiAI/network_validate_report.txt --compression medium
 
 Exec/report summary (validate)
@@ -627,7 +627,7 @@ Running the ST.AI c-model (AI RUNNER)...(name=network, mode=HOST)
   weights             :   1869344                                                 
   macc                :   43582896                                                
   hash                :   0x6844e5c6679b8606aa0867c0ef6f16d3                      
-  compile_datetime    :   Jan 22 2026 19:53:23                                    
+  compile_datetime    :   Jan 27 2026 15:53:17                                    
   --------------------------------------------------------------------------------
   protocol            :   DLL Driver v2.0 - Direct Python binding                 
   tools               :   ST.AI (legacy api) v2.2.0                               
@@ -642,7 +642,7 @@ Running the ST.AI c-model (AI RUNNER)...(name=network, mode=HOST)
   ST.AI Profiling results v2.0 - "network"
   ---------------------------------------------------------------
   nb sample(s)   :   10                                          
-  duration       :   22.209 ms by sample (22.053/23.046/0.281)   
+  duration       :   22.230 ms by sample (22.028/22.325/0.085)   
   macc           :   43582896                                    
   ---------------------------------------------------------------
   
@@ -748,7 +748,7 @@ m_id   name                       c_macc                    c_rom               
 ------ -------------------------- ------------------------- ------------------------- ------ -------- ------------------ 
 2      conv1_bn                   |||||||||||||      6.2%   |                  0.0%   [0]      6.0%                      
 3      conv1_relu                 |                  0.5%   |                  0.0%   [1]      0.1%                      
-5      conv_dw_1_bn               |||||              2.1%   |                  0.0%   [2]      3.6%                      
+5      conv_dw_1_bn               |||||              2.1%   |                  0.0%   [2]      3.4%                      
 6      conv_dw_1_relu             |                  0.5%   |                  0.0%   [3]      0.1%                      
 8      conv_pw_1_bn               ||||||||           3.7%   |                  0.0%   [4]      4.8%                      
 9      conv_pw_1_relu             ||                 0.9%   |                  0.0%   [5]      0.3%                      
@@ -766,11 +766,11 @@ m_id   name                       c_macc                    c_rom               
 29     conv_pw_4_relu             |                  0.2%   |                  0.0%   [17]     0.0%                      
 31     conv_dw_5_bn               |||                1.0%   |                  0.1%   [18]     1.6%                      
 32     conv_dw_5_relu             |                  0.2%   |                  0.0%   [19]     0.0%                      
-34     conv_pw_5_bn               |||||||||||||||    7.4%   |                  0.9%   [20]     6.6%                      
+34     conv_pw_5_bn               |||||||||||||||    7.4%   |                  0.9%   [20]     6.7%                      
 35     conv_pw_5_relu             |                  0.2%   |                  0.0%   [21]     0.0%                      
 36     conv_pad_6                 |                  0.3%   |                  0.1%   [22]     0.4%                      
 39     conv_dw_6_relu             |                  0.1%   |                  0.0%   [23]     0.0%                      
-41     conv_pw_6_bn               ||||||||           3.7%   |                  1.8%   [24]     3.4%                      
+41     conv_pw_6_bn               ||||||||           3.7%   |                  1.8%   [24]     3.3%                      
 42     conv_pw_6_relu             |                  0.1%   |                  0.0%   [25]     0.0%                      
 44     conv_dw_7_bn               ||                 0.5%   |                  0.3%   [26]     0.8%                      
 45     conv_dw_7_relu             |                  0.1%   |                  0.0%   [27]     0.0%                      
@@ -794,7 +794,7 @@ m_id   name                       c_macc                    c_rom               
 72     conv_pw_11_relu            |                  0.1%   |                  0.0%   [45]     0.0%                      
 73     conv_pad_12                |                  0.1%   |                  0.3%   [46]     0.2%                      
 76     conv_dw_12_relu            |                  0.0%   |                  0.0%   [47]     0.0%                      
-78     conv_pw_12_bn              ||||||||           3.7%   ||                 7.1%   [48]     3.8%                      
+78     conv_pw_12_bn              ||||||||           3.7%   ||                 7.1%   [48]     3.9%                      
 79     conv_pw_12_relu            |                  0.1%   |                  0.0%   [49]     0.0%                      
 81     conv_dw_13_bn              |                  0.3%   |                  0.5%   [50]     0.4%                      
 82     conv_dw_13_relu            |                  0.1%   |                  0.0%   [51]     0.0%                      

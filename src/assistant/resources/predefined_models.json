@@ -1,0 +1,60 @@
+{
+    "image_classification": {
+        "description": "Classificazione immagini",
+        "models": [
+            {
+                "name": "MobileNetV2",
+                "local_filename": "mobilenetv2_224.h5",
+                "size": "14.0MB",
+                "accuracy": "71%",
+                "inference_time": "50ms (STM32H7)",
+                "huggingface_repo": "STMicroelectronics/mobilenetv2",
+                "huggingface_filename": "mobilenetv2_224.h5",
+                "url": "https://github.com/STMicroelectronics/stm32ai-modelzoo/raw/main/image_classification/mobilenetv2/Public_pretrainedmodel_public_dataset/ImageNet/mobilenet_v2_1.0_224/mobilenet_v2_1.0_224.h5"
+            },
+            {
+                "name": "MobileNetV1 (0.25)",
+                "local_filename": "mobilenetv1_128.h5",
+                "size": "3.6MB",
+                "accuracy": "65%",
+                "inference_time": "30ms (STM32F4)",
+                "huggingface_repo": "STMicroelectronics/mobilenetv1",
+                "huggingface_filename": "mobilenetv1_128.h5",
+                "url": "https://github.com/STMicroelectronics/stm32ai-modelzoo/raw/main/image_classification/mobilenetv1/Public_pretrainedmodel_public_dataset/ImageNet/mobilenet_v1_0.25_224/mobilenet_v1_0.25_224.h5"
+            },
+            {
+                "name": "EfficientNetV2B0",
+                "local_filename": "efficientnet_v2B0_224.h5",
+                "size": "29.0MB",
+                "accuracy": "80%",
+                "inference_time": "140ms (STM32H7)",
+                "huggingface_repo": "STMicroelectronics/efficientnetv2",
+                "huggingface_filename": "efficientnet_v2B0_224.h5",
+                "url": "https://github.com/STMicroelectronics/stm32ai-modelzoo/raw/main/image_classification/efficientnetv2/Public_pretrainedmodel_public_dataset/ImageNet/efficientnet_v2B0_224/efficientnet_v2B0_224.h5"
+            },
+            {
+                "name": "MobileNetV2 alpha 0.35 (128x128)",
+                "local_filename": "mobilenetv2_0.35_128.h5",
+                "size": "6.9MB",
+                "accuracy": "60%",
+                "inference_time": "15ms (STM32F4)",
+                "huggingface_repo": "STMicroelectronics/mobilenetv2-small",
+                "huggingface_filename": "mobilenetv2_0.35_128.h5",
+                "url": "https://github.com/STMicroelectronics/stm32ai-modelzoo/raw/main/image_classification/mobilenetv2/Public_pretrainedmodel_public_dataset/ImageNet/mobilenet_v2_0.35_128/mobilenet_v2_0.35_128.h5"
+            }
+        ]
+    },
+    "object_detection": {
+        "description": "Rilevamento oggetti",
+        "models": [
+            {
+                "name": "YOLOv2 Tiny (224x224)",
+                "local_filename": "yolov2_tiny_224.h5",
+                "size": "42.1MB",
+                "accuracy": "N/A",
+                "inference_time": "200ms (STM32H7)",
+                "url": "https://github.com/STMicroelectronics/stm32ai-modelzoo/raw/main/object_detection/yolo_v2_tiny/Public_pretrainedmodel_public_dataset/COCO/yolo_v2_tiny_224_224/yolo_v2_tiny_224_224.h5"
+            }
+        ]
+    }
+}
