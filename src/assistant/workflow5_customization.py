@@ -1456,8 +1456,8 @@ MODIFICATION TYPES (EXAMPLES):
    - Parameters: {{"new_shape": [128, 128, 3]}}
    
 6. change_learning_rate
-   - Examples: "learning rate 0.001", "lr 1e-3"
-   - Parameters: {{"learning_rate": 0.001}}
+   - Examples: "learning rate 0.0001", "lr 1e-4"
+   - Parameters: {{"learning_rate": 0.0001}}
 
 7. add_resizing_layer
    - Examples: "add resizing layer to accept any input size and modify to original shape", "add resizing layer", "Add resizing layer to accept flexible input sizes"
@@ -1997,7 +1997,12 @@ def execute_in_environment(python_code: str, state: MasterState, timeout: int = 
             timeout=timeout
         )
         
-        return res
+        return {
+            'success': res.get('success', False),
+            'stdout': res.get('stdout', ''),
+            'stderr': res.get('error', ''), # run_subprocess_streaming merges streams; error contains typical stderr
+            'returncode': res.get('returncode', 0 if res.get('success') else 1)
+        }
     except Exception as e:
         logger.error(f"❌ Subprocess error: {e}")
         return {'success': False, 'stdout': "", 'stderr': str(e), 'returncode': 1}
@@ -3098,10 +3103,10 @@ except Exception as e:
         logger.info(f"  [Subprocess] Executing fine-tuning...")
         
         # ===== USA execute_in_environment =====
-        result = execute_in_environment(python_code, state, timeout=1200)
+        result = execute_in_environment(python_code, state, timeout=3600)
         
-        stdout = result['stdout']
-        stderr = result['stderr']
+        stdout = result.get('stdout', '')
+        stderr = result.get('stderr', '')
         
         logger.info(f"  [Raw stdout lines: {len(stdout.split(chr(10)))}]")
         

@@ -868,7 +868,7 @@ def process_speech_commands(extract_dir: str, output_dir: str, target_shape=(32,
     with open(os.path.join(output_dir, "classes.json"), "w") as f:
         json.dump(class_to_idx, f)
 
-def process_generic_vision_dataset(extract_dir: str, output_dir: str, target_shape=(224, 224), max_samples=10000):
+def process_generic_vision_dataset(extract_dir: str, output_dir: str, target_shape=(224, 224), max_samples=5000):
     """
     Scansiona una cartella estratta alla ricerca di immagini e le converte in .npy.
     Inferisce le classi dalle sottocartelle.

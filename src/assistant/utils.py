@@ -267,8 +267,8 @@ def validate_modification_params(mod_type: str, params: dict, total_layers: int 
     elif mod_type == 'change_learning_rate':
         lr = params.get('learning_rate')
         if lr is None or not isinstance(lr, (int, float)) or lr <= 0 or lr > 1:
-            sanitized_params['learning_rate'] = 0.001
-            issues.append(f"change_learning_rate: invalid or missing LR, using 0.001")
+            sanitized_params['learning_rate'] = 0.0001
+            issues.append(f"change_learning_rate: invalid or missing LR, using 0.0001")
 
     return sanitized_params, issues
 
@@ -298,7 +298,23 @@ def run_subprocess_streaming(
     import subprocess
     import time
     
-    logger_instance.info(f"🚀 Running: {' '.join(cmd)}")
+    # Truncate command log if too long to avoid "wall of code"
+    full_cmd = ' '.join(cmd)
+    if len(full_cmd) > 100:
+        if '-c' in cmd:
+            idx = cmd.index('-c')
+            if idx + 1 < len(cmd):
+                script = cmd[idx+1]
+                first_line = script.strip().split('\n')[0][:60]
+                num_lines = len(script.strip().split('\n'))
+                summary = f"{cmd[0]} -c \"{first_line}...\" ({num_lines} lines)"
+                logger_instance.info(f"🚀 Running: {summary}")
+            else:
+                logger_instance.info(f"🚀 Running: {full_cmd[:100]}...")
+        else:
+            logger_instance.info(f"🚀 Running: {full_cmd[:100]}...")
+    else:
+        logger_instance.info(f"🚀 Running: {full_cmd}")
     
     stdout_lines = []
     try:

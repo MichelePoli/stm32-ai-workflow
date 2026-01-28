@@ -182,7 +182,7 @@ While NNI provides comprehensive hyperparameter optimization, users often requir
 Large pre-trained models (e.g., MobileNetV2) are prone to catastrophic forgetting and overfitting when applied to small or specialized datasets like Fruit-360. To mitigate this, the system applies three automated strategies:
 
 \begin{itemize}
-    \item \textbf{Dynamic Sampling Escalation}: Instead of training on the full dataset (which might lead to OOM or excessive latency), the system employs a capped sampling strategy (10,000 images). This ensures a balanced representation across classes while maintaining execution speed.
+    \item \textbf{Dynamic Sampling Escalation}: Instead of training on the full dataset (which might lead to OOM or excessive latency), the system employs a capped sampling strategy (5000 images). This ensures a balanced representation across classes while maintaining execution speed.
     \item \textbf{Proactive Regularization}: The system automatically inserts a \texttt{Dropout} layer (default rate 0.3) during the final layer replacement phase. This rate is dynamic; if the user specifies a custom value (e.g., 0.4) in their natural language intent, the system prioritizes the explicit instruction over the safety default.
     \item \textbf{Epoch Capping}: Standard runs are capped at 10 epochs to provide a quick ``sanity check'' before expensive optimization loops are triggered.
 \end{itemize}

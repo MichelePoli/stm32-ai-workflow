@@ -134,7 +134,7 @@ class MasterState:
     continue_after_customization: bool = False  # Continua con AI analysis?
     
     # Training parameters
-    custom_learning_rate: float = 0.0001  # Learning rate per fine-tuning
+    custom_learning_rate: float = 0.0001  # Learning rate per fine-tuning (start with 1e-4)
     custom_epochs: int = 10  # Epoche di training
     custom_batch_size: int = 64  # Batch size (più grande = più veloce, più memoria)
     
