@@ -352,7 +352,9 @@ def select_predefined_dataset(state: MasterState, config: dict) -> MasterState:
     
     prompt = {
         "instruction": menu_text,
-        "valid_options": valid_keys,
+        # Prepend a dummy value at index 0 so that the UI indices [1, 2, 3...]
+        # align with the human-readable menu [1, 2, 3...]
+        "valid_options": ["(Digitare numero / nome)"] + valid_keys,
         "hint": "Inserisci il numero o il nome del dataset (es: 1 oppure cifar10)"
     }
     

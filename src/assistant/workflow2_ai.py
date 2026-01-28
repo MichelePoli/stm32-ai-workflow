@@ -517,12 +517,18 @@ Rispondi sempre in formato JSON con:
             status_icon = "❌"
             status_note = f"Too Large ({flash_ratio:.1f}x)"
             
+        # Estrai formato dal nome file (url o local_filename)
+        import os
+        filename = model.get('local_filename', model['url'])
+        _, ext = os.path.splitext(filename)
+        ext = ext.upper() if ext else "N/D"
+
         print(f"\n{i}. {model['name']} {status_icon}")
-        print(f"   📏 Dimensione: {model['size']} ({status_note})")
+        print(f"   📏 Dimensione: {model['size']} ({status_note}) | 📄 Formato: {ext}")
         print(f"   🎯 Accuratezza: {model['accuracy']}")
         print(f"   ⚡ Inferenza: {model['inference_time']}")
         
-        model_options_text.append(f"{i}. {model['name']} {status_icon} ({model['size']} - {status_note})")
+        model_options_text.append(f"{i}. {model['name']} {status_icon} [{ext}] ({model['size']} - {status_note})")
     
     print(f"\n{len(available_models)+1}. Nessuno di questi (ricerca online)")
     print("="*70 + "\n")
@@ -698,11 +704,18 @@ def search_recommendation_model(state: MasterState, config: dict) -> MasterState
         # ✅ INTERRUPT: Chiedi conferma all'utente
         logger.info(f"\n✓ MODELLO TROVATO - Richiesta conferma utente...")
         
+        # Estrai formato
+        import os
+        filename = github_result.get('local_filename', github_result['url_raw'])
+        _, ext = os.path.splitext(filename)
+        ext = ext.upper() if ext else "N/D"
+
         prompt = {
             "instruction": f"""Modello AI trovato per {state.last_task}
 
 📦 Dettagli:
 - Nome: {github_result['name']}
+- Formato: {ext}
 - Size: {github_result.get('size', 'N/A')}
 - Source: {github_result.get('source', 'GitHub')}
 - Method: {github_result.get('selection_method', 'N/A')}
@@ -764,11 +777,18 @@ def search_recommendation_model(state: MasterState, config: dict) -> MasterState
             # ✅ INTERRUPT: Chiedi conferma all'utente (anche per Google)
             logger.info(f"\n✓ MODELLO TROVATO (Google) - Richiesta conferma utente...")
             
+            # Estrai formato
+            import os
+            filename = google_result['model'].get('local_filename', google_result['model']['url'])
+            _, ext = os.path.splitext(filename)
+            ext = ext.upper() if ext else "N/D"
+            
             prompt = {
                 "instruction": f"""Modello AI trovato per {state.last_task}
 
 📦 Dettagli:
 - Nome: {google_result['model']['name']}
+- Formato: {ext}
 - Size: {google_result['model'].get('size', 'N/A')}
 - Source: {google_result['model'].get('source', 'Google Search')}
 
@@ -831,6 +851,12 @@ def search_recommendation_model(state: MasterState, config: dict) -> MasterState
             # ✅ INTERRUPT FINALE: Chiedi conferma anche per fallback
             logger.info(f"\n✓ MODELLO FALLBACK - Richiesta conferma utente...")
             
+            # Estrai formato
+            import os
+            filename = fallback_model.get('local_filename', fallback_model.get('url', ''))
+            _, ext = os.path.splitext(filename)
+            ext = ext.upper() if ext else "N/D"
+            
             prompt = {
                 "instruction": f"""Modello di fallback per {state.last_task}
 
@@ -838,6 +864,8 @@ Dopo 3 tentativi di ricerca, ecco il modello di fallback:
 
 📦 Dettagli:
 - Nome: {fallback_model['name']}
+- Formato: {ext}
+- Size: {fallback_model.get('size', 'N/A')}
 - Source: Task-based fallback
 
 🔗 URL: {fallback_model.get('url', 'N/A')}
