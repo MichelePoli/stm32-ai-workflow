@@ -414,8 +414,8 @@ def choose_predefined_taskbased_model(state: MasterState, config: dict) -> Maste
     
     prompt = {"instruction": prompt_text}
     
-    user_response = interrupt(prompt) # per adesso commentata per velocizzare
-    #user_response = "" # BYPASS
+    # user_response = interrupt(prompt) # per adesso commentata per velocizzare
+    user_response = "1" # BYPASS
     if isinstance(user_response, dict):
         user_text = user_response.get("response", user_response.get("input", str(user_response)))
     else:
@@ -549,8 +549,8 @@ Rispondi con: numero (1-{len(available_models)+1}) oppure descrivi
         """
     }
     
-    model_response = interrupt(model_prompt) # per adesso commentata per velocizzare
-    # model_response = "" # BYPASS
+    # model_response = interrupt(model_prompt) # per adesso commentata per velocizzare
+    model_response = "2" # BYPASS
     
     if isinstance(model_response, dict):
         model_text = model_response.get("response", model_response.get("input", str(model_response)))

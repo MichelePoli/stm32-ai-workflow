@@ -126,8 +126,8 @@ def decide_data_source(state: MasterState, config: dict) -> MasterState:
         }
     }
     
-    user_response = interrupt(prompt)
-    # user_response = "" # BYPASS
+    # user_response = interrupt(prompt)
+    user_response = "1" # BYPASS
     if isinstance(user_response, dict):
         user_text = str(user_response.get("response", user_response.get("input", ""))).lower()
     else:
@@ -361,9 +361,8 @@ def select_predefined_dataset(state: MasterState, config: dict) -> MasterState:
         "hint": "Inserisci il numero o il nome del dataset (es: 1 oppure cifar10)"
     }
     
-    # ===== STEP 7: Richiesta input utente =====
-    user_response = interrupt(prompt)
-    # user_response = "" # BYPASS
+    # user_response = interrupt(prompt)
+    user_response = "fruit_360" # BYPASS
     if isinstance(user_response, dict):
         selection = str(user_response.get("response", user_response.get("input", ""))).lower().strip()
     else:

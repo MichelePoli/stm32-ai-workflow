@@ -119,7 +119,13 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
-logging.getLogger("langgraph_api.server").setLevel(logging.WARNING)
+
+# Silencing noisy internal framework logs
+logging.getLogger("langgraph_api.server").setLevel(logging.WARNING)  # Silenzia log server interni
+logging.getLogger("langgraph_storage.queue").setLevel(logging.WARNING) # Silenzia statistiche periodiche "Worker stats" e "Queue stats"
+logging.getLogger("langgraph_api.metadata").setLevel(logging.ERROR)   # Nasconde errori persistenti di invio metadati a LangSmith
+logging.getLogger("httpx").setLevel(logging.WARNING)                 # Silenzia log delle richieste HTTP interne
+
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
@@ -259,8 +265,8 @@ def clarify_request(state: MasterState, config: dict) -> MasterState:
             "4": "Ricerca informazioni online"
         }
     }
-    user_choice = interrupt(prompt)
-    # user_choice = "" # BYPASS
+    # user_choice = interrupt(prompt)
+    user_choice = "2" # BYPASS
     
     # Default: option 2 (AI analysis)
     if not user_choice or str(user_choice).strip() == "":
@@ -292,8 +298,8 @@ def decide_continue_to_ai(state: MasterState, config: dict) -> MasterState:
         "instruction": f"Firmware generato in {project_path}! Continui con analisi AI? (sì/no)",
     }
     
-    user_response = interrupt(prompt)
-    # user_response = "" # BYPASS
+    # user_response = interrupt(prompt)
+    user_response = "sì" # BYPASS
     
     if isinstance(user_response, dict):
         user_text = user_response.get("response", user_response.get("input", str(user_response)))
@@ -322,8 +328,8 @@ def decide_continue_to_integration(state: MasterState, config: dict) -> MasterSt
         "instruction": "Analisi AI completata! Continui con integrazione? (sì/no)",
     }
     
-    user_response = interrupt(prompt)
-    # user_response = "" # BYPASS
+    # user_response = interrupt(prompt)
+    user_response = "sì" # BYPASS
     
     if isinstance(user_response, dict):
         user_text = user_response.get("response", user_response.get("input", str(user_response)))

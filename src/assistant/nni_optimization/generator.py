@@ -3,28 +3,8 @@ import logging
 import json
 import re
 import urllib.request
+from src.assistant.utils import force_unload_ollama
 
-def force_unload_ollama(model_name: str = "gpt-oss:20b"):
-    """
-    Force Ollama to unload the model from GPU to free up VRAM for TensorFlow/NNI.
-    Sends a request with keep_alive=0.
-    """
-    try:
-        url = "http://localhost:11434/api/generate"
-        data = {
-            "model": model_name,
-            "keep_alive": 0
-        }
-        req = urllib.request.Request(
-            url,
-            data=json.dumps(data).encode('utf-8'),
-            headers={'Content-Type': 'application/json'}
-        )
-        with urllib.request.urlopen(req) as response:
-            logger.info(f"🔫 Ollama model '{model_name}' unloaded to free VRAM for NNI.")
-            
-    except Exception as e:
-        logger.warning(f"⚠️ Failed to unload Ollama model: {e}")
 
 from typing import Dict, Any, Optional
 from agno.agent import Agent

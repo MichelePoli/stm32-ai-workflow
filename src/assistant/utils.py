@@ -11,7 +11,9 @@ import os
 import re
 import hashlib
 import logging
-from typing import Optional, Type
+import json
+import urllib.request
+from typing import Optional, Type, Dict, Any
 from pydantic import BaseModel
 from langchain_ollama import ChatOllama
 from src.assistant.configuration import Configuration
@@ -66,6 +68,29 @@ def get_llm(
         return llm.with_structured_output(structured_schema)
     
     return llm
+
+
+def force_unload_ollama(model_name: str = "gpt-oss:20b"):
+    """
+    Force Ollama to unload the model from GPU to free up VRAM for training/NNI.
+    Sends a request with keep_alive=0.
+    """
+    try:
+        url = "http://localhost:11434/api/generate"
+        data = {
+            "model": model_name,
+            "keep_alive": 0
+        }
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(data).encode('utf-8'),
+            headers={'Content-Type': 'application/json'}
+        )
+        with urllib.request.urlopen(req) as response:
+            logger.info(f"🔫 Ollama model '{model_name}' unloaded to free VRAM.")
+            
+    except Exception as e:
+        logger.warning(f"⚠️ Failed to unload Ollama model: {e}")
 
 
 # ============================================================================
@@ -281,7 +306,8 @@ def run_subprocess_streaming(
     cmd: list, 
     logger_instance, 
     prefix: str = "[Subprocess]",
-    timeout: int = 600
+    timeout: int = 600,
+    ignore_list: list = None
 ) -> dict:
     """
     Run a subprocess and stream its output to a logger in real-time.
@@ -291,6 +317,7 @@ def run_subprocess_streaming(
         logger_instance: Logger to output to
         prefix: Prefix for each logged line
         timeout: Execution timeout in seconds
+        ignore_list: Optional list of strings to suppress from logs if found in a line
         
     Returns:
         Dictionary with success, stdout, and returncode
@@ -337,6 +364,11 @@ def run_subprocess_streaming(
             if line:
                 clean_line = line.strip()
                 if clean_line:
+                    # Optional filtering
+                    if ignore_list and any(x in clean_line for x in ignore_list):
+                        stdout_lines.append(line)
+                        continue
+                        
                     logger_instance.info(f"  {prefix} {clean_line}")
                     stdout_lines.append(line)
             
