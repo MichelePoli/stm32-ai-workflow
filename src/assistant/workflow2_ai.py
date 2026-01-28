@@ -1181,16 +1181,9 @@ RISPOSTA - SOLO IL NUMERO:
         
         logger.debug(f"Prompt LLM: {prompt[:350]}...")
         
-        if config is None:
-            logger.warning(f"⚠️  config non fornito, uso default Ollama")
-            llm = ChatOllama(model="mistral", temperature=0)
-        else:
-            cfg = Configuration.from_runnable_config(config)
-            llm = ChatOllama(
-                model=cfg.local_llm,
-                temperature=0,
-                num_ctx=cfg.llm_context_window
-            )
+        # Use centralized LLM setup
+        from src.assistant.utils import get_llm
+        llm = get_llm(config)
         
         # ✅ STRUCTURED OUTPUT - Forza formato
         class ModelSelection(BaseModel):
@@ -1668,6 +1661,11 @@ def download_model_to_cache(state: MasterState, config: dict, model: dict) -> Ma
         state.model_path = cfg.ai_model_path
         return state
     
+    # ===== SECURITY: Sanitize filename to prevent path traversal =====
+    from src.assistant.utils import sanitize_filename
+    model_filename = sanitize_filename(model_filename)
+    logger.debug(f"Sanitized filename: {model_filename}")
+    
     cached_path = os.path.join(cache_dir, model_filename)
     
     # === VERIFICA CACHE ===
@@ -1758,7 +1756,21 @@ def download_model_to_cache(state: MasterState, config: dict, model: dict) -> Ma
                                     last_log = (int(pct / 20)) * 20
                                     logger.info(f"  ⬇️  {last_log}%")
                 
+                
                 logger.info(f"✓ Download completato! Size: {os.path.getsize(cached_path) / (1024*1024):.1f} MB")
+                
+                # ===== SECURITY: Verify file integrity (SHA256) =====
+                from src.assistant.utils import verify_file_integrity
+                expected_hash = model.get("sha256")  # Optional field in model dict
+                if expected_hash:
+                    logger.info(f"🔐 Verifying file integrity...")
+                    if not verify_file_integrity(cached_path, expected_hash):
+                        logger.error(f"❌ Integrity check FAILED! Removing corrupted file.")
+                        os.remove(cached_path)
+                        raise SecurityError("Downloaded file failed SHA256 verification")
+                    logger.info(f"✓ Integrity verified!")
+                else:
+                    logger.warning(f"⚠️  No SHA256 hash provided - skipping integrity check")
                 
                 # ✅ STAMPA ARCHITETTURA - MODO ROBUSTO (uguale a sopra)
                 logger.info(f"\n📋 ANALISI ARCHITETTURA MODELLO (appena scaricato)")

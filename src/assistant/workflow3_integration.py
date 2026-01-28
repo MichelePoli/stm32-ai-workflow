@@ -387,7 +387,8 @@ static ai_buffer ai_output[AI_{net_upper}_OUT_NUM];
   
   /* Get the weights/params from the data module */
   if (!ai_{net_name}_data_params_get(&params)) {{
-      /* TODO: Handle error */
+      Error_Handler();  /* STM32 HAL standard error handler */
+      /* Alternatively, implement custom error recovery */
   }}
   
   /* Set the activations buffer */
@@ -396,12 +397,14 @@ static ai_buffer ai_output[AI_{net_upper}_OUT_NUM];
   /* Create the network */
   err = ai_{net_name}_create(&{net_name}, AI_{net_upper}_DATA_CONFIG);
   if (err.type != AI_ERROR_NONE) {{
-      /* TODO: Handle error */
+      Error_Handler();  /* Network creation failed */
+      /* Error code available in err.type and err.code */
   }}
   
   /* Initialize the network */
   if (!ai_{net_name}_init({net_name}, &params)) {{
-      /* TODO: Handle error */
+      Error_Handler();  /* Network initialization failed */
+      /* Check params.activations buffer allocation */
   }}
   
   /* Initialize input/output buffers */
@@ -418,13 +421,33 @@ static ai_buffer ai_output[AI_{net_upper}_OUT_NUM];
         while_pattern = r'(\/\* USER CODE BEGIN WHILE \*\/)'
         ai_while = f'''
     /* AI Inference */
-    /* TODO: Fill in_data with sensor data */
+    /* Fill in_data with sensor data (ADC, I2C, SPI, etc.)
+       Example:
+       HAL_ADC_Start(&hadc1);
+       HAL_ADC_PollForConversion(&hadc1, HAL_MAX_DELAY);
+       in_data[0] = (ai_float)HAL_ADC_GetValue(&hadc1) / 4095.0f;
+       ... (fill remaining input features)
+    */
     
     if (ai_{net_name}_run({net_name}, &ai_input[0], &ai_output[0]) != 1) {{
-        /* TODO: Handle error */
+        /* Inference failed - blink error LED */
+        HAL_GPIO_WritePin(LED_ERROR_GPIO_Port, LED_ERROR_Pin, GPIO_PIN_SET);
+        HAL_Delay(100);
+        HAL_GPIO_WritePin(LED_ERROR_GPIO_Port, LED_ERROR_Pin, GPIO_PIN_RESET);
     }}
     
-    /* TODO: Use out_data results */
+    /* Process inference results
+       Example for classification:
+       int predicted_class = 0;
+       ai_float max_prob = out_data[0];
+       for (int i = 1; i < AI_{net_upper}_OUT_1_SIZE; i++) {{
+           if (out_data[i] > max_prob) {{
+               max_prob = out_data[i];
+               predicted_class = i;
+           }}
+       }}
+       // Use predicted_class for application logic (actuators, display, etc.)
+    */
 '''
         if re.search(while_pattern, main_content) and f'ai_{net_name}_run' not in main_content:
             main_content = re.sub(while_pattern, r'\1' + ai_while, main_content)

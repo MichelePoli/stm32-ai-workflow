@@ -175,9 +175,12 @@ Format richiesto:
         user_input = str(user_response.get("response", user_response.get("input", "")))
     else:
         user_input = str(user_response)
-        
-    # Estrazione strutturata
-    llm = ChatOllama(model="mistral:latest", temperature=0).with_structured_output(DatasetRegistration)
+    
+    logger.info(f"📝 User response: {user_input[:100]}")
+    
+    # Parse con LLM structured output
+    from src.assistant.utils import get_llm
+    llm = get_llm(config, structured_schema=DatasetRegistration)
     try:
         info = llm.invoke([
             SystemMessage(content="Sei un esperto di MLOps. Estrai le informazioni del dataset dall'input utente."),

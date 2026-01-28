@@ -194,3 +194,21 @@ class Configuration:
 ║   Compression:   {self.ai_compression:<35} ║
 ╚════════════════════════════════════════════════════════╝
 """
+    
+    def __repr__(self) -> str:
+        """
+        Override __repr__ to redact sensitive fields from logs.
+        
+        This prevents accidental password/token leakage in debug output.
+        """
+        safe_dict = {}
+        for k, v in self.__dict__.items():
+            # Redact fields containing sensitive keywords
+            if any(sensitive in k.lower() for sensitive in ['password', 'token', 'key', 'secret', 'api']):
+                safe_dict[k] = "***REDACTED***"
+            else:
+                safe_dict[k] = v
+        
+        # Format as readable string
+        items = ", ".join(f"{k}={repr(v)}" for k, v in list(safe_dict.items())[:5])
+        return f"Configuration({items}...)"

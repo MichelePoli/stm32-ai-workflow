@@ -1415,12 +1415,12 @@ Write your modifications in natural language (or leave empty for defaults):
     
     try:
         # Setup LLM
-        llm = ChatOllama(
-            model="mistral",
-            temperature=0.3,
-            num_ctx=config.get('llm_context_window', 2048) if config else 2048
+        from src.assistant.utils import get_llm
+        structured_llm = get_llm(
+            config, 
+            structured_schema=ParsedModificationsPlan, 
+            temperature=0.3
         )
-        structured_llm = llm.with_structured_output(ParsedModificationsPlan)
         
         # Prompt per LLM
         llm_prompt = f"""Parse this neural network modification request.
@@ -1504,53 +1504,26 @@ Return JSON with modifications list."""
         
         # ===== VALIDAZIONE PARAMETRI =====
         issues = []
+        from src.assistant.utils import get_llm, validate_modification_params
         
         for i, mod in enumerate(result.modifications):
-            mod_type = mod.type
-            params = mod.params
+            # Use centralized validation logic
+            sanitized_params, mod_issues = validate_modification_params(
+                mod.type, 
+                mod.params, 
+                total_layers=total_layers
+            )
+            result.modifications[i].params = sanitized_params
+            issues.extend(mod_issues)
             
-            # Freeze_layers validation
-            if mod_type == 'freeze_layers':
-                num_frozen = params.get('num_frozen_layers')
-                if num_frozen is None: # Il parser LLM a volte restituiva None (null) per alcuni parametri (come num_frozen_layers) invece di un numero. Il codice di validazione provava a confrontare questo None con un intero (es. None <= 0), causando l'errore.
-                    num_frozen = 1
-                
-                if num_frozen > total_layers:
-                    params['num_frozen_layers'] = max(1, total_layers - 1)
-                    issues.append(f"freeze_layers: capped to {total_layers-1}")
-                elif num_frozen <= 0:
-                    params['num_frozen_layers'] = 1
-                    issues.append(f"freeze_layers: adjusted to 1")
-            
-            # Change_output_layer validation
-            elif mod_type == 'change_output_layer':
-                new_classes = params.get('new_classes')
+            # Additional custom validation for output layer (classes)
+            if mod.type == 'change_output_layer':
+                new_classes = sanitized_params.get('new_classes')
                 if new_classes is None:
                     new_classes = output_classes
-
                 if new_classes <= 0 or new_classes > 10000:
-                    params['new_classes'] = output_classes
+                    result.modifications[i].params['new_classes'] = output_classes
                     issues.append(f"change_output_layer: invalid {new_classes}, using {output_classes}")
-            
-            # Add_dropout validation
-            elif mod_type == 'add_dropout':
-                rate = params.get('rate')
-                if rate is None:
-                    rate = 0.5
-                
-                if not (0.0 < rate < 1.0):
-                    params['rate'] = 0.5
-                    issues.append(f"add_dropout: invalid rate {rate}, using 0.5")
-            
-            # Change_learning_rate validation
-            elif mod_type == 'change_learning_rate':
-                lr = params.get('learning_rate')
-                if lr is None:
-                    lr = 0.0001
-                
-                if lr <= 0 or lr > 1:
-                    params['learning_rate'] = 0.0001
-                    issues.append(f"change_learning_rate: invalid {lr}, using 0.0001")
         
         if issues:
             result.validation.issues = issues
@@ -2014,63 +1987,18 @@ def execute_in_environment(python_code: str, state: MasterState, timeout: int = 
     stderr_accumulator = []
     
     try:
-        # Popen permette di leggere l'output in tempo reale
-        process = subprocess.Popen(
-            [python_path, '-c', python_code],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            env={**os.environ, 'TF_CPP_MIN_LOG_LEVEL': '3'},
-            bufsize=1, # Line buffering
-            universal_newlines=True
+        from src.assistant.utils import run_subprocess_streaming
+        
+        cmd = [python_path, '-c', python_code]
+        res = run_subprocess_streaming(
+            cmd, 
+            logger, 
+            prefix="[Train]", 
+            timeout=timeout
         )
         
-        # MONITORING OUTPUT
-        import select
-        import time
-        
-        start_time = time.time()
-        
-        while True:
-            # Check timeout
-            if time.time() - start_time > timeout:
-                process.terminate()
-                raise subprocess.TimeoutExpired(process.args, timeout)
-            
-            # Leggi stream pronti
-            reads = [process.stdout.fileno(), process.stderr.fileno()]
-            ret = select.select(reads, [], [], 0.1)
-            
-            for fd in ret[0]:
-                if fd == process.stdout.fileno():
-                    line = process.stdout.readline()
-                    if line:
-                        clean_line = line.strip()
-                        if clean_line:
-                            logger.info(f"  [Train] {clean_line}")
-                            stdout_accumulator.append(line)
-                if fd == process.stderr.fileno():
-                    line = process.stderr.readline()
-                    if line:
-                        stderr_accumulator.append(line)
-            
-            # Fine processo
-            if process.poll() is not None:
-                # Leggi ultimi rimasugli
-                remaining_out, remaining_err = process.communicate()
-                if remaining_out: stdout_accumulator.append(remaining_out)
-                if remaining_err: stderr_accumulator.append(remaining_err)
-                break
-                
-        return {
-            'success': process.returncode == 0,
-            'stdout': "".join(stdout_accumulator).strip(),
-            'stderr': "".join(stderr_accumulator).strip(),
-            'returncode': process.returncode
-        }
+        return res
     except Exception as e:
-        if isinstance(e, subprocess.TimeoutExpired):
-            raise e
         logger.error(f"❌ Subprocess error: {e}")
         return {'success': False, 'stdout': "", 'stderr': str(e), 'returncode': 1}
 
@@ -3661,10 +3589,10 @@ Quantized: {state.should_quantize}
         user_response = "continue_ai"
     
     # ===== LLM CLASSIFICATION =====
-    logger.info(f"📝 User response: '{user_response}'")
-    
-    try:
-        llm_classifier = ChatOllama(model="mistral:latest").with_structured_output(ContinueDecision)
+        logger.info(f"🤖 Chiedendo all'utente se continuare...")
+        
+        from src.assistant.utils import get_llm
+        llm_classifier = get_llm(config, structured_schema=ContinueDecision)
         
         decision = llm_classifier.invoke([
             SystemMessage(content=continue_decision_instructions),
