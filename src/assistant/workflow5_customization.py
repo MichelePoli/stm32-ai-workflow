@@ -2036,7 +2036,7 @@ import json
 import sys
 
 model_path = r'{model_path}'
-temp_output = '/tmp/model_loaded_temp.keras'
+temp_output = '/tmp/model_loaded_temp.h5'
 
 try:
     model = tf.keras.models.load_model(
@@ -2052,7 +2052,7 @@ try:
         'total_params': int(model.count_params()),
     }}
     
-    model.save(temp_output, save_format='keras')
+    model.save(temp_output, save_format='h5')
     
     print(f"SUCCESS: {{temp_output}}|" + json.dumps(info))
     sys.exit(0)
@@ -2200,7 +2200,7 @@ import sys
 
 model_path = r'{loaded_model_path}'
 modifications = {json.dumps(parsed_mods.get('modifications', []))}
-output_path = '/tmp/customized_model.keras'
+output_path = '/tmp/customized_model.h5'
 
 try:
     # ===== LOAD MODEL =====
@@ -2474,7 +2474,7 @@ try:
 
     # ===== SALVA MODELLO =====
     print(f"\\n[Saving] Model saving...")
-    model.save(output_path, save_format='keras')
+    model.save(output_path, save_format='h5')
     print(f"✓ Model saved: {{output_path}}")
     
     # ===== INFO FINALE =====
@@ -2611,7 +2611,13 @@ def fine_tune_customized_model(state: MasterState, config: dict) -> MasterState:
         logger.info(f"📌 Model: {os.path.basename(model_path)} ({model_size_mb:.1f}MB)")
         
         training_rec = state.parsed_modifications.get('training_recommendation', {})
-        learning_rate = training_rec.get('learning_rate', state.custom_learning_rate or 0.001)
+        # Conservative Learning Rate for fine-tuning (start with 1e-4)
+        learning_rate = training_rec.get('learning_rate', state.custom_learning_rate or 0.0001)
+        
+        # Safety cap: ensure LR is not too aggressive for pre-trained weights
+        if learning_rate > 0.001: 
+            logger.warning(f"⚠️  High LR suggested ({learning_rate}), capping at 0.001 for stability during fine-tuning.")
+            learning_rate = 0.001
         # Force 10 epochs if not explicitly requested otherwise, and cap at 10 for standard runs
         epochs = min(training_rec.get('epochs', state.custom_epochs or 10), 10)
         batch_size = training_rec.get('batch_size', state.custom_batch_size or 32)
@@ -2621,7 +2627,7 @@ def fine_tune_customized_model(state: MasterState, config: dict) -> MasterState:
         
         logger.info(f"📌 Training config: {epochs} epochs, batch={batch_size}, LR={learning_rate}")
         
-        output_path = model_path.replace('.keras', '_finetuned.keras').replace('.h5', '_finetuned.h5')
+        output_path = model_path.replace('.keras', '_finetuned.h5').replace('.h5', '_finetuned.h5')
         
         # ===== PYTHON SCRIPT =====
         python_code = f"""
@@ -2729,8 +2735,8 @@ try:
             X_real = np.load(os.path.join(real_dataset_path, "x_train.npy"))
             y_real = np.load(os.path.join(real_dataset_path, "y_train.npy"))
             
-            # LIMIT: Use only first 10000 samples to avoid OOM and speed up testing
-            max_samples = 10000
+            # LIMIT: Use only first 5000 samples to avoid OOM and speed up testing
+            max_samples = 5000
             if len(X_real) > max_samples:
                 print(f"  ⚠️  Limiting dataset to {{max_samples}} samples (OOM prevention)")
                 X_real = X_real[:max_samples]
@@ -3036,7 +3042,7 @@ try:
     callbacks_list = [
         PrintEpochProgress(),
         EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True, verbose=0),
-        ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=3, min_lr=1e-7, verbose=0)
+        ReduceLROnPlateau(monitor='val_loss', factor=0.2, patience=2, min_lr=1e-7, verbose=0)
     ]
 
     if data_gen:
@@ -3589,6 +3595,7 @@ Quantized: {state.should_quantize}
         user_response = "continue_ai"
     
     # ===== LLM CLASSIFICATION =====
+    try:
         logger.info(f"🤖 Chiedendo all'utente se continuare...")
         
         from src.assistant.utils import get_llm
