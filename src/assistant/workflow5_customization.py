@@ -3153,7 +3153,15 @@ except Exception as e:
             'Created device /job:localhost',
             'built with optimized CPU instructions',
             'appropriate compiler flags',
-            'Class Dist:'
+            'Class Dist:',
+            'layout failed: INVALID_ARGUMENT',
+            'Loaded cuDNN version',
+            'Start cannot spawn child process',
+            'TensorFloat-32 will be used',
+            'XLA service',
+            'StreamExecutor device',
+            'disabling MLIR crash reproducer',
+            'Compiled cluster using XLA'
         ]
         
         # ===== USA execute_in_environment =====
