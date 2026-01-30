@@ -1,0 +1,50 @@
+# for Apple Silicon - Mac 
+name: stm32
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - pip
+  - pip:
+    # Core AI & LangChain
+    - langgraph
+    - langchain
+    - langchain-community
+    - langchain-core
+    - langchain-ollama
+    - langsmith
+    - agno
+    
+    # ML & Data
+    - h5py
+    - tensorflow
+    
+    # Web & API
+    - fastapi
+    - uvicorn
+    - sse-starlette
+    - httpx
+    - requests
+    - beautifulsoup4
+    
+    # Data & Utilities
+    - pydantic
+    - python-dotenv
+    - pandas
+    - numpy
+    - pyyaml
+    - tqdm
+    
+    # Tools
+    - duckduckgo-search
+    - googlesearch-python
+    - tavily-python
+    - scholarly
+    - semanticscholar
+    
+    # Optional / specific
+    - chromadb
+    - sentence-transformers
+    - e2b
+    - e2b-code-interpreter

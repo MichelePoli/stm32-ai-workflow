@@ -1,0 +1,45 @@
+{
+    "name": "stm32-ai-assistant",
+    "displayName": "STM32 Edge AI Chat",
+    "description": "Chat with your STM32 AI Workflow Agent",
+    "version": "0.0.1",
+    "engines": {
+        "vscode": "^1.85.0"
+    },
+    "categories": [
+        "AI",
+        "Chat"
+    ],
+    "activationEvents": [],
+    "main": "./out/extension.js",
+    "contributes": {
+        "chatParticipants": [
+            {
+                "id": "stm32-ai.assistant",
+                "name": "stm32ai",
+                "fullName": "STM32 Edge AI Assistant",
+                "description": "Analyze models, generate firmware, and integrate AI on STM32",
+                "isSticky": true
+            }
+        ],
+        "commands": [
+            {
+                "command": "stm32-ai.startServer",
+                "title": "Start STM32 AI Server"
+            }
+        ]
+    },
+    "scripts": {
+        "vscode:prepublish": "npm run compile",
+        "compile": "tsc -p ./",
+        "watch": "tsc -watch -p ./"
+    },
+    "devDependencies": {
+        "@types/vscode": "^1.85.0",
+        "@types/node": "18.x",
+        "typescript": "^5.3.3"
+    },
+    "dependencies": {
+        "node-fetch": "^3.3.2"
+    }
+}

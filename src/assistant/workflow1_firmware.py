@@ -1,6 +1,7 @@
 import os
 import subprocess
 import shutil
+import platform
 import re
 import json
 import logging
@@ -10,6 +11,7 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 from langchain_ollama import ChatOllama
 from langchain_core.messages import SystemMessage, HumanMessage
+from langchain_core.runnables import RunnableConfig
 from langgraph.types import interrupt
 
 from src.assistant.configuration import Configuration
@@ -136,7 +138,7 @@ def get_template_ioc_path(board_name: Optional[str], mcu_series: Optional[str]) 
 # WORKFLOW 1: FIRMWARE GENERATION
 # ============================================================================
 
-def collect_project_info(state: MasterState, config: dict) -> MasterState:
+def collect_project_info(state: MasterState, config: RunnableConfig = None) -> MasterState:
     """
     Raccoglie info progetto da risposta naturale dell'utente.
     La risposta viene analizzata da LLM per estrarre gli attributi, inclusa mcu_series.
@@ -239,7 +241,7 @@ Esempio: "Crea progetto MyApp per STM32F401 con CubeIDE"
     logger.info("✓ Configurazione firmware raccolta")
     return state
 
-def search_and_install_stm32_package(state: MasterState, config: dict) -> MasterState:
+def search_and_install_stm32_package(state: MasterState, config: RunnableConfig = None) -> MasterState:
     """
     Nodo che clona l'intero package STM32 da GitHub e lo salva in ~/STM32Cube/Repository/
     Scarica AUTOMATICAMENTE l'ultima versione disponibile dal repository.
@@ -530,7 +532,7 @@ def check_package_installation(state: MasterState) -> Literal["generate_cubemx_s
         return "finalize_project"
 
 
-def generate_cubemx_script(state: MasterState, config: dict) -> MasterState:
+def generate_cubemx_script(state: MasterState, config: RunnableConfig = None) -> MasterState:
     folder = f"{state.project_name}_{state.timestamp}"
     state.firmware_project_path = os.path.join(state.base_dir, folder)
 
@@ -602,10 +604,19 @@ def recover_with_ioc_fallback(state: MasterState) -> bool:
     return True
 
 
-def execute_generation(state: MasterState, config: dict) -> MasterState:
+def execute_generation(state: MasterState, config: RunnableConfig = None) -> MasterState:
     import time
     os.makedirs(state.firmware_project_path, exist_ok=True)
-    cmd = ["xvfb-run", "-a", state.cubemx_path, "-q", state.firmware_script_path]
+    
+    # Su macOS (Darwin) non usiamo xvfb-run. Su Linux lo usiamo se necessario.
+    if platform.system() == "Darwin":
+        cmd = [state.cubemx_path, "-q", state.firmware_script_path]
+    else:
+        # Tenta di usare xvfb-run su Linux se disponibile, altrimenti fallback diretto
+        if shutil.which("xvfb-run"):
+            cmd = ["xvfb-run", "-a", state.cubemx_path, "-q", state.firmware_script_path]
+        else:
+            cmd = [state.cubemx_path, "-q", state.firmware_script_path]
     
     try:
         logger.info(f"🚀 Executing CubeMX (Attempt 1)...")
@@ -675,7 +686,7 @@ def execute_generation(state: MasterState, config: dict) -> MasterState:
     return state
 
 
-def finalize_project(state: MasterState, config: dict) -> MasterState:
+def finalize_project(state: MasterState, config: RunnableConfig = None) -> MasterState:
     if state.firmware_generation_success:
         print(f"✓ Progetto firmware generato: {state.firmware_project_path}")
         state.firmware_project_dir = state.firmware_project_path
@@ -683,171 +694,4 @@ def finalize_project(state: MasterState, config: dict) -> MasterState:
         print(f"✗ Errore firmware: {state.firmware_error_message}")
     return state
 
-
-# ============================================================================
-# DECISION NODES - COLLEGA RAMI SEQUENZIALI
-# ============================================================================
-
-def decide_continue_to_ai(state: MasterState, config: dict) -> MasterState:
-    """
-    Nodo di decisione dopo finalize_project.
-    La risposta viene analizzata da un LLM. Così anche se l'utente risponde in modo non strutturato, possiamo interpretarla. 
-    """
-    
-    logger.info("📋 Decisione: Continuare verso analisi AI?")
-    
-    prompt = {
-        "instruction": "Il firmware è stato generato con successo! Vuoi continuare con l'analisi del modello AI o terminare qui?",
-    }
-    
-    # L'utente risponde in linguaggio naturale
-    # user_response = interrupt(prompt)
-    user_response = "CONTINUARE" # BYPASS
-    # user_response = "" # BYPASS
-    
-    # DEBUG: Stampa quello che hai ricevuto
-    # logger.info(f"🔍 user_response RAW: {user_response}")
-    # logger.info(f"🔍 user_response TYPE: {type(user_response)}")
-    
-    # Gestisci il caso in cui sia dict o stringa/int
-    if isinstance(user_response, dict):
-        user_text = user_response.get("response", user_response.get("input", str(user_response)))
-    else:
-        user_text = str(user_response)
-    
-    # logger.info(f"🔍 user_text ESTRATTO: '{user_text}'")
-    
-    # === USA LLM PER ANALIZZARE LA RISPOSTA ===
-    
-    cfg = Configuration.from_runnable_config(config)
-    
-    llm = ChatOllama(
-        model=cfg.local_llm,
-        temperature=0,
-        num_ctx=cfg.llm_context_window
-    )
-     
-    # Prompt SEMPLIFICATO per l'LLM
-    analysis_prompt = f"""Analizza questa risposta e rispondi SOLO con una di queste due parole:
-    
-Risposta: "{user_text}"
-
-Se l'utente dice SÌ / CONTINUA / PROCEDI → rispondi: CONTINUARE
-Se l'utente dice NO / TERMINA / STOP → rispondi: TERMINARE
-
-Risposta:"""
-    
-    logger.info(f"📝 Analysis prompt:\n{analysis_prompt}")
-    
-    response = llm.invoke([
-        SystemMessage(content="Rispondi SOLO con una parola: CONTINUARE o TERMINARE"),
-        HumanMessage(content=analysis_prompt)
-    ])
-    
-    decision_text = response.content.strip().upper()
-    
-    logger.info(f"🤖 LLM Decision RAW: '{decision_text}'")
-    
-    # Interpreta la decisione (più tollerante)
-    if "CONTINUARE" in decision_text or "CONTINUA" in decision_text or "SÌ" in decision_text:
-        logger.info("✓ CONTINUE DETECTED - Going to AI Analysis")
-        state.route = "continue_to_ai"
-    else:
-        logger.info("✓ TERMINATE DETECTED - Going to END")
-        state.route = "end_workflow"
-    
-    logger.info(f"📊 Final state.route: {state.route}")
-    
     return state
-
-
-def decide_continue_to_integration(state: MasterState, config: dict) -> MasterState:
-    """
-    Nodo di decisione dopo finalize_analysis.
-    La risposta viene analizzata da un LLM. Così anche se l'utente risponde in modo non strutturato, possiamo interpretarla.
-    """
-    
-    logger.info("📋 Decisione: Continuare verso integrazione?")
-    
-    prompt = {
-        "instruction": "L'analisi AI è stata completata con successo! Vuoi continuare con l'integrazione del codice AI nel firmware o terminare qui?",
-    }
-    
-    # L'utente risponde in linguaggio naturale
-    # user_response = interrupt(prompt)
-    user_response = "CONTINUARE" # BYPASS
-    # user_response = "" # BYPASS
-    
-    
-    # DEBUG: Stampa quello che hai ricevuto
-    # logger.info(f"🔍 user_response RAW: {user_response}")
-    # logger.info(f"🔍 user_response TYPE: {type(user_response)}")
-    
-    # Gestisci il caso in cui sia dict o stringa/int
-    if isinstance(user_response, dict):
-        user_text = user_response.get("response", user_response.get("input", str(user_response)))
-    else:
-        user_text = str(user_response)
-    
-    # logger.info(f"🔍 user_text ESTRATTO: '{user_text}'")
-    
-    # === USA LLM PER ANALIZZARE LA RISPOSTA ===
-    
-    cfg = Configuration.from_runnable_config(config)
-    
-    llm = ChatOllama(
-        model=cfg.local_llm,
-        temperature=0,
-        num_ctx=cfg.llm_context_window
-    )
-     
-    # Prompt SEMPLIFICATO per l'LLM
-    analysis_prompt = f"""Analizza questa risposta e rispondi SOLO con una di queste due parole:
-    
-Risposta: "{user_text}"
-
-Se l'utente dice SÌ / CONTINUA / PROCEDI / INTEGRA → rispondi: CONTINUARE
-Se l'utente dice NO / TERMINA / STOP / FINE → rispondi: TERMINARE
-
-Risposta:"""
-    
-    logger.info(f"📝 Analysis prompt:\n{analysis_prompt}")
-    
-    response = llm.invoke([
-        SystemMessage(content="Rispondi SOLO con una parola: CONTINUARE o TERMINARE"),
-        HumanMessage(content=analysis_prompt)
-    ])
-    
-    decision_text = response.content.strip().upper()
-    
-    logger.info(f"🤖 LLM Decision RAW: '{decision_text}'")
-    
-    # Interpreta la decisione (più tollerante)
-    if "CONTINUARE" in decision_text or "CONTINUA" in decision_text or "SÌ" in decision_text:
-        logger.info("✓ CONTINUE DETECTED - Going to Integration")
-        state.route = "continue_to_integration"
-    else:
-        logger.info("✓ TERMINATE DETECTED - Going to END")
-        state.route = "end_workflow"
-    
-    logger.info(f"📊 Final state.route: {state.route}")
-    
-    return state
-
-
-def decision_continue_routing(state: MasterState) -> Literal["collect_analysis_info", "collect_integration_info", "end"]:
-    """
-    Funzione di routing per i nodi di decisione.
-    Determina il prossimo nodo in base alla scelta dell'utente.
-    """
-    
-    if state.route == "continue_to_ai":
-        logger.info("→ Routing verso: collect_analysis_info")
-        return "collect_analysis_info"
-    elif state.route == "continue_to_integration":
-        logger.info("→ Routing verso: collect_integration_info")
-        return "collect_integration_info"
-    else:
-        logger.info("→ Routing verso: END")
-        return "end"
-

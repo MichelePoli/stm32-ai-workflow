@@ -127,8 +127,8 @@ class MasterState:
     final_model_path: str = ""  # Path del modello customizzato salvato definitivamente
 
     # Environment management
-    python_path: str = ""  # Path del Python interpreter (es: /home/mrusso/miniconda3/envs/stm32_legacy/bin/python)
-    conda_env: str = ""    # Nome ambiente conda (es: 'stm32_legacy', 'stm32')
+    python_path: str = ""  # Path del Python interpreter (es: /usr/bin/python)
+    conda_env: str = ""    # Nome ambiente conda (es: 'stm32legacy', 'stm32')
     
     # Decision after customization
     continue_after_customization: bool = False  # Continua con AI analysis?
@@ -160,7 +160,8 @@ class MasterState:
     # === NNI OPTIMIZATION ===
     optimization_mode: str = "standard"  # "nni", "standard" - modalità di ottimizzazione iperparametri
 
-    
+    # === CROSS-SESSION CONTEXT ===
+    persistent_context: dict = field(default_factory=dict) # Info persistenti dell'utente (es: board preferita)
 
 # ============================================================================
 # INPUT SCHEMA

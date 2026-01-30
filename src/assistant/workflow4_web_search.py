@@ -17,15 +17,16 @@ from typing import Literal, Optional
 
 from langchain_ollama import ChatOllama
 from agno.agent import Agent
-from agno.tools.googlesearch import GoogleSearchTools
+from agno.tools.duckduckgo import DuckDuckGoTools
 from langchain_core.messages import SystemMessage, HumanMessage
+from langchain_core.runnables import RunnableConfig
 from langgraph.types import interrupt
 from pydantic import BaseModel, Field
 
 from src.assistant.configuration import Configuration
 from src.assistant.state import MasterState
 
-from agno.tools.googlesearch import GoogleSearchTools
+from agno.tools.duckduckgo import DuckDuckGoTools
 from agno.models.ollama import Ollama
 import asyncio
 
@@ -311,7 +312,7 @@ Prioritizza fonti ufficiali e recenti.
 # WORKFLOW 4: WEB RESEARCH (OTTIMIZZATO CON PROMPT DINAMICO)
 # ============================================================================
 
-def classify_search(state: MasterState, config: dict) -> MasterState:
+def classify_search(state: MasterState, config: RunnableConfig = None) -> MasterState:
     """Classifica il tipo di ricerca richiesta dall'utente."""
     
     logger.info(f"🔍 Classificazione ricerca: {state.message}")
@@ -361,7 +362,7 @@ def search_type_decision(state: MasterState) -> Literal["execute_web_search", "c
         return "clarify"
 
 
-def execute_web_search(state: MasterState, config: dict) -> MasterState:
+def execute_web_search(state: MasterState, config: RunnableConfig = None) -> MasterState:
     """
     Nodo unico di ricerca che adatta il prompt dinamicamente.
     Molto più elegante che avere 4 nodi separati.
@@ -379,7 +380,7 @@ def execute_web_search(state: MasterState, config: dict) -> MasterState:
         # Inizializza Agno Agent con Google Search
         agent = Agent(
             model=Ollama(id="mistral"),
-            tools=[GoogleSearchTools()],
+            tools=[DuckDuckGoTools()],
             show_tool_calls=False,
             markdown=True
         )
@@ -443,7 +444,7 @@ def execute_web_search(state: MasterState, config: dict) -> MasterState:
     return state
 
 
-def summarize_search_results(state: MasterState, config: dict) -> MasterState:
+def summarize_search_results(state: MasterState, config: RunnableConfig = None) -> MasterState:
     """
     Nodo che riassume i risultati della ricerca web.
     Input: state.search_results (RAW text)
@@ -495,7 +496,7 @@ def summarize_search_results(state: MasterState, config: dict) -> MasterState:
     return state
 
 
-def finalize_search(state: MasterState, config: dict) -> MasterState:
+def finalize_search(state: MasterState, config: RunnableConfig = None) -> MasterState:
     """Nodo finale che presenta i risultati della ricerca (Riassunto + Eval)."""
     
     if state.web_research_success:

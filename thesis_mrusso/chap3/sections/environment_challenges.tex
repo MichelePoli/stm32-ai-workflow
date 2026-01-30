@@ -81,3 +81,25 @@ This distinction arises from the technical requirements of neural network "surgi
 A common question in edge AI orchestration is whether these deployment formats can be back-converted into editable Keras artifacts. While bridge libraries like \texttt{onnx2keras} exist, they are often unreliable for complex architectures due to operator name mangling. For \texttt{.tflite} models, the conversion is fundamentally "destructive": the process of \textit{Operator Fusion} (merging convolution and activation layers) and \textit{Quantization} (converting FP32 to INT8) removes the structural and numerical resolution required for stable fine-tuning. Consequently, the framework adopts the best practice of requiring the original "source" formats for customization, treating deployment artifacts as a terminal stage in the MLOps pipeline.
 
 To maintain system robustness, a format-based validation gate was implemented in the customization node, ensuring that only native Keras artifacts enter the optimization pipeline, while guiding users towards Workflow 2 for non-editable binary formats.
+
+\subsection{Cross-Platform Portability and macOS ARM64 Support}
+
+Developing an orchestration framework for STMicroelectronics toolchains (primarily Linux and Windows-centric) on a macOS ARM64 (Apple Silicon) environment introduced specific portability challenges. To ensure a seamless developer experience across heterogeneous host systems, several architectural adaptations were implemented.
+
+\subsubsection{Path Abstraction and Configuration Management}
+
+A primary barrier to portability was the use of system-specific absolute paths (e.g., \texttt{/mnt/shared-storage/...} on Linux server deployments). To resolve this, I implemented a \textbf{Dynamic Configuration Layer} in \texttt{configuration.py}:
+\begin{itemize}
+    \item \textbf{Environment-Agnostic Defaults}: The system now utilizes relative paths (relative to the project root or the user's home directory) for critical resources such as model caches (\texttt{\textasciitilde/.stm32\_ai\_models}) and model discovery catalogs.
+    \item \textbf{Late-Binding Path Resolution}: Paths for external binaries (e.g., STM32CubeMX CLI) are resolved at runtime using the \texttt{sys.platform} flag, allowing the system to automatically toggle between macOS and Linux executable naming conventions (e.g., \texttt{.exe} parity or Homebrew-specific install locations).
+\end{itemize}
+
+\subsubsection{Conda Architecture and Dependency Management}
+
+The shift to Apple Silicon required a specialized dependency management strategy due to the lack of native ARM64 support for older versions of TensorFlow and specific ST binaries.
+\begin{enumerate}
+    \item \textbf{Clean Environment Strategy}: I developed a \texttt{environment\_clean.yaml} specification that leverages the \texttt{conda-forge} channel to provide consistent ARM64 builds for modern Python libraries (LangGraph, FastAPI) while strictly isolating the legacy x86\_64 toolchains in separate sub-environments.
+    \item \textbf{Acceleration Adapters}: For local development on macOS, the system was configured to detect \texttt{tensorflow-macos} and \texttt{tensorflow-metal} plugins. This enables hardware acceleration on the Mac's Integrated GPU (Metal Performance Shaders) during the model customization phase (Workflow 5), providing a high-performance local alternative to expensive GPU-equipped Linux servers for initial prototyping.
+\end{enumerate}
+
+These adaptations ensure that the MLOps pipeline is truly "environment-agnostic", supporting both industrial Linux servers for heavy optimization and local macOS laptops for rapid UI development and testing within the VS Code integration.

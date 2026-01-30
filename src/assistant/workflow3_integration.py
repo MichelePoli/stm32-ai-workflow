@@ -22,6 +22,7 @@ from datetime import datetime
 
 from langchain_ollama import ChatOllama
 from langchain_core.messages import SystemMessage, HumanMessage
+from langchain_core.runnables import RunnableConfig
 from langgraph.types import interrupt
 from pydantic import BaseModel, Field
 
@@ -67,7 +68,7 @@ Analizza la risposta dell'utente e estrai i seguenti campi:
 
 1. **firmware_project_dir**: Path completo al progetto firmware generato
    Esempi:
-   - "/mnt/shared-storage/mrusso/STM32CubeMX/MySTM32Project_20251028_171632"
+   - "/Users/user/STM32CubeMX/MyProject"
    - "~/STM32Projects/MyProject"
    - "/home/user/firmware/project"
    → Se non specificato: null
@@ -107,7 +108,7 @@ Rispondi SEMPRE in formato JSON con:
 # ============================================================================
 
 
-def collect_integration_info(state: MasterState, config: dict) -> MasterState:
+def collect_integration_info(state: MasterState, config: RunnableConfig = None) -> MasterState:
     """
     Raccoglie info integrazione da risposta naturale dell'utente.
     La risposta viene analizzata da LLM per estrarre i path.
@@ -133,10 +134,10 @@ Per favore specifica (in linguaggio naturale):
 - Path completo al codice AI generato
 
 Esempi di path:
-  Firmware: /mnt/shared-storage/mrusso/STM32CubeMX/MySTM32Project_20251028_171632
+  Firmware: ~/STM32CubeMX/MySTM32Project
   AI code: ./analisiAI/code_resnet
 
-Esempio risposta: "Integra il codice da ./analisiAI/code_resnet nel firmware di /mnt/shared-storage/mrusso/STM32CubeMX/MySTM32Project_20251028_171632"
+Esempio risposta: "Integra il codice da ./analisiAI/code_resnet nel firmware di ~/STM32CubeMX/MySTM32Project"
             """,
         }
         
@@ -281,7 +282,7 @@ Esempio risposta: "Integra il codice da ./analisiAI/code_resnet nel firmware di 
     return state
 
 
-def scan_ai_files(state: MasterState, config: dict) -> MasterState:
+def scan_ai_files(state: MasterState, config: RunnableConfig = None) -> MasterState:
     logger.info("Scansione file AI...")
     
     try:
@@ -308,7 +309,7 @@ def scan_ai_files(state: MasterState, config: dict) -> MasterState:
     return state
 
 
-def copy_ai_files(state: MasterState, config: dict) -> MasterState:
+def copy_ai_files(state: MasterState, config: RunnableConfig = None) -> MasterState:
     logger.info("Copia file AI nel firmware...")
     
     try:
@@ -335,7 +336,7 @@ def copy_ai_files(state: MasterState, config: dict) -> MasterState:
     return state
 
 
-def modify_main_c(state: MasterState, config: dict) -> MasterState:
+def modify_main_c(state: MasterState, config: RunnableConfig = None) -> MasterState:
     if not state.modify_main:
         logger.info("Modifica main.c saltata")
         state.main_modification_success = True
@@ -466,7 +467,7 @@ static ai_buffer ai_output[AI_{net_upper}_OUT_NUM];
     return state
 
 
-def verify_integration(state: MasterState, config: dict) -> MasterState:
+def verify_integration(state: MasterState, config: RunnableConfig = None) -> MasterState:
     logger.info("Verifica integrazione...")
     
     try:
@@ -500,7 +501,7 @@ def verify_integration(state: MasterState, config: dict) -> MasterState:
     return state
 
 
-def finalize_integration(state: MasterState, config: dict) -> MasterState:
+def finalize_integration(state: MasterState, config: RunnableConfig = None) -> MasterState:
     if state.integration_success:
         print("✓ INTEGRAZIONE COMPLETATA CON SUCCESSO!")
         print(f"✓ File AI copiati: {len(state.ai_src_files)} .c, {len(state.ai_header_files)} .h")

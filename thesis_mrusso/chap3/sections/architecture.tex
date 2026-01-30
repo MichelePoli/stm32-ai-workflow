@@ -152,3 +152,27 @@ The system implements structured logging across all workflow nodes with severity
 Log entries include contextual metadata such as workflow name, current node, and relevant state variables, enabling rapid debugging of complex multi-step executions.
 
 Additionally, the framework emits progress updates to the LangGraph API server, which can be consumed by frontend clients (e.g., Gradio UI, REST API consumers) for real-time status visualization.
+
+\subsection{Interactive IDE Integration: VS Code Extension}
+
+To bridge the gap between complex MLOps orchestration and the developer's daily workflow, a custom \textbf{Visual Studio Code Extension} was developed to act as the primary interface for the assistant. This integration transforms the framework from a disconnected backend service into a real-time, context-aware companion integrated directly into the Integrated Development Environment (IDE).
+
+\subsubsection{Client-Server Communication via FastAPI}
+
+The extension communicates with the LangGraph orchestrator through a lightweight \textbf{FastAPI backend} (\texttt{server.py}). This architectural choice provides several benefits:
+\begin{itemize}
+    \item \textbf{Asynchronous Event Streaming}: The server uses an \texttt{event\_generator} function that leverages Python's \texttt{asyncio} to stream graph events to the client in real-time. Each node execution in the graph triggers a JSON event containing progress updates, partial markdown responses, or routing decisions.
+    \item \textbf{Decoupled Execution}: The complex neural network computations and toolchain invocations run in a dedicated Python process, preventing the VS Code frontend from freezing during intensive tasks.
+    \item \textbf{API-Driven Extensibility}: The same backend can simultaneously serve multiple clients (CLI, Web UI, IDE), ensuring a consistent project state across different views.
+\end{itemize}
+
+\subsubsection{VS Code Chat Participant API}
+
+The frontend is implemented using the \textbf{VS Code Chat Participant API}, which allows the assistant to participate in the native GitHub Copilot-style chat interface. The extension handles the following event stream logic:
+\begin{itemize}
+    \item \textbf{Progress Reporting}: Server-emitted \texttt{progress} events are rendered as real-time bullet points (e.g., \textit{"Routing to AI Flow..."}, \textit{"Downloading MobileNetV2..."}), providing the user with visibility into the assistant's internal reasoning steps.
+    \item \textbf{Markdown Rendering}: Final reports and intermediate task lists are streamed as Markdown, allowing for rich formatting, code blocks, and clickable file links.
+    \item \textbf{Cancellation Handling}: The extension propagates VS Code cancellation tokens to the Python server, allowing the backend to gracefully interrupt long-running LangGraph executions if the user closes the chat session.
+\end{itemize}
+
+By embedding the assistant within the IDE, the framework gains access to the local file system context, enabling features like automatic path resolution for \texttt{.ioc} files and direct opening of generated C source code upon completion of the integration workflow.

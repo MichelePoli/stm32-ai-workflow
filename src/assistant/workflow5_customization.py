@@ -21,6 +21,7 @@ from datetime import datetime
 import logging
 import tensorflow as tf
 from typing import Optional, Tuple, List, Literal, Any
+from langchain_core.runnables import RunnableConfig
 import urllib.request
 from src.assistant.utils import get_llm, force_unload_ollama
 
@@ -51,7 +52,7 @@ from agno.agent import Agent
 #from agno.tools.github import GithubTools
 #utilizza altri tools oltre GoogleSearchTools, vedi dai tools di agno
 from agno.models.ollama import Ollama
-from agno.tools.googlesearch import GoogleSearchTools 
+from agno.tools.duckduckgo import DuckDuckGoTools
 
 import numpy as np
 
@@ -283,7 +284,7 @@ def save_model_with_metadata(model: Model,
     logger.info(f"✓ Modello salvato: {output_path}")
 
 
-def inspect_model_architecture(state: MasterState, config: dict) -> MasterState:
+def inspect_model_architecture(state: MasterState, config: RunnableConfig = None) -> MasterState:
     """Ispeziona dettagliatamente il modello scaricato con fallback robusto"""
 
     logger.info("🔍 Ispezionando architettura modello...")
@@ -293,8 +294,31 @@ def inspect_model_architecture(state: MasterState, config: dict) -> MasterState:
         logger.info("✓ Info architettura già presenti, skip analisi.")
         return state
 
+    # === CONTROLLO FORMATO E ESISTENZA FILE ===
+    ext = os.path.splitext(state.model_path)[1].lower() if state.model_path else ""
+    
+    file_exists = os.path.exists(state.model_path) if state.model_path else False
+    if not file_exists:
+        logger.warning(f"⚠️  Il file del modello non esiste: {state.model_path}")
+        logger.info("ℹ️  Continuo con metadati virtuali per scopi di integrazione.")
+        state.model_architecture = {
+            "input_shape": "Variable (Missing File)",
+            "output_shape": "Variable (Missing File)",
+            "n_layers": 0,
+            "layer_types": [],
+            "layer_names": [],
+            "total_params": 0,
+            "trainable_params": 0,
+            "model_size_mb": 0.0,
+            "has_batchnorm": False,
+            "has_dropout": False,
+            "output_classes": 0,
+            "format": ext or "unknown"
+        }
+        state.model_summary_text = "Il file del modello selezionato non è stato trovato sul file system locale.\nIl workflow prosegue in modalità 'Virtual' per permettere il test dell'interfaccia VS Code."
+        return state
+
     # === GESTIONE FORMATI NON-KERAS (ONNX, TFLITE) ===
-    ext = os.path.splitext(state.model_path)[1].lower()
     if ext in ['.onnx', '.tflite']:
         logger.info(f"ℹ️  Formato {ext} rilevato. Fornisco metadati generici.")
         file_size = os.path.getsize(state.model_path)
@@ -406,6 +430,9 @@ def inspect_model_architecture(state: MasterState, config: dict) -> MasterState:
         
         # ❌ Fallback finale: default minimo
         logger.warning("⚠️  Usando default minimale per continuare il workflow")
+        
+        file_size = os.path.getsize(state.model_path) if os.path.exists(state.model_path) else 0
+        
         state.model_architecture = {
             "input_shape": "Unknown",
             "output_shape": "Unknown",
@@ -414,7 +441,7 @@ def inspect_model_architecture(state: MasterState, config: dict) -> MasterState:
             "layer_names": [],
             "total_params": 0,
             "trainable_params": 0,
-            "model_size_mb": os.path.getsize(state.model_path) / (1024*1024),
+            "model_size_mb": file_size / (1024*1024),
             "has_batchnorm": False,
             "has_dropout": False,
             "output_classes": 0,
@@ -423,7 +450,7 @@ def inspect_model_architecture(state: MasterState, config: dict) -> MasterState:
         return state
 
 
-def ask_modification_intent(state, config: dict):
+def ask_modification_intent(state, config: RunnableConfig = None):
     """Chiede all'utente se vuole modificare il modello"""
     
     logger.info("💬 Richiesta intenzione di modifica...")
@@ -499,7 +526,7 @@ def decide_after_inspection(state) -> Literal["retrieve_best_practices_for_archi
 # RETRIEVE BEST PRACTICES FOR ARCHITECTURE
 # ===========================================================================
 
-def retrieve_best_practices_for_architecture(state: MasterState, config: dict) -> MasterState:
+def retrieve_best_practices_for_architecture(state: MasterState, config: RunnableConfig = None) -> MasterState:
     """Con web fetch optional (timeout 10s max)"""
     
     model_name = state.selected_model.get('name', 'Unknown') if state.selected_model else None
@@ -732,7 +759,7 @@ def search_web(queries: List[str]) -> List[dict[str, str]]:
             # ===== SETUP AGNO AGENT =====
             agent = Agent(
                 model=Ollama(id="mistral"),
-                tools=[GoogleSearchTools()],
+                tools=[DuckDuckGoTools()],
                 show_tool_calls=False,
                 markdown=True
             )
@@ -1323,7 +1350,7 @@ def is_model_compatible_with_input_shape_change(model_name: str) -> bool:
     return True
 
 
-def ask_and_parse_user_modifications(state: any, config: dict) -> any:
+def ask_and_parse_user_modifications(state: any, config: RunnableConfig = None) -> any:
     """
     ✨ VERSIONE CONSOLIDATA: Chiedi all'utente e parsa immediatamente
     
@@ -1657,7 +1684,7 @@ def get_modification_best_practices(model_architecture: dict) -> str:
 \n"""
 
 
-def collect_modification_confirmation(state: any, config: dict) -> any:
+def collect_modification_confirmation(state: any, config: RunnableConfig = None) -> any:
     """
     Mostra preview delle modifiche e chiede conferma all'utente.
     Usa LLM per comprendere risposte in linguaggio naturale.
@@ -1911,21 +1938,18 @@ Return ONLY the JSON, no other text.
 # ============================================================================
 
 ARCHITECTURE_ENV_MAP = {
-    'mobilenet': 'stm32_legacy',
-    'resnet': 'stm32_legacy',
-    'vgg': 'stm32_legacy',
-    'efficientnet': 'stm32_legacy',
-    'inception': 'stm32_legacy',
-    'yolo': 'stm32_legacy',
-    'har': 'stm32_legacy',
-    'custom': 'stm32_legacy',
+    'mobilenet': 'stm32legacy',
+    'resnet': 'stm32legacy',
+    'vgg': 'stm32legacy',
+    'efficientnet': 'stm32legacy',
+    'inception': 'stm32legacy',
+    'yolo': 'stm32legacy',
+    'har': 'stm32legacy',
+    'custom': 'stm32legacy',
 }
 
-CONDA_PYTHON_PATHS = {
-    'stm32_legacy': '/home/mrusso/miniconda3/envs/stm32_legacy/bin/python', #keras 2.x (per modelli vecchi)
-    'stm32': '/home/mrusso/miniconda3/envs/stm32/bin/python', # keras 3.x
-}
-# ho creato un environment stm32_legacy per usare keras 2.x (per modelli vecchi) in modo da non causare errori.
+# CONDA_PYTHON_PATHS rimosso in favore di cfg.get_python_path()
+# ho creato un environment stm32legacy per usare keras 2.x (per modelli vecchi) in modo da non causare errori.
 # in caso in cui vi è bisogno di creare un nuovo environment con pacchetti diversi si può aggiungere qui il path del python corrispondente.
 # la funzione load_model_with_conda_env si occuperà di usare il python corretto in base all'architettura del modello.
 
@@ -1967,7 +1991,7 @@ def execute_in_environment(python_code: str, state: MasterState, timeout: int = 
     """
     ✨ Esegui codice Python nell'ambiente specificato in state.python_path
     
-    Funziona per stm32_legacy, stm32, o qualsiasi ambiente conda
+    Funziona per stm32legacy, stm32, o qualsiasi ambiente conda
     
     Returns: {'success': bool, 'stdout': str, 'stderr': str, 'returncode': int}
     """
@@ -2027,12 +2051,19 @@ def load_model_with_conda_env(model_path: str, architecture: str, state: MasterS
     logger.info(f"🔄 Loading {architecture} model...")
     
     # ===== DETERMINA AMBIENTE E PYTHON PATH (LOGICA ORIGINALE) =====
-    conda_env = ARCHITECTURE_ENV_MAP.get(architecture, 'stm32_legacy')
-    python_path = CONDA_PYTHON_PATHS.get(conda_env)
+    cfg = Configuration.from_runnable_config() # Configuration carica da env se non pssato
     
-    if not python_path:
-        logger.error(f"❌ No Python path configured for {conda_env}")
-        raise Exception(f"Unknown environment: {conda_env}")
+    # .keras -> stm32, .h5 -> stm32legacy
+    if model_path.endswith('.keras'):
+        conda_env = 'stm32'
+    else:
+        conda_env = ARCHITECTURE_ENV_MAP.get(architecture, 'stm32legacy')
+        
+    python_path = cfg.get_python_path(conda_env)
+    
+    if "NOT_FOUND" in python_path:
+        logger.error(f"❌ No Python path found for {conda_env}")
+        raise Exception(f"Environment not found: {conda_env}")
     
     logger.info(f"  Environment: {conda_env}")
     logger.info(f"  Python: {python_path}")
@@ -2168,7 +2199,7 @@ def load_stm32_model_safe(model_path: str, state: MasterState) -> str:
 # APPLY USER CUSTOMIZATION
 # ============================================================================
 
-def apply_user_customization(state: MasterState, config: dict) -> MasterState:
+def apply_user_customization(state: MasterState, config: RunnableConfig = None) -> MasterState:
     """
     ✨ Applicazione modifiche CON GESTIONE CORRETTA DI MULTIPLE RECONSTRUCTIONS (applica le ricostruzioni insieme e da in output un solo modello customizzato. Prima per ogni ricostruzione veniva creato un nuovo modello aggiornato versione 1, versione 2, etc)
     """
@@ -2605,7 +2636,7 @@ def _validate_modifications(modifications: dict) -> bool:
 # ============================================================================
 
 # Funzione molto importante. 
-def fine_tune_customized_model(state: MasterState, config: dict) -> MasterState:
+def fine_tune_customized_model(state: MasterState, config: RunnableConfig = None) -> MasterState:
     """
     ✨ Fine-tuning usando execute_in_environment (state.python_path)
     Supporta sia Classification che Object Detection (YOLO)
@@ -3233,7 +3264,7 @@ except Exception as e:
     return state
 
 
-def ask_optimization_preference(state: MasterState, config: dict) -> MasterState:
+def ask_optimization_preference(state: MasterState, config: RunnableConfig = None) -> MasterState:
     """Chiede all'utente se vuole usare NNI o training standard"""
     logger.info("=" * 70)
     logger.info("🤔 ASK_OPTIMIZATION_PREFERENCE NODE EXECUTING")
@@ -3281,7 +3312,7 @@ def optimization_routing(state: MasterState) -> Literal["optimize_hyperparameter
 # Altrimenti → Va nell'else → Routing verso Fine-Tuning Standard
     
     
-def optimize_hyperparameters_with_nni(state: MasterState, config: dict) -> MasterState:
+def optimize_hyperparameters_with_nni(state: MasterState, config: RunnableConfig = None) -> MasterState:
     """
     ✨ Esegue ottimizzazione iperparametri con NNI (Agentic/Adaptive Mode)
     Generate script dinamici basati su modello e dataset.
@@ -3319,8 +3350,8 @@ def optimize_hyperparameters_with_nni(state: MasterState, config: dict) -> Maste
             "num_classes": state.model_architecture.get("output_classes", 10) 
         }
         
-        # Output Directory for Generated Scripts - Save in project root
-        project_root = "/mnt/shared-storage/mrusso/Langgraph_General_v7_subnodes"
+        # Output Directory for Generated Scripts - Save in current working directory or base_dir
+        project_root = os.getcwd()
         experiment_dir = os.path.join(project_root, "nni_experiments", f"exp_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
         os.makedirs(experiment_dir, exist_ok=True)
         
@@ -3384,10 +3415,8 @@ def optimize_hyperparameters_with_nni(state: MasterState, config: dict) -> Maste
              
         logger.info(f"▶️  Launching NNI Manager: {manager_script}")
         
-        # Run process with correct Python environment
-        # NNI must be installed in the environment (stm32_legacy by default) 
-        # viene usato stm32_legacy (e precisamente il path /home/mrusso/miniconda3/envs/stm32_legacy/bin/python) per lanciare il manager NNI !!!
-        python_path = CONDA_PYTHON_PATHS.get('stm32_legacy', "python")
+        cfg = Configuration.from_runnable_config()
+        python_path = cfg.get_python_path('stm32legacy')
         
         logger.info(f"▶️  Launching NNI Manager with: {python_path}")
         
@@ -3446,7 +3475,7 @@ def optimize_hyperparameters_with_nni(state: MasterState, config: dict) -> Maste
 
 import shutil
 
-def validate_customized_model(state: MasterState, config: dict) -> MasterState:
+def validate_customized_model(state: MasterState, config: RunnableConfig = None) -> MasterState:
     """
     ✨ Valida il modello customizzato IN SUBPROCESS (usa state.python_path)
     """
@@ -3525,7 +3554,7 @@ except Exception as e:
     return state
 
 
-def save_customized_model_final(state: MasterState, config: dict) -> MasterState:
+def save_customized_model_final(state: MasterState, config: RunnableConfig = None) -> MasterState:
     """
     ✨ Salva il modello customizzato come .h5 (compatibile con stedgeai)
     Valida usando state.python_path
@@ -3618,7 +3647,7 @@ except Exception as e:
 
 
 
-def ask_continue_after_customization(state: MasterState, config: dict) -> MasterState:
+def ask_continue_after_customization(state: MasterState, config: RunnableConfig = None) -> MasterState:
     """Chiedi se continuare con AI analysis"""
     
     logger.info("🤔 Chiedendo se continuare...")

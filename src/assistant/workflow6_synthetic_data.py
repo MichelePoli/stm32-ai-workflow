@@ -20,6 +20,7 @@ from datetime import datetime
 from langgraph.types import interrupt
 from langchain_ollama import ChatOllama
 from langchain_core.messages import SystemMessage, HumanMessage
+from langchain_core.runnables import RunnableConfig
 from pydantic import BaseModel, Field
 
 from src.assistant.configuration import Configuration
@@ -47,7 +48,7 @@ class SyntheticDataRequest(BaseModel):
 # NODES
 # ============================================================================
 
-def ask_synthetic_data_requirements(state: MasterState, config: dict) -> MasterState:
+def ask_synthetic_data_requirements(state: MasterState, config: RunnableConfig = None) -> MasterState:
     """Chiede all'utente che tipo di dati generare"""
     
     logger.info("🧪 Avvio procedura generazione dati sintetici...")
@@ -124,7 +125,7 @@ Per "mixed" o richieste complesse, cerca di mappare al tipo più simile o usa "s
     return state
 
 
-def generate_synthetic_samples(state: MasterState, config: dict) -> MasterState:
+def generate_synthetic_samples(state: MasterState, config: RunnableConfig = None) -> MasterState:
     """Genera i campioni usando numpy"""
     
     req = state.synthetic_request
@@ -207,7 +208,7 @@ def generate_synthetic_samples(state: MasterState, config: dict) -> MasterState:
     return state
 
 
-def validate_synthetic_data(state: MasterState, config: dict) -> MasterState:
+def validate_synthetic_data(state: MasterState, config: RunnableConfig = None) -> MasterState:
     """Mostra riepilogo e chiede conferma"""
     
     summary = f"""

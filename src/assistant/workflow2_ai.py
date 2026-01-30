@@ -31,15 +31,17 @@ from tensorflow.keras.models import Model, load_model, model_from_json
 
 from langchain_ollama import ChatOllama
 from langchain_core.messages import SystemMessage, HumanMessage
+from langchain_core.runnables import RunnableConfig
 from langgraph.types import interrupt
 from pydantic import BaseModel, Field
 
 from src.assistant.configuration import Configuration
 from src.assistant.state import MasterState
 
-from agno.tools.googlesearch import GoogleSearchTools
+# from agno.tools.googlesearch import GoogleSearchTools # Module missing in new agno
+from agno.tools.duckduckgo import DuckDuckGoTools # Alternative
 from agno.models.ollama import Ollama
-from agno.agent import Agent  
+from agno.agent import Agent
 
 
 logger = logging.getLogger(__name__)
@@ -270,7 +272,7 @@ PREDEFINED_MODELS = load_predefined_models()
 # ============================================================================
 # NODI WORKFLOW 2
 # ============================================================================
-def collect_analysis_info(state: MasterState, config: dict) -> MasterState:
+def collect_analysis_info(state: MasterState, config: RunnableConfig = None) -> MasterState:
     """
     Raccoglie SOLO target MCU e compression.
     La selezione modello viene gestita nei nodi successivi !
@@ -367,7 +369,7 @@ Esempi:
 # ============================================================================
 # NODO: SCEGLI DA MODELLI PREDEFINITI (TASK-BASED)
 # ============================================================================
-def choose_predefined_taskbased_model(state: MasterState, config: dict) -> MasterState:
+def choose_predefined_taskbased_model(state: MasterState, config: RunnableConfig = None) -> MasterState:
     """
     Mostra modelli predefiniti con parsing LLM.
     Salva il task per fallback intelligente.
@@ -656,11 +658,11 @@ Rispondi con: numero (1-{len(available_models)+1}) oppure descrivi
 # ============================================================================
 # NODO PRINCIPALE per la ricerca modelli !
 # ============================================================================
-def search_recommendation_model(state: MasterState, config: dict) -> MasterState:
+def search_recommendation_model(state: MasterState, config: RunnableConfig = None) -> MasterState:
     """
     ✅ NODO PRINCIPALE: Ricerca modello con fallback intelligente
     
-    TYPE HINTS: state: MasterState, config: dict → MasterState
+    TYPE HINTS: state: MasterState, config: RunnableConfig → MasterState
     
     Flusso:
     1. GitHub (ibrido Python+LLM) - conta iterazione
@@ -956,7 +958,7 @@ def search_h5_file_in_repo_hybrid( #fondamentale
     repo_path: str,
     task: str,
     target_mcu: Optional[str] = None,
-    config: dict = None,
+    config: RunnableConfig = None,
     max_depth: int = 5  # ← LIMITE DI PROFONDITÀ
 ) -> Optional[dict]:
     """
@@ -1141,7 +1143,7 @@ def llm_select_best_model(
     h5_files: List[dict],
     task: str,
     target_mcu: str,
-    config: dict = None
+    config: RunnableConfig = None
 ) -> Optional[dict]:
     """
     LLM ragiona e seleziona il migliore file .h5
@@ -1238,7 +1240,7 @@ Se hai dubbi, scegli il modello più piccolo e stabile."""),
 
 def search_via_google_tools_hybrid(
     state: MasterState,
-    config: dict
+    config: RunnableConfig
 ) -> dict:
     """
     Ricerca Google Search come fallback (NON incrementa iterazioni)
@@ -1269,7 +1271,7 @@ Ritorna esattamente questo formato JSON:
         
         google_agent = Agent(
             model=Ollama(id="mistral"),
-            tools=[GoogleSearchTools()],
+            tools=[DuckDuckGoTools()],
             instructions=[
                 "Ricerca file .h5 per STM32",
                 "Link GitHub /raw/ diretti",
@@ -1277,6 +1279,7 @@ Ritorna esattamente questo formato JSON:
             ],
             show_tool_calls=True
         )
+
         
         google_response = google_agent.run(google_prompt)
         response_text = (
@@ -1495,20 +1498,17 @@ def get_task_based_default_model(task: str) -> Optional[dict]:
 # ============================================================================
 
 ARCHITECTURE_ENV_MAP = {
-    'mobilenet': 'stm32_legacy',
-    'resnet': 'stm32_legacy',
-    'vgg': 'stm32_legacy',
-    'efficientnet': 'stm32_legacy',
-    'inception': 'stm32_legacy',
-    'yolo': 'stm32_legacy',
-    'har': 'stm32_legacy',
-    'custom': 'stm32_legacy',
+    'mobilenet': 'stm32legacy',
+    'resnet': 'stm32legacy',
+    'vgg': 'stm32legacy',
+    'efficientnet': 'stm32legacy',
+    'inception': 'stm32legacy',
+    'yolo': 'stm32legacy',
+    'har': 'stm32legacy',
+    'custom': 'stm32legacy',
 }
 
-CONDA_PYTHON_PATHS = {
-    'stm32_legacy': '/home/mrusso/miniconda3/envs/stm32_legacy/bin/python', #keras 2.x 
-    'stm32': '/home/mrusso/miniconda3/envs/stm32/bin/python', # keras 3.x
-}
+# CONDA_PYTHON_PATHS rimosso in favore di config.get_python_path()
 
 def detect_architecture_from_model(model_path: str) -> str:
     """Detecta architettura dal nome modello"""
@@ -1541,7 +1541,7 @@ def execute_in_environment(python_code: str, python_path: str, timeout: int = 60
         'returncode': result.returncode
     }
 
-def inspect_model_via_legacy_env(model_path: str) -> Optional[dict]:
+def inspect_model_via_legacy_env(model_path: str, config: RunnableConfig = None) -> Optional[dict]:
     """
     Ispeziona modello usando env legacy (per evitare crash Keras 3 con modelli vecchi)
     Ritorna dict con info architettura o None se fallisce.
@@ -1563,15 +1563,17 @@ def inspect_model_via_legacy_env(model_path: str) -> Optional[dict]:
     try:
         arch = detect_architecture_from_model(model_path)
         
-        # Scegli environment: .keras -> stm32 (Keras 3), .h5 -> stm32_legacy (Keras 2) o stm32
+        cfg = Configuration.from_runnable_config(config)
+        
+        # Scegli environment: .keras -> stm32 (Keras 3), .h5 -> stm32legacy (Keras 2) o stm32
         if model_path.endswith('.keras'):
             env_name = 'stm32'
         else:
-            env_name = ARCHITECTURE_ENV_MAP.get(arch, 'stm32_legacy')
+            env_name = ARCH_ENVIRONMENT_MAP.get(arch, 'stm32legacy')
         
-        python_path = CONDA_PYTHON_PATHS.get(env_name)
+        python_path = cfg.get_python_path(env_name)
         
-        if not python_path or not os.path.exists(python_path):
+        if not python_path or "NOT_FOUND" in python_path:
             logger.warning(f"⚠️  Python path non trovato per {env_name}: {python_path}")
             return None
             
@@ -1621,7 +1623,7 @@ except Exception as e:
 # ============================================================================
 # NODO 3: DOWNLOAD MODELLO
 # ============================================================================
-def download_model(state: MasterState, config: dict) -> MasterState:
+def download_model(state: MasterState, config: RunnableConfig = None) -> MasterState:
     """
     Wrapper per scaricare il modello dallo state.selected_model.
     Viene chiamato dal routing dopo ricerca online accettata.
@@ -1643,7 +1645,7 @@ def download_model(state: MasterState, config: dict) -> MasterState:
     
     return state
 
-def download_model_to_cache(state: MasterState, config: dict, model: dict) -> MasterState:
+def download_model_to_cache(state: MasterState, config: RunnableConfig, model: dict) -> MasterState:
     """
     Download modello con skip intelligente + ANALISI ROBUSTA
     """
@@ -1683,10 +1685,10 @@ def download_model_to_cache(state: MasterState, config: dict, model: dict) -> Ma
         # 2. HDF5 Raw (Fallback)
         # 3. NO standard load_model()
         
-        legacy_info = inspect_model_via_legacy_env(cached_path)
+        legacy_info = inspect_model_via_legacy_env(cached_path, config)
             
         if legacy_info:
-            logger.info(f"✓ Analisi riuscita (via stm32_legacy)!")
+            logger.info(f"✓ Analisi riuscita (via stm32legacy)!")
             logger.info(f"  Input: {legacy_info.get('input_shape')}")
             logger.info(f"  Output: {legacy_info.get('output_shape')}")
             logger.info(f"  Params: {legacy_info.get('total_params'):,}")
@@ -1779,7 +1781,7 @@ def download_model_to_cache(state: MasterState, config: dict, model: dict) -> Ma
                 # 1. Legacy Env Subprocess (Primo tentativo)
                 # 2. HDF5 Raw (Fallback)
                 
-                legacy_info = inspect_model_via_legacy_env(cached_path)
+                legacy_info = inspect_model_via_legacy_env(cached_path, config)
                 
                 if legacy_info:
                     logger.info(f"✓ Analisi riuscita (via {legacy_info.get('env_used', 'unknown')})!")
@@ -1935,7 +1937,7 @@ def model_selection_routing(state: MasterState) -> Literal[
             return "download_model"
 
 
-def run_analyze(state: MasterState, config: dict) -> MasterState:
+def run_analyze(state: MasterState, config: RunnableConfig = None) -> MasterState:
     """
     ✨ Analizza il modello (customizzato O originale)
     
@@ -2062,7 +2064,7 @@ except Exception as e:
     return state
 
 
-def run_validate(state: MasterState, config: dict) -> MasterState:
+def run_validate(state: MasterState, config: RunnableConfig = None) -> MasterState:
     validate_file = os.path.join(state.ai_output_dir, "network_validate_report.txt")
     os.makedirs(os.path.dirname(validate_file), exist_ok=True)
     cmd = [
@@ -2082,7 +2084,7 @@ def run_validate(state: MasterState, config: dict) -> MasterState:
     return state
 
 
-def run_generate(state: MasterState, config: dict) -> MasterState:
+def run_generate(state: MasterState, config: RunnableConfig = None) -> MasterState:
     code_dir = os.path.join(state.ai_output_dir, "code_resnet")
     os.makedirs(code_dir, exist_ok=True)
     cmd = [
@@ -2104,7 +2106,7 @@ def run_generate(state: MasterState, config: dict) -> MasterState:
     return state
 
 
-def finalize_analysis(state: MasterState, config: dict) -> MasterState:
+def finalize_analysis(state: MasterState, config: RunnableConfig = None) -> MasterState:
     if state.analyze_success and state.validate_success and state.generate_success:
         print("✓ Analisi AI completata!")
         print(f" - Report analyze in: {state.analyze_report_dir}")
@@ -2145,7 +2147,7 @@ def get_mcu_limits(target_mcu: str) -> tuple[int, int]:
         return (256 * 1024, 64 * 1024)
 
 
-def check_resource_constraints(state: MasterState, config: dict) -> MasterState:
+def check_resource_constraints(state: MasterState, config: RunnableConfig = None) -> MasterState:
     """
     Analizza il report STEdgeAI per verificare se il modello ci sta.
     """
@@ -2321,7 +2323,7 @@ L'automazione torna alla selezione modello forzando una scelta più appropriata.
         # return "run_generate" # per alcuni test fatti la utilizzavo per forzare l'integrazione 
 
 
-def handle_resource_failure(state: MasterState, config: dict) -> MasterState:
+def handle_resource_failure(state: MasterState, config: RunnableConfig = None) -> MasterState:
     """
     Chiede all'utente se vuole cambiare board o modello dopo un fallimento di risorse.
     """
@@ -2387,7 +2389,7 @@ Rispondi con un JSON che contiene:
         
     return state
 
-def add_custom_model_procedure(state: MasterState, config: dict) -> MasterState:
+def add_custom_model_procedure(state: MasterState, config: RunnableConfig = None) -> MasterState:
     """
     Procedura per aggiungere un nuovo modello al catalogo.
     """
