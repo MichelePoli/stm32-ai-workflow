@@ -11,6 +11,7 @@
 # Dipendenze: tensorflow, keras, requests
 
 import os
+import shutil
 import logging
 import json
 from typing import Literal, Optional, List, Dict, Any
@@ -20,6 +21,7 @@ from langgraph.types import interrupt
 from langchain_ollama import ChatOllama
 from langchain_core.messages import SystemMessage, HumanMessage
 from pydantic import BaseModel, Field
+from langchain_core.runnables import RunnableConfig
 from typing import Literal, Optional, List, Dict, Any, Union
 
 class DatasetRegistration(BaseModel):
@@ -112,7 +114,7 @@ def validate_url(url: str) -> bool:
 # NODES
 # ============================================================================
 
-def decide_data_source(state: MasterState, config: dict) -> MasterState:
+def decide_data_source(state: MasterState, config: RunnableConfig = None) -> MasterState:
     """Chiede all'utente quale fonte dati utilizzare"""
     
     logger.info("📊 Dataset Source Selection")
@@ -152,7 +154,7 @@ def decide_data_source(state: MasterState, config: dict) -> MasterState:
     return state
 
 
-def register_custom_dataset(state: MasterState, config: dict) -> MasterState:
+def register_custom_dataset(state: MasterState, config: RunnableConfig = None) -> MasterState:
     """Permette all'utente di registrare un nuovo dataset fornendo un URL"""
     
     logger.info("➕ Registrazione nuovo dataset...")
@@ -223,7 +225,7 @@ Format richiesto:
     return state
 
 
-def select_predefined_dataset(state: MasterState, config: dict) -> MasterState:
+def select_predefined_dataset(state: MasterState, config: RunnableConfig = None) -> MasterState:
     """
     Mostra menu dataset basato sul task del modello selezionato.
     Determina automaticamente il task_type più appropriato.
@@ -489,12 +491,17 @@ def check_dataset_model_compatibility(model_input_shape, dataset_name: str, task
     return False
 
 
-def download_dataset(state: MasterState, config: dict) -> MasterState:
+def download_dataset(state: MasterState, config: RunnableConfig = None) -> MasterState:
     """Scarica il dataset selezionato utilizzando il catalogo dinamico"""
     
     dataset_name = state.real_dataset_name
     logger.info(f"📥 Avvio download dataset: {dataset_name}...")
     
+    # Check disk space
+    if not check_disk_space(state.base_dir, required_gb=5.0):
+        # Proseguiamo comunque ma avvisiamo
+        pass
+
     # Setup dir
     dataset_dir = os.path.join(state.base_dir, "data", "real_datasets", dataset_name)
     os.makedirs(dataset_dir, exist_ok=True)
@@ -597,9 +604,9 @@ def download_dataset(state: MasterState, config: dict) -> MasterState:
                     logger.info(f"✅ Extracted dir found")
                 
                 # Processing specifico basato sulla categoria
+                processing_success = True
                 if category_name == "audio":
                     logger.info("🎵 Processing audio spectrograms...")
-                    # target_shape can be retrieved from dataset_info if needed, or use default
                     process_speech_commands(extract_dir, dataset_dir)
                     logger.info(f"✅ Audio dataset processed")
                 elif category_name == "human_activity_recognition":
@@ -614,16 +621,24 @@ def download_dataset(state: MasterState, config: dict) -> MasterState:
                     }
                     with open(os.path.join(dataset_dir, "metadata.json"), "w") as f:
                         json.dump(metadata, f, indent=2)
-                    logger.info(f"✅ HAR dataset downloaded")
-                    logger.info(f"💡 Dataset contains raw sensor data (accelerometer/gyroscope)")
-                    logger.info(f"⚠️  Preprocessing required: windowing, feature extraction, normalization")
                 else:
-                    logger.info(f"✅ Generic dataset pronto in {extract_dir}")
-                    
                     # Se la categoria è vision o object_detection (immagini), processa automaticamente
                     if category_name in ["vision", "object_detection"]:
                         logger.info(f"🖼️  Tentativo di processing automatico per dataset immagini...")
                         process_generic_vision_dataset(extract_dir, dataset_dir)
+                    else:
+                        logger.info(f"✅ Generic dataset pronto in {extract_dir}")
+                
+                # 🧹 CLEANUP: Rimuovi cartella estratta e archivio per risparmiare spazio
+                try:
+                    if os.path.exists(extract_dir):
+                        logger.info(f"🧹 Cleanup: Rimosso {extract_dir}")
+                        shutil.rmtree(extract_dir)
+                    if os.path.exists(archive_path):
+                        logger.info(f"🧹 Cleanup: Rimosso {archive_path}")
+                        os.remove(archive_path)
+                except Exception as cleanup_err:
+                    logger.warning(f"⚠️ Errore durante cleanup: {cleanup_err}")
 
         # C. TFDS (TensorFlow Datasets)
         elif tfds_name:
@@ -913,24 +928,26 @@ def process_generic_vision_dataset(extract_dir: str, output_dir: str, target_sha
     
     logger.info(f"⚙️  Processing {len(image_paths)} campioni...")
     
+    X = []
+    y = []
+    
     for p in image_paths:
         try:
             img = tf.io.read_file(p)
             img = tf.image.decode_image(img, channels=3, expand_animations=False)
             img = tf.image.resize(img, target_shape[:2])
-            img = img / 255.0  # Normalizzazione [0,1]
-            
+            # Salviamo in uint8 [0, 255] per risparmiare 4x spazio su disco (float32 -> uint8)
+            img = tf.cast(img, tf.uint8)
             X.append(img.numpy())
             y.append(class_to_idx[path_to_class[p]])
         except Exception as e:
-            # logger.debug(f"Salto file corrotto {p}: {e}")
             continue
             
     if not X:
         logger.error("❌ Errore: Nessuna immagine valida processata.")
         return
         
-    X = np.array(X, dtype='float32')
+    X = np.array(X, dtype='uint8')
     y = np.array(y, dtype='int32')
     
     # 4. Salvataggio
@@ -945,4 +962,14 @@ def process_generic_vision_dataset(extract_dir: str, output_dir: str, target_sha
     with open(os.path.join(output_dir, "classes.json"), "w") as f:
         json.dump(class_to_idx, f, indent=2)
         
-    logger.info(f"✅ Processing completato. Salvati {len(X)} campioni in {output_dir}")
+    logger.info(f"✅ Processing completato. Salvati {len(X)} campioni (uint8) in {output_dir}")
+
+def check_disk_space(path: str, required_gb: float = 5.0) -> bool:
+    """Verifica se c'è abbastanza spazio su disco."""
+    import shutil
+    total, used, free = shutil.disk_usage(path)
+    free_gb = free / (2**30)
+    if free_gb < required_gb:
+        logger.warning(f"⚠️  Spazio su disco critico: {free_gb:.2f} GB disponibili. Richiesti: {required_gb} GB.")
+        return False
+    return True

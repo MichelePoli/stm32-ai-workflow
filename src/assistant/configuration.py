@@ -1,4 +1,7 @@
 import os
+import subprocess
+import shutil
+import platform
 from dataclasses import dataclass, field, fields
 from typing import Any, Optional
 
@@ -28,13 +31,13 @@ class Configuration:
     base_dir: str = field(
         default_factory=lambda: os.environ.get(
             "BASE_DIR", 
-            "/mnt/shared-storage/mrusso/STM32CubeMX"
+            os.path.expanduser("~/STM32CubeMX")
         )
     )
     cubemx_path: str = field(
         default_factory=lambda: os.environ.get(
             "CUBEMX_PATH",
-            "/mnt/shared-storage/mrusso/nuova/STM32CubeMX/STM32CubeMX"
+            os.path.expanduser("~/STM32CubeMX/STM32CubeMX") if platform.system() != "Darwin" else "/Applications/STMicroelectronics/STM32CubeMX.app/Contents/Resources/STM32CubeMX"
         )
     )
 
@@ -70,7 +73,7 @@ class Configuration:
     ai_model_path: str = field(
         default_factory=lambda: os.environ.get(
             "AI_MODEL_PATH",
-            "/mnt/shared-storage/mrusso/resnet_v1_32_32_tfs.h5"
+            "./data/models/default_model.h5"
         )
     )
     ai_output_dir: str = field(
@@ -170,6 +173,47 @@ class Configuration:
             return False
         
         return True
+
+    def get_python_path(self, env_name: str) -> str:
+        """
+        Ritorna il path dell'eseguibile python per un dato ambiente conda.
+        Tenta di trovarlo dinamicamente per evitare hardcoded paths.
+        """
+        # 1. Tenta con 'conda run'
+        try:
+            cmd = ["conda", "run", "-n", env_name, "which", "python"]
+            if platform.system() == "Windows":
+                cmd = ["conda", "run", "-n", env_name, "where", "python"]
+                
+            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+            path = result.stdout.strip().split('\n')[0]
+            if os.path.exists(path):
+                return path
+        except Exception:
+            pass
+
+        # 2. Fallback su percorsi comuni basati sulla piattaforma
+        home = os.path.expanduser("~")
+        if platform.system() == "Darwin": # macOS
+            paths = [
+                f"/Library/anaconda3/envs/{env_name}/bin/python",
+                f"/opt/anaconda3/envs/{env_name}/bin/python",
+                f"{home}/anaconda3/envs/{env_name}/bin/python",
+                f"{home}/miniconda3/envs/{env_name}/bin/python",
+                f"/usr/local/anaconda3/envs/{env_name}/bin/python"
+            ]
+        else: # Linux/Generic
+            paths = [
+                f"{home}/anaconda3/envs/{env_name}/bin/python",
+                f"{home}/miniconda3/envs/{env_name}/bin/python",
+                f"/opt/conda/envs/{env_name}/bin/python"
+            ]
+
+        for p in paths:
+            if os.path.exists(p):
+                return p
+
+        return f"PYTHON_PATH_NOT_FOUND_{env_name}"
 
     def summary(self) -> str:
         """Ritorna un summary della configurazione."""
