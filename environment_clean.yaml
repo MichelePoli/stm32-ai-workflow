@@ -9,6 +9,7 @@ dependencies:
   - pip:
     # Core AI & LangChain
     - langgraph
+    - langgraph-checkpoint-redis
     - langchain
     - langchain-community
     - langchain-core
