@@ -904,3 +904,6 @@ checkpointer_redis = aioredis.Redis(host="localhost", port=6379, db=0, decode_re
 
 # Nota: memory e graph devono essere inizializzati dentro un event loop (es: startup di FastAPI)
 # per evitare "RuntimeError: no running event loop"
+
+# Per LangGraph CLI / Dev visualization (senza persistenza Redis)
+graph = builder.compile()
