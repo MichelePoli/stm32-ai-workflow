@@ -151,9 +151,21 @@ Esempio risposta: "Integra il codice da ./analisiAI/code_resnet nel firmware di 
         else:
             user_text = str(user_response)
         
-        # Default: use paths from state (already populated)
+        # Default: use paths from state (already populated) OR persistent context
         if not user_text or user_text.strip() == "":
-            user_text = f"Firmware: {state.firmware_project_dir}, AI: {state.ai_code_dir}"
+            
+            # Recupera dal context se non presente nello state
+            default_fw = state.firmware_project_dir
+            if not default_fw and state.persistent_context:
+                default_fw = state.persistent_context.get("last_project_path")
+                if default_fw:
+                    logger.info(f"✓ Ereditato path progetto dal profilo: {default_fw}")
+
+            # Se ancora nullo, usa stringa vuota o placeholder
+            default_fw = default_fw or ""
+            default_ai = state.ai_code_dir or ""
+            
+            user_text = f"Firmware: {default_fw}, AI: {default_ai}"
         
         logger.info(f"📝 User input RAW: '{user_text}'")
         

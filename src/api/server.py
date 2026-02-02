@@ -78,14 +78,27 @@ async def stream_chat(request: ChatRequest):
     """
     logger.info(f"Ricevuta richiesta chat: {len(request.messages)} messaggi")
     
+    # -------------------------------------------------------------------------
+    # 1. LOGICA DI INPUT E ID SESSIONE
+    # -------------------------------------------------------------------------
+    # user_id: Identifica CHI è l'utente (es. "michele", "michele_test").
+    #          Questo ID è stabile nel tempo e permette di recuperare il PROFILO UTENTE (Long-Term Memory).
+    # session_id: Identifica LA CONVERSAZIONE corrente (es. "session-001").
+    #             Questo ID definisce il "Thread" di LangGraph per il checkpointer.
+    #             Se cambia session_id, LangGraph parte con uno stato pulito (Short-Term Memory resettata).
+    # -------------------------------------------------------------------------
+
     # 1. Ricostruisci input per il grafo
-    # L'ultimo messaggio utente è l'input principale
+    # L'ultimo messaggio utente è l'input principale per il grafo
     last_user_message = next((m.content for m in reversed(request.messages) if m.role == 'user'), "")
     
-    # Config personalizzata dal client (opzionale)
-    # config = {"configurable": {"thread_id": "vscode-session"}}
-    
-    # 2. Recupera Profilo Globale Utente da Redis (Long-term memory)
+    # -------------------------------------------------------------------------
+    # 2. LONG-TERM MEMORY (REDIS: user_profile)
+    # -------------------------------------------------------------------------
+    # Recuperiamo il "Profilo Utente" da Redis usando una chiave legata SOLO allo user_id.
+    # Questa memoria sopravvive al cambio di sessione.
+    # Chiave Redis: "user:{user_id}:profile"
+    # -------------------------------------------------------------------------
     user_profile_key = f"user:{request.user_id}:profile"
     try:
         raw_profile = await redis_client.get(user_profile_key)
@@ -96,45 +109,67 @@ async def stream_chat(request: ChatRequest):
         user_profile = {}
 
     # 3. Definisci lo stato iniziale
+    # Iniettiamo il profilo utente nello stato iniziale (MasterState).
+    # Il grafo (nodo general_chat) userà questi dati per il recall.
     initial_state = {
         "message": last_user_message,
         "persistent_context": user_profile  # Inietta memoria a lungo termine
     }
     
-    # Context injection (file aperti, selezione)
+    # Context injection (file aperti su VS Code, selezione, etc.)
     if request.context:
         logger.info(f"Context ricevuto: {request.context.keys()}")
     
     async def event_generator():
         try:
-            # Configurazione per LangGraph (user_id + session_id per gestione sessione)
+            # -------------------------------------------------------------------------
+            # 4. SHORT-TERM MEMORY (REDIS: LangGraph Checkpoint)
+            # -------------------------------------------------------------------------
+            # LangGraph usa un "thread_id" per salvare lo stato di avanzamento del workflow.
+            # Combinando user_id + session_id garantiamo che:
+            # - Utenti diversi non si mischino.
+            # - Lo stesso utente può avere più chat separate (sessioni diverse).
+            # Chiave Thread: "{user_id}:{session_id}"
+            # -------------------------------------------------------------------------
             composite_thread_id = f"{request.user_id}:{request.session_id}"
             config = {"configurable": {"thread_id": composite_thread_id}}
             
             logger.info(f"▶️ Avvio esecuzione thread: {composite_thread_id}")
-            # Nota: graph.stream restituisce eventi per ogni nodo
+            
+            # Eseguiamo il grafo (astream) in modalità asincrona.
+            # MOTIVO ASYNC:
+            # 1. Non-bloccante: Il server può gestire altri utenti mentre attende l'LLM (che è lento).
+            # 2. Streaming: Possiamo inviare aggiornamenti (progress/token) al client MAN MANO che arrivano,
+            #    migliorando la percezione di velocità (Time-to-First-Token basso).
+            # config indica a LangGraph dove salvare lo stato intermedio.
             async for event in graph.astream(initial_state, config=config):
                 
-                # Cerca output dai nodi
+                # Cerca output dai nodi (es. "firmware_flow", "general_chat")
                 for node_name, node_state in event.items():
                     logger.info(f"Nodo eseguito: {node_name}")
                     
-                    # Genera un messaggio di progresso leggibile
+                    # Genera un messaggio di progresso JSON per il client
                     display_name = node_name.replace("_", " ").capitalize()
                     yield f'{{"type": "progress", "content": "{display_name}"}}\n'
                     
-                    # Logica specifica per inviare Markdown utile
+                    # Logica specifica per inviare feedback utile all'utente (Markdown)
                     if node_name == "route_request" and "route" in node_state:
                          route = node_state["route"]
                          msg = f"🔍 Ho analizzato la tua richiesta: **{route.replace('_', ' ')}**."
                          yield f'{{"type": "markdown", "content": "{msg}\\n\\n"}}\n'
                     
-                    # Se il nodo ha dei risultati di analisi o messaggi specifici
+                    # Se il nodo ha prodotto un "message" (es. chat response), invialo
                     if "message" in node_state and node_name != "route_request":
-                         # Evitiamo di reinviare il messaggio iniziale utente
                          yield f'{{"type": "markdown", "content": "{node_state["message"]}\\n\\n"}}\n'
 
             # 🏁 FINE PIPELINE: Salvataggio Profilo Globale (Summary). Qui il ciclo async for event in graph.astream(...) è terminato e significa che il grafo ha raggiunto il nodo END. Qui parte la logica di "salvataggio finale".
+            # -------------------------------------------------------------------------
+            # 5. AGGIORNAMENTO LONG-TERM MEMORY e salvataggio finale
+            # -------------------------------------------------------------------------
+            # Il workflow è terminato (il ciclo for è finito).
+            # Ora estraiamo lo stato finale per aggiornare il Profilo Utente su Redis.
+            # Questo permette alla prossima sessione di sapere cosa abbiamo fatto qui.
+            # -------------------------------------------------------------------------
             try:
                 final_snapshot = await graph.aget_state(config)
                 state = final_snapshot.values
@@ -145,6 +180,7 @@ async def stream_chat(request: ChatRequest):
                     "mcu_series": state.get("mcu_series"),
                     "last_workflow": state.get("route"),
                     "last_model": state.get("selected_model"),
+                    "last_project_path": state.get("firmware_project_path") or state.get("firmware_project_dir"),
                     "timestamp": state.get("timestamp")
                 }
                 # Rimuovi None

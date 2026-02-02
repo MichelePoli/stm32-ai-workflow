@@ -208,11 +208,13 @@ Esempio: "Crea progetto MyApp per STM32F401 con CubeIDE"
     # ioc_file_path: Se estratto, usa quello; altrimenti None
     state.ioc_file_path = extraction_result.ioc_file_path or None
     
-    # board_name: Se estratto, usa quello; altrimenti usa default o quello nello state
-    state.board_name = extraction_result.board_name or state.board_name or "STM32F401VCHx"
+    # board_name: Se estratto, usa quello; altrimenti cerca nel persistent_context; fallback a default
+    context_board = state.persistent_context.get("board_name") if state.persistent_context else None
+    state.board_name = extraction_result.board_name or context_board or state.board_name or "STM32F401VCHx" # se dici "Crea un progetto firmware" senza specificare la board, il sistema la pesca automaticamente dal tuo profilo Redis (es. STM32H7) invece di usare la STM32F401 di default.
     
-    # mcu_series: Se estratto, usa quello; altrimenti calcola da board_name o usa ""  # ✅ NUOVO
-    state.mcu_series = extraction_result.mcu_series or ""
+    # mcu_series: Se estratto, usa quello; altrimenti cerca nel persistent_context; fallback a stringa vuota
+    context_series = state.persistent_context.get("mcu_series") if state.persistent_context else None
+    state.mcu_series = extraction_result.mcu_series or context_series or "" 
     
     # project_name: Se estratto, usa quello; altrimenti usa quello nello state
     state.project_name = extraction_result.project_name or state.project_name or "MySTM32Project"

@@ -303,10 +303,16 @@ Esempi:
     else:
         user_text = str(user_response)
     
-    # ✅ FIX: Eredita board context dal firmware workflow se disponibile
+    # ✅ FIX: Eredita board context dal firmware workflow O dal persistent profile
     if not user_text or user_text.strip() == "":
-        # Se firmware è stato generato, usa quella board
-        if state.mcu_series and state.mcu_series.strip():
+        
+        # Recupera mcu_series dallo stato corrente O dalla memoria persistente
+        current_series = state.mcu_series
+        if not current_series and state.persistent_context:
+             current_series = state.persistent_context.get("mcu_series")
+
+        # Se firmware è stato generato o recuperato dal profilo
+        if current_series and current_series.strip():
             # Mappa serie MCU a target string per STEdgeAI
             series_to_target = {
                 "F0": "stm32f0",
@@ -328,13 +334,15 @@ Esempi:
                 "C0": "stm32c0",
                 "N6": "stm32n6"
             }
-            target_mcu = series_to_target.get(state.mcu_series.upper(), "stm32f4")
+            target_mcu = series_to_target.get(current_series.upper(), "stm32f4")
             user_text = f"{target_mcu}, medium compression"
-            logger.info(f"✓ Ereditato contesto firmware: board_name={state.board_name}, mcu_series={state.mcu_series} → target={target_mcu}")
+            
+            source_info = "firmware workflow" if state.mcu_series else "persistent profile"
+            logger.info(f"✓ Ereditato contesto ({source_info}): mcu_series={current_series} → target={target_mcu}")
         else:
             # Fallback se non c'è contesto firmware
             user_text = "STM32F4, medium compression"
-            logger.info("ℹ️  Nessun contesto firmware, uso default STM32F4")
+            logger.info("ℹ️  Nessun contesto firmware/profilo, uso default STM32F4")
     
     logger.info(f"📝 User input RAW: '{user_text}'")
     

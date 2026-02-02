@@ -22,11 +22,11 @@ The validation run utilized the following configuration, selected automatically 
 The session logs confirmed the successful intervention of the \textit{Class Mismatch Rescue} mechanism (see Section~\ref{sec:standard_fine_tuning}). The system detected a discrepancy between the model's native output (1000 classes, ImageNet) and the dataset (132 classes).
 
 \begin{lstlisting}[language=bash, caption={Log excerpt showing autonomous architecture repair}, label={lst:log_repair}]
-[Train] ⚠️  CLASS MISMATCH DETECTED!
+[Train] WARNING: CLASS MISMATCH DETECTED!
 [Train] Model expects: 1000 classes
 [Train] Dataset has: 132 classes
-[Train] 🔧 Applying automatic fix: Replacing final layer...
-[Train] ✓ Final layer replaced: Dense(132, activation='softmax')
+[Train] Applying automatic fix: Replacing final layer...
+[Train] Final layer replaced: Dense(132, activation='softmax')
 \end{lstlisting}
 
 Simultaneously, the NLP parser correctly interpreted the user's customization request ("freeze first 5 layers and add 0.4 dropout"), generating a valid training script that froze 5,792 parameters while keeping 601,884 parameters trainable.

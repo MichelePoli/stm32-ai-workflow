@@ -47,6 +47,7 @@
 \lstset{escapeinside={(*@}{@*)}}
 \usepackage{color}
 \usepackage{rotating}
+\usepackage{lscape}  % For landscape environment in appendix
 
 \usepackage{enumitem}
 \usepackage{siunitx}
@@ -57,7 +58,8 @@
   frame = single,
   mathescape,
   columns=fullflexible,
-  breaklines=true 
+  breaklines=true,
+  literate={⚠}{\textwarning}1 {✓}{\checkmark}1 {🔧}{[tool]}1
 }
 
 \usepackage{pgfplots} %bar chart
@@ -201,7 +203,7 @@
 
 %Eventualiappendici
 
-%\input{./appendix.tex}
+\input{./appendix.tex}
 
 \input{./acknowledgments.tex}
 
