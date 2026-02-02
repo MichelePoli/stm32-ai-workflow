@@ -178,13 +178,14 @@ Il sistema ha quattro workflow principali:
 
 **CONTESTO UTENTE (Profilo Persistente):**
 Ti verrà fornito un "Profilo Utente" con informazioni sulle sessioni precedenti (board usata, MCU, ultimo modello). 
-Usa queste informazioni se la richiesta dell'utente è ambigua o fa riferimento al passato (es: "Quale board stavo usando?").
+Usa queste informazioni se la richiesta dell'utente è ambigua o fa riferimento al passato (es: "Quale board stavo usando?", "Cosa ho fatto ieri?"). 
+In questi casi di RECALL o conversazione, usa SEMPRE la route "chat".
 
 Analizza la richiesta dell'utente e il suo profilo per determinare il workflow più appropriato.
-Se la richiesta è ambigua, scegli il workflow più generale.
+Se la richiesta è ambigua e non riguarda la memoria, scegli il workflow più generale.
 
 Rispondi SEMPRE in formato JSON con tre campi:
-- "route": uno tra "firmware", "ai_analysis", "integration", "web_research"
+- "route": uno tra "firmware", "ai_analysis", "integration", "web_research", "chat"
 - "confidence": numero tra 0.0 e 1.0
 - "reasoning": breve spiegazione (max 100 caratteri)
 """
@@ -276,15 +277,19 @@ def general_chat(state: MasterState, config: RunnableConfig = None) -> MasterSta
         # Costruisci il prompt includendo la memoria storica
         user_memory = json.dumps(state.persistent_context, indent=2) if state.persistent_context else "Nessuna informazione precedente disponibile."
         
-        instructions = f"""Sei l'Assistente AI per STM32. Rispondi in modo amichevole e professionale.
+        instructions = f"""Sei l'Assistente AI per STM32. 
         
-        MEMORIA UTENTE (Profilo Persistente):
+        Ecco le INFORMAZIONI SUL CONTESTO UTENTE (usale per rispondere a domande come "cosa stavo facendo?" o "quale board uso?"):
         {user_memory}
         
-        Se l'utente fa domande sul passato o su cosa stava facendo, usa i dati sopra.
-        Se l'utente ti saluta, rispondi cordialmente.
-        Parla in Italiano.
+        ISTRUZIONI:
+        1. Se l'utente chiede informazioni sul suo passato o sul progetto attuale, USA ESPLICITAMENTE i dati nel JSON sopra.
+        2. Non inventare informazioni se non sono presenti nel contesto.
+        3. Rispondi in modo amichevole e professionale.
+        4. Parla sempre in ITALIANO.
         """
+        
+        logger.info(f"🧠 Context injected into Chat Prompt: {user_memory}")
         
         response = llm.invoke([
             SystemMessage(content=instructions),
@@ -359,7 +364,7 @@ def decide_continue_to_ai(state: MasterState, config: RunnableConfig = None) -> 
     
     # L'utente risponde in linguaggio naturale
     # user_response = interrupt(prompt)
-    user_response = "CONTINUARE" # BYPASS
+    user_response = "TERMINARE" # BYPASS
     # user_response = "" # BYPASS
     
     # DEBUG: Stampa quello che hai ricevuto

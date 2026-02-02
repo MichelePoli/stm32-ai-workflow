@@ -381,7 +381,6 @@ def execute_web_search(state: MasterState, config: RunnableConfig = None) -> Mas
         agent = Agent(
             model=Ollama(id="mistral"),
             tools=[DuckDuckGoTools()],
-            show_tool_calls=False,
             markdown=True
         )
 
