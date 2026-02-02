@@ -14,6 +14,7 @@
 
 import os
 import logging
+import json
 from typing import Literal
 from datetime import datetime
 
@@ -127,6 +128,7 @@ logging.basicConfig(
 logging.getLogger("langgraph_api.server").setLevel(logging.WARNING)  # Silenzia log server interni
 logging.getLogger("langgraph_storage.queue").setLevel(logging.WARNING) # Silenzia statistiche periodiche "Worker stats" e "Queue stats"
 logging.getLogger("langgraph_api.metadata").setLevel(logging.ERROR)   # Nasconde errori persistenti di invio metadati a LangSmith
+logging.getLogger("langsmith.client").setLevel(logging.ERROR)         # Silenzia errori 403 Forbidden di LangSmith (come il client di telemetria di LangChain che cercava di inviare dati ai server ufficiali senza avere una chiave API valida.)
 logging.getLogger("httpx").setLevel(logging.WARNING)                 # Silenzia log delle richieste HTTP interne
 
 logger = logging.getLogger(__name__)

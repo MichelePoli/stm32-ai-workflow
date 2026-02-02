@@ -169,4 +169,7 @@ class MasterState:
 
 class MasterInput(TypedDict, total=False):
     message: str
+    persistent_context: dict
 
+# Il file server.py caricava correttamente il profilo utente, ma questo file state.py aveva una definizione restrittiva di "Input" che filtrava e scartava silenziosamente quel profilo prima che entrasse nel grafo. 
+# Di conseguenza, l'LLM partiva sempre "da zero".
