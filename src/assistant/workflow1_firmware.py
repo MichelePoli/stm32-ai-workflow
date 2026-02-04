@@ -265,7 +265,7 @@ def search_and_install_stm32_package(state: MasterState, config: RunnableConfig 
     
     # === 1. VERIFICA SE PACKAGE È GIÀ INSTALLATO ===
     
-    stm32_cube_repo = os.path.expanduser("~/STM32Cube/Repository")
+    stm32_cube_repo = cfg.stm32_repo_path
     os.makedirs(stm32_cube_repo, exist_ok=True)
     
     # Cartelle package per questa serie (es: STM32Cube_FW_N6_*)

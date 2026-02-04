@@ -40,6 +40,12 @@ class Configuration:
             os.path.expanduser("~/STM32CubeMX/STM32CubeMX") if platform.system() != "Darwin" else "/Applications/STMicroelectronics/STM32CubeMX.app/Contents/Resources/STM32CubeMX"
         )
     )
+    stm32_repo_path: str = field(
+        default_factory=lambda: os.environ.get(
+            "STM32_REPO_PATH",
+            os.path.expanduser("~/STM32Cube/Repository")
+        )
+    )
 
     # ============================================================================
     # CONFIGURAZIONE STM32
