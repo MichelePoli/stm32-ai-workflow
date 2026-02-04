@@ -457,55 +457,62 @@ def ask_modification_intent(state, config: RunnableConfig = None):
     
     cfg = Configuration.from_runnable_config(config)
     
-    # === CHIEDI DECISIONE ===
+    # === ESTRATTORE LLM ===
+    from src.assistant.utils import extract_user_response, get_llm
+    llm = get_llm(config)
+    llm_classifier = llm.with_structured_output(ModificationDecision)
     
-    prompt = {
-        "instruction": """Vuoi apportare modifiche all'architettura del modello?
+    # --- Passo 1: Prova a usare il messaggio iniziale ---
+    initial_intent = None
+    if not state.user_response:
+        res = llm_classifier.invoke([
+            SystemMessage(content=modification_decision_instructions),
+            HumanMessage(content=f"Messaggio: {state.message}")
+        ])
+        # Se la confidenza è alta, prendiamo per buona la decisione
+        if res.confidence > 0.8:
+            initial_intent = res.wants_modifications
+            logger.info(f"🤖 Intento rilevato nel messaggio iniziale: {initial_intent}")
+
+    # --- Passo 2: Verifica e Interrupt ---
+    if initial_intent is None:
+        if not state.user_response:
+            prompt = {
+                "instruction": """Vuoi apportare modifiche all'architettura del modello?
 
 Opzioni:
 - SÌ: Procediamo con la customizzazione (ridurre layer, aggiungere regularizzazione, etc.)
 - NO: Andiamo avanti direttamente con STEdgeAI analyze/validate/generate
 
 Cosa preferisci? (si/no)""",
-    }
-    
-    # user_response = interrupt(prompt)
-    user_response = "si" # BYPASS
-    if isinstance(user_response, dict):
-        user_text = str(user_response.get("response", user_response.get("input", ""))).lower()
+            }
+            # Suggerimento se ha mai fatto modifiche
+            has_modified = state.persistent_context.get("last_workflow") == "customization" if state.persistent_context else False
+            if has_modified:
+                prompt["suggestion"] = "💡 L'ultima volta hai personalizzato il modello. Vuoi farlo di nuovo?"
+
+            logger.info("⏸️ Interrupting for modification intent.")
+            interrupt(prompt)
+        
+        # Dopo la ripresa
+        user_text = extract_user_response(state.user_response).lower()
+        state.user_response = ""
+        
+        # Riapplica LLM sulla risposta specifica
+        decision = llm_classifier.invoke([
+            SystemMessage(content=modification_decision_instructions),
+            HumanMessage(content=f"Risposta utente: {user_text}")
+        ])
     else:
-        user_text = str(user_response).lower()
-    
-    # Default: no modifications (skip customization)
-    if not user_text or user_text.strip() == "":
-        user_text = "si" #ho messo si, giusto per velocizzare il test. ma va bene anche 'no'
-    
-    logger.info(f"📝 User response: '{user_text}'")
-    
-    # === CLASSIFICA CON MISTRAL ===
-    
-    llm = ChatOllama(
-        model=cfg.local_llm,  # oppure "mistral" se lo preferisci
-        temperature=0,
-        num_ctx=cfg.llm_context_window
-    )
-    
-    llm_classifier = llm.with_structured_output(ModificationDecision)
-    
-    decision = llm_classifier.invoke([
-        SystemMessage(content=modification_decision_instructions),
-        HumanMessage(content=f"Risposta utente: {user_text}")
-    ])
-    
-    logger.info(f"✓ Decisione classificata:")
-    logger.info(f"  wants_modifications: {decision.wants_modifications}")
-    logger.info(f"  confidence: {decision.confidence:.2f}")
-    
+        # Usiamo l'intento rilevato inizialmente
+        # Creiamo un oggetto finto o usiamo direttamente i dati
+        decision = ModificationDecision(wants_modifications=initial_intent, reasoning="Detected in initial message", confidence=1.0)
+
     # === SALVA NELLO STATE ===
-    
     state.wants_model_modifications = decision.wants_modifications
     state.modification_intent_confidence = decision.confidence
     
+    logger.info(f"✓ Decisione finale: wants_modifications={state.wants_model_modifications}")
     return state
 
 def decide_after_inspection(state) -> Literal["retrieve_best_practices_for_architecture", "run_analyze"]:
@@ -1417,27 +1424,52 @@ Write your modifications in natural language (or leave empty for defaults):
         "best_practices": best_practices,
     }
     
-    # ===== STEP 1: Chiedere all'utente =====
-    logger.info("  [Step 1/2] Asking user for modifications...")
-    # user_modifications = interrupt(prompt)
-    user_modifications = "freeze first 5 layers and add 0.4 dropout" # BYPASS
+    # === ESTRATTORE LLM ===
+    from src.assistant.utils import extract_user_response, get_llm
+    cfg = Configuration.from_runnable_config(config)
+    llm = get_llm(config)
+    llm_extractor = llm.with_structured_output(ParsedModificationsPlan)
     
-    # Default: freeze first 5 layers
-    if not user_modifications or str(user_modifications).strip() == "":
-        user_modifications = "Freeze primi 5 layer, aggiungi dropout 0.3"
-    
-    # ===== VALIDAZIONE INPUT =====
-    if not user_modifications or not isinstance(user_modifications, str):
-        logger.warning("⚠️  Empty input, using default")
-        user_modifications = "Freeze 50% of layers and add dropout"
-    
-    user_modifications = user_modifications.strip()
-    
-    if len(user_modifications) < 3:
-        logger.warning(f"⚠️  Input very short ({len(user_modifications)} chars)")
-    
-    logger.info(f"📝 User request: {user_modifications[:80]}...")
-    state.user_custom_modifications = user_modifications
+    # --- Passo 1: Prova a usare il messaggio iniziale ---
+    initial_mods_detected = False
+    if not state.user_response:
+        # Qui dovremmo costruire il prompt per il parsing (simile a quello sotto)
+        # Ma abbreviato per vedere se ci sono modifiche esplicite
+        res = llm_extractor.invoke([
+            SystemMessage(content="Extract modifications from this message. If none, return empty list."),
+            HumanMessage(content=f"Messaggio: {state.message}")
+        ])
+        if res.modifications:
+            state.user_custom_modifications = state.message # Salviamo il trigger come fonte
+            initial_mods_detected = True
+            logger.info("🤖 Modifiche rilevate nel messaggio iniziale.")
+
+    # --- Passo 2: Verifica e Interrupt ---
+    if not initial_mods_detected:
+        if not state.user_response:
+            prompt = {
+                "instruction": """Descrivi le modifiche che vuoi apportare al modello.
+Esempi:
+- "Freeze primi 10 layer e aggiungi dropout 0.3"
+- "Cambia input a 128x128"
+- "Usa learning rate 1e-4"
+""",
+            }
+            # Suggerimento se abbiamo qualcosa nel profilo? 
+            # Per ora nessun campo specifico per "last_modifications" ma potremmo aggiungerlo.
+            
+            logger.info("⏸️ Interrupting for customization details.")
+            interrupt(prompt)
+        
+        # Dopo la ripresa
+        user_modifications = extract_user_response(state.user_response)
+        state.user_response = ""
+        state.user_custom_modifications = user_modifications
+    else:
+        user_modifications = state.user_custom_modifications
+
+    user_modifications = user_modifications.strip() if user_modifications else ""
+    logger.info(f"📝 User request finale: {user_modifications[:80]}...")
     
     # ===== STEP 2: Parsare con LLM =====
     logger.info("  [Step 2/2] Parsing with LLM structured output...")
@@ -1769,11 +1801,16 @@ Training Recommendation:{train_text}
     }
     
     # ⏸️ INTERRUPT: Attendi risposta utente
-    # user_response = interrupt(confirmation_prompt)
-    user_response = "yes" # BYPASS
+    from src.assistant.utils import extract_user_response
+    if not state.user_response or state.user_response.strip() == "":
+        interrupt(confirmation_prompt)
     
     # Log della risposta raw
-    logger.info(f"📝 Risposta utente (raw): '{user_response}'")
+    logger.info(f"📝 Risposta utente (state): '{state.user_response}'")
+    
+    # Estrai il testo pulito
+    user_response = extract_user_response(state.user_response)
+    state.user_response = "" # Clear
     
     # ==================== PARSING LLM DELLA RISPOSTA ====================
     
@@ -3278,15 +3315,13 @@ def ask_optimization_preference(state: MasterState, config: RunnableConfig = Non
         }
     }
     
-    logger.info("📝 Calling interrupt()...")
-    # user_response = interrupt(prompt)
-    user_response = "standard" # BYPASS
-    # logger.info(f"✓ Interrupt returned: {user_response}")
+    from src.assistant.utils import extract_user_response
+    logger.info("📝 Checking for UI response...")
+    if not state.user_response or state.user_response.strip() == "":
+        interrupt(prompt)
     
-    if isinstance(user_response, dict):
-        response = user_response.get("response", "standard")
-    else:
-        response = str(user_response)
+    response = extract_user_response(state.user_response)
+    state.user_response = "" # Clear
     
     # Default if empty
     if not response or response.strip() == "":
@@ -3677,11 +3712,15 @@ Quantized: {state.should_quantize}
         "options": ["continue_ai", "end"]
     }
     
-    # user_response = interrupt(prompt)
-    user_response = "continue_ai" # BYPASS
+    from src.assistant.utils import extract_user_response
+    if not state.user_response or state.user_response.strip() == "":
+        interrupt(prompt)
+    
+    user_response = extract_user_response(state.user_response)
+    state.user_response = "" # Clear
     
     # Default: continue with AI analysis if empty
-    if not user_response or str(user_response).strip() == "":
+    if not user_response or user_response.strip() == "":
         user_response = "continue_ai"
     
     # ===== LLM CLASSIFICATION =====

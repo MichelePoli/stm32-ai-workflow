@@ -397,6 +397,46 @@ def run_subprocess_streaming(
 
 
 # ============================================================================
+# COMMON HELPERS
+# ============================================================================
+
+def extract_user_response(response: Any) -> str:
+    """
+    Extract a clean string from various possible interrupt response formats.
+    
+    LangGraph's interrupt() can return different types based on how the client
+    sends data. This helper standardizes the extraction of the main text.
+    
+    Args:
+        response: The raw response from interrupt()
+        
+    Returns:
+        The extracted user string, or empty string if not found
+    """
+    from typing import Any
+    
+    if response is None:
+        return ""
+    if isinstance(response, (str, int, float)):
+        return str(response).strip()
+    
+    if isinstance(response, dict):
+        # Priority 1: Specific known keys
+        for key in ["response", "message", "input", "text"]:
+            if key in response and response[key]:
+                return str(response[key]).strip()
+        
+        # Priority 2: If it's a single key dict, take the value
+        if len(response) == 1:
+            val = list(response.values())[0]
+            if val:
+                return str(val).strip()
+    
+    # Fallback: string representation
+    return str(response).strip()
+
+
+# ============================================================================
 # EXCEPTIONS
 # ============================================================================
 

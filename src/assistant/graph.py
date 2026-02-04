@@ -355,72 +355,66 @@ def clarify_request(state: MasterState, config: RunnableConfig = None) -> Master
 def decide_continue_to_ai(state: MasterState, config: RunnableConfig = None) -> MasterState:
     """
     Nodo di decisione dopo finalize_project.
-    La risposta viene analizzata da un LLM. Così anche se l'utente risponde in modo non strutturato, possiamo interpretarla. 
     """
     
     logger.info("📋 Decisione: Continuare verso analisi AI?")
     
-    prompt = {
-        "instruction": "Il firmware è stato generato con successo! Vuoi continuare con l'analisi del modello AI o terminare qui?",
-    }
-    
-    # L'utente risponde in linguaggio naturale
-    # user_response = interrupt(prompt)
-    user_response = "TERMINARE" # BYPASS
-    # user_response = "" # BYPASS
-    
-    # DEBUG: Stampa quello che hai ricevuto
-    # logger.info(f"🔍 user_response RAW: {user_response}")
-    # logger.info(f"🔍 user_response TYPE: {type(user_response)}")
-    
-    # Gestisci il caso in cui sia dict o stringa/int
-    if isinstance(user_response, dict):
-        user_text = user_response.get("response", user_response.get("input", str(user_response)))
-    else:
-        user_text = str(user_response)
-    
-    # logger.info(f"🔍 user_text ESTRATTO: '{user_text}'")
-    
-    # === USA LLM PER ANALIZZARE LA RISPOSTA ===
-    
+    # === ESTRATTORE LLM ===
+    from src.assistant.utils import extract_user_response, get_llm
     cfg = Configuration.from_runnable_config(config)
+    llm = get_llm(config)
     
-    llm = ChatOllama(
-        model=cfg.local_llm,
-        temperature=0,
-        num_ctx=cfg.llm_context_window
-    )
-     
-    # Prompt SEMPLIFICATO per l'LLM
-    analysis_prompt = f"""Analizza questa risposta e rispondi SOLO con una di queste due parole:
+    # Prompt semplificato per classificazione
+    classification_prompt = """Analizza la risposta dell'utente e rispondi SOLO con una di queste due parole:
     
-Risposta: "{user_text}"
+Se l'utente vuole continuare con l'analisi AI / X-CUBE-AI / ottimizzazione -> CONTINUARE
+Se l'utente vuole fermarsi / ha finito -> TERMINARE
 
-Se l'utente dice SÌ / CONTINUA / PROCEDI → rispondi: CONTINUARE
-Se l'utente dice NO / TERMINA / STOP → rispondi: TERMINARE
+Rispondi SOLO con la parola, senza altro testo.
+"""
 
-Risposta:"""
-    
-    logger.info(f"📝 Analysis prompt:\n{analysis_prompt}")
-    
-    response = llm.invoke([
-        SystemMessage(content="Rispondi SOLO con una parola: CONTINUARE o TERMINARE"),
-        HumanMessage(content=analysis_prompt)
-    ])
-    
-    decision_text = response.content.strip().upper()
-    
-    logger.info(f"🤖 LLM Decision RAW: '{decision_text}'")
-    
-    # Interpreta la decisione (più tollerante)
-    if "CONTINUARE" in decision_text or "CONTINUA" in decision_text or "SÌ" in decision_text:
-        logger.info("✓ CONTINUE DETECTED - Going to AI Analysis")
+    # --- Passo 1: Prova a usare il messaggio iniziale ---
+    initial_decision = None
+    if not state.user_response:
+        res = llm.invoke([
+            SystemMessage(content=classification_prompt),
+            HumanMessage(content=f"Messaggio: {state.message}")
+        ])
+        decision_text = res.content.strip().upper()
+        if "CONTINUARE" in decision_text: initial_decision = "CONTINUARE"
+        elif "TERMINARE" in decision_text: initial_decision = "TERMINARE"
+        
+        if initial_decision == "CONTINUARE":
+            logger.info("🤖 Intento di continuazione rilevato nel messaggio iniziale.")
+
+    # --- Passo 2: Verifica e Interrupt ---
+    if not initial_decision:
+        if not state.user_response:
+            prompt = {
+                "instruction": "Il firmware è stato generato con successo! Vuoi continuare con l'analisi del modello AI o terminare qui?",
+            }
+            logger.info("⏸️ Intento di continuazione non chiaro, richiedo input...")
+            interrupt(prompt)
+        
+        # Dopo la ripresa
+        user_text = extract_user_response(state.user_response)
+        state.user_response = ""
+        
+        res = llm.invoke([
+            SystemMessage(content=classification_prompt),
+            HumanMessage(content=f"Risposta: {user_text}")
+        ])
+        decision_text = res.content.strip().upper()
+    else:
+        decision_text = initial_decision
+
+    # Interpreta la decisione
+    if "CONTINUARE" in decision_text:
+        logger.info("✓ CONTINUE - Going to AI Analysis")
         state.route = "continue_to_ai"
     else:
-        logger.info("✓ TERMINATE DETECTED - Going to END")
+        logger.info("✓ TERMINATE - Ending flow")
         state.route = "end_workflow"
-    
-    logger.info(f"📊 Final state.route: {state.route}")
     
     return state
 
@@ -428,70 +422,64 @@ Risposta:"""
 def decide_continue_to_integration(state: MasterState, config: RunnableConfig = None) -> MasterState:
     """
     Nodo di decisione dopo finalize_analysis.
-    La risposta viene analizzata da un LLM. Così anche se l'utente risponde in modo non strutturato, possiamo interpretarla.
     """
     
     logger.info("📋 Decisione: Continuare verso integrazione?")
     
-    prompt = {
-        "instruction": "L'analisi AI è stata completata con successo! Vuoi continuare con l'integrazione del codice AI nel firmware o terminare qui?",
-    }
-    
-    # L'utente risponde in linguaggio naturale
-    # user_response = interrupt(prompt)
-    user_response = "CONTINUARE" # BYPASS
-    # user_response = "" # BYPASS
-    
-    
-    # DEBUG: Stampa quello che hai ricevuto
-    # logger.info(f"🔍 user_response RAW: {user_response}")
-    # logger.info(f"🔍 user_response TYPE: {type(user_response)}")
-    
-    # Gestisci il caso in cui sia dict o stringa/int
-    if isinstance(user_response, dict):
-        user_text = user_response.get("response", user_response.get("input", str(user_response)))
-    else:
-        user_text = str(user_response)
-    
-    # logger.info(f"🔍 user_text ESTRATTO: '{user_text}'")
-    
-    # === USA LLM PER ANALIZZARE LA RISPOSTA ===
-    
+    # === ESTRATTORE LLM ===
+    from src.assistant.utils import extract_user_response, get_llm
     cfg = Configuration.from_runnable_config(config)
+    llm = get_llm(config)
     
-    llm = ChatOllama(
-        model=cfg.local_llm,
-        temperature=0,
-        num_ctx=cfg.llm_context_window
-    )
-     
-    # Prompt SEMPLIFICATO per l'LLM
-    analysis_prompt = f"""Analizza questa risposta e rispondi SOLO con una di queste due parole:
+    classification_prompt = """Analizza la risposta dell'utente e rispondi SOLO con una di queste due parole:
     
-Risposta: "{user_text}"
+Se l'utente vuole integrare il codice nel firmware / procedere con l'unione -> CONTINUARE
+Se l'utente vuole fermarsi / ha finito -> TERMINARE
 
-Se l'utente dice SÌ / CONTINUA / PROCEDI / INTEGRA → rispondi: CONTINUARE
-Se l'utente dice NO / TERMINA / STOP / FINE → rispondi: TERMINARE
+Rispondi SOLO con la parola, senza altro testo.
+"""
 
-Risposta:"""
-    
-    logger.info(f"📝 Analysis prompt:\n{analysis_prompt}")
-    
-    response = llm.invoke([
-        SystemMessage(content="Rispondi SOLO con una parola: CONTINUARE o TERMINARE"),
-        HumanMessage(content=analysis_prompt)
-    ])
-    
-    decision_text = response.content.strip().upper()
-    
-    logger.info(f"🤖 LLM Decision RAW: '{decision_text}'")
-    
-    # Interpreta la decisione (più tollerante)
-    if "CONTINUARE" in decision_text or "CONTINUA" in decision_text or "SÌ" in decision_text:
-        logger.info("✓ CONTINUE DETECTED - Going to Integration")
+    # --- Passo 1: Prova a usare il messaggio iniziale ---
+    initial_decision = None
+    if not state.user_response:
+        res = llm.invoke([
+            SystemMessage(content=classification_prompt),
+            HumanMessage(content=f"Messaggio: {state.message}")
+        ])
+        decision_text = res.content.strip().upper()
+        if "CONTINUARE" in decision_text: initial_decision = "CONTINUARE"
+        elif "TERMINARE" in decision_text: initial_decision = "TERMINARE"
+        
+        if initial_decision == "CONTINUARE":
+            logger.info("🤖 Intento di integrazione rilevato nel messaggio iniziale.")
+
+    # --- Passo 2: Verifica e Interrupt ---
+    if not initial_decision:
+        if not state.user_response:
+            prompt = {
+                "instruction": "L'analisi AI è stata completata con successo! Vuoi continuare con l'integrazione del codice AI nel firmware o terminare qui?",
+            }
+            logger.info("⏸️ Intento di integrazione non chiaro, richiedo input...")
+            interrupt(prompt)
+        
+        # Dopo la ripresa
+        user_text = extract_user_response(state.user_response)
+        state.user_response = ""
+        
+        res = llm.invoke([
+            SystemMessage(content=classification_prompt),
+            HumanMessage(content=f"Risposta: {user_text}")
+        ])
+        decision_text = res.content.strip().upper()
+    else:
+        decision_text = initial_decision
+
+    # Interpreta la decisione
+    if "CONTINUARE" in decision_text:
+        logger.info("✓ CONTINUE - Going to Integration")
         state.route = "continue_to_integration"
     else:
-        logger.info("✓ TERMINATE DETECTED - Going to END")
+        logger.info("✓ TERMINATE - Ending flow")
         state.route = "end_workflow"
     
     logger.info(f"📊 Final state.route: {state.route}")

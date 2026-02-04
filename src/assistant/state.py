@@ -13,6 +13,7 @@ class MasterState:
     # === INPUT MESSAGE ===
     message: str = ""
     route: str = ""
+    user_response: str = "" # Landing field for Human-in-the-Loop responses
     
     # === CONFIGURAZIONE (riempiti da route_request) ===
     st_email: str = ""
@@ -169,6 +170,7 @@ class MasterState:
 
 class MasterInput(TypedDict, total=False):
     message: str
+    user_response: str
     persistent_context: dict
 
 # Il file server.py caricava correttamente il profilo utente, ma questo file state.py aveva una definizione restrittiva di "Input" che filtrava e scartava silenziosamente quel profilo prima che entrasse nel grafo. 

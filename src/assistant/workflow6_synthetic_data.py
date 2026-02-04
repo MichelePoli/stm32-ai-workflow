@@ -70,25 +70,47 @@ Esempi:
         """
     }
     
-    user_response = interrupt(prompt)
-    # user_response = "" # BYPASS
-    if isinstance(user_response, dict):
-        user_text = user_response.get("response", user_response.get("input", str(user_response)))
-    else:
-        user_text = str(user_response)
-    
-    # Default: 10 sine waves at 440Hz
-    if not user_text or user_text.strip() == "":
-        user_text = "Genera 10 campioni di onda sinusoidale a 440Hz"
-        
-    logger.info(f"📝 Richiesta utente: '{user_text}'")
-    
-    # === PARSING CON LLM ===
+    # === ESTRATTORE LLM ===
     cfg = Configuration.from_runnable_config(config)
-    llm = ChatOllama(model=cfg.local_llm, temperature=0)
+    from src.assistant.utils import extract_user_response, get_llm
+    llm = get_llm(config)
     llm_parser = llm.with_structured_output(SyntheticDataRequest)
     
-    system_prompt = """Sei un esperto di DSP (Digital Signal Processing).
+    # --- Passo 1: Prova a usare il messaggio iniziale ---
+    initial_req_detected = False
+    if not state.user_response:
+        res = llm_parser.invoke([
+            SystemMessage(content="Extract signal generation parameters. Return None if not specified."),
+            HumanMessage(content=f"Messaggio: {state.message}")
+        ])
+        if res.signal_type:
+            state.synthetic_request = res.dict()
+            initial_req_detected = True
+            logger.info(f"🤖 Parametri rilevati nel messaggio iniziale: {state.synthetic_request}")
+
+    # --- Passo 2: Verifica e Interrupt ---
+    if not initial_req_detected:
+        if not state.user_response:
+            logger.info("⏸️ Interrupting for synthetic data requirements.")
+            interrupt(prompt)
+        
+        # Dopo la ripresa
+        user_text = extract_user_response(state.user_response)
+        state.user_response = ""
+        
+        # Parsing con LLM sulla risposta specifica (stesso sistema di prima)
+        # usiamo il system_prompt definito sotto per coerenza
+    else:
+        user_text = state.message # Usiamo il messaggio originale se rilevato lì
+
+    # (L'LLM viene invocato comunque sotto se non saltiamo tutto il blocco)
+    # Ma per seguire il pattern, lo invochiamo qui se siamo in fase di risposta
+    if not initial_req_detected:
+        logger.info(f"📝 User input finale: '{user_text}'")
+    
+    # === PARSING CON LLM (se non già fatto) ===
+    if not initial_req_detected:
+        system_prompt = """Sei un esperto di DSP (Digital Signal Processing).
 Analizza la richiesta dell'utente ed estrai i parametri per la generazione del segnale.
 Se l'utente non specifica, usa questi default:
 - Duration: 1.0s
@@ -100,28 +122,28 @@ Se l'utente non specifica, usa questi default:
 Per "mixed" o richieste complesse, cerca di mappare al tipo più simile o usa "sine" con rumore.
 """
 
-    try:
-        request = llm_parser.invoke([
-            SystemMessage(content=system_prompt),
-            HumanMessage(content=f"Richiesta: {user_text}")
-        ])
+        try:
+            request = llm_parser.invoke([
+                SystemMessage(content=system_prompt),
+                HumanMessage(content=f"Richiesta: {user_text}")
+            ])
+            
+            state.synthetic_request = request.dict()
+            logger.info(f"✓ Parametri estratti: {state.synthetic_request}")
         
-        state.synthetic_request = request.dict()
-        logger.info(f"✓ Parametri estratti: {state.synthetic_request}")
-        
-    except Exception as e:
-        logger.error(f"❌ Errore parsing richiesta: {e}")
-        # Fallback
-        state.synthetic_request = {
-            "signal_type": "sine",
-            "frequency": 440.0,
-            "duration_sec": 1.0,
-            "sample_rate": 16000,
-            "num_samples": 10,
-            "amplitude": 0.5,
-            "noise_level": 0.0
-        }
-        
+        except Exception as e:
+            logger.error(f"❌ Errore parsing richiesta: {e}")
+            # Fallback
+            state.synthetic_request = {
+                "signal_type": "sine",
+                "frequency": 440.0,
+                "duration_sec": 1.0,
+                "sample_rate": 16000,
+                "num_samples": 10,
+                "amplitude": 0.5,
+                "noise_level": 0.0
+            }
+            
     return state
 
 
@@ -230,10 +252,12 @@ def validate_synthetic_data(state: MasterState, config: RunnableConfig = None) -
     
     user_response = interrupt(prompt)
     # user_response = "" # BYPASS
-    if isinstance(user_response, dict):
-        user_text = str(user_response.get("response", user_response.get("input", ""))).lower()
-    else:
-        user_text = str(user_response).lower()
+    from src.assistant.utils import extract_user_response
+    if not state.user_response or state.user_response.strip() == "":
+        interrupt(prompt)
+    
+    user_text = extract_user_response(state.user_response).lower()
+    state.user_response = "" # Clear
     
     # Default: proceed with fine-tuning (sì)
     if not user_text or user_text.strip() == "":

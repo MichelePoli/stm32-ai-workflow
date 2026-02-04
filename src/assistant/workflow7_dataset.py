@@ -119,37 +119,80 @@ def decide_data_source(state: MasterState, config: RunnableConfig = None) -> Mas
     
     logger.info("📊 Dataset Source Selection")
     
-    prompt = {
-        "instruction": "Quale dataset vuoi utilizzare per il fine-tuning?",
-        "options": {
-            "1": "Real Dataset (Seleziona dai predefiniti)",
-            "2": "Register New Dataset (Aggiungi tramite URL)",
-            "3": "Synthetic Data (Generato ora)"
-        }
-    }
+    # === ESTRATTORE LLM ===
+    from src.assistant.utils import extract_user_response, get_llm
+    cfg = Configuration.from_runnable_config(config)
+    llm = get_llm(config)
     
-    # user_response = interrupt(prompt)
-    user_response = "1" # BYPASS
-    if isinstance(user_response, dict):
-        user_text = str(user_response.get("response", user_response.get("input", ""))).lower()
-    else:
-        user_text = str(user_response).lower()
+    # Prompt semplificato per classificazione sorgente
+    source_classification_prompt = """Classifica la sorgente dei dati dalla richiesta dell'utente.
     
-    # Default: synthetic (no download)
-    if not user_text or user_text.strip() == "":
-        user_text = "1" # ho messo 1, giusto per velocizzare il test. ma va bene anche '2'
+1. REAL: L'utente vuole usare dataset famosi o esistenti (CIFAR, MNIST, etc.)
+2. REGISTER: L'utente vuole fornire un URL o registrare un nuovo dataset
+3. SYNTHETIC: L'utente vuole generare dati artificialmente
+
+Rispondi SOLO con una parola: REAL, REGISTER, o SYNTHETIC. Se incerto: null.
+"""
+
+    # --- Passo 1: Prova a usare il messaggio iniziale ---
+    initial_source = None
+    if not state.user_response:
+        res = llm.invoke([
+            SystemMessage(content=source_classification_prompt),
+            HumanMessage(content=f"Messaggio: {state.message}")
+        ])
+        source_text = res.content.strip().upper()
+        if "REAL" in source_text: initial_source = "real"
+        elif "REGISTER" in source_text: initial_source = "register"
+        elif "SYNTHETIC" in source_text: initial_source = "synthetic"
         
-    if "1" in user_text or "real" in user_text:
-        state.dataset_source = "real"
-    elif "2" in user_text or "register" in user_text or "aggiungi" in user_text:
-        state.dataset_source = "register"
-    elif "3" in user_text or "synthetic" in user_text:
-        state.dataset_source = "synthetic"
+        if initial_source:
+            logger.info(f"🤖 Sorgente rilevata nel messaggio iniziale: {initial_source}")
+
+    # --- Passo 2: Verifica e Interrupt ---
+    if not initial_source:
+        if not state.user_response:
+            prompt = {
+                "instruction": """Quale sorgente dati vuoi utilizzare per il fine-tuning?
+
+Opzioni:
+1. **Real Dataset**: Seleziona dai predefiniti (CIFAR, MNIST, SpeechCommands)
+2. **Register New**: Aggiungi tramite URL diretto
+3. **Synthetic Data**: Genera ora dati artificiali (sine, noise, etc.)
+
+Cosa preferisci? (1, 2 o 3)""",
+            }
+            # Suggerimento se l'utente ha una preferenza passata
+            last_source = state.persistent_context.get("last_dataset_source", "Si consiglia Synthetic per i test veloci.") if state.persistent_context else "Si consiglia Synthetic per i test veloci."
+            prompt["suggestion"] = f"💡 L'ultima volta hai usato: **{last_source}**."
+            
+            logger.info("⏸️ Interrupting for data source decision.")
+            interrupt(prompt)
+        
+        # Dopo la ripresa
+        user_text = extract_user_response(state.user_response).lower()
+        state.user_response = ""
+        
+        if "1" in user_text or "real" in user_text or "predefini" in user_text:
+            state.dataset_source = "real"
+        elif "2" in user_text or "register" in user_text or "url" in user_text:
+            state.dataset_source = "register"
+        elif "3" in user_text or "synthetic" in user_text or "gener" in user_text:
+            state.dataset_source = "synthetic"
+        else:
+            # Re-invoca LLM sulla risposta se non banale
+            res = llm.invoke([
+                SystemMessage(content=source_classification_prompt),
+                HumanMessage(content=f"Risposta: {user_text}")
+            ])
+            source_text = res.content.strip().upper()
+            if "REAL" in source_text: state.dataset_source = "real"
+            elif "REGISTER" in source_text: state.dataset_source = "register"
+            elif "SYNTHETIC" in source_text: state.dataset_source = "synthetic"
+            else: state.dataset_source = "synthetic" # Default
     else:
-        # Default fallback
-        logger.warning(f"⚠️  Scelta non riconosciuta '{user_text}', default a Synthetic")
-        state.dataset_source = "synthetic"
-        
+        state.dataset_source = initial_source
+
     logger.info(f"✅ Selected: {state.dataset_source}")
     return state
 
@@ -168,15 +211,15 @@ Format richiesto:
 - Descrizione: [Breve descrizione]
 """
     
-    user_response = interrupt({
-        "instruction": prompt_text,
-        "hint": "Puoi scrivere in linguaggio naturale, estrarrò io i dati."
-    })
+    from src.assistant.utils import extract_user_response
+    if not state.user_response or state.user_response.strip() == "":
+        interrupt({
+            "instruction": prompt_text,
+            "hint": "Puoi scrivere in linguaggio naturale, estrarrò io i dati."
+        })
     
-    if isinstance(user_response, dict):
-        user_input = str(user_response.get("response", user_response.get("input", "")))
-    else:
-        user_input = str(user_response)
+    user_input = extract_user_response(state.user_response)
+    state.user_response = "" # Clear
     
     logger.info(f"📝 User response: {user_input[:100]}")
     
@@ -357,18 +400,42 @@ def select_predefined_dataset(state: MasterState, config: RunnableConfig = None)
     
     prompt = {
         "instruction": menu_text,
-        # Prepend a dummy value at index 0 so that the UI indices [1, 2, 3...]
-        # align with the human-readable menu [1, 2, 3...]
         "valid_options": ["(Digitare numero / nome)"] + valid_keys,
         "hint": "Inserisci il numero o il nome del dataset (es: 1 oppure cifar10)"
     }
     
-    # user_response = interrupt(prompt)
-    user_response = "fruit_360" # BYPASS
-    if isinstance(user_response, dict):
-        selection = str(user_response.get("response", user_response.get("input", ""))).lower().strip()
+    # === ESTRATTORE LLM ===
+    from src.assistant.utils import extract_user_response, get_llm
+    llm = get_llm(config)
+    
+    # --- Passo 1: Prova a usare il messaggio iniziale ---
+    initial_selection = None
+    if not state.user_response:
+        # Check se uno dei nomi dei dataset è nel messaggio trigger
+        msg_low = state.message.lower()
+        for key in valid_keys:
+            if key.lower() in msg_low:
+                initial_selection = key
+                logger.info(f"🤖 Dataset '{key}' rilevato nel messaggio iniziale.")
+                break
+
+    # --- Passo 2: Verifica e Interrupt ---
+    if not initial_selection:
+        if not state.user_response:
+            # Suggerimento se l'utente ha una preferenza passata
+            last_ds = state.persistent_context.get("last_real_dataset", "Nessuno") if state.persistent_context else "Nessuno"
+            if last_ds != "Nessuno" and last_ds in valid_keys:
+                prompt["suggestion"] = f"💡 L'ultima volta hai usato: **{last_ds}**. Vuoi usare lo stesso?"
+            
+            logger.info("⏸️ Interrupting for dataset selection.")
+            interrupt(prompt)
+        
+        selection = extract_user_response(state.user_response).lower().strip()
+        state.user_response = ""
     else:
-        selection = str(user_response).lower().strip()
+        selection = initial_selection
+
+    # (Logica di parsing numero/nome rimane uguale e fluisce sotto)
     
     # ===== STEP 8: Parsing risposta utente =====
     # Default: primo dataset consigliato (o primo disponibile)

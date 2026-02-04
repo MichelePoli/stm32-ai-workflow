@@ -115,19 +115,8 @@ def collect_integration_info(state: MasterState, config: RunnableConfig = None) 
     Se i path sono già presenti nello state (da run precedente), usali.
     """
     
-    logger.info("📋 Raccolta configurazione integrazione...")
-    
-    # Se i path sono già presenti nello state, puoi anche saltare
-    if state.firmware_project_dir and state.ai_code_dir:
-        logger.info(f"✓ Path già presenti nello state:")
-        logger.info(f"  Firmware: {state.firmware_project_dir}")
-        logger.info(f"  AI Code: {state.ai_code_dir}")
-        # Procedi direttamente al resto della logica
-    else:
-        logger.info("📌 Path non presenti nello state, richiedo all'utente...")
-        
-        prompt = {
-            "instruction": """Configurazione Integrazione AI nel Firmware
+    prompt = {
+        "instruction": """Configurazione Integrazione AI nel Firmware
             
 Per favore specifica (in linguaggio naturale):
 - Path completo al progetto firmware generato
@@ -139,81 +128,70 @@ Esempi di path:
 
 Esempio risposta: "Integra il codice da ./analisiAI/code_resnet nel firmware di ~/STM32CubeMX/MySTM32Project"
             """,
-        }
-        
-        # L'utente risponde in linguaggio naturale
-        user_response = interrupt(prompt)
-        # user_response = "" # BYPASS # come se l'utente non avesse digitato nulla e si prendono i valori di Default. 
-        
-        # Gestisci il caso in cui sia dict o stringa/int
-        if isinstance(user_response, dict):
-            user_text = user_response.get("response", user_response.get("input", str(user_response)))
-        else:
-            user_text = str(user_response)
-        
-        # Default: use paths from state (already populated) OR persistent context
-        if not user_text or user_text.strip() == "":
-            
-            # Recupera dal context se non presente nello state
-            default_fw = state.firmware_project_dir
-            if not default_fw and state.persistent_context:
-                default_fw = state.persistent_context.get("last_project_path")
-                if default_fw:
-                    logger.info(f"✓ Ereditato path progetto dal profilo: {default_fw}")
-
-            # Se ancora nullo, usa stringa vuota o placeholder
-            default_fw = default_fw or ""
-            default_ai = state.ai_code_dir or ""
-            
-            user_text = f"Firmware: {default_fw}, AI: {default_ai}"
-        
-        logger.info(f"📝 User input RAW: '{user_text}'")
-        
-        # === USA LLM PER ESTRARRE I PATH ===
-        
-        cfg = Configuration.from_runnable_config(config)
-        
-        llm = ChatOllama(
-            model=cfg.local_llm,
-            temperature=0,
-            num_ctx=cfg.llm_context_window
-        )
-        
-        # Crea LLM con structured output
-        llm_extractor = llm.with_structured_output(IntegrationInfoExtraction)
-        
-        logger.info(f"🤖 Estrazione path da LLM...")
-        
-        extraction_result = llm_extractor.invoke([
+    }
+    
+    # === ESTRATTORE LLM ===
+    from src.assistant.utils import extract_user_response, get_llm
+    cfg = Configuration.from_runnable_config(config)
+    llm = get_llm(config)
+    llm_extractor = llm.with_structured_output(IntegrationInfoExtraction)
+    
+    # --- Passo 1: Prova a usare il messaggio iniziale (se non siamo in fase di risposta) ---
+    if not state.user_response:
+        res = llm_extractor.invoke([
             SystemMessage(content=integration_info_extraction_instructions),
-            HumanMessage(content=f"Risposta utente: {user_text}")
+            HumanMessage(content=f"Messaggio: {state.message}")
+        ])
+        if res.firmware_project_dir: state.firmware_project_dir = res.firmware_project_dir
+        if res.ai_code_dir: state.ai_code_dir = res.ai_code_dir
+
+    # --- Passo 2: Verifica e Interrupt ---
+    if not state.firmware_project_dir or not state.ai_code_dir:
+        if not state.user_response:
+            # Recupera path progetto dal profilo
+            last_fw = state.persistent_context.get("last_project_path", "Nessuno") if state.persistent_context else "Nessuno"
+            
+            dynamic_prompt = {
+                "instruction": prompt["instruction"],
+                "suggestion": f"💡 Ho visto che l'ultimo progetto era: **{last_fw}**. Vuoi usare lo stesso path o uno nuovo?"
+            }
+            logger.info("⏸️ Interrupting for integration paths with profile suggestion.")
+            interrupt(dynamic_prompt)
+        
+        # Dopo la ripresa
+        user_text = extract_user_response(state.user_response)
+        state.user_response = ""
+        
+        res = llm_extractor.invoke([
+            SystemMessage(content=integration_info_extraction_instructions),
+            HumanMessage(content=f"Risposta: {user_text}")
         ])
         
-        logger.info(f"✓ Estrazione completata:")
-        logger.info(f"  firmware_project_dir: {extraction_result.firmware_project_dir}")
-        logger.info(f"  ai_code_dir: {extraction_result.ai_code_dir}")
+        # Gestione "USE_PROFILE" (Aggiungiamo istruzioni all'estrattore dopo)
+        context_fw = state.persistent_context.get("last_project_path") if state.persistent_context else None
         
-        # === APPLICA GLI ATTRIBUTI ESTRATTI ALLO STATE ===
+        # Logica euristica se LLM non ha istruzioni USE_PROFILE qui
+        text_low = user_text.lower()
+        if ("precedente" in text_low or "profilo" in text_low or "si" == text_low.strip()) and context_fw:
+            state.firmware_project_dir = context_fw
+            logger.info(f"📋 Applicato path progetto da profilo: {state.firmware_project_dir}")
+        else:
+            if res.firmware_project_dir: state.firmware_project_dir = res.firmware_project_dir
         
-        # firmware_project_dir: Se estratto, usa quello; altrimenti usa quello nello state
-        state.firmware_project_dir = extraction_result.firmware_project_dir or state.firmware_project_dir
-        
-        # ai_code_dir: Se estratto, usa quello; altrimenti usa quello nello state
-        state.ai_code_dir = extraction_result.ai_code_dir or state.ai_code_dir
-        
-        logger.info(f"✓ State aggiornato:")
-        logger.info(f"  firmware_project_dir: {state.firmware_project_dir}")
-        logger.info(f"  ai_code_dir: {state.ai_code_dir}")
-        
-        # === VALIDAZIONI ===
-        
-        if not state.firmware_project_dir:
-            logger.error("❌ firmware_project_dir non specificato!")
-            raise ValueError("firmware_project_dir è obbligatorio per l'integrazione")
-        
-        if not state.ai_code_dir:
-            logger.error("❌ ai_code_dir non specificato!")
-            raise ValueError("ai_code_dir è obbligatorio per l'integrazione")
+        if res.ai_code_dir: state.ai_code_dir = res.ai_code_dir
+
+    # --- Passo 3: Finalizzazione e Validazione ---
+    if not state.firmware_project_dir:
+        # Fallback profilo se ancora vuoto
+        state.firmware_project_dir = state.persistent_context.get("last_project_path") if state.persistent_context else None
+    
+    if not state.firmware_project_dir:
+        raise ValueError("firmware_project_dir è obbligatorio per l'integrazione")
+    
+    if not state.ai_code_dir:
+        raise ValueError("ai_code_dir è obbligatorio per l'integrazione")
+
+    logger.info(f"✓ Configurazione finale: FW={state.firmware_project_dir}, AI={state.ai_code_dir}")
     
     # === ESPANDI I PATH (~ e variabili d'ambiente) ===
     

@@ -139,3 +139,4 @@ xxhash==3.6.0
 yarl==1.22.0
 zipp==3.23.0
 zstandard @ file:///croot/zstandard_1731356346222/work
+redis==5.0.1

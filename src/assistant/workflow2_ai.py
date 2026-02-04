@@ -296,53 +296,61 @@ Esempi:
         """,
     }
     
-    # user_response = interrupt(prompt) # per adesso commentata per velocizzare
-    user_response = "" # BYPASS
-    if isinstance(user_response, dict):
-        user_text = user_response.get("response", user_response.get("input", str(user_response)))
-    else:
-        user_text = str(user_response)
+    from src.assistant.utils import extract_user_response, get_llm
     
-    # ✅ FIX: Eredita board context dal firmware workflow O dal persistent profile
-    if not user_text or user_text.strip() == "":
+    # --- Passo 1: Prova a usare il messaggio iniziale ---
+    # Cerchiamo se l'utente ha già specificato una board/target nel comando di avvio
+    initial_target = None
+    if not state.user_response:
+        # Analisi euristica veloce del messaggio iniziale
+        msg_low = state.message.lower()
+        targets = ["f0", "f1", "f2", "f3", "f4", "f7", "h5", "h7", "l0", "l1", "l4", "l5", "u5", "g0", "g4", "w5", "c0", "n6"]
+        for t in targets:
+            if t in msg_low:
+                initial_target = f"stm32{t}"
+                break
+    
+    # --- Passo 2: Verifica e Interrupt ---
+    # Forza interruzione se l'intento non è cristallino nel primo messaggio
+    if not initial_target:
+        if not state.user_response:
+            # Suggerimento dal profilo
+            last_series = state.persistent_context.get("mcu_series", "F4") if state.persistent_context else "F4"
+            dynamic_prompt = {
+                "instruction": prompt["instruction"],
+                "suggestion": f"💡 L'ultima volta hai lavorato su serie **{last_series}**. Vuoi continuare con questa o cambiare?"
+            }
+            logger.info("⏸️ Interrupting for AI analysis config with profile suggestion.")
+            interrupt(dynamic_prompt)
         
+        # Dopo la ripresa
+        user_text = extract_user_response(state.user_response)
+        state.user_response = ""
+    else:
+        # Abbiamo già il target dal messaggio iniziale
+        user_text = state.message
+        logger.info(f"✓ Target '{initial_target}' rilevato nel messaggio iniziale.")
+
+    # --- Passo 3: Eredità e Parsing ---
+    if not user_text or user_text.strip() == "" or "precedente" in user_text.lower() or "quella di" in user_text.lower() or "profilo" in user_text.lower():
         # Recupera mcu_series dallo stato corrente O dalla memoria persistente
         current_series = state.mcu_series
         if not current_series and state.persistent_context:
              current_series = state.persistent_context.get("mcu_series")
-
-        # Se firmware è stato generato o recuperato dal profilo
+        
         if current_series and current_series.strip():
-            # Mappa serie MCU a target string per STEdgeAI
             series_to_target = {
-                "F0": "stm32f0",
-                "F1": "stm32f1",
-                "F2": "stm32f2",
-                "F3": "stm32f3",
-                "F4": "stm32f4",
-                "F7": "stm32f7",
-                "H5": "stm32h5",
-                "H7": "stm32h7",
-                "L0": "stm32l0",
-                "L1": "stm32l1",
-                "L4": "stm32l4",
-                "L5": "stm32l5",
-                "U5": "stm32u5",
-                "G0": "stm32g0",
-                "G4": "stm32g4",
-                "W5": "stm32w5",
-                "C0": "stm32c0",
-                "N6": "stm32n6"
+                "F0": "stm32f0", "F1": "stm32f1", "F2": "stm32f2", "F3": "stm32f3", 
+                "F4": "stm32f4", "F7": "stm32f7", "H5": "stm32h5", "H7": "stm32h7",
+                "L0": "stm32l0", "L1": "stm32l1", "L4": "stm32l4", "L5": "stm32l5",
+                "U5": "stm32u5", "G0": "stm32g0", "G4": "stm32g4", "W5": "stm32w5",
+                "C0": "stm32c0", "N6": "stm32n6"
             }
             target_mcu = series_to_target.get(current_series.upper(), "stm32f4")
-            user_text = f"{target_mcu}, medium compression"
-            
-            source_info = "firmware workflow" if state.mcu_series else "persistent profile"
-            logger.info(f"✓ Ereditato contesto ({source_info}): mcu_series={current_series} → target={target_mcu}")
+            user_text = f"{target_mcu}, high compression"
+            logger.info(f"📋 Applicata configurazione da profilo: {target_mcu}")
         else:
-            # Fallback se non c'è contesto firmware
-            user_text = "STM32F4, medium compression"
-            logger.info("ℹ️  Nessun contesto firmware/profilo, uso default STM32F4")
+            user_text = "STM32F4, high compression"
     
     logger.info(f"📝 User input RAW: '{user_text}'")
     
@@ -424,12 +432,12 @@ def choose_predefined_taskbased_model(state: MasterState, config: RunnableConfig
     
     prompt = {"instruction": prompt_text}
     
-    # user_response = interrupt(prompt) # per adesso commentata per velocizzare
-    user_response = "1" # BYPASS
-    if isinstance(user_response, dict):
-        user_text = user_response.get("response", user_response.get("input", str(user_response)))
-    else:
-        user_text = str(user_response).strip()
+    from src.assistant.utils import extract_user_response
+    if not state.user_response or state.user_response.strip() == "":
+        interrupt(prompt)
+        
+    user_text = extract_user_response(state.user_response).strip()
+    state.user_response = "" # Clear after use
     
     # Default: image classification (option 1)
     if not user_text or user_text.strip() == "":
@@ -559,13 +567,12 @@ Rispondi con: numero (1-{len(available_models)+1}) oppure descrivi
         """
     }
     
-    # model_response = interrupt(model_prompt) # per adesso commentata per velocizzare
-    model_response = "2" # BYPASS
-    
-    if isinstance(model_response, dict):
-        model_text = model_response.get("response", model_response.get("input", str(model_response)))
-    else:
-        model_text = str(model_response).strip()
+    from src.assistant.utils import extract_user_response
+    if not state.user_response or state.user_response.strip() == "":
+        interrupt(model_prompt)
+        
+    model_text = extract_user_response(state.user_response).strip()
+    state.user_response = "" # Clear after use
     
     logger.info(f"📝 User model input: '{model_text}'")
     

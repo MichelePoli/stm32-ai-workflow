@@ -77,18 +77,19 @@ Analizza la risposta dell'utente e estrai i seguenti campi:
 
 Rispondi SEMPRE in formato JSON valido, anche se alcuni campi sono null.
 
+**Note Speciali:**
+- Se l'utente dice "usa la precedente", "come l'altra volta", "quella di ieri", "usa il profilo" -> imposta `board_name` come "USE_PROFILE".
+- Altrimenti estrai i dati reali.
+
 Esempi:
 - Input: "Crea un progetto per STM32F401 con CubeIDE, nome MyApp"
   Output: {"ioc_file_path": null, "board_name": "STM32F401", "mcu_series": "F4", "project_name": "MyApp", "toolchain": "STM32CubeIDE"}
 
+- Input: "Usa la board di ieri"
+  Output: {"board_name": "USE_PROFILE", "mcu_series": null, "project_name": null, "toolchain": null}
+
 - Input: "Ho un file config.ioc in ~/boards/, usa quello"
   Output: {"ioc_file_path": "~/boards/config.ioc", "board_name": null, "mcu_series": null, "project_name": null, "toolchain": null}
-
-- Input: "STM32H743ZI, progetto NeuralNet, Keil"
-  Output: {"ioc_file_path": null, "board_name": "STM32H743ZI", "mcu_series": "H7", "project_name": "NeuralNet", "toolchain": "Keil"}
-
-- Input: "Voglio usare STM32N657Z0HxQ per questo"
-  Output: {"ioc_file_path": null, "board_name": "STM32N657Z0HxQ", "mcu_series": "N6", "project_name": null, "toolchain": null}
 """
 # ============================================================================
 # UTILITIES
@@ -159,88 +160,74 @@ Esempio: "Crea progetto MyApp per STM32F401 con CubeIDE"
         """,
     }
     
-    # L'utente risponde in linguaggio naturale
-    # user_response = interrupt(prompt)
-    user_response = "STM32F401VCHx, MyProject, STM32CubeIDE" # BYPASS
-    # user_response = "" # BYPASS
-    
-    # Gestisci il caso in cui sia dict o stringa/int
-    if isinstance(user_response, dict):
-        user_text = user_response.get("response", user_response.get("input", str(user_response)))
-    else:
-        user_text = str(user_response)
-    
-    # Default: STM32F401 with CubeIDE
-    if not user_text or user_text.strip() == "":
-        user_text = "STM32F401VCHx, MyProject, STM32CubeIDE"
-    
-    logger.info(f"📝 User input RAW: '{user_text}'")
-    
-    # === USA LLM PER ESTRARRE GLI ATTRIBUTI ===
-    
+    # === ESTRATTORE LLM ===
+    from src.assistant.utils import extract_user_response, get_llm
+    from langchain_core.messages import SystemMessage, HumanMessage
     cfg = Configuration.from_runnable_config(config)
-    
-    llm = ChatOllama(
-        model=cfg.local_llm,
-        temperature=0,
-        num_ctx=cfg.llm_context_window
-    )
-    
-    # Crea LLM con structured output
+    llm = get_llm(config)
     llm_extractor = llm.with_structured_output(ProjectInfoExtraction)
     
-    logger.info(f"🤖 Estrazione attributi da LLM...")
-    
-    extraction_result = llm_extractor.invoke([
-        SystemMessage(content=project_info_extraction_instructions),
-        HumanMessage(content=f"Risposta utente: {user_text}")
-    ])
-    
-    logger.info(f"✓ Estrazione completata:")
-    logger.info(f"  ioc_file_path: {extraction_result.ioc_file_path}")
-    logger.info(f"  board_name: {extraction_result.board_name}")
-    logger.info(f"  mcu_series: {extraction_result.mcu_series}")  # ✅ NUOVO
-    logger.info(f"  project_name: {extraction_result.project_name}")
-    logger.info(f"  toolchain: {extraction_result.toolchain}")
-    
-    # === APPLICA GLI ATTRIBUTI ESTRATTI ALLO STATE ===
-    
-    # ioc_file_path: Se estratto, usa quello; altrimenti None
-    state.ioc_file_path = extraction_result.ioc_file_path or None
-    
-    # board_name: Se estratto, usa quello; altrimenti cerca nel persistent_context; fallback a default
-    context_board = state.persistent_context.get("board_name") if state.persistent_context else None
-    state.board_name = extraction_result.board_name or context_board or state.board_name or "STM32F401VCHx" # se dici "Crea un progetto firmware" senza specificare la board, il sistema la pesca automaticamente dal tuo profilo Redis (es. STM32H7) invece di usare la STM32F401 di default.
-    
-    # mcu_series: Se estratto, usa quello; altrimenti cerca nel persistent_context; fallback a stringa vuota
-    context_series = state.persistent_context.get("mcu_series") if state.persistent_context else None
-    state.mcu_series = extraction_result.mcu_series or context_series or "" 
-    
-    # project_name: Se estratto, usa quello; altrimenti usa quello nello state
-    state.project_name = extraction_result.project_name or state.project_name or "MySTM32Project"
-    
-    # toolchain: Se estratto, usa quello; altrimenti usa quello nello state
-    state.toolchain = extraction_result.toolchain or state.toolchain or "STM32CubeIDE"
-    
-    logger.info(f"✓ State aggiornato:")
-    logger.info(f"  ioc_file_path: {state.ioc_file_path}")
-    logger.info(f"  board_name: {state.board_name}")
-    logger.info(f"  mcu_series: {state.mcu_series}")  # ✅ NUOVO
-    logger.info(f"  project_name: {state.project_name}")
-    logger.info(f"  toolchain: {state.toolchain}")
-    
-    # === VALIDAZIONI ===
-    
-    if not state.ioc_file_path and not state.board_name:
-        logger.warning("⚠️  Nè ioc_file_path nè board_name specificati, uso default")
+    # --- Passo 1: Prova a usare il messaggio iniziale ---
+    initial_board = None
+    if not state.user_response:
+        res = llm_extractor.invoke([
+            SystemMessage(content=project_info_extraction_instructions),
+            HumanMessage(content=f"Messaggio: {state.message}")
+        ])
+        initial_board = res.board_name
+        # Salviamo quello che abbiamo trovato finora
+        state.board_name = res.board_name
+        state.project_name = res.project_name
+        state.toolchain = res.toolchain
+        state.ioc_file_path = res.ioc_file_path
+
+    # --- Passo 2: Verifica e Interrupt ---
+    # Se non c'è una board nel messaggio o è generico, CHIEDI.
+    if not initial_board or initial_board.lower() == "unknown":
+        if not state.user_response:
+            # Recupera board dal profilo per suggerimento
+            last_board = state.persistent_context.get("board_name", "Nessuna") if state.persistent_context else "Nessuna"
+            
+            # Arricchiamo il prompt per l'utente
+            dynamic_prompt = {
+                "instruction": prompt["instruction"],
+                "suggestion": f"� Ho visto che l'ultima volta hai usato: **{last_board}**. Vuoi usare la stessa o una nuova?"
+            }
+            logger.info("⏸️ Interrupting: Requesting project info with profile suggestion.")
+            interrupt(dynamic_prompt)
+        
+        # Dopo la ripresa
+        user_text = extract_user_response(state.user_response)
+        state.user_response = ""
+        
+        res = llm_extractor.invoke([
+            SystemMessage(content=project_info_extraction_instructions),
+            HumanMessage(content=f"Risposta: {user_text}")
+        ])
+        
+        # Gestione "USE_PROFILE"
+        context_board = state.persistent_context.get("board_name") if state.persistent_context else None
+        if res.board_name == "USE_PROFILE" and context_board:
+            state.board_name = context_board
+            state.mcu_series = state.persistent_context.get("mcu_series")
+            logger.info(f"📋 Applicata board da profilo: {state.board_name}")
+        else:
+            if res.board_name: state.board_name = res.board_name
+            if res.mcu_series: state.mcu_series = res.mcu_series
+        
+        if res.project_name: state.project_name = res.project_name
+        if res.toolchain: state.toolchain = res.toolchain
+
+    # --- Passo 3: Finalizzazione ---
+    if not state.board_name:
         state.board_name = "STM32F401VCHx"
         state.mcu_series = "F4"
+        
+    state.project_name = state.project_name or "MySTM32Project"
+    state.toolchain = state.toolchain or "STM32CubeIDE"
     
-    if state.ioc_file_path and not os.path.exists(state.ioc_file_path):
-        raise FileNotFoundError(f"❌ .ioc file non trovato: {state.ioc_file_path}")
-    
+    logger.info(f"✓ Configurazione finale: {state.board_name} ({state.mcu_series})")
     state.timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    logger.info("✓ Configurazione firmware raccolta")
     return state
 
 def search_and_install_stm32_package(state: MasterState, config: RunnableConfig = None) -> MasterState:
