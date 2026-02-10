@@ -8,6 +8,12 @@
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}	%Font di compilazione
 \usepackage{lmodern}		%Font non bitmapped
+\usepackage{savesym}        % Resolve package conflicts
+\usepackage{amsmath}
+\usepackage{amsfonts}               %  Pacchetto speciale per i font matematici AMS
+\usepackage{amssymb}                %  Pacchetto speciale per i simboli matematici AMS
+\usepackage{mathtools}
+\usepackage{nicefrac}
 \usepackage{glossaries} % for \gls command
 \usepackage[pdfa]{hyperref}
 \usepackage[pdfa]{hyperref}
@@ -52,11 +58,16 @@
 \usepackage{enumitem}
 \usepackage{siunitx}
 \usepackage{longtable}
+\usepackage{fourier-orns}
+\savesymbol{warning}
+\usepackage{textcomp}
+\usepackage{wasysym}
+\restoresymbol{WS}{warning}
+\newcommand{\textwarning}{\WSwarning} % wasysym version
 \usepackage{caption}
 \lstset{
   basicstyle=\ttfamily\small,
   frame = single,
-  mathescape,
   columns=fullflexible,
   breaklines=true,
   literate={⚠}{\textwarning}1 {✓}{\checkmark}1 {🔧}{[tool]}1
@@ -125,6 +136,67 @@
                 belowskip=20pt
 }
 
+% JSON language definition for listings
+\lstdefinelanguage{json}{
+    basicstyle=\ttfamily\small,
+    numbers=left,
+    numberstyle=\scriptsize,
+    stepnumber=1,
+    numbersep=8pt,
+    showstringspaces=false,
+    breaklines=true,
+    frame=lines,
+    backgroundcolor=\color{lightgray!10},
+    string=[s]{"}{"},
+    stringstyle=\color{blue},
+    comment=[l]{:},
+    commentstyle=\color{black},
+    morecomment=[l]{//},
+    morecomment=[s]{/*}{*/},
+    literate=
+     *{0}{{{\color{red}0}}}{1}
+      {1}{{{\color{red}1}}}{1}
+      {2}{{{\color{red}2}}}{1}
+      {3}{{{\color{red}3}}}{1}
+      {4}{{{\color{red}4}}}{1}
+      {5}{{{\color{red}5}}}{1}
+      {6}{{{\color{red}6}}}{1}
+      {7}{{{\color{red}7}}}{1}
+      {8}{{{\color{red}8}}}{1}
+      {9}{{{\color{red}9}}}{1}
+      {:}{{{\color{black}{:}}}}{1}
+      {,}{{{\color{black}{,}}}}{1}
+      {\{}{{{\color{black}{\{}}}}{1}
+      {\}}{{{\color{black}{\}}}}}{1}
+      {[}{{{\color{black}{[}}}}{1}
+      {]}{{{\color{black}{]}}}}{1}
+      {true}{{{\color{ggreen}true}}}{4}
+      {false}{{{\color{ggreen}false}}}{5}
+      {null}{{{\color{ggreen}null}}}{4},
+}
+
+% TypeScript language definition for listings
+\lstdefinelanguage{typescript}{
+    keywords={break, case, catch, class, const, continue, debugger, default, delete, do, else, enum, export, extends, false, finally, for, function, if, import, in, instanceof, new, null, return, super, switch, this, throw, true, try, typeof, var, void, while, with, yield, any, boolean, constructor, declare, get, module, set, type, readonly, static, async, await, string, number, symbol},
+    keywordstyle=\color{blue}\bfseries,
+    ndkeywords={export, default, terminal},
+    ndkeywordstyle=\color{red}\bfseries,
+    identifierstyle=\color{black},
+    sensitive=false,
+    comment=[l]{//},
+    morecomment=[s]{/*}{*/},
+    commentstyle=\color{green}\ttfamily,
+    stringstyle=\color{red}\ttfamily,
+    morestring=[b]',
+    morestring=[b]",
+    morestring=[b]`
+}
+
+% Alias Python to python for case-insensitivity in listings
+\lstalias{Python}{python}
+\lstalias{Typescript}{typescript}
+\lstalias{TypeScript}{typescript}
+
 \newenvironment{itemize*}{
 \begin{itemize}
   \setlength{\itemsep}{1pt}
@@ -142,10 +214,6 @@
 
 %math
 \newcommand*{\mathfont}{\fontfamily{pcr}\selectfont}
-\usepackage{amsmath}
-\usepackage{amsfonts}               %  Pacchetto speciale per i font matematici AMS
-\usepackage{amssymb}                %  Pacchetto speciale per i simboli matematici AMS
-\usepackage{mathtools}
 \usepackage{nicefrac}
 
 %%%%%%commands

@@ -14,7 +14,7 @@ The workflow begins by extracting critical deployment parameters from the user's
 
 Example extraction:
 
-\begin{lstlisting}[language=Python, caption={Parameter extraction from user input}, label={lst:param_extraction}]
+\begin{lstlisting}[language=python, caption={Parameter extraction from user input}, label={lst:param_extraction}]
 # User: "I need a model for image classification on STM32H7 with high compression"
 
 llm_extractor = ChatOllama(model="mistral:latest").with_structured_output(AnalysisInfoExtraction)
@@ -51,7 +51,7 @@ Each entry includes a technical description, a validated download URL, and metad
     \item Filters \texttt{PREDEFINED\_MODELS} by task type
     \item \textbf{Proactive Compatibility Check}: Before presenting options, the system cross-references each model's uncompressed footprint against the target MCU's Flash memory. Models are dynamically labeled as:
     \begin{itemize}
-        \item \textbf{Fits} (\checkmark): Model fits natively ($<1.0\times$ flash limit).
+        \item \textbf{Fits} ($\checkmark$): Model fits natively ($<1.0\times$ flash limit).
         \item \textbf{Compressible} (\textwarning): Model requires quantization ($<4.0\times$ overflow).
         \item \textbf{Too Large} (\texttimes): Model exceeds physical limits even with max compression ($>8.0\times$ overflow).
     \end{itemize}
@@ -128,7 +128,7 @@ Algorithm~\ref{alg:model_search} formalizes the complete iterative search strate
 \paragraph{Google Search Fallback}
 If GitHub search yields no results (e.g., for domain-specific tasks like audio keyword spotting), the system invokes \texttt{search\_via\_google\_tools\_hybrid()} using Agno's GoogleSearchTools:
 
-\begin{lstlisting}[language=Python, caption={Google Search for pretrained models}, label={lst:google_search}]
+\begin{lstlisting}[language=python, caption={Google Search for pretrained models}, label={lst:google_search}]
 query = f"pretrained {task} model Keras .h5 STM32 edge AI"
 agent = Agent(
     model=Ollama(id="qwen3:latest"),
@@ -239,7 +239,7 @@ A significant challenge encountered during development was incompatibility betwe
 
 When the system detects a Keras 2.x model file (based on HDF5 metadata), the \texttt{download\_model\_to\_cache()} function spawns a subprocess in the legacy environment:
 
-\begin{lstlisting}[language=Python, caption={Subprocess-based model inspection}, label={lst:legacy_env}]
+\begin{lstlisting}[language=python, caption={Subprocess-based model inspection}, label={lst:legacy_env}]
 # Spawn subprocess in legacy environment
 cmd = [
     "/path/to/stm32_legacy/bin/python",  # Isolated Python interpreter

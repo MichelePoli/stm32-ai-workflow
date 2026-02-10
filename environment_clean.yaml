@@ -1,4 +1,4 @@
-# for Apple Silicon - Mac 
+# for Apple Silicon - MacOS
 name: stm32
 channels:
   - conda-forge
