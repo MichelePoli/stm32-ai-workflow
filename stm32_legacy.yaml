@@ -65,13 +65,13 @@ dependencies:
       - libclang==18.1.1
       - markdown==3.9
       - markupsafe==3.0.3
-      - nni==3.0
+      - nni==2.10.1
       - numpy==1.24.3
       - nvidia-ml-py==13.590.44
       - oauthlib==3.3.1
       - opt-einsum==3.4.0
       - packaging==25.0
-      - pandas==2.3.3
+      - pandas==2.2.3
       - prettytable==3.16.0
       - protobuf==4.25.8
       - psutil==7.2.0
@@ -98,8 +98,8 @@ dependencies:
       - termcolor==3.1.0
       - threadpoolctl==3.6.0
       - tqdm==4.67.1
-      - typeguard==4.1.2
-      - typing-extensions==4.15.0
+      - typeguard==2.13.3
+      - typing-extensions==4.5.0
       - tzdata==2025.3
       - urllib3==2.5.0
       - wcwidth==0.2.14

@@ -1,0 +1,54 @@
+# for Linux - Ubuntu (gpu-vm)
+name: stm32
+channels:
+  - conda-forge
+  - nvidia/label/cuda-12.4.1 # Specific channel for CUDA if needed, or stick to forge
+  - defaults
+dependencies:
+  - python=3.11
+  - pip
+  - cudatoolkit >=11.8 # Essential for GPU acceleration
+  - cudnn >=8.6
+  - pip:
+      # Core AI & LangChain
+      - langgraph
+      - langgraph-checkpoint-redis
+      - langchain
+      - langchain-community
+      - langchain-core
+      - langchain-ollama
+      - langsmith
+      - agno
+      
+      # ML & Data
+      - h5py
+      - tensorflow[and-cuda] # Explicit GPU support for Linux
+      
+      # Web & API
+      - fastapi
+      - uvicorn
+      - sse-starlette
+      - httpx
+      - requests
+      - beautifulsoup4
+      
+      # Data & Utilities
+      - pydantic
+      - python-dotenv
+      - pandas
+      - numpy
+      - pyyaml
+      - tqdm
+      
+      # Tools
+      - duckduckgo-search
+      - googlesearch-python
+      - tavily-python
+      - scholarly
+      - semanticscholar
+      
+      # Optional / specific
+      - chromadb
+      - sentence-transformers
+      - e2b
+      - e2b-code-interpreter
