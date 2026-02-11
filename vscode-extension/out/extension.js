@@ -15,22 +15,33 @@ const vscode = require("vscode");
 const SERVER_URL = 'http://127.0.0.1:8000/stream';
 function activate(context) {
     console.log('Attivazione estensione STM32 AI Assistant');
-    // 1. Registra il Chat Participant
+    // -----------------------------------------------------------------------
+    // 1. REGISTRA IL CHAT PARTICIPANT
+    // -----------------------------------------------------------------------
+    // Questo handler viene chiamato da VS Code quando l'utente scrive "@stm32ai ..."
+    // request: contiene il prompt dell'utente
+    // stream: è il canale per inviare risposte progressive (testo, markdown, chip)
+    // -----------------------------------------------------------------------
     const handler = (request, context, stream, token) => __awaiter(this, void 0, void 0, function* () {
         try {
-            // Messaggio iniziale di progress
-            // Nota: l'API stream.progress non è documentata come standard metodo dello stream in tutte le versioni, 
-            // ma useremo un semplice messaggio markdown se necessario o verificheremo @types/vscode.
-            // Per sicurezza, usiamo markdown "Thinking..." se progress non va, ma VS Code Insiders ha progress.
-            // Assumiamo che il server gestisca il flusso.
+            // Feedback immediato per dire "Sto pensando..."
             stream.markdown('Contatto il Brain STM32... \n\n');
-            // 2. Prepara il payload per il server
+            // -----------------------------------------------------------------------
+            // 2. PREPARAZIONE PAYLOAD
+            // -----------------------------------------------------------------------
+            // Costruiamo il JSON da mandare al nostro server Python (server.py)
+            // L'API FastAPI si aspetta { messages: [...], context: {...} }
             const messages = [
-                // Aggiungi la history se necessario (qui semplificato)
+                // Qui potremmo aggiungere la history della chat precedente se volessimo
                 { role: 'user', content: request.prompt }
             ];
-            // 3. Esegui richiesta POST al server Python
-            // Nota: Node 18+ ha fetch nativo.
+            // Recuperiamo info sul contesto (es. file aperto) se necessario
+            // const activeEditor = vscode.window.activeTextEditor;
+            // -----------------------------------------------------------------------
+            // 3. CHIAMATA AL SERVER PYTHON (FastAPI)
+            // -----------------------------------------------------------------------
+            // Usiamo 'fetch' per una richiesta POST allo stream endpoint.
+            // Questo endpoint restituisce una risposta "Transfer-Encoding: chunked" (NDJSON)
             const response = yield fetch(SERVER_URL, {
                 method: 'POST',
                 headers: {
@@ -39,8 +50,11 @@ function activate(context) {
                 body: JSON.stringify({
                     messages: messages,
                     context: {
-                    // Inserire qui eventuali info sul file aperto o selezione
-                    }
+                    // "activeFile": activeEditor?.document.fileName  // Esempio futuro
+                    },
+                    // Passiamo ID utente e sessione (hardcoded per ora, ma espandibile)
+                    user_id: "michele",
+                    session_id: "vscode-session"
                 })
             });
             if (!response.ok) {
@@ -49,12 +63,19 @@ function activate(context) {
             if (!response.body) {
                 throw new Error("Nessuna risposta dal server");
             }
-            // 4. Leggi lo stream (NDJSON o SSE)
-            // Usiamo un lettore di stream testuale
+            // -----------------------------------------------------------------------
+            // 4. LETTURA DELLO STREAM (NDJSON)
+            // -----------------------------------------------------------------------
+            // Il server invia pezzi di JSON separati da newline.
+            // Esempio:
+            // {"type": "progress", "content": "Analizzando..."}
+            // {"type": "markdown", "content": "Ciao **Michele**!"}
+            // -----------------------------------------------------------------------
             const reader = response.body.getReader();
             const decoder = new TextDecoder("utf-8");
             let buffer = "";
             while (true) {
+                // Controllo se l'utente ha cliccato "Cancel" nella UI di Chat
                 if (token.isCancellationRequested) {
                     console.log("Richiesta cancellata dall'utente.");
                     break;
@@ -64,30 +85,30 @@ function activate(context) {
                     break;
                 const chunk = decoder.decode(value, { stream: true });
                 buffer += chunk;
-                // Processa linee (NDJSON)
+                // Splitta per gestire il "newline delimited JSON"
                 const lines = buffer.split("\n");
-                // Mantieni l'ultimo frammento se incompleto
+                // L'ultima parte potrebbe essere incompleta, la rimettiamo nel buffer
                 buffer = lines.pop() || "";
                 for (const line of lines) {
                     if (!line.trim())
                         continue;
-                    if (line.startsWith("data: ")) {
-                        // Gestione SSE se il server usa 'data: '
-                        // Ma il nostro server invia JSON raw o NDJSON per semplicità nel codice precedente.
-                        // Se il server usa NDJSON puro:
-                    }
                     try {
-                        // Tenta di pulire eventuali prefissi SSE se presenti
+                        // Pulizia eventuale prefisso SSE "data: "
                         const cleanLine = line.replace(/^data: /, "");
                         const data = JSON.parse(cleanLine);
+                        // -----------------------------------------------------------------------
+                        // 5. RENDERING NELLA CHAT UI
+                        // -----------------------------------------------------------------------
                         if (data.type === 'markdown') {
+                            // Aggiunge testo Markdown alla risposta
                             stream.markdown(data.content);
                         }
                         else if (data.type === 'progress') {
-                            stream.markdown(`* ${data.content}...\n`);
+                            // Mostra un bullet point di progresso (o API progress nativa se disponibile)
+                            stream.markdown(`* *${data.content}*\n`);
                         }
                         else if (data.type === 'error') {
-                            stream.markdown(`\n> **Errore**: ${data.content}\n`);
+                            stream.markdown(`\n> ❌ **Errore**: ${data.content}\n`);
                         }
                         else if (data.type === 'debug') {
                             console.log(`[SERVER DEBUG] ${data.content}`);
