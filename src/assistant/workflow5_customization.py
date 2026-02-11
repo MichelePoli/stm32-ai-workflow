@@ -465,14 +465,26 @@ def ask_modification_intent(state, config: RunnableConfig = None):
     # --- Passo 1: Prova a usare il messaggio iniziale ---
     initial_intent = None
     if not state.user_response:
-        res = llm_classifier.invoke([
-            SystemMessage(content=modification_decision_instructions),
-            HumanMessage(content=f"Messaggio: {state.message}")
-        ])
-        # Se la confidenza è alta, prendiamo per buona la decisione
-        if res.confidence > 0.8:
-            initial_intent = res.wants_modifications
-            logger.info(f"🤖 Intento rilevato nel messaggio iniziale: {initial_intent}")
+        # Pulisci il messaggio per il controllo
+        msg_clean = state.message.lower().strip()
+        
+        # Se il messaggio è un trigger generico (es. "ai", "@assistant ai"), 
+        # non tentiamo l'inferenza automatica: dobbiamo chiedere.
+        generic_triggers = ["ai", "ai_analysis", "analyze", "modello", "model", "start ai"]
+        is_generic = any(t == msg_clean for t in generic_triggers) or msg_clean.startswith("@")
+        
+        if not is_generic:
+            res = llm_classifier.invoke([
+                SystemMessage(content=modification_decision_instructions),
+                HumanMessage(content=f"Messaggio: {state.message}")
+            ])
+            # Se la confidenza è molto alta (es. > 0.9), evitiamo l'interrupt.
+            # Altrimenti (anche se è 0.8) chiediamo conferma.
+            if res.confidence > 0.9:
+                initial_intent = res.wants_modifications
+                logger.info(f"🤖 Intento rilevato nel messaggio iniziale: {initial_intent} (Conf: {res.confidence})")
+            else:
+                logger.info(f"🤔 Intento incerto nel messaggio iniziale (Conf: {res.confidence}), richiedo conferma.")
 
     # --- Passo 2: Verifica e Interrupt ---
     if initial_intent is None:
@@ -1794,8 +1806,7 @@ Training Recommendation:{train_text}
     
     # Prompt mostrato all'utente (supporta risposte naturali)
     confirmation_prompt = {
-        "instruction": "Do you want to apply these modifications? (Yes/No/Edit)",
-        "preview": preview,
+        "instruction": f"{preview}\n\nDo you want to apply these modifications? (Yes/No/Edit)",
         "options": ["yes", "no", "edit"],
         "hint": "You can respond naturally (e.g., 'yes please', 'apply it', 'go back')"
     }
@@ -2253,6 +2264,12 @@ def apply_user_customization(state: MasterState, config: RunnableConfig = None) 
         state.customization_applied = False
         state.error_message = "Invalid model path"
         return state
+        
+    # Resolve correct python path
+    cfg = Configuration.from_runnable_config(config)
+    state.python_path = cfg.get_python_path('stm32')
+    state.conda_env = 'stm32'
+    logger.info(f"🔧 Resolved environment for customization: {state.python_path}")
     
     try:
         logger.info("[STEP 1/3] LOADING MODEL")
@@ -2710,6 +2727,12 @@ def fine_tune_customized_model(state: MasterState, config: RunnableConfig = None
         
         logger.info(f"📌 Training config: {epochs} epochs, batch={batch_size}, LR={learning_rate}")
         
+        # Ensure we use the correct environment and python path
+        cfg = Configuration.from_runnable_config(config)
+        state.conda_env = 'stm32'
+        state.python_path = cfg.get_python_path('stm32')
+        logger.info(f"🔧 Resolved environment: {state.conda_env} -> {state.python_path}")
+        
         output_path = model_path.replace('.keras', '_finetuned.h5').replace('.h5', '_finetuned.h5')
         
         # ===== PYTHON SCRIPT =====
@@ -2718,21 +2741,10 @@ import sys
 import os
 
 # --- AUTO-CONFIGURE CUDA PATH (Robust) ---
-# Must be done BEFORE loading TensorFlow
-if 'LD_LIBRARY_PATH' not in os.environ:
-    conda_lib_path = os.path.join(sys.prefix, 'lib')
-    if os.path.exists(conda_lib_path):
-        os.environ['LD_LIBRARY_PATH'] = f"{{conda_lib_path}}:{{os.environ.get('LD_LIBRARY_PATH', '')}}"
-        print(f"[Train] 🔧 Added Conda lib to LD_LIBRARY_PATH: {{conda_lib_path}}")
-        
-        # Self-restart to apply env vars to dynamic linker
-        if 'RESTARTED_WITH_LD' not in os.environ:
-             print("[Train] 🔄 Restarting script to apply environment...")
-             os.environ['RESTARTED_WITH_LD'] = 'true'
-             try:
-                 os.execv(sys.executable, [sys.executable] + sys.argv)
-             except Exception as e:
-                 print(f"[Train] ⚠️ Restart failed: {{e}}")
+# NOTE: Manual LD_LIBRARY_PATH manipulation removed to avoid symbol lookup errors.
+# We rely on the correct environment being selected by the parent process.
+import os
+import sys
 
 import tensorflow as tf
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau

@@ -161,6 +161,11 @@ Esempio: "Crea progetto MyApp per STM32F401 con CubeIDE"
     }
     
     # === ESTRATTORE LLM ===
+    # === IDEMPOTENCY CHECK ===
+    if state.board_name and state.board_name != "STM32F401VCHx" and not state.user_response:
+        logger.info(f"⏭️  Idempotenza: Board '{state.board_name}' già configurata. Salto interrupt.")
+        return state
+
     from src.assistant.utils import extract_user_response, get_llm
     from langchain_core.messages import SystemMessage, HumanMessage
     cfg = Configuration.from_runnable_config(config)
@@ -176,10 +181,10 @@ Esempio: "Crea progetto MyApp per STM32F401 con CubeIDE"
         ])
         initial_board = res.board_name
         # Salviamo quello che abbiamo trovato finora
-        state.board_name = res.board_name
-        state.project_name = res.project_name
-        state.toolchain = res.toolchain
-        state.ioc_file_path = res.ioc_file_path
+        if res.board_name: state.board_name = res.board_name
+        if res.project_name: state.project_name = res.project_name
+        if res.toolchain: state.toolchain = res.toolchain
+        if res.ioc_file_path: state.ioc_file_path = res.ioc_file_path
 
     # --- Passo 2: Verifica e Interrupt ---
     # Se non c'è una board nel messaggio o è generico, CHIEDI.
@@ -608,16 +613,16 @@ def execute_generation(state: MasterState, config: RunnableConfig = None) -> Mas
             cmd = [state.cubemx_path, "-q", state.firmware_script_path]
     
     try:
-        logger.info(f"🚀 Executing CubeMX (Attempt 1)...")
-        res = subprocess.run(cmd, capture_output=True, text=True, timeout=80)
+        logger.info(f"🚀 Executing CubeMX (Attempt 1, timeout: 300s)...")
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
         
         if res.returncode != 0:
             logger.warning(f"⚠️  Generation Failed (RC={res.returncode}). Trying Fallback...")
             # FALLBACK
             if recover_with_ioc_fallback(state):
-                logger.info(f"🚀 Executing CubeMX (Fallback Attempt)...")
+                logger.info(f"🚀 Executing CubeMX (Fallback Attempt, timeout: 600s)...")
                 # Rilancia comando (lo script file è lo stesso, ma contenuto è cambiato)
-                res = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+                res = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
 
         state.firmware_generation_success = (res.returncode == 0)
         

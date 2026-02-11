@@ -37,6 +37,7 @@ from pydantic import BaseModel, Field
 
 from src.assistant.configuration import Configuration
 from src.assistant.state import MasterState
+from src.assistant.utils import get_llm, extract_user_response
 
 # from agno.tools.googlesearch import GoogleSearchTools # Module missing in new agno
 from agno.tools.duckduckgo import DuckDuckGoTools # Alternative
@@ -296,6 +297,12 @@ Esempi:
         """,
     }
     
+    # === IDEMPOTENCY CHECK ===
+    # Se abbiamo già target e compression (es: iniettati da config o resume), saltiamo.
+    if state.target and state.compression and not state.user_response:
+        logger.info(f"⏭️  Idempotenza: Target '{state.target}' e Compression '{state.compression}' già presenti. Salto interrupt.")
+        return state
+
     from src.assistant.utils import extract_user_response, get_llm
     
     # --- Passo 1: Prova a usare il messaggio iniziale ---
@@ -392,9 +399,14 @@ def choose_predefined_taskbased_model(state: MasterState, config: RunnableConfig
     Usa PREDEFINED_MODELS come unica fonte.
     """
     
-    logger.info("📋 Scelta modello da catalogo predefinito...")
+def choose_ai_task(state: MasterState, config: RunnableConfig = None) -> MasterState:
+    """
+    Nodo 1: Sceglie il TASK (es. Classificazione immagini)
+    Gestisce l'interrupt per il menu principale.
+    """
+    logger.info("📋 Scelta Task AI...")
     
-    # Ricarica modelli dal JSON per essere sicuri che siano aggiornati
+    # Ricarica modelli dal JSON
     global PREDEFINED_MODELS
     PREDEFINED_MODELS = load_predefined_models()
     
@@ -407,266 +419,135 @@ def choose_predefined_taskbased_model(state: MasterState, config: RunnableConfig
     
     # === STEP 1: COSTRUZIONE PROMPT DINAMICO ===
     categories = list(PREDEFINED_MODELS.keys())
-    
     prompt_lines = ["Seleziona il task che vuoi fare:\n"]
-    idx = 1
     mapping = {}
-    
-    for cat in categories:
+    for i, cat in enumerate(categories, 1):
         desc = PREDEFINED_MODELS[cat].get("description", cat)
-        prompt_lines.append(f"{idx}. {desc}")
-        mapping[str(idx)] = cat
-        idx += 1
+        prompt_lines.append(f"{i}. {desc}")
+        mapping[str(i)] = cat
     
-    # Opzioni fisse alla fine
-    reg_idx = idx
+    reg_idx = len(categories) + 1
     prompt_lines.append(f"{reg_idx}. Registra un NUOVO modello (fornisci dettagli nel prossimo step)")
     mapping[str(reg_idx)] = "register_new"
     
-    other_idx = idx + 1
+    other_idx = reg_idx + 1
     prompt_lines.append(f"{other_idx}. Nessuno di questi (ricerca online)")
     mapping[str(other_idx)] = "other"
     
-    prompt_text = "\n".join(prompt_lines)
-    prompt_text += f"\n\nRispondi: 1-{other_idx} oppure descrivi il task"
+    prompt_text = "\n".join(prompt_lines) + f"\n\nRispondi: 1-{other_idx} oppure descrivi il task"
     
-    prompt = {"instruction": prompt_text}
-    
-    from src.assistant.utils import extract_user_response
+    # === IDEMPOTENCY & INTERRUPT ===
+    if state.last_task and state.last_task != "other" and not state.user_response:
+        logger.info(f"⏭️  Idempotenza: Task '{state.last_task}' già selezionato.")
+        return state
+
     if not state.user_response or state.user_response.strip() == "":
-        interrupt(prompt)
-        
+        interrupt({"instruction": prompt_text})
+            
     user_text = extract_user_response(state.user_response).strip()
     state.user_response = "" # Clear after use
-    
-    # Default: image classification (option 1)
-    if not user_text or user_text.strip() == "":
-        user_text = "1"
-    
-    logger.info(f"📝 User task input: '{user_text}'")
+    if not user_text: user_text = "1"
     
     # === ESTRAI TASK CON LLM ===
-    
-    # Costruisci istruzioni dinamiche per l'LLM
-    dynamic_instructions = f"""Analizza la risposta dell'utente e determina il task AI richiesto.
-Il sistema presenta un menu dinamico:
-{prompt_text}
-
-MAPPING CRITICO:
-"""
-    for k, v in mapping.items():
-        dynamic_instructions += f'- "{k}" -> {v}\n'
-    
-    dynamic_instructions += """
-Rispondi sempre in formato JSON con:
-- "task": la chiave tecnica del task (es: image_classification, register_new, etc.)
-- "confidence": 0.0-1.0
-"""
+    dynamic_instructions = f"Analizza la risposta dell'utente e determina il task AI richiesto.\nMenu:\n{prompt_text}\n\nMapping:\n"
+    for k, v in mapping.items(): dynamic_instructions += f'- "{k}" -> {v}\n'
+    dynamic_instructions += "\nRispondi JSON: {\"task\": \"...\", \"confidence\": 0.0-1.0}"
 
     llm_extractor = llm.with_structured_output(TaskSelectionExtraction)
-    
     task_result = llm_extractor.invoke([
         SystemMessage(content=dynamic_instructions),
         HumanMessage(content=f"Risposta utente: {user_text}")
     ])
     
-    logger.info(f"✓ Task estratto: {task_result.task} (confidence: {task_result.confidence:.2f})")
+    state.last_task = task_result.task
+    logger.info(f"✓ Task selezionato: {state.last_task}")
     
-    selected_task = task_result.task
-    
-    # ✅ SALVA IL TASK NELLO STATE PER FALLBACK INTELLIGENTE
-    state.last_task = selected_task
-    logger.info(f"✓ Task salvato per fallback: {selected_task}")
-    
-    if selected_task == "register_new":
-        logger.info("🆕 Utente vuole registrare un nuovo modello")
+    if state.last_task == "register_new":
         state.model_discovery_method = "register_new"
-        return state
+    elif state.last_task == "other" or task_result.confidence < 0.5:
+        state.model_discovery_method = "search"
+        state.search_iterations = 0
+    else:
+        state.model_discovery_method = "taskbased"
         
-    if selected_task == "other" or task_result.confidence < 0.5:
-        logger.info("✓ Task non riconosciuto, va a ricerca online")
-        state.model_discovery_method = "search"
-        state.search_iterations = 0
+    return state
+
+
+def choose_ai_model(state: MasterState, config: RunnableConfig = None) -> MasterState:
+    """
+    Nodo 2: Sceglie il MODELLO specifico dal catalogo del task.
+    Gestisce l'interrupt per la lista modelli.
+    """
+    if state.model_discovery_method != "taskbased":
         return state
+
+    logger.info(f"📋 Scelta Modello per task '{state.last_task}'...")
     
-    # === STEP 2: CARICA MODELLI DA PREDEFINED_MODELS ===
-    
-    task_info = PREDEFINED_MODELS.get(selected_task)
-    
+    # === IDEMPOTENCY CHECK ===
+    if state.selected_model and not state.user_response:
+        logger.info(f"⏭️  Idempotenza: Modello '{state.selected_model['name']}' già selezionato.")
+        return state
+
+    task_info = PREDEFINED_MODELS.get(state.last_task)
     if not task_info:
-        logger.warning(f"⚠️  Task '{selected_task}' non trovato in PREDEFINED_MODELS")
-        logger.info("→ Fallback a ricerca online")
         state.model_discovery_method = "search"
-        state.search_iterations = 0
         return state
-    
+
     available_models = task_info["models"]
     state.available_models = available_models
-    
-    logger.info(f"✓ Caricati {len(available_models)} modelli per task '{selected_task}'")
-    
-    # === STEP 3: MOSTRA MODELLI CON COMPATIBILITÀ ===
-    
-    # Recupera limiti MCU
-    flash_limit, ram_limit = get_mcu_limits(state.target)
-    
-    print("\n" + "="*70)
-    print(f"📦 MODELLI DISPONIBILI: {task_info['description']}")
-    print(f"🎯 Target: {state.target} (Flash: {format_bytes(flash_limit)})")
-    print("="*70)
+    flash_limit, _ = get_mcu_limits(state.target)
     
     model_options_text = []
-    
     for i, model in enumerate(available_models, 1):
-        # Calcola compatibilità
         size_bytes = parse_size_str(model['size'])
         flash_ratio = size_bytes / flash_limit
+        status_icon = "✅" if flash_ratio <= 1.0 else ("⚠️" if flash_ratio <= 8.0 else "❌")
+        status_note = "Fits" if flash_ratio <= 1.0 else (f"Compressible ({flash_ratio:.1f}x)" if flash_ratio <= 8.0 else f"Too Large ({flash_ratio:.1f}x)")
         
-        status_icon = "❓"
-        status_note = ""
-        
-        if flash_ratio <= 1.0:
-            status_icon = "✅"
-            status_note = "Fits"
-        elif flash_ratio <= 8.0:
-            status_icon = "⚠️"
-            status_note = f"Compressible ({flash_ratio:.1f}x)"
-        else:
-            status_icon = "❌"
-            status_note = f"Too Large ({flash_ratio:.1f}x)"
-            
-        # Estrai formato dal nome file (url o local_filename)
         import os
         filename = model.get('local_filename', model['url'])
-        _, ext = os.path.splitext(filename)
-        ext = ext.upper() if ext else "N/D"
-
-        print(f"\n{i}. {model['name']} {status_icon}")
-        print(f"   📏 Dimensione: {model['size']} ({status_note}) | 📄 Formato: {ext}")
-        print(f"   🎯 Accuratezza: {model['accuracy']}")
-        print(f"   ⚡ Inferenza: {model['inference_time']}")
-        
+        ext = os.path.splitext(filename)[1].upper() or "N/D"
         model_options_text.append(f"{i}. {model['name']} {status_icon} [{ext}] ({model['size']} - {status_note})")
     
-    print(f"\n{len(available_models)+1}. Nessuno di questi (ricerca online)")
-    print("="*70 + "\n")
-    
-    # === STEP 4: CHIEDI MODELLO ===
-    
-    # Crea lista modelli per il prompt
     models_list = "\n".join(model_options_text)
+    prompt_text = f"Quale modello vuoi usare per {task_info['description']}?\n\nOpzioni disponibili:\n{models_list}\n{len(available_models)+1}. Nessuno di questi (ricerca online)\n\nRispondi con il numero."
     
-    model_prompt = {
-        "instruction": f"""Quale modello vuoi usare per {task_info['description']}?
-
-Opzioni disponibili:
-{models_list}
-{len(available_models)+1}. Nessuno di questi (ricerca online)
-
-Rispondi con: numero (1-{len(available_models)+1}) oppure descrivi
-        """
-    }
-    
-    from src.assistant.utils import extract_user_response
+    # === INTERRUPT ===
     if not state.user_response or state.user_response.strip() == "":
-        interrupt(model_prompt)
-        
+        interrupt({"instruction": prompt_text})
+            
     model_text = extract_user_response(state.user_response).strip()
     state.user_response = "" # Clear after use
     
-    logger.info(f"📝 User model input: '{model_text}'")
+    # === ESTRAZIONE SCELTA ===
+    cfg = Configuration.from_runnable_config(config)
+    llm = get_llm(config)
+    llm_model_extractor = llm.with_structured_output(ModelSelectionExtraction)
     
-    # === MANUALE: CHECK FUZZY MATCH SU NOME ===
-    # Permette di scrivere "MobileNet V2" invece di "1"
-    matched_model_index = None
-    
-    user_normalized = model_text.lower().replace(" ", "").replace("-", "").replace("_", "")
-    
-    # 1. Check Exact/Partial Index (es. "1", "1.")
-    if model_text.strip().replace(".", "").isdigit():
-        pass # Lascia all'LLM o gestisci dopo
-        
-    # 2. Check Name Match
-    else:
-        for i, model in enumerate(available_models, 1):
-            name_normalized = model['name'].lower().replace(" ", "").replace("-", "").replace("_", "")
-            
-            # Match forte: una contiene l'altra
-            if name_normalized in user_normalized or user_normalized in name_normalized:
-                logger.info(f"✓ Fuzzy match trovato: '{model_text}' -> {model['name']} (Index {i})")
-                matched_model_index = i
-                break
-    
-    # Se abbiamo un match manuale, bypassiamo l'LLM o lo usiamo come conferma
-    if matched_model_index is not None:
-        model_result = ModelSelectionExtraction(
-            model_index=matched_model_index, 
-            model_accepted=True, 
-            wants_another_search=False
-        )
-    else:
-        # === FALLBACK: ESTRAI SCELTA CON LLM ===
-        llm_model_extractor = llm.with_structured_output(ModelSelectionExtraction)
-        
-        model_result = llm_model_extractor.invoke([
-            SystemMessage(content=model_selection_instructions),
-            HumanMessage(content=f"Numero di modelli disponibili: {len(available_models)}\nRisposta utente: {model_text}")
-        ])
-    
-    logger.info(f"✓ Scelta estratta:")
-    logger.info(f"  model_index: {model_result.model_index}")
-    logger.info(f"  model_accepted: {model_result.model_accepted}")
-    logger.info(f"  wants_another_search: {model_result.wants_another_search}")
-    
-    # === STEP 5: APPLICA SCELTA ===
+    model_result = llm_model_extractor.invoke([
+        SystemMessage(content=model_selection_instructions),
+        HumanMessage(content=f"Modelli: {len(available_models)}\nRisposta: {model_text}")
+    ])
     
     if model_result.model_accepted and model_result.model_index:
         model_idx = model_result.model_index - 1
-        
         if 0 <= model_idx < len(available_models):
-            selected_model = available_models[model_idx]
-            state.selected_model = selected_model
-            state.model_discovery_method = "taskbased"
+            state.selected_model = available_models[model_idx]
             state.model_accepted = True
-            
-            logger.info(f"✓ Modello selezionato: {selected_model['name']}")
-            logger.info(f"  Size: {selected_model['size']}, Accuracy: {selected_model['accuracy']}")
-            
-            # ✅ STOP DOWNLOAD QUI - CI PENSA IL NODO SUCCESSIVO (download_model)
-            # state = download_model_to_cache(state, config, selected_model)
-            
+            logger.info(f"✓ Modello scelto: {state.selected_model['name']}")
         else:
-            logger.warning(f"⚠️  Indice modello fuori range: {model_result.model_index}")
-            logger.info("→ Fallback a ricerca online")
             state.model_discovery_method = "search"
-            state.search_iterations = 0
-    
+    elif model_result.wants_another_search:
+        state.model_discovery_method = "search"
+        state.search_iterations = 0
     else:
-        # Nessun modello predefinito accettato
-        if model_result.wants_another_search:
-            logger.info("✓ Utente vuole ricerca online")
-            state.model_discovery_method = "search"
-            state.search_iterations = 0
+        fallback_model = get_task_based_default_model(state.last_task)
+        if fallback_model:
+            state.selected_model = fallback_model
+            state.model_accepted = True
         else:
-            logger.info("✓ Utente vuole default task-based")
-            
-            # ✅ USA IL PRIMO MODELLO DEL TASK COME DEFAULT (non config generico)
-            fallback_model = get_task_based_default_model(selected_task)
-            
-            if fallback_model:
-                logger.info(f"✓ Fallback task-based: {fallback_model['name']}")
-                state.selected_model = fallback_model
-                state.model_discovery_method = "taskbased_fallback"
-                state.model_accepted = True
-                
-                # Download del fallback model - STOP, ci pensa il nodo successivo
-                # state = download_model_to_cache(state, config, fallback_model)
-            else:
-                # Ultimo fallback: config generico
-                logger.warning("⚠️  Nessun fallback task-based, uso config")
-                state.model_path = cfg.ai_model_path
-                state.model_discovery_method = "default"
-    
+            state.model_discovery_method = "default"
+
     return state
 
 
@@ -1962,6 +1843,7 @@ def run_analyze(state: MasterState, config: RunnableConfig = None) -> MasterStat
     """
     
     logger.info("🔍 Eseguendo analisi del modello...")
+    cfg = Configuration.from_runnable_config(config)
     
     try:
         # ===== DETERMINA MODELLO =====
@@ -1995,7 +1877,7 @@ try:
 except Exception as e:
     print(f"CONVERSION_ERROR:{{e}}")
 """
-                python_path = CONDA_PYTHON_PATHS.get('stm32') # Usa env Keras 3
+                python_path = cfg.get_python_path('stm32') # Usa env Keras 3
                 res = execute_in_environment(conversion_script, python_path)
                 
                 if not res['success'] or "CONVERSION_OK" not in res['stdout']:
