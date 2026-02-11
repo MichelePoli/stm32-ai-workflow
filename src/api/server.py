@@ -79,23 +79,11 @@ async def stream_chat(request: ChatRequest):
     """
     logger.info(f"Ricevuta richiesta chat: {len(request.messages)} messaggi")
     
-    # -------------------------------------------------------------------------
-    # 1. LOGICA DI INPUT E ID SESSIONE
-    # -------------------------------------------------------------------------
-    # user_id: Identifica CHI è l'utente (es. "mrusso").
-    #          Questo ID è stabile e permette di recuperare il PROFILO UTENTE (Long-Term Memory).
-    # session_id: Identifica LA CONVERSAZIONE corrente.
-    #             Questo ID definisce il "Thread" di LangGraph per il checkpointer.
-    # -------------------------------------------------------------------------
-
     # ultimo messaggio utente è l'input principale per il grafo
     last_user_message = next((m.content for m in reversed(request.messages) if m.role == 'user'), "")
     
     # -------------------------------------------------------------------------
     # 2. LONG-TERM MEMORY (REDIS: user_profile)
-    # -------------------------------------------------------------------------
-    # Recuperiamo il "Profilo Utente" da Redis legato allo user_id.
-    # Questa memoria sopravvive al cambio di sessione.
     # -------------------------------------------------------------------------
     user_profile_key = f"user:{request.user_id}:profile"
     try:
@@ -107,7 +95,6 @@ async def stream_chat(request: ChatRequest):
         user_profile = {}
 
     # 3. Definisci lo stato iniziale
-    # Inietta il profilo utente nello stato iniziale (MasterState).
     initial_state = {
         "message": last_user_message,
         "persistent_context": user_profile
@@ -117,18 +104,21 @@ async def stream_chat(request: ChatRequest):
         logger.info(f"Context ricevuto: {request.context.keys()}")
     
     async def event_generator():
-        # Coda per aggregare eventi dal grafo e log dal subprocess
+        # LIVE LOGGING & HEARTBEAT MECHANISM:
+        # Usiamo una coda asincrona (asyncio.Queue) per aggregare eventi provenienti da diverse fonti:
+        # 1. Eventi dal grafo LangGraph (nodi, interruzioni).
+        # 2. Log catturati in tempo reale (es. progresso training).
         queue = asyncio.Queue()
         loop = asyncio.get_event_loop()
 
-        # Handler per catturare i log (es. training progress)
+        # Handler personalizzato per catturare i log generati dai moduli dell'assistente
         class QueueHandler(logging.Handler):
             def emit(self, record):
                 try:
                     msg = self.format(record)
-                    # Filtriamo i log interessanti per l'utente in tempo reale
+                    # Filtriamo solo i log rilevanti per l'utente (progressi training, subprocessi)
                     if any(x in msg for x in ["[Train]", "Epoch ", "accuracy:", "loss:", "[Subprocess]"]):
-                        # Logica safe per spingere nella coda asincrona da un contesto sincrono
+                        # Inseriamo il messaggio nella coda in modo thread-safe
                         loop.call_soon_threadsafe(queue.put_nowait, {"type": "log", "content": msg})
                 except Exception:
                     pass
@@ -144,11 +134,6 @@ async def stream_chat(request: ChatRequest):
             l.addHandler(handler)
 
         try:
-            # -------------------------------------------------------------------------
-            # 4. SHORT-TERM MEMORY (REDIS: LangGraph Checkpoint)
-            # -------------------------------------------------------------------------
-            # LangGraph usa un "thread_id" per salvare lo stato di avanzamento.
-            # -------------------------------------------------------------------------
             composite_thread_id = f"{request.user_id}:{request.session_id}"
             config = {"configurable": {"thread_id": composite_thread_id}}
 
@@ -174,15 +159,8 @@ async def stream_chat(request: ChatRequest):
                 initial_state["user_response"] = ""
                 stream_input = initial_state
 
-            # -------------------------------------------------------------------------
-            # 5. ESECUZIONE ASINCRONA E STREAMING
-            # -------------------------------------------------------------------------
-            # MOTIVO ASYNC:
-            # 1. Non-bloccante: Il server gestisce altri utenti mentre attende l'LLM.
-            # 2. Streaming: Invio aggiornamenti (progress/log) man mano che arrivano.
-            # -------------------------------------------------------------------------
-
-            # Avvia il grafo in un task separato
+            # Avvia l'esecuzione del grafo in un task non-bloccante separato.
+            # Questo permette al 'while' qui sotto di gestire contemporaneamente i log e gli heartbeat.
             async def run_graph_task():
                 try:
                     async for event in graph.astream(stream_input, config=config):
@@ -191,20 +169,20 @@ async def stream_chat(request: ChatRequest):
                     logger.error(f"Errore nel task del grafo: {e}")
                     await queue.put({"type": "error", "content": str(e)})
                 finally:
-                    await queue.put(None) # Signal completion
+                    await queue.put(None) # Signal completion (marker di fine)
 
             asyncio.create_task(run_graph_task())
 
-            # Consuma dalla coda con heartbeat
+            # Loop di consumo degli eventi con gestione timeout per Heartbeat
             while True:
                 try:
-                    # Timeout di 15s per l'heartbeat
+                    # Se non riceviamo eventi entro 15 secondi, scatta il timeout (Heartbeat)
                     item = await asyncio.wait_for(queue.get(), timeout=15)
-                    if item is None:
+                    if item is None: # Fine dell'esecuzione
                         break
 
                     if item["type"] == "log":
-                        # Stream the log to the UI
+                        # Spedisce il log del subprocess direttamente nell'interfaccia VS Code
                         yield json.dumps({"type": "markdown", "content": f"_{item['content']}_\n"}) + "\n"
                     
                     elif item["type"] == "error":
@@ -238,14 +216,10 @@ async def stream_chat(request: ChatRequest):
                                  yield json.dumps({"type": "markdown", "content": f"{node_state['message']}\n\n"}) + "\n"
                 
                 except asyncio.TimeoutError:
-                    # Heartbeat: manda un pacchetto vuoto o un progress silenzioso per evitare timeout client
+                    # HEARTBEAT: invia un pacchetto leggero per mantenere attiva la connessione HTTP.
+                    # Questo evita che il client (VS Code) chiuda la connessione durante operazioni lunghe (es. training).
                     yield json.dumps({"type": "progress", "content": "..."}) + "\n"
 
-            # -------------------------------------------------------------------------
-            # 6. AGGIORNAMENTO PROFILO E CHIUSURA
-            # -------------------------------------------------------------------------
-            # Il workflow è terminato. Estraiamo lo stato finale per la Long-Term Memory.
-            # -------------------------------------------------------------------------
             # Logica di salvataggio finale profilo (dopo fine coda)
             try:
                 final_snapshot = await graph.aget_state(config)
