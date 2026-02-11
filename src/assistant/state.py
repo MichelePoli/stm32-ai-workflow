@@ -3,9 +3,9 @@
 # ============================================================================
 
 from dataclasses import dataclass, field
-from typing import Optional, List
 from datetime import datetime
-from typing import Tuple, Optional, TypedDict, List, Literal
+from typing import Tuple, Optional, List, Literal
+from typing_extensions import TypedDict
 from pydantic import BaseModel, Field
 
 @dataclass
