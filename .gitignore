@@ -47,3 +47,33 @@ frontend/.env
 
 # Personal Notes (restano in locale, ma non vengono caricati su GIT)
 *.docx
+
+# Installer files and archives
+*.zip
+*.pack
+SetupSTM32CubeMX-*
+stedgeai-linux-*
+stm32cubemx-*
+x-cube-ai-*
+
+# Extracted installer directories
+jre/
+Middlewares/
+Projects/
+Documentation/
+Package_license.html
+Readme.html
+
+# Generated outputs
+st_ai_output/
+st_ai_ws/
+TestProject/
+*.script
+
+# STMicroelectronics packages
+STMicroelectronics.*
+
+# Temporary utility files
+create_dummy_model.py
+extract_docx.py
+auto-install.xml

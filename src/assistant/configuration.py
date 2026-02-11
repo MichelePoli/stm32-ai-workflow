@@ -46,6 +46,12 @@ class Configuration:
             os.path.expanduser("~/STM32Cube/Repository")
         )
     )
+    stedgeai_path: str = field(
+        default_factory=lambda: os.environ.get(
+            "STEDGEAI_PATH",
+            os.path.expanduser("~/stm32-ai_utilities/linux/stedgeai")
+        )
+    )
 
     # ============================================================================
     # CONFIGURAZIONE STM32
