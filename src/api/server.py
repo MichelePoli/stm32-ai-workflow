@@ -79,11 +79,23 @@ async def stream_chat(request: ChatRequest):
     """
     logger.info(f"Ricevuta richiesta chat: {len(request.messages)} messaggi")
     
+    # -------------------------------------------------------------------------
+    # 1. LOGICA DI INPUT E ID SESSIONE
+    # -------------------------------------------------------------------------
+    # user_id: Identifica CHI è l'utente (es. "mrusso").
+    #          Questo ID è stabile e permette di recuperare il PROFILO UTENTE (Long-Term Memory).
+    # session_id: Identifica LA CONVERSAZIONE corrente.
+    #             Questo ID definisce il "Thread" di LangGraph per il checkpointer.
+    # -------------------------------------------------------------------------
+
     # ultimo messaggio utente è l'input principale per il grafo
     last_user_message = next((m.content for m in reversed(request.messages) if m.role == 'user'), "")
     
     # -------------------------------------------------------------------------
     # 2. LONG-TERM MEMORY (REDIS: user_profile)
+    # -------------------------------------------------------------------------
+    # Recuperiamo il "Profilo Utente" da Redis legato allo user_id.
+    # Questa memoria sopravvive al cambio di sessione.
     # -------------------------------------------------------------------------
     user_profile_key = f"user:{request.user_id}:profile"
     try:
@@ -95,6 +107,7 @@ async def stream_chat(request: ChatRequest):
         user_profile = {}
 
     # 3. Definisci lo stato iniziale
+    # Inietta il profilo utente nello stato iniziale (MasterState).
     initial_state = {
         "message": last_user_message,
         "persistent_context": user_profile
@@ -131,6 +144,11 @@ async def stream_chat(request: ChatRequest):
             l.addHandler(handler)
 
         try:
+            # -------------------------------------------------------------------------
+            # 4. SHORT-TERM MEMORY (REDIS: LangGraph Checkpoint)
+            # -------------------------------------------------------------------------
+            # LangGraph usa un "thread_id" per salvare lo stato di avanzamento.
+            # -------------------------------------------------------------------------
             composite_thread_id = f"{request.user_id}:{request.session_id}"
             config = {"configurable": {"thread_id": composite_thread_id}}
 
@@ -155,6 +173,14 @@ async def stream_chat(request: ChatRequest):
             else:
                 initial_state["user_response"] = ""
                 stream_input = initial_state
+
+            # -------------------------------------------------------------------------
+            # 5. ESECUZIONE ASINCRONA E STREAMING
+            # -------------------------------------------------------------------------
+            # MOTIVO ASYNC:
+            # 1. Non-bloccante: Il server gestisce altri utenti mentre attende l'LLM.
+            # 2. Streaming: Invio aggiornamenti (progress/log) man mano che arrivano.
+            # -------------------------------------------------------------------------
 
             # Avvia il grafo in un task separato
             async def run_graph_task():
@@ -212,9 +238,14 @@ async def stream_chat(request: ChatRequest):
                                  yield json.dumps({"type": "markdown", "content": f"{node_state['message']}\n\n"}) + "\n"
                 
                 except asyncio.TimeoutError:
-                    # Heartbeat: manda un pacchetto vuoto o un progress silenzioso
+                    # Heartbeat: manda un pacchetto vuoto o un progress silenzioso per evitare timeout client
                     yield json.dumps({"type": "progress", "content": "..."}) + "\n"
 
+            # -------------------------------------------------------------------------
+            # 6. AGGIORNAMENTO PROFILO E CHIUSURA
+            # -------------------------------------------------------------------------
+            # Il workflow è terminato. Estraiamo lo stato finale per la Long-Term Memory.
+            # -------------------------------------------------------------------------
             # Logica di salvataggio finale profilo (dopo fine coda)
             try:
                 final_snapshot = await graph.aget_state(config)

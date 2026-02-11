@@ -2265,7 +2265,8 @@ def apply_user_customization(state: MasterState, config: RunnableConfig = None) 
         state.error_message = "Invalid model path"
         return state
         
-    # Resolve correct python path
+    # Risoluzione dinamica del percorso Python e dell'ambiente Conda.
+    # Evita hardcoded paths e garantisce stabilità su diversi sistemi Linux.
     cfg = Configuration.from_runnable_config(config)
     state.python_path = cfg.get_python_path('stm32')
     state.conda_env = 'stm32'
@@ -2727,7 +2728,8 @@ def fine_tune_customized_model(state: MasterState, config: RunnableConfig = None
         
         logger.info(f"📌 Training config: {epochs} epochs, batch={batch_size}, LR={learning_rate}")
         
-        # Ensure we use the correct environment and python path
+        # Risoluzione ambiente Conda per il training. Utilizziamo 'stm32'
+        # che contiene TensorFlow e librerie ottimizzate.
         cfg = Configuration.from_runnable_config(config)
         state.conda_env = 'stm32'
         state.python_path = cfg.get_python_path('stm32')
@@ -2740,9 +2742,9 @@ def fine_tune_customized_model(state: MasterState, config: RunnableConfig = None
 import sys
 import os
 
-# --- AUTO-CONFIGURE CUDA PATH (Robust) ---
-# NOTE: Manual LD_LIBRARY_PATH manipulation removed to avoid symbol lookup errors.
-# We rely on the correct environment being selected by the parent process.
+# --- CONFIGURAZIONE GPU E AMBIENTE (Robust) ---
+# NOTA: La manipolazione manuale di LD_LIBRARY_PATH è stata rimossa per evitare "symbol lookup error".
+# Ci affidiamo alla gestione nativa di Conda per il caricamento delle librerie di sistema.
 import os
 import sys
 
