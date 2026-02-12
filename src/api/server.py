@@ -104,21 +104,18 @@ async def stream_chat(request: ChatRequest):
         logger.info(f"Context ricevuto: {request.context.keys()}")
     
     async def event_generator():
-        # LIVE LOGGING & HEARTBEAT MECHANISM:
-        # Usiamo una coda asincrona (asyncio.Queue) per aggregare eventi provenienti da diverse fonti:
-        # 1. Eventi dal grafo LangGraph (nodi, interruzioni).
-        # 2. Log catturati in tempo reale (es. progresso training).
+        # Coda per aggregare eventi dal grafo e log dal subprocess
         queue = asyncio.Queue()
         loop = asyncio.get_event_loop()
 
-        # Handler personalizzato per catturare i log generati dai moduli dell'assistente
+        # Handler per catturare i log (es. training progress)
         class QueueHandler(logging.Handler):
             def emit(self, record):
                 try:
                     msg = self.format(record)
-                    # Filtriamo solo i log rilevanti per l'utente (progressi training, subprocessi)
+                    # Filtriamo i log interessanti per l'utente in tempo reale
                     if any(x in msg for x in ["[Train]", "Epoch ", "accuracy:", "loss:", "[Subprocess]"]):
-                        # Inseriamo il messaggio nella coda in modo thread-safe
+                        # Logica safe per spingere nella coda asincrona da un contesto sincrono
                         loop.call_soon_threadsafe(queue.put_nowait, {"type": "log", "content": msg})
                 except Exception:
                     pass
@@ -159,8 +156,7 @@ async def stream_chat(request: ChatRequest):
                 initial_state["user_response"] = ""
                 stream_input = initial_state
 
-            # Avvia l'esecuzione del grafo in un task non-bloccante separato.
-            # Questo permette al 'while' qui sotto di gestire contemporaneamente i log e gli heartbeat.
+            # Avvia il grafo in un task separato
             async def run_graph_task():
                 try:
                     async for event in graph.astream(stream_input, config=config):
@@ -169,20 +165,20 @@ async def stream_chat(request: ChatRequest):
                     logger.error(f"Errore nel task del grafo: {e}")
                     await queue.put({"type": "error", "content": str(e)})
                 finally:
-                    await queue.put(None) # Signal completion (marker di fine)
+                    await queue.put(None) # Signal completion
 
             asyncio.create_task(run_graph_task())
 
-            # Loop di consumo degli eventi con gestione timeout per Heartbeat
+            # Consuma dalla coda con heartbeat
             while True:
                 try:
-                    # Se non riceviamo eventi entro 15 secondi, scatta il timeout (Heartbeat)
+                    # Timeout di 15s per l'heartbeat
                     item = await asyncio.wait_for(queue.get(), timeout=15)
-                    if item is None: # Fine dell'esecuzione
+                    if item is None:
                         break
 
                     if item["type"] == "log":
-                        # Spedisce il log del subprocess direttamente nell'interfaccia VS Code
+                        # Stream the log to the UI
                         yield json.dumps({"type": "markdown", "content": f"_{item['content']}_\n"}) + "\n"
                     
                     elif item["type"] == "error":
@@ -216,8 +212,7 @@ async def stream_chat(request: ChatRequest):
                                  yield json.dumps({"type": "markdown", "content": f"{node_state['message']}\n\n"}) + "\n"
                 
                 except asyncio.TimeoutError:
-                    # HEARTBEAT: invia un pacchetto leggero per mantenere attiva la connessione HTTP.
-                    # Questo evita che il client (VS Code) chiuda la connessione durante operazioni lunghe (es. training).
+                    # Heartbeat: manda un pacchetto vuoto o un progress silenzioso
                     yield json.dumps({"type": "progress", "content": "..."}) + "\n"
 
             # Logica di salvataggio finale profilo (dopo fine coda)

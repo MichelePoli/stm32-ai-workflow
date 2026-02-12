@@ -468,10 +468,8 @@ def ask_modification_intent(state, config: RunnableConfig = None):
         # Pulisci il messaggio per il controllo
         msg_clean = state.message.lower().strip()
         
-        # LOGICA DI PROTEZIONE:
         # Se il messaggio è un trigger generico (es. "ai", "@assistant ai"), 
-        # significa che l'utente sta avviando il workflow ma non ha ancora espresso 
-        # una preferenza sulla modifica. In questo caso, evitiamo l'inferenza automatica.
+        # non tentiamo l'inferenza automatica: dobbiamo chiedere.
         generic_triggers = ["ai", "ai_analysis", "analyze", "modello", "model", "start ai"]
         is_generic = any(t == msg_clean for t in generic_triggers) or msg_clean.startswith("@")
         
@@ -480,10 +478,8 @@ def ask_modification_intent(state, config: RunnableConfig = None):
                 SystemMessage(content=modification_decision_instructions),
                 HumanMessage(content=f"Messaggio: {state.message}")
             ])
-            # SOGLIA DI CONFIDENZA ALTA:
-            # Per evitare di saltare erroneamente la fase di personalizzazione (che è critica),
-            # procediamo automaticamente solo se l'LLM è quasi certo (>90%).
-            # Se la confidenza è più bassa, forziamo un interrupt per chiedere conferma all'utente.
+            # Se la confidenza è molto alta (es. > 0.9), evitiamo l'interrupt.
+            # Altrimenti (anche se è 0.8) chiediamo conferma.
             if res.confidence > 0.9:
                 initial_intent = res.wants_modifications
                 logger.info(f"🤖 Intento rilevato nel messaggio iniziale: {initial_intent} (Conf: {res.confidence})")
@@ -1808,9 +1804,7 @@ Training Recommendation:{train_text}
 
     # ==================== RICHIESTA CONFERMA ====================
     
-    # UI FEEDBACK FIX:
-    # L'estensione VS Code visualizza solo il campo 'instruction'.
-    # Incorporiamo l'anteprima (preview) direttamente nell'istruzione per massima visibilità.
+    # Prompt mostrato all'utente (supporta risposte naturali)
     confirmation_prompt = {
         "instruction": f"{preview}\n\nDo you want to apply these modifications? (Yes/No/Edit)",
         "options": ["yes", "no", "edit"],
@@ -2271,9 +2265,7 @@ def apply_user_customization(state: MasterState, config: RunnableConfig = None) 
         state.error_message = "Invalid model path"
         return state
         
-    # RISOLUZIONE AMBIENTE:
-    # Usiamo Configuration per trovare dinamicamente il percorso di 'stm32'.
-    # Questo garantisce che il sottoprocesso di manipolazione modello usi le librerie corrette (Keras 3/TF 2.16+).
+    # Resolve correct python path
     cfg = Configuration.from_runnable_config(config)
     state.python_path = cfg.get_python_path('stm32')
     state.conda_env = 'stm32'
@@ -2735,9 +2727,7 @@ def fine_tune_customized_model(state: MasterState, config: RunnableConfig = None
         
         logger.info(f"📌 Training config: {epochs} epochs, batch={batch_size}, LR={learning_rate}")
         
-        # STABILITÀ TRAINING:
-        # Garantiamo l'uso dell'ambiente 'stm32' risolto dinamicamente.
-        # Evitiamo hardcoded paths per supportare diverse installazioni Conda.
+        # Ensure we use the correct environment and python path
         cfg = Configuration.from_runnable_config(config)
         state.conda_env = 'stm32'
         state.python_path = cfg.get_python_path('stm32')
@@ -2751,9 +2741,8 @@ import sys
 import os
 
 # --- AUTO-CONFIGURE CUDA PATH (Robust) ---
-# NOTE: La manipolazione manuale di LD_LIBRARY_PATH è stata rimossa.
-# In passato causava 'symbol lookup error' caricando file .so incompatibili.
-# Ora ci affidiamo interamente all'ambiente Conda 'stm32' che è configurato correttamente.
+# NOTE: Manual LD_LIBRARY_PATH manipulation removed to avoid symbol lookup errors.
+# We rely on the correct environment being selected by the parent process.
 import os
 import sys
 
