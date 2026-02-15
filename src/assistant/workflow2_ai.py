@@ -378,7 +378,7 @@ Esempi:
     
     state.target = extraction_result.target or state.target or "stm32h743"
     state.compression = extraction_result.compression or state.compression or "high"
-    state.ai_output_dir = "./analisiAI"
+    state.ai_output_dir = cfg.ai_output_dir
     
     os.makedirs(state.ai_output_dir, exist_ok=True)
     

@@ -89,7 +89,7 @@ class Configuration:
         )
     )
     ai_output_dir: str = field(
-        default_factory=lambda: os.environ.get("AI_OUTPUT_DIR", "./analisiAI")
+        default_factory=lambda: os.environ.get("AI_OUTPUT_DIR", os.path.expanduser("~/stm32-ai-workflow/st_ai_output"))
     )
     ai_target: str = field(
         default_factory=lambda: os.environ.get("AI_TARGET", "stm32f401")
