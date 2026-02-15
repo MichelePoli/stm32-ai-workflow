@@ -200,6 +200,7 @@ def route_request(state: MasterState, config: RunnableConfig = None) -> MasterSt
     """Router principale che classifica tra firmware, AI, integration, web_research"""
     
     logger.info(f"🔀 Routing messaggio: {state.message[:80]}...")
+
     
     # === GESTIONE RESET TOTALE ===
     msg_clean = state.message.lower().strip()

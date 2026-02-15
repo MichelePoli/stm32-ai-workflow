@@ -68,6 +68,7 @@ Readme.html
 st_ai_output/
 st_ai_ws/
 TestProject/
+STM32CubeMX/
 *.script
 
 # STMicroelectronics packages

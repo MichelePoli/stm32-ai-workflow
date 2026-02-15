@@ -95,6 +95,25 @@ Esempi:
 # UTILITIES
 # ============================================================================
 
+def extract_mcu_series_from_board(board_name: str) -> Optional[str]:
+    """
+    Estrae la serie MCU dal nome della board.
+    Es: "STM32F401VCHx" → "F4"
+        "STM32N657Z0HxQ" → "N6"
+        "STM32H743ZI" → "H7"
+    """
+    import re
+    if not board_name:
+        return None
+    
+    # Pattern: STM32 + (Lettera)(Cifra) → serie
+    match = re.search(r'STM32([A-Z])([0-9])', board_name, re.IGNORECASE)
+    if match:
+        letter = match.group(1).upper()
+        digit = match.group(2)
+        return f"{letter}{digit}"
+    return None
+
 def get_template_ioc_path(board_name: Optional[str], mcu_series: Optional[str]) -> Optional[str]:
     """
     Cerca un file .ioc pre-generato nella cartella templates/ioc_files.
@@ -182,9 +201,11 @@ Esempio: "Crea progetto MyApp per STM32F401 con CubeIDE"
         initial_board = res.board_name
         # Salviamo quello che abbiamo trovato finora
         if res.board_name: state.board_name = res.board_name
+        if res.mcu_series: state.mcu_series = res.mcu_series
         if res.project_name: state.project_name = res.project_name
         if res.toolchain: state.toolchain = res.toolchain
         if res.ioc_file_path: state.ioc_file_path = res.ioc_file_path
+
 
     # --- Passo 2: Verifica e Interrupt ---
     # Se non c'è una board nel messaggio o è generico, CHIEDI.
@@ -227,6 +248,17 @@ Esempio: "Crea progetto MyApp per STM32F401 con CubeIDE"
     if not state.board_name:
         state.board_name = "STM32F401VCHx"
         state.mcu_series = "F4"
+    
+    # Estrazione automatica mcu_series se mancante
+    if not state.mcu_series and state.board_name:
+        extracted = extract_mcu_series_from_board(state.board_name)
+        if extracted:
+            state.mcu_series = extracted
+            logger.info(f"📊 MCU series estratta automaticamente da board_name: {extracted}")
+        else:
+            # Fallback finale a F4
+            state.mcu_series = "F4"
+            logger.warning(f"⚠️  Impossibile estrarre serie, fallback a F4")
         
     state.project_name = state.project_name or "MySTM32Project"
     state.toolchain = state.toolchain or "STM32CubeIDE"
@@ -599,63 +631,135 @@ def recover_with_ioc_fallback(state: MasterState) -> bool:
 
 
 def execute_generation(state: MasterState, config: RunnableConfig = None) -> MasterState:
+    """
+    Genera il progetto in una directory TEMPORANEA LOCALE (/tmp) 
+    e poi lo sposta nella cartella finale per evitare problemi di locking su filesystem di rete.
+    """
     import time
-    os.makedirs(state.firmware_project_path, exist_ok=True)
     
+    # === 1. CREA DIRECTORY TEMPORANEA LOCALE ===
+    temp_project_path = f"/tmp/stm32_{state.timestamp}"
+    os.makedirs(temp_project_path, exist_ok=True)
+    logger.info(f"📂 Directory temporanea creata: {temp_project_path}")
+    
+    # === 2. MODIFICA LO SCRIPT PER USARE IL PATH TEMPORANEO ===
+    # Lo script è già stato creato da generate_cubemx_script, lo rileggiamo e modifichiamo
+    with open(state.firmware_script_path, "r") as f:
+        original_script = f.read()
+    
+    # Sostituiamo il path finale con quello temporaneo
+    temp_script = original_script.replace(
+        f"project path {state.firmware_project_path}",
+        f"project path {temp_project_path}"
+    )
+    
+    # Scriviamo lo script modificato
+    temp_script_path = f"/tmp/script_temp_{state.timestamp}.scr"
+    with open(temp_script_path, "w") as f:
+        f.write(temp_script)
+    
+    logger.info(f"✏️  Script modificato per usare path temporaneo")
+    
+    # === 3. ESEGUI CUBEMX SULLA DIRECTORY TEMPORANEA ===
     # Su macOS (Darwin) non usiamo xvfb-run. Su Linux lo usiamo se necessario.
     if platform.system() == "Darwin":
-        cmd = [state.cubemx_path, "-q", state.firmware_script_path]
+        cmd = [state.cubemx_path, "-q", temp_script_path]
     else:
         # Tenta di usare xvfb-run su Linux se disponibile, altrimenti fallback diretto
         if shutil.which("xvfb-run"):
-            cmd = ["xvfb-run", "-a", state.cubemx_path, "-q", state.firmware_script_path]
+            cmd = ["xvfb-run", "-a", state.cubemx_path, "-q", temp_script_path]
         else:
-            cmd = [state.cubemx_path, "-q", state.firmware_script_path]
+            cmd = [state.cubemx_path, "-q", temp_script_path]
     
     try:
-        logger.info(f"🚀 Executing CubeMX (Attempt 1, timeout: 300s)...")
+        logger.info(f"🚀 Executing CubeMX in temp dir (Attempt 1, timeout: 300s)...")
         res = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
         
         if res.returncode != 0:
             logger.warning(f"⚠️  Generation Failed (RC={res.returncode}). Trying Fallback...")
-            # FALLBACK
+            # FALLBACK: Riprova con template .ioc
             if recover_with_ioc_fallback(state):
+                # Aggiorna anche lo script temporaneo
+                with open(state.firmware_script_path, "r") as f:
+                    fallback_script = f.read()
+                temp_fallback_script = fallback_script.replace(
+                    f"project path {state.firmware_project_path}",
+                    f"project path {temp_project_path}"
+                )
+                with open(temp_script_path, "w") as f:
+                    f.write(temp_fallback_script)
+                
                 logger.info(f"🚀 Executing CubeMX (Fallback Attempt, timeout: 600s)...")
-                # Rilancia comando (lo script file è lo stesso, ma contenuto è cambiato)
                 res = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
 
         state.firmware_generation_success = (res.returncode == 0)
         
         if state.firmware_generation_success:
-            logger.info("Attendo creazione cartelle...")
+            logger.info("✓ Generazione completata in temp dir, attendo creazione cartelle...")
             time.sleep(2)
             
+            # === 4. VERIFICA CHE LA GENERAZIONE SIA COMPLETA ===
             for attempt in range(10):
-                # Verifica sia nella root che in eventuali sottocartelle (CubeMX spesso crea una cartella col nome progetto)
-                # Cerchiamo Src e Inc ovunque sotto firmware_project_path
-                src_exists = any(os.path.isdir(os.path.join(dp, "Src")) for dp, dn, filenames in os.walk(state.firmware_project_path))
-                inc_exists = any(os.path.isdir(os.path.join(dp, "Inc")) for dp, dn, filenames in os.walk(state.firmware_project_path))
+                # Cerchiamo Src e Inc nella directory temporanea
+                src_exists = any(os.path.isdir(os.path.join(dp, "Src")) for dp, dn, filenames in os.walk(temp_project_path))
+                inc_exists = any(os.path.isdir(os.path.join(dp, "Inc")) for dp, dn, filenames in os.walk(temp_project_path))
                 
                 if src_exists and inc_exists:
-                    logger.info("✓ Cartelle verificate con successo (root o annidate)")
+                    logger.info("✓ Cartelle Src/ e Inc/ verificate nella directory temporanea")
                     break
                 
-                logger.info(f"Attesa cartelle... attempt {attempt+1}/10")
+                logger.info(f"Attesa cartelle in temp dir... attempt {attempt+1}/10")
                 time.sleep(1)
             else:
-                logger.warning("⚠ Cartelle potrebbero non essere completamente create")
+                logger.warning("⚠️  Cartelle potrebbero non essere completamente create")
+            
+            # === 5. SPOSTA DALLA DIRECTORY TEMPORANEA ALLA FINALE ===
+            logger.info(f"📦 Spostamento progetto dalla temp dir alla destinazione finale...")
+            
+            # Crea la directory base se non esiste
+            os.makedirs(os.path.dirname(state.firmware_project_path), exist_ok=True)
+            
+            # Se la destinazione finale esiste già, rimuovila
+            if os.path.exists(state.firmware_project_path):
+                logger.warning(f"⚠️  Cartella di destinazione già esistente, rimuovo...")
+                shutil.rmtree(state.firmware_project_path)
+            
+            # Sposta tutto dalla temp alla finale
+            shutil.move(temp_project_path, state.firmware_project_path)
+            logger.info(f"✓✓✓ Progetto spostato con successo in: {state.firmware_project_path}")
+            
         else:
             state.firmware_error_message = res.stderr or f"Return code {res.returncode}"
+            logger.error(f"❌ Generazione fallita: {state.firmware_error_message}")
     
     except subprocess.TimeoutExpired:
         logger.error("❌ First attempt TIMED OUT. Trying Fallback...")
         # FALLBACK on timeout
         try:
             if recover_with_ioc_fallback(state):
+                # Aggiorna script temporaneo con fallback
+                with open(state.firmware_script_path, "r") as f:
+                    fallback_script = f.read()
+                temp_fallback_script = fallback_script.replace(
+                    f"project path {state.firmware_project_path}",
+                    f"project path {temp_project_path}"
+                )
+                with open(temp_script_path, "w") as f:
+                    f.write(temp_fallback_script)
+                
                 logger.info(f"🚀 Executing CubeMX (Fallback Attempt)...")
                 res = subprocess.run(cmd, capture_output=True, text=True, timeout=150)
                 state.firmware_generation_success = (res.returncode == 0)
-                if not state.firmware_generation_success:
+                
+                if state.firmware_generation_success:
+                    # Sposta anche in caso di fallback riuscito
+                    logger.info("✓ Fallback riuscito, sposto in destinazione finale...")
+                    os.makedirs(os.path.dirname(state.firmware_project_path), exist_ok=True)
+                    if os.path.exists(state.firmware_project_path):
+                        shutil.rmtree(state.firmware_project_path)
+                    shutil.move(temp_project_path, state.firmware_project_path)
+                    logger.info(f"✓ Progetto spostato dopo fallback")
+                else:
                     state.firmware_error_message = res.stderr or f"Fallback Return code {res.returncode}"
             else:
                 state.firmware_generation_success = False
@@ -670,14 +774,33 @@ def execute_generation(state: MasterState, config: RunnableConfig = None) -> Mas
     except Exception as e:
         state.firmware_generation_success = False
         state.firmware_error_message = str(e)
+        logger.exception(e)
+    
     finally:
+        # === 6. CLEANUP SCRIPT TEMPORANEI ===
         try:
             os.remove(state.firmware_script_path)
+            logger.info("✓ Cleanup script originale")
         except OSError:
             pass
+        
+        try:
+            os.remove(temp_script_path)
+            logger.info("✓ Cleanup script temporaneo")
+        except OSError:
+            pass
+        
+        # Cleanup temp dir SE ancora esiste (caso di errore)
+        if os.path.exists(temp_project_path):
+            try:
+                shutil.rmtree(temp_project_path)
+                logger.info("✓ Cleanup temp directory (errore)")
+            except Exception as cleanup_err:
+                logger.warning(f"⚠️  Non posso rimuovere temp dir: {cleanup_err}")
     
     logger.info(f"✓ Firmware generato: {state.firmware_project_path}" if state.firmware_generation_success else f"✗ Firmware fallito: {state.firmware_error_message}")
     return state
+
 
 
 def finalize_project(state: MasterState, config: RunnableConfig = None) -> MasterState:

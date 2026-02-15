@@ -31,7 +31,7 @@ class Configuration:
     base_dir: str = field(
         default_factory=lambda: os.environ.get(
             "BASE_DIR", 
-            os.path.expanduser("~/STM32CubeMX")
+            os.path.expanduser("~/stm32-ai-workflow/STM32CubeMX")
         )
     )
     cubemx_path: str = field(
