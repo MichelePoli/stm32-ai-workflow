@@ -905,6 +905,7 @@ builder.add_conditional_edges(
     decision_continue_routing,
     {
         "ai_flow": "collect_analysis_info",
+        "firmware_flow": "collect_project_info",
         "end": END
     }
 )
@@ -912,7 +913,7 @@ builder.add_conditional_edges(
 # === AI BRANCH CONNECTION ===
 builder.add_conditional_edges(
     "finalize_analysis",
-    lambda state: "collect_project_info" if state.route == "change_board" else "decide_continue_to_integration",
+    lambda state: "firmware_flow" if state.route == "change_board" else "decide_continue_to_integration",
     {
         "firmware_flow": "collect_project_info",
         "decide_continue_to_integration": "decide_continue_to_integration"

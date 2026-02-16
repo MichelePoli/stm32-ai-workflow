@@ -2311,6 +2311,10 @@ Rispondi con un JSON che contiene:
     
     if "board" in decision:
         state.route = "change_board"
+        # Reset board state to force new selection in collect_project_info
+        state.board_name = None
+        state.mcu_series = ""
+        logger.info("🧹 Reset board state per cambio microcontrollore.")
     else:
         state.route = "change_model"
         

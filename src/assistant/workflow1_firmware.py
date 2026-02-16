@@ -181,7 +181,9 @@ Esempio: "Crea progetto MyApp per STM32F401 con CubeIDE"
     
     # === ESTRATTORE LLM ===
     # === IDEMPOTENCY CHECK ===
-    if state.board_name and state.board_name != "STM32F401VCHx" and not state.user_response:
+    # SKIP if board is already set, unless we are explicitly coming from a "change_board" route
+    is_backtracking = state.route == "change_board"
+    if state.board_name and state.board_name != "STM32F401VCHx" and not state.user_response and not is_backtracking:
         logger.info(f"⏭️  Idempotenza: Board '{state.board_name}' già configurata. Salto interrupt.")
         return state
 
@@ -192,8 +194,9 @@ Esempio: "Crea progetto MyApp per STM32F401 con CubeIDE"
     llm_extractor = llm.with_structured_output(ProjectInfoExtraction)
     
     # --- Passo 1: Prova a usare il messaggio iniziale ---
+    # SKIP Discovery if we are backtracking to change board (force new input)
     initial_board = None
-    if not state.user_response:
+    if not state.user_response and not is_backtracking:
         res = llm_extractor.invoke([
             SystemMessage(content=project_info_extraction_instructions),
             HumanMessage(content=f"Messaggio: {state.message}")
