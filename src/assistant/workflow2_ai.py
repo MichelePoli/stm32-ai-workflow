@@ -320,6 +320,7 @@ Esempi:
     # --- Passo 2: Verifica e Interrupt ---
     # Forza interruzione se l'intento non è cristallino nel primo messaggio
     if not initial_target:
+        resume_value = None
         if not state.user_response:
             # Suggerimento dal profilo
             last_series = state.persistent_context.get("mcu_series", "F4") if state.persistent_context else "F4"
@@ -328,10 +329,13 @@ Esempi:
                 "suggestion": f"💡 L'ultima volta hai lavorato su serie **{last_series}**. Vuoi continuare con questa o cambiare?"
             }
             logger.info("⏸️ Interrupting for AI analysis config with profile suggestion.")
-            interrupt(dynamic_prompt)
+            resume_value = interrupt(dynamic_prompt)
         
-        # Dopo la ripresa
-        user_text = extract_user_response(state.user_response)
+        # Dopo la ripresa: usa interrupt return value come priorità
+        if resume_value and str(resume_value).strip():
+            user_text = str(resume_value).strip()
+        else:
+            user_text = extract_user_response(state.user_response)
         state.user_response = ""
     else:
         # Abbiamo già il target dal messaggio iniziale
@@ -366,7 +370,8 @@ Esempi:
     llm = ChatOllama(
         model=cfg.local_llm,
         temperature=0,
-        num_ctx=cfg.llm_context_window
+        num_ctx=cfg.llm_context_window,
+        
     )
     
     llm_extractor = llm.with_structured_output(AnalysisInfoExtraction)
@@ -441,10 +446,15 @@ def choose_ai_task(state: MasterState, config: RunnableConfig = None) -> MasterS
         logger.info(f"⏭️  Idempotenza: Task '{state.last_task}' già selezionato.")
         return state
 
+    resume_value = None
     if not state.user_response or state.user_response.strip() == "":
-        interrupt({"instruction": prompt_text})
-            
-    user_text = extract_user_response(state.user_response).strip()
+        resume_value = interrupt({"instruction": prompt_text})
+    
+    # Usa interrupt return value come priorità
+    if resume_value and str(resume_value).strip():
+        user_text = str(resume_value).strip()
+    else:
+        user_text = extract_user_response(state.user_response).strip()
     state.user_response = "" # Clear after use
     if not user_text: user_text = "1"
     
@@ -512,11 +522,15 @@ def choose_ai_model(state: MasterState, config: RunnableConfig = None) -> Master
     models_list = "\n".join(model_options_text)
     prompt_text = f"Quale modello vuoi usare per {task_info['description']}?\n\nOpzioni disponibili:\n{models_list}\n{len(available_models)+1}. Nessuno di questi (ricerca online)\n\nRispondi con il numero."
     
-    # === INTERRUPT ===
+    resume_value = None
     if not state.user_response or state.user_response.strip() == "":
-        interrupt({"instruction": prompt_text})
-            
-    model_text = extract_user_response(state.user_response).strip()
+        resume_value = interrupt({"instruction": prompt_text})
+    
+    # Usa interrupt return value come priorità
+    if resume_value and str(resume_value).strip():
+        model_text = str(resume_value).strip()
+    else:
+        model_text = extract_user_response(state.user_response).strip()
     state.user_response = "" # Clear after use
     
     # === ESTRAZIONE SCELTA ===
@@ -1173,7 +1187,6 @@ Ritorna esattamente questo formato JSON:
                 "Link GitHub /raw/ diretti",
                 "Non inventare URL"
             ],
-            show_tool_calls=True
         )
 
         

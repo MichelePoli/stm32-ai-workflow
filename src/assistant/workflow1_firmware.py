@@ -210,6 +210,7 @@ Esempio: "Crea progetto MyApp per STM32F401 con CubeIDE"
     # --- Passo 2: Verifica e Interrupt ---
     # Se non c'è una board nel messaggio o è generico, CHIEDI.
     if not initial_board or initial_board.lower() == "unknown":
+        resume_value = None
         if not state.user_response:
             # Recupera board dal profilo per suggerimento
             last_board = state.persistent_context.get("board_name", "Nessuna") if state.persistent_context else "Nessuna"
@@ -220,10 +221,13 @@ Esempio: "Crea progetto MyApp per STM32F401 con CubeIDE"
                 "suggestion": f"� Ho visto che l'ultima volta hai usato: **{last_board}**. Vuoi usare la stessa o una nuova?"
             }
             logger.info("⏸️ Interrupting: Requesting project info with profile suggestion.")
-            interrupt(dynamic_prompt)
+            resume_value = interrupt(dynamic_prompt)
         
-        # Dopo la ripresa
-        user_text = extract_user_response(state.user_response)
+        # Dopo la ripresa: usa interrupt return value come priorità
+        if resume_value and str(resume_value).strip():
+            user_text = str(resume_value).strip()
+        else:
+            user_text = extract_user_response(state.user_response)
         state.user_response = ""
         
         res = llm_extractor.invoke([

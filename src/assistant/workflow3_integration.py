@@ -147,6 +147,7 @@ Esempio risposta: "Integra il codice da ./analisiAI/code_resnet nel firmware di 
 
     # --- Passo 2: Verifica e Interrupt ---
     if not state.firmware_project_dir or not state.ai_code_dir:
+        resume_value = None
         if not state.user_response:
             # Recupera path progetto dal profilo
             last_fw = state.persistent_context.get("last_project_path", "Nessuno") if state.persistent_context else "Nessuno"
@@ -156,10 +157,13 @@ Esempio risposta: "Integra il codice da ./analisiAI/code_resnet nel firmware di 
                 "suggestion": f"💡 Ho visto che l'ultimo progetto era: **{last_fw}**. Vuoi usare lo stesso path o uno nuovo?"
             }
             logger.info("⏸️ Interrupting for integration paths with profile suggestion.")
-            interrupt(dynamic_prompt)
+            resume_value = interrupt(dynamic_prompt)
         
-        # Dopo la ripresa
-        user_text = extract_user_response(state.user_response)
+        # Dopo la ripresa: usa interrupt return value come priorità
+        if resume_value and str(resume_value).strip():
+            user_text = str(resume_value).strip()
+        else:
+            user_text = extract_user_response(state.user_response)
         state.user_response = ""
         
         res = llm_extractor.invoke([

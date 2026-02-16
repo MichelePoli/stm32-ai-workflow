@@ -90,12 +90,16 @@ Esempi:
 
     # --- Passo 2: Verifica e Interrupt ---
     if not initial_req_detected:
+        resume_value = None
         if not state.user_response:
             logger.info("⏸️ Interrupting for synthetic data requirements.")
-            interrupt(prompt)
+            resume_value = interrupt(prompt)
         
-        # Dopo la ripresa
-        user_text = extract_user_response(state.user_response)
+        # Dopo la ripresa: usa interrupt return value come priorità
+        if resume_value and str(resume_value).strip():
+            user_text = str(resume_value).strip()
+        else:
+            user_text = extract_user_response(state.user_response)
         state.user_response = ""
         
         # Parsing con LLM sulla risposta specifica (stesso sistema di prima)
@@ -250,13 +254,16 @@ def validate_synthetic_data(state: MasterState, config: RunnableConfig = None) -
         "instruction": f"{summary}\n\nVuoi procedere con il fine-tuning usando questi dati? (sì/no)",
     }
     
-    user_response = interrupt(prompt)
-    # user_response = "" # BYPASS
-    from src.assistant.utils import extract_user_response
+    resume_value = None
     if not state.user_response or state.user_response.strip() == "":
-        interrupt(prompt)
+        resume_value = interrupt(prompt)
     
-    user_text = extract_user_response(state.user_response).lower()
+    # Usa interrupt return value come priorità
+    if resume_value and str(resume_value).strip():
+        user_text = str(resume_value).strip().lower()
+    else:
+        from src.assistant.utils import extract_user_response
+        user_text = extract_user_response(state.user_response).lower()
     state.user_response = "" # Clear
     
     # Default: proceed with fine-tuning (sì)

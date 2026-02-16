@@ -451,15 +451,19 @@ Rispondi SOLO con la parola, senza altro testo.
 
     # --- Passo 2: Verifica e Interrupt ---
     if not initial_decision:
+        resume_value = None
         if not state.user_response:
             prompt = {
                 "instruction": "Il firmware è stato generato con successo! Vuoi continuare con l'analisi del modello AI o terminare qui?",
             }
             logger.info("⏸️ Intento di continuazione non chiaro, richiedo input...")
-            interrupt(prompt)
+            resume_value = interrupt(prompt)
         
-        # Dopo la ripresa
-        user_text = extract_user_response(state.user_response)
+        # Dopo la ripresa: usa interrupt return value come priorità
+        if resume_value and str(resume_value).strip():
+            user_text = str(resume_value).strip()
+        else:
+            user_text = extract_user_response(state.user_response)
         state.user_response = ""
         
         res = llm.invoke([
@@ -517,15 +521,19 @@ Rispondi SOLO con la parola, senza altro testo.
 
     # --- Passo 2: Verifica e Interrupt ---
     if not initial_decision:
+        resume_value = None
         if not state.user_response:
             prompt = {
                 "instruction": "L'analisi AI è stata completata con successo! Vuoi continuare con l'integrazione del codice AI nel firmware o terminare qui?",
             }
             logger.info("⏸️ Intento di integrazione non chiaro, richiedo input...")
-            interrupt(prompt)
+            resume_value = interrupt(prompt)
         
-        # Dopo la ripresa
-        user_text = extract_user_response(state.user_response)
+        # Dopo la ripresa: usa interrupt return value come priorità
+        if resume_value and str(resume_value).strip():
+            user_text = str(resume_value).strip()
+        else:
+            user_text = extract_user_response(state.user_response)
         state.user_response = ""
         
         res = llm.invoke([

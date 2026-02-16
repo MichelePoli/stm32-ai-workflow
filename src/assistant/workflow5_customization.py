@@ -488,6 +488,7 @@ def ask_modification_intent(state, config: RunnableConfig = None):
 
     # --- Passo 2: Verifica e Interrupt ---
     if initial_intent is None:
+        resume_value = None
         if not state.user_response:
             prompt = {
                 "instruction": """Vuoi apportare modifiche all'architettura del modello?
@@ -504,10 +505,13 @@ Cosa preferisci? (si/no)""",
                 prompt["suggestion"] = "💡 L'ultima volta hai personalizzato il modello. Vuoi farlo di nuovo?"
 
             logger.info("⏸️ Interrupting for modification intent.")
-            interrupt(prompt)
+            resume_value = interrupt(prompt)
         
-        # Dopo la ripresa
-        user_text = extract_user_response(state.user_response).lower()
+        # Dopo la ripresa: usa interrupt return value come priorità
+        if resume_value and str(resume_value).strip():
+            user_text = str(resume_value).strip().lower()
+        else:
+            user_text = extract_user_response(state.user_response).lower()
         state.user_response = ""
         
         # Riapplica LLM sulla risposta specifica
@@ -779,7 +783,6 @@ def search_web(queries: List[str]) -> List[dict[str, str]]:
             agent = Agent(
                 model=Ollama(id="mistral"),
                 tools=[DuckDuckGoTools()],
-                show_tool_calls=False,
                 markdown=True
             )
             
@@ -1445,16 +1448,17 @@ Write your modifications in natural language (or leave empty for defaults):
     # --- Passo 1: Prova a usare il messaggio iniziale ---
     initial_mods_detected = False
     if not state.user_response:
-        # Qui dovremmo costruire il prompt per il parsing (simile a quello sotto)
-        # Ma abbreviato per vedere se ci sono modifiche esplicite
+        # Prova a estrarre modifiche dal messaggio iniziale, ma verifica con confidence
         res = llm_extractor.invoke([
-            SystemMessage(content="Extract modifications from this message. If none, return empty list."),
+            SystemMessage(content="Extract modifications from this message. If the message does NOT contain explicit neural network modification requests (like freeze layers, add dropout, change input, etc.), return an EMPTY modifications list. Do NOT invent modifications."),
             HumanMessage(content=f"Messaggio: {state.message}")
         ])
-        if res.modifications:
-            state.user_custom_modifications = state.message # Salviamo il trigger come fonte
+        if res.modifications and res.confidence >= 0.7:
+            state.user_custom_modifications = state.message
             initial_mods_detected = True
-            logger.info("🤖 Modifiche rilevate nel messaggio iniziale.")
+            logger.info(f"🤖 Modifiche rilevate nel messaggio iniziale (confidence: {res.confidence:.0%}).")
+        else:
+            logger.info(f"ℹ️ Nessuna modifica nel messaggio iniziale (confidence: {res.confidence:.0%}), chiedo all'utente.")
 
     # --- Passo 2: Verifica e Interrupt ---
     if not initial_mods_detected:
@@ -1467,14 +1471,18 @@ Esempi:
 - "Usa learning rate 1e-4"
 """,
             }
-            # Suggerimento se abbiamo qualcosa nel profilo? 
-            # Per ora nessun campo specifico per "last_modifications" ma potremmo aggiungerlo.
             
             logger.info("⏸️ Interrupting for customization details.")
-            interrupt(prompt)
+            resume_value = interrupt(prompt)
+            
+            # Usa il return value di interrupt() come priorità (compatibilità LangGraph Studio)
+            if resume_value and str(resume_value).strip():
+                user_modifications = str(resume_value).strip()
+            else:
+                user_modifications = extract_user_response(state.user_response)
+        else:
+            user_modifications = extract_user_response(state.user_response)
         
-        # Dopo la ripresa
-        user_modifications = extract_user_response(state.user_response)
         state.user_response = ""
         state.user_custom_modifications = user_modifications
     else:
@@ -1507,48 +1515,58 @@ CURRENT MODEL:
 
 MODIFICATION TYPES (EXAMPLES):
 1. freeze_layers
-   - Examples: "freeze first 5", "freeze 10 layers"
+   - Examples (EN): "freeze first 5", "freeze 10 layers"
+   - Examples (IT): "freeza i primi 5", "congela 10 layers", "blocca i primi 5 layer"
    - Parameters: {{"num_frozen_layers": 5}}
    
 2. freeze_almost_all
-   - Examples: "keep last 3 trainable", "freeze all except 4"
+   - Examples (EN): "keep last 3 trainable", "freeze all except 4"
+   - Examples (IT): "tieni gli ultimi 3 addestrabili", "congela tutto tranne 4"
    - Parameters: {{"num_trainable_layers": 3}}
    
 3. change_output_layer
-   - Examples: "change to 100 classes", "10 output classes"
+   - Examples (EN): "change to 100 classes", "10 output classes"
+   - Examples (IT): "cambia a 100 classi", "10 classi di output"
    - Parameters: {{"new_classes": 100}}
    
 4. add_dropout
-   - Examples: "add 0.3 dropout", "dropout 0.5", "0.3 dropout"
+   - Examples (EN): "add 0.3 dropout", "dropout 0.5", "0.3 dropout"
+   - Examples (IT): "aggiungi dropout 0.3", "metti dropout 0.5"
    - Parameters: {{"rate": 0.3}}
    - NOTE: rate MUST be between 0.0 and 1.0
    
 5. change_input_shape
-   - Examples: "change input to 128x128", "192x192x3 input"
+   - Examples (EN): "change input to 128x128", "192x192x3 input"
+   - Examples (IT): "cambia input a 128x128"
    - Parameters: {{"new_shape": [128, 128, 3]}}
    
 6. change_learning_rate
-   - Examples: "learning rate 0.0001", "lr 1e-4"
+   - Examples (EN): "learning rate 0.0001", "lr 1e-4"
+   - Examples (IT): "usa learning rate 0.0001"
    - Parameters: {{"learning_rate": 0.0001}}
 
 7. add_resizing_layer
-   - Examples: "add resizing layer to accept any input size and modify to original shape", "add resizing layer", "Add resizing layer to accept flexible input sizes"
+   - Examples (EN): "add resizing layer to accept any input size"
+   - Examples (IT): "aggiungi layer di ridimensionamento"
    - Parameters: {{}}
 
 IMPORTANT RULES:
-1. Extract ALL modifications mentioned (can be multiple)
-2. For dropout: extract rate as decimal (0.0-1.0)
-3. For output: extract class number
-4. For input shape: extract [height, width, channels]
-5. Match patterns like "0.3 dropout", "dropout 0.3", "add dropout 0.3"
-6. If unsure about parameters, use sensible defaults
-7. If user mentions "flexible", "variable", "any size", "dynamic" → use add_resizing_layer. If user mentions "change input" → use change_input_shape
+1. The user may write in ITALIAN or ENGLISH. Interpret both languages correctly.
+2. Extract ALL modifications mentioned (can be multiple)
+3. For dropout: extract rate as decimal (0.0-1.0)
+4. For output: extract class number
+5. For input shape: extract [height, width, channels]
+6. Match patterns like "0.3 dropout", "dropout 0.3", "add dropout 0.3", "aggiungi dropout 0.3"
+7. Italian equivalents: "freeza"="freeze", "congela"="freeze", "aggiungi"="add", "cambia"="change", "metti"="add"
+8. If unsure about parameters, use sensible defaults
+9. If user mentions "flexible", "variable", "any size", "dynamic" → use add_resizing_layer. If user mentions "change input"/"cambia input" → use change_input_shape
+10. ONLY return modifications the user explicitly asked for. Do NOT invent extra modifications.
 
 Return JSON with modifications list."""
         
         # Invoke LLM
         result: ParsedModificationsPlan = structured_llm.invoke([
-            SystemMessage(content="You are a neural network customization expert. Return valid JSON only."),
+            SystemMessage(content="You are a neural network customization expert. The user may write in Italian or English. Parse their request accurately. Return valid JSON only."),
             HumanMessage(content=llm_prompt)
         ])
         
@@ -1813,14 +1831,19 @@ Training Recommendation:{train_text}
     
     # ⏸️ INTERRUPT: Attendi risposta utente
     from src.assistant.utils import extract_user_response
+    resume_value = None
     if not state.user_response or state.user_response.strip() == "":
-        interrupt(confirmation_prompt)
+        resume_value = interrupt(confirmation_prompt)
     
-    # Log della risposta raw
-    logger.info(f"📝 Risposta utente (state): '{state.user_response}'")
-    
-    # Estrai il testo pulito
-    user_response = extract_user_response(state.user_response)
+    # Usa il return value di interrupt() come priorità (compatibilità LangGraph Studio),
+    # altrimenti usa state.user_response (compatibilità server.py/VS Code)
+    if resume_value and str(resume_value).strip():
+        raw_response = str(resume_value).strip()
+        logger.info(f"📝 Risposta utente (interrupt return): '{raw_response}'")
+        user_response = raw_response
+    else:
+        logger.info(f"📝 Risposta utente (state): '{state.user_response}'")
+        user_response = extract_user_response(state.user_response)
     state.user_response = "" # Clear
     
     # ==================== PARSING LLM DELLA RISPOSTA ====================
@@ -3329,10 +3352,15 @@ def ask_optimization_preference(state: MasterState, config: RunnableConfig = Non
     
     from src.assistant.utils import extract_user_response
     logger.info("📝 Checking for UI response...")
+    resume_value = None
     if not state.user_response or state.user_response.strip() == "":
-        interrupt(prompt)
+        resume_value = interrupt(prompt)
     
-    response = extract_user_response(state.user_response)
+    # Usa interrupt return value come priorità
+    if resume_value and str(resume_value).strip():
+        response = str(resume_value).strip()
+    else:
+        response = extract_user_response(state.user_response)
     state.user_response = "" # Clear
     
     # Default if empty
@@ -3725,10 +3753,15 @@ Quantized: {state.should_quantize}
     }
     
     from src.assistant.utils import extract_user_response
+    resume_value = None
     if not state.user_response or state.user_response.strip() == "":
-        interrupt(prompt)
+        resume_value = interrupt(prompt)
     
-    user_response = extract_user_response(state.user_response)
+    # Usa interrupt return value come priorità
+    if resume_value and str(resume_value).strip():
+        user_response = str(resume_value).strip()
+    else:
+        user_response = extract_user_response(state.user_response)
     state.user_response = "" # Clear
     
     # Default: continue with AI analysis if empty

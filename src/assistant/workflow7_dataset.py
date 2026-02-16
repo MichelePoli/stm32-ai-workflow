@@ -151,6 +151,7 @@ Rispondi SOLO con una parola: REAL, REGISTER, o SYNTHETIC. Se incerto: null.
 
     # --- Passo 2: Verifica e Interrupt ---
     if not initial_source:
+        resume_value = None
         if not state.user_response:
             prompt = {
                 "instruction": """Quale sorgente dati vuoi utilizzare per il fine-tuning?
@@ -167,10 +168,13 @@ Cosa preferisci? (1, 2 o 3)""",
             prompt["suggestion"] = f"💡 L'ultima volta hai usato: **{last_source}**."
             
             logger.info("⏸️ Interrupting for data source decision.")
-            interrupt(prompt)
+            resume_value = interrupt(prompt)
         
-        # Dopo la ripresa
-        user_text = extract_user_response(state.user_response).lower()
+        # Dopo la ripresa: usa interrupt return value come priorità
+        if resume_value and str(resume_value).strip():
+            user_text = str(resume_value).strip().lower()
+        else:
+            user_text = extract_user_response(state.user_response).lower()
         state.user_response = ""
         
         if "1" in user_text or "real" in user_text or "predefini" in user_text:
@@ -212,13 +216,18 @@ Format richiesto:
 """
     
     from src.assistant.utils import extract_user_response
+    resume_value = None
     if not state.user_response or state.user_response.strip() == "":
-        interrupt({
+        resume_value = interrupt({
             "instruction": prompt_text,
             "hint": "Puoi scrivere in linguaggio naturale, estrarrò io i dati."
         })
     
-    user_input = extract_user_response(state.user_response)
+    # Usa interrupt return value come priorità
+    if resume_value and str(resume_value).strip():
+        user_input = str(resume_value).strip()
+    else:
+        user_input = extract_user_response(state.user_response)
     state.user_response = "" # Clear
     
     logger.info(f"📝 User response: {user_input[:100]}")
@@ -421,6 +430,7 @@ def select_predefined_dataset(state: MasterState, config: RunnableConfig = None)
 
     # --- Passo 2: Verifica e Interrupt ---
     if not initial_selection:
+        resume_value = None
         if not state.user_response:
             # Suggerimento se l'utente ha una preferenza passata
             last_ds = state.persistent_context.get("last_real_dataset", "Nessuno") if state.persistent_context else "Nessuno"
@@ -428,9 +438,13 @@ def select_predefined_dataset(state: MasterState, config: RunnableConfig = None)
                 prompt["suggestion"] = f"💡 L'ultima volta hai usato: **{last_ds}**. Vuoi usare lo stesso?"
             
             logger.info("⏸️ Interrupting for dataset selection.")
-            interrupt(prompt)
+            resume_value = interrupt(prompt)
         
-        selection = extract_user_response(state.user_response).lower().strip()
+        # Usa interrupt return value come priorità
+        if resume_value and str(resume_value).strip():
+            selection = str(resume_value).strip().lower()
+        else:
+            selection = extract_user_response(state.user_response).lower().strip()
         state.user_response = ""
     else:
         selection = initial_selection
