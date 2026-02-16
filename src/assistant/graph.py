@@ -716,7 +716,14 @@ def inject_ai_analysis_nodes(builder: StateGraph):
         }
     )
     
-    builder.add_edge("apply_user_customization", "decide_data_source")
+    builder.add_conditional_edges(
+        "apply_user_customization",
+        lambda state: "decide_data_source" if state.customization_applied else "ask_continue_after_customization",
+        {
+            "decide_data_source": "decide_data_source",
+            "ask_continue_after_customization": "ask_continue_after_customization"
+        }
+    )
     
     # 5. Data Source Routing
     def inner_dataset_source_routing(state: MasterState) -> Literal["select_predefined_dataset", "register_custom_dataset", "ask_synthetic_data_requirements", "ask_optimization_preference"]:

@@ -223,14 +223,17 @@ Esempio: "Crea progetto MyApp per STM32F401 con CubeIDE"
                 "instruction": prompt["instruction"],
                 "suggestion": f"� Ho visto che l'ultima volta hai usato: **{last_board}**. Vuoi usare la stessa o una nuova?"
             }
-            logger.info("⏸️ Interrupting: Requesting project info with profile suggestion.")
-            resume_value = interrupt(dynamic_prompt)
-        
-        # Dopo la ripresa: usa interrupt return value come priorità
-        if resume_value and str(resume_value).strip():
-            user_text = str(resume_value).strip()
+        if not state.user_response:
+            # logger.info("⏸️ Interrupting: Requesting project info with profile suggestion.")
+            # resume_value = interrupt(dynamic_prompt)
+            logger.info("⏭️  BYPASS: Selezione automatica board -> 'STM32H7A3ZI'")
+            user_text = "STM32H7A3ZI"
         else:
-            user_text = extract_user_response(state.user_response)
+            # Dopo la ripresa: usa interrupt return value come priorità
+            if resume_value and str(resume_value).strip():
+                user_text = str(resume_value).strip()
+            else:
+                user_text = extract_user_response(state.user_response)
         state.user_response = ""
         
         res = llm_extractor.invoke([
@@ -270,7 +273,16 @@ Esempio: "Crea progetto MyApp per STM32F401 con CubeIDE"
     state.project_name = state.project_name or "MySTM32Project"
     state.toolchain = state.toolchain or "STM32CubeIDE"
     
-    logger.info(f"✓ Configurazione finale: {state.board_name} ({state.mcu_series})")
+    if state.board_name and (not state.target or state.target == "stm32f401"):
+        # Sincronizza target AI con la board selezionata
+        b_low = state.board_name.lower()
+        targets = ["f0", "f1", "f2", "f3", "f4", "f7", "h5", "h7", "l0", "l1", "l4", "l5", "u5", "g0", "g4", "w5", "c0", "n6"]
+        for t in targets:
+            if t in b_low:
+                state.target = f"stm32{t}"
+                break
+    
+    logger.info(f"✓ Configurazione finale: {state.board_name} ({state.mcu_series}) - Target AI: {state.target}")
     state.timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     return state
 

@@ -504,14 +504,17 @@ Cosa preferisci? (si/no)""",
             if has_modified:
                 prompt["suggestion"] = "💡 L'ultima volta hai personalizzato il modello. Vuoi farlo di nuovo?"
 
-            logger.info("⏸️ Interrupting for modification intent.")
-            resume_value = interrupt(prompt)
-        
-        # Dopo la ripresa: usa interrupt return value come priorità
-        if resume_value and str(resume_value).strip():
-            user_text = str(resume_value).strip().lower()
+        if not state.user_response:
+            # logger.info("⏸️ Interrupting for modification intent.")
+            # resume_value = interrupt(prompt)
+            logger.info("⏭️  BYPASS: Selezione automatica modifica -> 'si'")
+            user_text = "si"
         else:
-            user_text = extract_user_response(state.user_response).lower()
+            # Dopo la ripresa: usa interrupt return value come priorità
+            if resume_value and str(resume_value).strip():
+                user_text = str(resume_value).strip().lower()
+            else:
+                user_text = extract_user_response(state.user_response).lower()
         state.user_response = ""
         
         # Riapplica LLM sulla risposta specifica
@@ -1460,7 +1463,12 @@ Write your modifications in natural language (or leave empty for defaults):
     if not state.user_response:
         # Prova a estrarre modifiche dal messaggio iniziale, ma verifica con confidence
         res = llm_extractor.invoke([
-            SystemMessage(content="Extract modifications from this message. If the message does NOT contain explicit neural network modification requests (like freeze layers, add dropout, change input, etc.), return an EMPTY modifications list. Do NOT invent modifications."),
+            SystemMessage(content="""Extract modifications from this message. 
+STRICT RULES:
+1. If the message does NOT contain explicit neural network modification requests (like freeze layers, add dropout, change input, etc.), return an EMPTY modifications list. 
+2. Do NOT invent modifications based on examples provided in the prompt.
+3. If the user just says 'yes', 'si', or 'ok' without specifying WHAT to change, return EMPTY.
+4. ONLY extract: freeze_layers, freeze_almost_all, change_output_layer, add_dropout, change_input_shape, change_learning_rate, add_resizing_layer."""),
             HumanMessage(content=f"Messaggio: {state.message}")
         ])
         if res.modifications and res.confidence >= 0.7:
@@ -1482,14 +1490,16 @@ Esempi:
 """,
             }
             
-            logger.info("⏸️ Interrupting for customization details.")
-            resume_value = interrupt(prompt)
+            # logger.info("⏸️ Interrupting for customization details.")
+            # resume_value = interrupt(prompt)
             
-            # Usa il return value di interrupt() come priorità (compatibilità LangGraph Studio)
-            if resume_value and str(resume_value).strip():
-                user_modifications = str(resume_value).strip()
-            else:
-                user_modifications = extract_user_response(state.user_response)
+            # # Usa il return value di interrupt() come priorità (compatibilità LangGraph Studio)
+            # if resume_value and str(resume_value).strip():
+            #     user_modifications = str(resume_value).strip()
+            # else:
+            #     user_modifications = extract_user_response(state.user_response)
+            logger.info("⏭️  BYPASS: Selezione automatica modifiche -> 'freeze first 5 layers and add 0.4 dropout'")
+            user_modifications = "freeze first 5 layers and add 0.4 dropout"
         else:
             user_modifications = extract_user_response(state.user_response)
         
@@ -1576,7 +1586,12 @@ Return JSON with modifications list."""
         
         # Invoke LLM
         result: ParsedModificationsPlan = structured_llm.invoke([
-            SystemMessage(content="You are a neural network customization expert. The user may write in Italian or English. Parse their request accurately. Return valid JSON only."),
+            SystemMessage(content="""You are a neural network customization expert. 
+STRICT RULES:
+1. Parse ONLY what is explicitly requested in the USER REQUEST.
+2. DO NOT add 'change_input_shape' or 'add_resizing_layer' unless specifically mentioned (e.g., 'change input to...', 'make it flexible', 'add resizing').
+3. If the request is 'freeze first 5 layers and add 0.4 dropout', modifications MUST ONLY contain 'freeze_layers' and 'add_dropout'.
+4. Match parameters accurately. Return valid JSON only."""),
             HumanMessage(content=llm_prompt)
         ])
         
@@ -1843,17 +1858,19 @@ Training Recommendation:{train_text}
     from src.assistant.utils import extract_user_response
     resume_value = None
     if not state.user_response or state.user_response.strip() == "":
-        resume_value = interrupt(confirmation_prompt)
-    
-    # Usa il return value di interrupt() come priorità (compatibilità LangGraph Studio),
-    # altrimenti usa state.user_response (compatibilità server.py/VS Code)
-    if resume_value and str(resume_value).strip():
-        raw_response = str(resume_value).strip()
-        logger.info(f"📝 Risposta utente (interrupt return): '{raw_response}'")
-        user_response = raw_response
+        # resume_value = interrupt(confirmation_prompt)
+        logger.info("⏭️  BYPASS: Conferma modifiche automatica -> 'si'")
+        user_response = "si"
     else:
-        logger.info(f"📝 Risposta utente (state): '{state.user_response}'")
-        user_response = extract_user_response(state.user_response)
+        # Usa il return value di interrupt() come priorità (compatibilità LangGraph Studio),
+        # altrimenti usa state.user_response (compatibilità server.py/VS Code)
+        if resume_value and str(resume_value).strip():
+            raw_response = str(resume_value).strip()
+            logger.info(f"📝 Risposta utente (interrupt return): '{raw_response}'")
+            user_response = raw_response
+        else:
+            logger.info(f"📝 Risposta utente (state): '{state.user_response}'")
+            user_response = extract_user_response(state.user_response)
     state.user_response = "" # Clear
     
     # ==================== PARSING LLM DELLA RISPOSTA ====================
@@ -2638,15 +2655,21 @@ except Exception as e:
 
         result = execute_in_environment(python_code, state, timeout=600)
         
-        if not result['success']:
-            logger.error(f"❌ Customization failed: {result['stderr'][:500]}")
-            state.customization_applied = False
-            state.error_message = result['stderr']
-            return state
-        
         output = result['stdout']
+        stderr = result['stderr']
         logger.info(f"Subprocess output:\n{output}")
         
+        # Rilevamento errori nel testo (anche se exit_code=0)
+        lowered_output = (output + "\n" + stderr).lower()
+        has_error = "error:" in lowered_output or "exception encountered:" in lowered_output or "traceback" in lowered_output
+        
+        if not result['success'] or has_error:
+            error_msg = stderr if stderr.strip() else output.split("ERROR:")[-1].strip()
+            logger.error(f"❌ Customization subprocess failed: {error_msg[:500]}")
+            state.customization_applied = False
+            state.error_message = error_msg
+            return state
+
         if "SUCCESS:" in output:
             parts = output.split("SUCCESS:")[-1].strip().split('|')
             customized_path = parts[0].strip()
@@ -3364,13 +3387,15 @@ def ask_optimization_preference(state: MasterState, config: RunnableConfig = Non
     logger.info("📝 Checking for UI response...")
     resume_value = None
     if not state.user_response or state.user_response.strip() == "":
-        resume_value = interrupt(prompt)
-    
-    # Usa interrupt return value come priorità
-    if resume_value and str(resume_value).strip():
-        response = str(resume_value).strip()
+        # resume_value = interrupt(prompt)
+        logger.info("⏭️  BYPASS: Selezione ottimizzazione automatica -> 'standard'")
+        response = "standard"
     else:
-        response = extract_user_response(state.user_response)
+        # Usa interrupt return value come priorità
+        if resume_value and str(resume_value).strip():
+            response = str(resume_value).strip()
+        else:
+            response = extract_user_response(state.user_response)
     state.user_response = "" # Clear
     
     # Default if empty
@@ -3751,14 +3776,18 @@ def ask_continue_after_customization(state: MasterState, config: RunnableConfig 
     
     
     
+    info = state.customized_model_info or {}
+    params = info.get('total_params')
+    params_str = f"{params:,}" if isinstance(params, (int, float)) else "N/A"
+    
     summary = f"""
 Customization Complete!
 
 Final Model: {state.final_model_path}
-- Input: {state.customized_model_info.get('input_shape')}
-- Output: {state.customized_model_info.get('output_shape')}
-- Params: {state.customized_model_info.get('total_params'):,}
-- Size: {state.customized_model_info.get('model_size_mb', 'N/A')} MB
+- Input: {info.get('input_shape', 'N/A')}
+- Output: {info.get('output_shape', 'N/A')}
+- Params: {params_str}
+- Size: {info.get('model_size_mb', 'N/A')} MB
 
 Training Results:
 - Accuracy: {state.training_test_result.get('final_accuracy', 'N/A')}

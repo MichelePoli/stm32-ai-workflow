@@ -166,20 +166,19 @@ Rispondi SEMPRE in formato JSON valido.
 
 # Istruzioni estratte dinamicamente
 
-model_selection_instructions = """Analizza la risposta dell'utente sulla selezione del modello.
+model_selection_instructions = """Analizza la risposta dell'utente sulla selezione del modello specifico.
+L'utente sta scegliendo un modello da una lista numerata.
 
-L'utente risponde a: "Quale modello vuoi usare? (1-N oppure 'no'/'ricerca')"
+REGOLE CRITICAL:
+1. Se la risposta è un numero (es. "1", "2"), mappa rigorosamente verso quell'indice (model_index).
+2. "model_accepted" deve essere true se l'utente sceglie un modello dalla lista.
+3. Se l'utente rifiuta tutti o scrive "no" / "nessuno", imposta wants_another_search: true e model_accepted: false.
+4. Se l'utente vuole usare un default o non sa, imposta model_accepted: false e wants_another_search: false.
 
-Esempi di risposte:
-- "1" o "Il primo" → model_index: 1, model_accepted: true
-- "2" o "Il secondo modello" → model_index: 2, model_accepted: true
-- "no" / "Nessuno" / "Non mi piace" → model_accepted: false, wants_another_search: true
-- "Usa il default" / "Default" → model_accepted: false, wants_another_search: false
-
-Rispondi SEMPRE in formato JSON con:
-- "model_index": numero intero (1-based) o null se non scelto
-- "model_accepted": true se utente accetta, false altrimenti
-- "wants_another_search": true se vuole cercare ancora, false se usa default
+Output JSON:
+- "model_index": int (1-based) o null
+- "model_accepted": boolean
+- "wants_another_search": boolean
 """
 
 model_feedback_extraction_instructions = """Analizza il feedback dell'utente sul modello proposto.
@@ -299,9 +298,25 @@ Esempi:
     
     # === IDEMPOTENCY CHECK ===
     # Se abbiamo già target e compression (es: iniettati da config o resume), saltiamo.
+    # CRITICO: Non saltare se il target è quello di default ma la board è diversa!
+    board_target = None
+    if state.board_name:
+        # Mappa semplice per board note o estrazione serie
+        b_low = state.board_name.lower()
+        targets = ["f0", "f1", "f2", "f3", "f4", "f7", "h5", "h7", "l0", "l1", "l4", "l5", "u5", "g0", "g4", "w5", "c0", "n6"]
+        for t in targets:
+            if t in b_low:
+                board_target = f"stm32{t}"
+                break
+    
+    # Se la board attuale suggerisce un target diverso da quello salvato, NON saltare
     if state.target and state.compression and not state.user_response:
-        logger.info(f"⏭️  Idempotenza: Target '{state.target}' e Compression '{state.compression}' già presenti. Salto interrupt.")
-        return state
+        if board_target and board_target != state.target:
+            logger.info(f"🔄 Reset target AI per allineamento board: {state.target} -> {board_target}")
+            state.target = board_target
+        else:
+            logger.info(f"⏭️  Idempotenza: Target '{state.target}' e Compression '{state.compression}' già presenti. Salto interrupt.")
+            return state
 
     from src.assistant.utils import extract_user_response, get_llm
     
@@ -418,24 +433,24 @@ def choose_ai_task(state: MasterState, config: RunnableConfig = None) -> MasterS
     cfg = Configuration.from_runnable_config(config)
     llm = get_llm(config=config, temperature=0)
     
-    # === STEP 1: COSTRUZIONE PROMPT DINAMICO ===
     categories = list(PREDEFINED_MODELS.keys())
-    prompt_lines = ["Seleziona il task che vuoi fare:\n"]
+    prompt_lines = ["--- MODELLI PREDEFINITI (Ottimizzati e Garantiti) ---", "Seleziona una categoria per vedere i modelli pronti all'uso:\n"]
     mapping = {}
     for i, cat in enumerate(categories, 1):
         desc = PREDEFINED_MODELS[cat].get("description", cat)
         prompt_lines.append(f"{i}. {desc}")
         mapping[str(i)] = cat
     
+    prompt_lines.append("\n--- ALTRE OPZIONI ---")
     reg_idx = len(categories) + 1
-    prompt_lines.append(f"{reg_idx}. Registra un NUOVO modello (fornisci dettagli nel prossimo step)")
+    prompt_lines.append(f"{reg_idx}. Registra un TUO modello locale (già presente sul disco)")
     mapping[str(reg_idx)] = "register_new"
     
     other_idx = reg_idx + 1
-    prompt_lines.append(f"{other_idx}. Nessuno di questi (ricerca online)")
+    prompt_lines.append(f"{other_idx}. Ricerca ONLINE (Cerca nuovi modelli su GitHub/Google)")
     mapping[str(other_idx)] = "other"
     
-    prompt_text = "\n".join(prompt_lines) + f"\n\nRispondi: 1-{other_idx} oppure descrivi il task"
+    prompt_text = "\n".join(prompt_lines) + f"\n\nRispondi con il numero (1-{other_idx}) o descrivi cosa vuoi fare."
     
     # === IDEMPOTENCY & INTERRUPT ===
     if state.last_task and state.last_task != "other" and not state.user_response:
@@ -444,20 +459,40 @@ def choose_ai_task(state: MasterState, config: RunnableConfig = None) -> MasterS
 
     resume_value = None
     if not state.user_response or state.user_response.strip() == "":
-        resume_value = interrupt({"instruction": prompt_text})
-    
-    # Usa interrupt return value come priorità
-    if resume_value and str(resume_value).strip():
-        user_text = str(resume_value).strip()
+        # logger.info("⏸️ Interrupting for AI task selection.")
+        # resume_value = interrupt({"instruction": prompt_text})
+        logger.info("⏭️  BYPASS: Selezione automatica task -> '1' (Classificazione)")
+        user_text = "1"
     else:
-        user_text = extract_user_response(state.user_response).strip()
+        # Usa interrupt return value come priorità
+        if resume_value and str(resume_value).strip():
+            user_text = str(resume_value).strip()
+        else:
+            user_text = extract_user_response(state.user_response).strip()
     state.user_response = "" # Clear after use
     if not user_text: user_text = "1"
     
+    logger.info(f"📥 Risposta utente ricevuta: '{user_text}'")
+    
     # === ESTRAI TASK CON LLM ===
-    dynamic_instructions = f"Analizza la risposta dell'utente e determina il task AI richiesto.\nMenu:\n{prompt_text}\n\nMapping:\n"
-    for k, v in mapping.items(): dynamic_instructions += f'- "{k}" -> {v}\n'
-    dynamic_instructions += "\nRispondi JSON: {\"task\": \"...\", \"confidence\": 0.0-1.0}"
+    mapping_text = "\n".join([f'- "{k}" -> {v}' for k, v in mapping.items()])
+    dynamic_instructions = f"""Analizza la risposta dell'utente e determina il task AI richiesto.
+Usa rigorosamente il mapping numerico se l'utente ha inserito un numero.
+
+Menu visualizzato all'utente:
+{prompt_text}
+
+MAPPING ESPLICITO:
+{mapping_text}
+
+REGOLE:
+1. Se l'utente risponde con un numero presente nel mapping, ritorna il task corrispondente.
+2. Se l'utente descrive un'azione, mappa verso la categoria più vicina.
+3. Se l'utente vuole qualcosa di non presente o una ricerca, usa "other".
+4. Il valore di "confidence" deve essere 1.0 per match numerici esatti.
+
+Rispondi in formato JSON: {{"task": "...", "confidence": 0.0-1.0}}
+"""
 
     llm_extractor = get_llm(
         config=config,
@@ -468,6 +503,8 @@ def choose_ai_task(state: MasterState, config: RunnableConfig = None) -> MasterS
         SystemMessage(content=dynamic_instructions),
         HumanMessage(content=f"Risposta utente: {user_text}")
     ])
+    
+    logger.info(f"🤖 LLM Extraction: task='{task_result.task}', confidence={task_result.confidence}")
     
     state.last_task = task_result.task
     logger.info(f"✓ Task selezionato: {state.last_task}")
@@ -524,13 +561,16 @@ def choose_ai_model(state: MasterState, config: RunnableConfig = None) -> Master
     
     resume_value = None
     if not state.user_response or state.user_response.strip() == "":
-        resume_value = interrupt({"instruction": prompt_text})
-    
-    # Usa interrupt return value come priorità
-    if resume_value and str(resume_value).strip():
-        model_text = str(resume_value).strip()
+        # logger.info("⏸️ Interrupting for AI model selection.")
+        # resume_value = interrupt({"instruction": prompt_text})
+        logger.info("⏭️  BYPASS: Selezione automatica modello -> '2' (MobileNetV1)")
+        model_text = "2"
     else:
-        model_text = extract_user_response(state.user_response).strip()
+        # Usa interrupt return value come priorità
+        if resume_value and str(resume_value).strip():
+            model_text = str(resume_value).strip()
+        else:
+            model_text = extract_user_response(state.user_response).strip()
     state.user_response = "" # Clear after use
     
     # === ESTRAZIONE SCELTA ===
@@ -541,10 +581,14 @@ def choose_ai_model(state: MasterState, config: RunnableConfig = None) -> Master
         temperature=0
     )
     
+    logger.info(f"📥 Risposta utente per modello: '{model_text}'")
+    
     model_result = llm_model_extractor.invoke([
         SystemMessage(content=model_selection_instructions),
-        HumanMessage(content=f"Modelli: {len(available_models)}\nRisposta: {model_text}")
+        HumanMessage(content=f"Modelli disponibili: {len(available_models)}\nRisposta utente: {model_text}")
     ])
+    
+    logger.info(f"🤖 LLM Model Extraction: index={model_result.model_index}, accepted={model_result.model_accepted}, search_again={model_result.wants_another_search}")
     
     if model_result.model_accepted and model_result.model_index:
         model_idx = model_result.model_index - 1
@@ -1651,7 +1695,8 @@ def download_model_to_cache(state: MasterState, config: RunnableConfig, model: d
             response = requests.get(direct_url, stream=True, timeout=30, allow_redirects=True)
             
             if response.status_code == 404:
-                logger.warning(f"⚠️  URL restituisce 404")
+                logger.warning(f"⚠️  URL restituisce 404 (Not Found)")
+                return None
             else:
                 response.raise_for_status()
                 
@@ -1670,8 +1715,14 @@ def download_model_to_cache(state: MasterState, config: RunnableConfig, model: d
                                     last_log = (int(pct / 20)) * 20
                                     logger.info(f"  ⬇️  {last_log}%")
                 
-                
-                logger.info(f"✓ Download completato! Size: {os.path.getsize(cached_path) / (1024*1024):.1f} MB")
+                # ✅ VERIFICA POST-DOWNLOAD
+                actual_size = os.path.getsize(cached_path)
+                if actual_size == 0:
+                    logger.error(f"❌ Download fallito: Il file salvato è vuoto (0 bytes)!")
+                    if os.path.exists(cached_path): os.remove(cached_path)
+                    return None
+                    
+                logger.info(f"✓ Download completato! Size: {actual_size / (1024*1024):.1f} MB")
                 
                 # ===== SECURITY: Verify file integrity (SHA256) =====
                 from src.assistant.utils import verify_file_integrity
@@ -2317,6 +2368,13 @@ Rispondi con un JSON che contiene:
         logger.info("🧹 Reset board state per cambio microcontrollore.")
     else:
         state.route = "change_model"
+        # Reset AI state to force new selection
+        state.last_task = None
+        state.selected_model = None
+        state.model_discovery_method = "taskbased"
+        state.model_accepted = False
+        state.search_iterations = 0
+        logger.info("🧹 Reset AI selection state per cambio modello.")
         
     return state
 

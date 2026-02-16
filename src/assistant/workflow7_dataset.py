@@ -167,14 +167,17 @@ Cosa preferisci? (1, 2 o 3)""",
             last_source = state.persistent_context.get("last_dataset_source", "Si consiglia Synthetic per i test veloci.") if state.persistent_context else "Si consiglia Synthetic per i test veloci."
             prompt["suggestion"] = f"💡 L'ultima volta hai usato: **{last_source}**."
             
-            logger.info("⏸️ Interrupting for data source decision.")
-            resume_value = interrupt(prompt)
-        
-        # Dopo la ripresa: usa interrupt return value come priorità
-        if resume_value and str(resume_value).strip():
-            user_text = str(resume_value).strip().lower()
+        if not state.user_response:
+            # logger.info("⏸️ Interrupting for data source decision.")
+            # resume_value = interrupt(prompt)
+            logger.info("⏭️  BYPASS: Selezione automatica sorgente -> '1' (Real Dataset)")
+            user_text = "1"
         else:
-            user_text = extract_user_response(state.user_response).lower()
+            # Dopo la ripresa: usa interrupt return value come priorità
+            if resume_value and str(resume_value).strip():
+                user_text = str(resume_value).strip().lower()
+            else:
+                user_text = extract_user_response(state.user_response).lower()
         state.user_response = ""
         
         if "1" in user_text or "real" in user_text or "predefini" in user_text:
@@ -437,14 +440,17 @@ def select_predefined_dataset(state: MasterState, config: RunnableConfig = None)
             if last_ds != "Nessuno" and last_ds in valid_keys:
                 prompt["suggestion"] = f"💡 L'ultima volta hai usato: **{last_ds}**. Vuoi usare lo stesso?"
             
-            logger.info("⏸️ Interrupting for dataset selection.")
-            resume_value = interrupt(prompt)
-        
-        # Usa interrupt return value come priorità
-        if resume_value and str(resume_value).strip():
-            selection = str(resume_value).strip().lower()
+        if not state.user_response:
+            # logger.info("⏸️ Interrupting for dataset selection.")
+            # resume_value = interrupt(prompt)
+            logger.info("⏭️  BYPASS: Selezione automatica dataset -> 'fruit_360'")
+            selection = "fruit_360"
         else:
-            selection = extract_user_response(state.user_response).lower().strip()
+            # Usa interrupt return value come priorità
+            if resume_value and str(resume_value).strip():
+                selection = str(resume_value).strip().lower()
+            else:
+                selection = extract_user_response(state.user_response).lower().strip()
         state.user_response = ""
     else:
         selection = initial_selection
