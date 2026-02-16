@@ -24,6 +24,83 @@ services:
       - minio_data:/data
     restart: always
 
+  ollama:
+    image: ollama/ollama:latest
+    container_name: stm32-ai-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    # GPU Support (Comment out if using CPU only)
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: always
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  ollama-pull-models:
+    image: ollama/ollama:latest
+    container_name: stm32-ai-ollama-puller
+    environment:
+      - OLLAMA_HOST=ollama:11434
+    volumes:
+      - ./scripts/pull_docker_models.sh:/pull_models.sh
+    entrypoint: /bin/sh
+    command: "-c 'sleep 5; /pull_models.sh'"
+    depends_on:
+      ollama:
+        condition: service_healthy
+
+  langgraph-app:
+    build: .
+    container_name: stm32-ai-langgraph
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - LOCAL_LLM=${MODEL_NAME:-mistral}
+      - REDIS_URL=redis://redis:6379
+    ports:
+      - "8000:8000"
+    depends_on:
+      ollama:
+        condition: service_healthy
+      ollama-pull-models:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
+    volumes:
+      - ./src:/app/src
+      - ./data:/app/data
+      - ./.env:/app/.env
+    restart: unless-stopped
+
+  # Future Triton Inference Server (Placeholder)
+  # triton-server:
+  #   image: nvcr.io/nvidia/tritonserver:23.10-py3
+  #   container_name: stm32-ai-triton
+  #   ports:
+  #     - "8001:8000" # HTTP (mapped to 8001 to avoid conflict with app)
+  #     - "8002:8001" # GRPC
+  #     - "8003:8002" # Metrics
+  #   volumes:
+  #     - ./model_repository:/models
+  #   command: ["tritonserver", "--model-repository=/models"]
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - driver: nvidia
+  #             count: 1
+  #             capabilities: [gpu]
+
 volumes:
   redis_data:
   minio_data:
+  ollama_data:

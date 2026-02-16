@@ -367,14 +367,13 @@ Esempi:
     
     # === ESTRAI TARGET E COMPRESSION ===
     
-    llm = ChatOllama(
-        model=cfg.local_llm,
-        temperature=0,
-        num_ctx=cfg.llm_context_window,
-        
-    )
+    # === ESTRAI TARGET E COMPRESSION ===
     
-    llm_extractor = llm.with_structured_output(AnalysisInfoExtraction)
+    llm_extractor = get_llm(
+        config=config,
+        structured_schema=AnalysisInfoExtraction,
+        temperature=0
+    )
     
     extraction_result = llm_extractor.invoke([
         SystemMessage(content=analysis_info_extraction_instructions),
@@ -416,11 +415,8 @@ def choose_ai_task(state: MasterState, config: RunnableConfig = None) -> MasterS
     PREDEFINED_MODELS = load_predefined_models()
     
     cfg = Configuration.from_runnable_config(config)
-    llm = ChatOllama(
-        model=cfg.local_llm,
-        temperature=0,
-        num_ctx=cfg.llm_context_window
-    )
+    cfg = Configuration.from_runnable_config(config)
+    llm = get_llm(config=config, temperature=0)
     
     # === STEP 1: COSTRUZIONE PROMPT DINAMICO ===
     categories = list(PREDEFINED_MODELS.keys())
@@ -463,7 +459,11 @@ def choose_ai_task(state: MasterState, config: RunnableConfig = None) -> MasterS
     for k, v in mapping.items(): dynamic_instructions += f'- "{k}" -> {v}\n'
     dynamic_instructions += "\nRispondi JSON: {\"task\": \"...\", \"confidence\": 0.0-1.0}"
 
-    llm_extractor = llm.with_structured_output(TaskSelectionExtraction)
+    llm_extractor = get_llm(
+        config=config,
+        structured_schema=TaskSelectionExtraction,
+        temperature=0
+    )
     task_result = llm_extractor.invoke([
         SystemMessage(content=dynamic_instructions),
         HumanMessage(content=f"Risposta utente: {user_text}")
@@ -535,8 +535,11 @@ def choose_ai_model(state: MasterState, config: RunnableConfig = None) -> Master
     
     # === ESTRAZIONE SCELTA ===
     cfg = Configuration.from_runnable_config(config)
-    llm = get_llm(config)
-    llm_model_extractor = llm.with_structured_output(ModelSelectionExtraction)
+    llm_model_extractor = get_llm(
+        config=config,
+        structured_schema=ModelSelectionExtraction,
+        temperature=0
+    )
     
     model_result = llm_model_extractor.invoke([
         SystemMessage(content=model_selection_instructions),

@@ -61,7 +61,8 @@ def get_llm(
     llm = ChatOllama(
         model=cfg.local_llm,
         temperature=temperature,
-        num_ctx=cfg.llm_context_window
+        num_ctx=cfg.llm_context_window,
+        base_url=cfg.ollama_base_url
     )
     
     if structured_schema:
@@ -76,7 +77,8 @@ def force_unload_ollama(model_name: str = "gpt-oss:20b"):
     Sends a request with keep_alive=0.
     """
     try:
-        url = "http://localhost:11434/api/generate"
+        base_url = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
+        url = f"{base_url}/api/generate"
         data = {
             "model": model_name,
             "keep_alive": 0

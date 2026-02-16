@@ -292,13 +292,12 @@ def route_request(state: MasterState, config: RunnableConfig = None) -> MasterSt
         logger.info(f"✓ Configurazione caricata")
         
         # === ROUTING LLM ===
-        llm = ChatOllama(
-            model=cfg.local_llm,
-            temperature=cfg.llm_temperature,
-            num_ctx=cfg.llm_context_window
+        from src.assistant.utils import get_llm
+        llm_router = get_llm(
+            config=config,
+            structured_schema=RouteDecision,
+            temperature=cfg.llm_temperature
         )
-        
-        llm_router = llm.with_structured_output(RouteDecision)
         
         # Includi profilo utente nella richiesta se presente
         user_info = f"\n\nPROFILO UTENTE: {state.persistent_context}" if state.persistent_context else ""
@@ -332,10 +331,10 @@ def general_chat(state: MasterState, config: RunnableConfig = None) -> MasterSta
     
     try:
         cfg = Configuration.from_runnable_config(config or {})
-        llm = ChatOllama(
-            model=cfg.local_llm,
-            temperature=0.7, # Leggermente più alta per chat
-            num_ctx=cfg.llm_context_window
+        from src.assistant.utils import get_llm
+        llm = get_llm(
+            config=config,
+            temperature=0.7 # Leggermente più alta per chat
         )
         
         # Costruisci il prompt includendo la memoria storica

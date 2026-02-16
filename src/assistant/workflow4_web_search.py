@@ -61,10 +61,11 @@ def _evaluate_summary_sync(
         )
         from deepeval.test_case import LLMTestCase
         
+        base_url = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
         # Initialize Ollama model
         ollama_model = OllamaModel(
-            model="mistral", # O deepseek-r1:latest se disponibile
-            base_url="http://localhost:11434"
+            model="deepseek-r1:latest", 
+            base_url=base_url
         )
         
         # Define metrics 
@@ -320,13 +321,11 @@ def classify_search(state: MasterState, config: RunnableConfig = None) -> Master
     try:
         cfg = Configuration.from_runnable_config(config)
         
-        llm = ChatOllama(
-            model=cfg.local_llm,
-            temperature=cfg.llm_temperature,
-            num_ctx=cfg.llm_context_window
+        from src.assistant.utils import get_llm
+        llm_classifier = get_llm(
+            config=config,
+            structured_schema=SearchClassification,
         )
-        
-        llm_classifier = llm.with_structured_output(SearchClassification)
         
         result = llm_classifier.invoke([
             SystemMessage(content=search_classification_instructions),
@@ -378,8 +377,9 @@ def execute_web_search(state: MasterState, config: RunnableConfig = None) -> Mas
         logger.info(f"📋 Prompt utilizzato per {state.search_type} (lunghezza: {len(search_prompt)} char)")
         
         # Inizializza Agno Agent con Google Search
+        cfg = Configuration.from_runnable_config(config)
         agent = Agent(
-            model=Ollama(id="mistral"),
+            model=Ollama(id="mistral", base_url=cfg.ollama_base_url),
             tools=[DuckDuckGoTools()],
             markdown=True
         )
@@ -479,9 +479,10 @@ def summarize_search_results(state: MasterState, config: RunnableConfig = None) 
         Answer:
         """
         
-        llm = ChatOllama(
-            model=cfg.local_llm,
-            temperature=0.2, # Low temp for factual summary
+        from src.assistant.utils import get_llm
+        llm = get_llm(
+            config=config,
+            temperature=0.2 # Low temp for factual summary
         )
         
         response = llm.invoke(summary_prompt)

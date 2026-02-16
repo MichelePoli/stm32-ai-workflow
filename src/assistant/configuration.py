@@ -77,6 +77,9 @@ class Configuration:
     llm_context_window: int = field(
         default_factory=lambda: int(os.environ.get("LLM_CONTEXT_WINDOW", "4096"))
     )
+    ollama_base_url: str = field(
+        default_factory=lambda: os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
+    )
 
     # ============================================================================
     # CONFIGURAZIONE AI ANALYSIS - ✅ AGGIUNTO
@@ -242,6 +245,7 @@ class Configuration:
 ║   Model:         {self.local_llm:<35} ║
 ║   Temperature:   {self.llm_temperature:<35} ║
 ║   Context:       {self.llm_context_window:<35} ║
+║   Base URL:      {self.ollama_base_url:<35} ║
 ║                                                        ║
 ║ AI Analysis                                            ║
 ║   Model:         {self.ai_model_path:<35} ║

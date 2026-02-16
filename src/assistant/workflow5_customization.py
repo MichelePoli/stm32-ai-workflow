@@ -576,7 +576,10 @@ def retrieve_best_practices_for_architecture(state: MasterState, config: Runnabl
                 query=f"best practices customization fine-tuning {arch_type}",
                 persist_dir=arch_persist_dir,
                 arch_type=arch_type,
-                embeddings_override=OllamaEmbeddings(model="mistral")
+                embeddings_override=OllamaEmbeddings(
+                    model="nomic-embed-text",
+                    base_url=os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
+                )
             )          
             if best_practices and len(best_practices) > 0:
                 logger.info(f"  ✓ Retrieved {len(best_practices)} docs from cache")
@@ -636,10 +639,15 @@ def _generate_and_cache_with_llm(
     try:
         # 1. Configura LLM
         # Usa mistral o il modello configurato localmente
+        # NOTA: Per un task semplice come questo, get_llm potrebbe essere overkill per i parametri extra, 
+        # ma sarebbe consistente. Tuttavia, qui usiamo 'mistral' hardcoded per sicurezza.
+        base_url = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
+        
         llm = ChatOllama(
             model="mistral",  
             temperature=0.3, # Bassa temperature per risposte tecniche
-            keep_alive="5m"
+            keep_alive="5m",
+            base_url=base_url
         )
         
         # 2. Prompt per Best Practices (CONCISO & SCHEMATICO)
@@ -693,7 +701,8 @@ def _generate_and_cache_with_llm(
             
             from langchain_ollama import OllamaEmbeddings
             embeddings = OllamaEmbeddings(
-                model="mistral"
+                model="nomic-embed-text",
+                base_url=os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
             )
             
             os.makedirs(persist_dir, exist_ok=True)
@@ -780,8 +789,9 @@ def search_web(queries: List[str]) -> List[dict[str, str]]:
             logger.debug(f"  Searching: {query}")
             
             # ===== SETUP AGNO AGENT =====
+            base_url = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
             agent = Agent(
-                model=Ollama(id="mistral"),
+                model=Ollama(id="mistral", base_url=base_url),
                 tools=[DuckDuckGoTools()],
                 markdown=True
             )
