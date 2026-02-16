@@ -102,6 +102,17 @@ class Configuration:
     )
 
     # ============================================================================
+    # CONDA ENVIRONMENTS
+    # ============================================================================
+    
+    stm32_env: str = field(
+        default_factory=lambda: os.environ.get("STM32_ENV", "stm32")
+    ) # Definisce il nome dell'ambiente principale (quello con Keras 3).Cerca prima una variabile d'ambiente chiamata STM32_ENV.Se non la trova, usa il valore predefinito "stm32".
+    stm32legacy_env: str = field(
+        default_factory=lambda: os.environ.get("STM32LEGACY_ENV", "stm32_legacy")
+    ) # Definisce il nome dell'ambiente legacy (quello con Keras 2). Cerca prima una variabile d'ambiente chiamata STM32LEGACY_ENV. Se non la trova, usa il valore predefinito "stm32_legacy".
+
+    # ============================================================================
     # LOGGING
     # ============================================================================
     
@@ -194,39 +205,66 @@ class Configuration:
         Ritorna il path dell'eseguibile python per un dato ambiente conda.
         Tenta di trovarlo dinamicamente per evitare hardcoded paths.
         """
-        # 1. Tenta con 'conda run'
-        try:
-            cmd = ["conda", "run", "-n", env_name, "which", "python"]
-            if platform.system() == "Windows":
-                cmd = ["conda", "run", "-n", env_name, "where", "python"]
-                
-            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-            path = result.stdout.strip().split('\n')[0]
-            if os.path.exists(path):
+        # Se viene passato uno dei nomi logici, usa il valore configurato
+        if env_name == 'stm32':
+            env_name = self.stm32_env
+        elif env_name == 'stm32legacy':
+            env_name = self.stm32legacy_env
+
+        def try_find_path(target_env: str) -> Optional[str]:
+            # 1. Tenta su percorsi comuni basati sulla piattaforma (PIÙ AFFIDABILE)
+            home = os.path.expanduser("~")
+            if platform.system() == "Darwin": # macOS
+                paths = [
+                    f"/Library/anaconda3/envs/{target_env}/bin/python",
+                    f"/opt/anaconda3/envs/{target_env}/bin/python",
+                    f"{home}/anaconda3/envs/{target_env}/bin/python",
+                    f"{home}/miniconda3/envs/{target_env}/bin/python",
+                    f"/usr/local/anaconda3/envs/{target_env}/bin/python"
+                ]
+            else: # Linux/Generic
+                paths = [
+                    f"{home}/anaconda3/envs/{target_env}/bin/python",
+                    f"{home}/miniconda3/envs/{target_env}/bin/python",
+                    f"/opt/conda/envs/{target_env}/bin/python"
+                ]
+
+            for p in paths:
+                if os.path.exists(p):
+                    return p
+
+            # 2. Fallback su 'conda run' (se i path standard falliscono o sono custom)
+            try:
+                cmd = ["conda", "run", "-n", target_env, "which", "python"]
+                if platform.system() == "Windows":
+                    cmd = ["conda", "run", "-n", target_env, "where", "python"]
+                    
+                result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+                path = result.stdout.strip().split('\n')[0]
+                if os.path.exists(path):
+                    return path
+            except Exception:
+                pass
+
+            return None
+
+        # Primo tentativo: nome esatto
+        path = try_find_path(env_name)
+        if path: return path
+
+        # Secondo tentativo: se fallisce, prova variazioni comuni (aggiunta/rimozione underscore)
+        variations = []
+        if "_" in env_name:
+            variations.append(env_name.replace("_", ""))
+        else:
+            # Prova ad aggiungere underscore in posti comuni se è un nome noto
+            if env_name == "stm32legacy": variations.append("stm32_legacy")
+            
+        for v in variations:
+            path = try_find_path(v)
+            if path:
+                print(f"⚠️  Environment '{env_name}' non trovato, uso variazione '{v}' trovata in {path}")
                 return path
-        except Exception:
-            pass
-
-        # 2. Fallback su percorsi comuni basati sulla piattaforma
-        home = os.path.expanduser("~")
-        if platform.system() == "Darwin": # macOS
-            paths = [
-                f"/Library/anaconda3/envs/{env_name}/bin/python",
-                f"/opt/anaconda3/envs/{env_name}/bin/python",
-                f"{home}/anaconda3/envs/{env_name}/bin/python",
-                f"{home}/miniconda3/envs/{env_name}/bin/python",
-                f"/usr/local/anaconda3/envs/{env_name}/bin/python"
-            ]
-        else: # Linux/Generic
-            paths = [
-                f"{home}/anaconda3/envs/{env_name}/bin/python",
-                f"{home}/miniconda3/envs/{env_name}/bin/python",
-                f"/opt/conda/envs/{env_name}/bin/python"
-            ]
-
-        for p in paths:
-            if os.path.exists(p):
-                return p
 
         return f"PYTHON_PATH_NOT_FOUND_{env_name}"
 

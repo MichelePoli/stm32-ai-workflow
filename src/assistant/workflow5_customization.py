@@ -3501,7 +3501,17 @@ def optimize_hyperparameters_with_nni(state: MasterState, config: RunnableConfig
         logger.info(f"▶️  Launching NNI Manager: {manager_script}")
         
         cfg = Configuration.from_runnable_config()
-        python_path = cfg.get_python_path('stm32legacy')
+        # Se abbiamo già usato un env specifico per la personalizzazione, usiamo lo stesso per NNI. Infatti già nella customization si capisce quale ambiente utilizzare in base al modello con la funzione load_model_with_conda_env. 
+        # Altrimenti capiamo dall'estensione
+        if state.conda_env:
+            env_name = state.conda_env
+            logger.info(f"📋 Usando ambiente memorizzato nello stato: {env_name}")
+        elif model_path.endswith('.keras'):
+            env_name = 'stm32' # Per i modelli moderni (Keras 3). È l'ambiente predefinito per i nuovi progetti.
+        else:
+            env_name = 'stm32_legacy' # Serve quando carichi file .h5 creati con versioni precedenti o architetture che non sono state ancora migrate a Keras 3.
+            
+        python_path = cfg.get_python_path(env_name)
         
         logger.info(f"▶️  Launching NNI Manager with: {python_path}")
         
