@@ -1873,11 +1873,17 @@ def run_analyze(state: MasterState, config: RunnableConfig = None) -> MasterStat
             state.ai_error_message = f"Model not found: {model_path}"
             return state
         
-        # ✅ FIX PER .keras (Keras 3): Converti in TFLite se necessario
-        # stedgeai v2.x ha bug con Keras 3 (es: Concatenate object has no attribute 'get_input_shape_at')
-        if model_path.endswith('.keras'):
-            logger.info("⚡ Rilevato modello Keras 3 (.keras). Avvio conversione TFLite per compatibilità stedgeai...")
-            tflite_path = model_path.replace('.keras', '.tflite')
+        # ✅ FIX PER Keras 3 (Ambiente 'stm32'): Converti in TFLite per compatibilità stedgeai
+        # stedgeai v2.x non supporta direttamente i modelli Keras 3 (anche se salvati come .h5)
+        # Rileviamo Keras 3 se il file è .keras O se sappiamo di essere in ambiente 'stm32'
+        is_keras3 = model_path.endswith('.keras') or state.conda_env == 'stm32'
+        
+        if is_keras3:
+            logger.info("⚡ Rilevato modello Keras 3. Avvio conversione TFLite per compatibilità stedgeai...")
+            tflite_path = model_path.replace('.keras', '.tflite').replace('.h5', '.tflite') # La funzione .replace() viene chiamata due volte di seguito. 
+            # Primo passaggio: Cerca .keras e lo sostituisce con .tflite.
+            # Secondo passaggio: Prende il risultato del primo e cerca .h5, sostituendolo con .tflite. 
+            # Questo garantisce che il file finale abbia estensione .tflite indipendentemente dal formato originale (.keras o .h5).
             
             if not os.path.exists(tflite_path): # Se il file è già presente, il sistema salta tutto il blocco di conversione. Significa che la conversione è già stata eseguita in precedenza.
                 conversion_script = f"""
@@ -2068,6 +2074,11 @@ def check_resource_constraints(state: MasterState, config: RunnableConfig = None
     
     if not state.analyze_success:
         logger.warning("⚠️  Analisi fallita, impossibile verificare constraints.")
+        state.ai_error_message = (
+            "Impossibile analizzare il modello con gli strumenti ST.\n"
+            "Questo solitamente accade per modelli non supportati o errori di conversione.\n"
+            "L'automazione tornerà alla selezione modello per permetterti di sceglierne un altro."
+        )
         state.resource_check_result = "error"
         return state
 
@@ -2221,11 +2232,14 @@ def resource_check_routing(state: MasterState) -> Literal["run_analyze", "run_va
         
     else: # critical or error
         # Notifica utente e torna alla scelta
-        logger.error("🚫 Model rejected due to hardware constraints.")
-        
-        # LOG ONLY - NO INTERRUPT
-        logger.error(f"""⛔ MODELLO TROPPO GRANDE PER {state.target}!
+        if not getattr(state, "analyze_success", True):
+             logger.error(f"❌ Errore Tecnico durante l'analisi: {getattr(state, 'ai_error_message', 'Sconosciuto')}")
+        else:
+            logger.error("🚫 Model rejected due to hardware constraints.")
             
+            # LOG ONLY - NO INTERRUPT
+            logger.error(f"""⛔ MODELLO TROPPO GRANDE PER {state.target}!
+                
 Dettagli Risorse:
 - RAM Richiesta: {format_bytes(state.ram_usage)} (Max: {format_bytes(get_mcu_limits(state.target)[1])})
 - Flash Richiesta: {format_bytes(state.flash_usage)} (Max: {format_bytes(get_mcu_limits(state.target)[0])})

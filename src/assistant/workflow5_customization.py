@@ -3557,6 +3557,7 @@ def optimize_hyperparameters_with_nni(state: MasterState, config: RunnableConfig
             logger.info(f"🏆 Found optimized model at: {best_model_path}")
             state.customized_model_path = best_model_path
             state.model_path = best_model_path # Update source for validation
+            state.customization_applied = True # Indichiamo che il modello è stato modificato
         else:
             logger.warning("⚠️  Optimized model NOT found. Using original/customized path.")
         
@@ -3721,6 +3722,7 @@ except Exception as e:
             info = json.loads(json_str)
             
             state.final_model_path = final_path
+            state.customization_applied = True # Assicuriamoci che sia True
             state.customized_model_info.update({
                 **info,
                 "model_size_mb": round(os.path.getsize(final_path) / (1024*1024), 2),
