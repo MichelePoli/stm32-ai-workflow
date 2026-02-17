@@ -320,15 +320,41 @@ def copy_ai_files(state: MasterState, config: RunnableConfig = None) -> MasterSt
             shutil.copy2(header_file, dest_path)
             logger.info(f"  Copiato: {filename}")
         
-        # === CHECK X-CUBE-AI MIDDLEWARE ===
-        proj_root = os.path.dirname(state.firmware_src_dir)  # Risali da Src/ al project root
-        middlewares_dir = os.path.join(proj_root, "Middlewares", "ST", "AI")
-        if not os.path.exists(middlewares_dir):
-            logger.warning("⚠️  Cartella Middlewares/ST/AI non trovata nel progetto firmware.")
-            logger.warning("    Il progetto potrebbe non compilare senza le librerie runtime X-CUBE-AI.")
-            logger.warning("    Aggiungi il componente X-CUBE-AI tramite STM32CubeMX (.ioc) o copia manualmente.")
+        # === CHECK X-CUBE-AI MIDDLEWARE HEADERS ===
+        # Cerca la cartella st_ai_ws creata da stedgeai accanto a st_ai_output
+        # Struttura attesa: <output_root>/st_ai_ws/inspector_network/workspace/include
+        
+        output_root = os.path.dirname(state.ai_code_dir.rstrip(os.sep)) # ../st_ai_output/code_resnet -> ../st_ai_output
+        ws_include_dir = os.path.join(output_root, "..", "st_ai_ws", "inspector_network", "workspace", "include")
+        ws_include_dir = os.path.abspath(ws_include_dir)
+        
+        proj_root = os.path.dirname(state.firmware_src_dir) 
+        middlewares_ai_inc = os.path.join(proj_root, "Middlewares", "ST", "AI", "Inc")
+
+        if os.path.exists(ws_include_dir):
+            logger.info(f"📂 Trovati headers runtime X-CUBE-AI in: {ws_include_dir}")
+            
+            # Crea cartella destinazione se non esiste
+            os.makedirs(middlewares_ai_inc, exist_ok=True)
+            
+            # Copia tutti i file .h
+            copied_count = 0
+            for header in os.listdir(ws_include_dir):
+                if header.endswith('.h'):
+                    src = os.path.join(ws_include_dir, header)
+                    dst = os.path.join(middlewares_ai_inc, header)
+                    shutil.copy2(src, dst)
+                    copied_count += 1
+            
+            logger.info(f"✓ Copiati {copied_count} headers runtime in Middlewares/ST/AI/Inc")
+            
         else:
-            logger.info("✓ Middlewares X-CUBE-AI rilevati")
+            logger.warning(f"⚠️  Headers runtime non trovati in: {ws_include_dir}")
+            logger.warning("    Il progetto potrebbe mancare di 'ai_platform.h'.")
+            
+            # Fallback warning originale
+            if not os.path.exists(os.path.join(proj_root, "Middlewares", "ST", "AI")):
+                 logger.warning("    Aggiungi il componente X-CUBE-AI tramite STM32CubeMX (.ioc).")
         
         state.copy_success = True
         logger.info("✓ Copia completata")
