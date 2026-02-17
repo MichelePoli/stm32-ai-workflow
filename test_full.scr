@@ -1,6 +1,0 @@
-config load "/home/mrusso/stm32-ai-workflow/src/assistant/templates/ioc_files/STM32F401VCHx.ioc"
-project name TestBench
-project toolchain "STM32CubeIDE"
-project path /home/mrusso/STM32CubeMX/TestBench
-project generate
-exit
