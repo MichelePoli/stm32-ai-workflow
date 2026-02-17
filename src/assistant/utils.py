@@ -48,13 +48,15 @@ def get_llm(
     """
     cfg = Configuration.from_runnable_config(config) if config else Configuration()
     
-    # Base URL logic: kwargs wins over config
+    # Logic for overrides: kwargs win over config
+    model = kwargs.pop('model', cfg.local_llm)
     base_url = kwargs.pop('base_url', cfg.ollama_base_url)
+    num_ctx = kwargs.pop('num_ctx', cfg.llm_context_window)
     
     llm = ChatOllama(
-        model=cfg.local_llm,
+        model=model,
         temperature=temperature,
-        num_ctx=cfg.llm_context_window,
+        num_ctx=num_ctx,
         base_url=base_url,
         **kwargs
     )
