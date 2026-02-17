@@ -20,7 +20,6 @@ import logging
 from typing import Optional, List, Literal
 from datetime import datetime
 
-from langchain_ollama import ChatOllama
 from langchain_core.messages import SystemMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.types import interrupt

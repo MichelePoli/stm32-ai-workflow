@@ -18,7 +18,6 @@ from typing import Literal, Optional, List, Dict, Any
 from datetime import datetime
 
 from langgraph.types import interrupt
-from langchain_ollama import ChatOllama
 from langchain_core.messages import SystemMessage, HumanMessage
 from pydantic import BaseModel, Field
 from langchain_core.runnables import RunnableConfig

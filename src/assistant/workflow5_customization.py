@@ -45,7 +45,6 @@ from typing import Any
 # Pydantic NON capisce: any ❌
 
 from pydantic import BaseModel, Field
-from langchain_ollama import ChatOllama
 from langchain_core.messages import SystemMessage, HumanMessage
 
 from agno.agent import Agent
@@ -634,24 +633,14 @@ def _generate_and_cache_with_llm(
     """
     import time
     from langchain_core.documents import Document
-    from langchain_ollama import ChatOllama
     
     start_time = time.time()
     logger.info(f"  Generating best practices for {arch_type} with LLM...")
     
     try:
         # 1. Configura LLM
-        # Usa mistral o il modello configurato localmente
-        # NOTA: Per un task semplice come questo, get_llm potrebbe essere overkill per i parametri extra, 
-        # ma sarebbe consistente. Tuttavia, qui usiamo 'mistral' hardcoded per sicurezza.
-        base_url = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
-        
-        llm = ChatOllama(
-            model="mistral",  
-            temperature=0.3, # Bassa temperature per risposte tecniche
-            keep_alive="5m",
-            base_url=base_url
-        )
+        # Usa il modello configurato centralmente (più robusto di hardcoded 'mistral')
+        llm = get_llm(None, temperature=0.3, keep_alive="5m")
         
         # 2. Prompt per Best Practices (CONCISO & SCHEMATICO)
         prompt = f"""You are an expert embedded AI engineer.

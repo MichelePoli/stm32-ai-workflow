@@ -15,7 +15,6 @@ import os
 import logging
 from typing import Literal, Optional
 
-from langchain_ollama import ChatOllama
 from agno.agent import Agent
 from agno.tools.duckduckgo import DuckDuckGoTools
 from langchain_core.messages import SystemMessage, HumanMessage

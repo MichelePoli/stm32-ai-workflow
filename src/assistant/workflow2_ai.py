@@ -29,7 +29,6 @@ from datetime import datetime
 
 from tensorflow.keras.models import Model, load_model, model_from_json
 
-from langchain_ollama import ChatOllama
 from langchain_core.messages import SystemMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.types import interrupt
@@ -1255,13 +1254,7 @@ Ritorna esattamente questo formato JSON:
         
         cfg = Configuration.from_runnable_config(config)
         
-        llm = ChatOllama(
-            model=cfg.local_llm,
-            temperature=0,
-            num_ctx=cfg.llm_context_window
-        )
-        
-        llm_extractor = llm.with_structured_output(SearchResultExtraction)
+        llm_extractor = get_llm(config, structured_schema=SearchResultExtraction)
         
         try:
             search_extraction = llm_extractor.invoke([
@@ -2323,14 +2316,8 @@ def handle_resource_failure(state: MasterState, config: RunnableConfig = None) -
         user_text = str(user_response)
         
     cfg = Configuration.from_runnable_config(config)
-    llm = ChatOllama(
-        model=cfg.local_llm,
-        temperature=0,
-        num_ctx=cfg.llm_context_window
-    )
-    
     # === ESTRAI DECISIONE CON LLM (Robusto con Structured Output) ===
-    llm_extractor = llm.with_structured_output(ResolutionExtraction)
+    llm_extractor = get_llm(config, structured_schema=ResolutionExtraction)
     
     analysis_prompt = f"""Analizza la risposta dell'utente e determina l'azione da intraprendere.
 L'utente ha visto queste opzioni:
@@ -2406,7 +2393,7 @@ Esempio:
         
     # 2. Parsing con LLM
     cfg = Configuration.from_runnable_config(config)
-    llm = ChatOllama(model=cfg.local_llm, temperature=0)
+    llm = get_llm(config)
     
     extraction_prompt = f"""Estrai i dettagli del nuovo modello dalla seguente risposta dell'utente:
 "{user_text}"

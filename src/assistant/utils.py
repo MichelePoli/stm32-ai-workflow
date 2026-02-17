@@ -28,7 +28,8 @@ logger = logging.getLogger(__name__)
 def get_llm(
     config: Optional[dict] = None,
     structured_schema: Optional[Type[BaseModel]] = None,
-    temperature: float = 0
+    temperature: float = 0,
+    **kwargs
 ):
     """
     Centralized LLM initialization with consistent configuration.
@@ -40,29 +41,22 @@ def get_llm(
         config: RunnableConfig dict (optional). If None, uses default Configuration.
         structured_schema: Pydantic BaseModel class for structured output (optional)
         temperature: LLM temperature (default: 0 for deterministic output)
+        **kwargs: Additional arguments for ChatOllama (e.g., keep_alive, base_url override)
     
     Returns:
         ChatOllama instance, optionally with structured output schema
-    
-    Example:
-        >>> # Simple LLM
-        >>> llm = get_llm(config)
-        >>> response = llm.invoke("Hello")
-        
-        >>> # Structured output
-        >>> class MySchema(BaseModel):
-        ...     answer: str
-        >>> llm = get_llm(config, structured_schema=MySchema)
-        >>> result = llm.invoke("What is 2+2?")
-        >>> print(result.answer)
     """
     cfg = Configuration.from_runnable_config(config) if config else Configuration()
+    
+    # Base URL logic: kwargs wins over config
+    base_url = kwargs.pop('base_url', cfg.ollama_base_url)
     
     llm = ChatOllama(
         model=cfg.local_llm,
         temperature=temperature,
         num_ctx=cfg.llm_context_window,
-        base_url=cfg.ollama_base_url
+        base_url=base_url,
+        **kwargs
     )
     
     if structured_schema:
