@@ -92,6 +92,7 @@ class MasterState:
     main_c_path: str = ""
     
     copy_success: bool = False
+    scan_success: bool = False
     main_modification_success: bool = False
     integration_success: bool = False
     integration_error_message: Optional[str] = None

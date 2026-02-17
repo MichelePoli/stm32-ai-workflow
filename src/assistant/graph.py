@@ -829,8 +829,26 @@ def inject_integration_nodes(builder: StateGraph):
     builder.add_node("finalize_integration", finalize_integration)
     
     builder.add_edge("collect_integration_info", "scan_ai_files")
-    builder.add_edge("scan_ai_files", "copy_ai_files")
-    builder.add_edge("copy_ai_files", "modify_main_c")
+    
+    # === CONDITIONAL EDGES: skip to finalize on failure ===
+    builder.add_conditional_edges(
+        "scan_ai_files",
+        lambda state: "copy_ai_files" if state.scan_success else "finalize_integration",
+        {
+            "copy_ai_files": "copy_ai_files",
+            "finalize_integration": "finalize_integration"
+        }
+    )
+    
+    builder.add_conditional_edges(
+        "copy_ai_files",
+        lambda state: "modify_main_c" if state.copy_success else "finalize_integration",
+        {
+            "modify_main_c": "modify_main_c",
+            "finalize_integration": "finalize_integration"
+        }
+    )
+    
     builder.add_edge("modify_main_c", "verify_integration")
     builder.add_edge("verify_integration", "finalize_integration")
 

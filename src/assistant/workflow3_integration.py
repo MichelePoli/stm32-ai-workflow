@@ -47,17 +47,6 @@ class IntegrationInfoExtraction(BaseModel):
     )
 
 
-class ModificationConfirmation(BaseModel):
-    """Conferma delle modifiche proposte"""
-    proceed_with_modifications: bool = Field(
-        description="L'utente vuole procedere con le modifiche proposte?"
-    )
-    confidence: float = Field(
-        ge=0.0, le=1.0,
-        description="Confidenza della decisione"
-    )
-
-
 # ============================================================================
 # EXTRACTION INSTRUCTIONS - WORKFLOW 3
 # ============================================================================
@@ -90,17 +79,7 @@ Esempi:
   Output: {"firmware_project_dir": null, "ai_code_dir": null}
 """
 
-modification_confirmation_instructions = """Analizza la risposta dell'utente e classifica se vuole procedere:
 
-L'utente risponde a: "Procediamo con le modifiche al firmware?"
-
-Risposte di ACCETTAZIONE: "si", "sì", "yes", "ok", "procedi", "avanti", "continua"
-Risposte di RIFIUTO: "no", "nope", "fermati", "stop", "rivedi", "no grazie"
-
-Rispondi SEMPRE in formato JSON con:
-- "proceed_with_modifications": true/false
-- "confidence": 0.0-1.0
-"""
 
 
 # ============================================================================
@@ -114,6 +93,13 @@ def collect_integration_info(state: MasterState, config: RunnableConfig = None) 
     La risposta viene analizzata da LLM per estrarre i path.
     Se i path sono già presenti nello state (da run precedente), usali.
     """
+    
+    # === IDEMPOTENCY CHECK ===
+    # Se arriviamo dal flusso sequenziale WF1→WF2→WF3, i path sono già popolati
+    if state.firmware_project_dir and state.ai_code_dir and not state.user_response:
+        logger.info(f"⏭️  Idempotenza: Path già presenti (FW={state.firmware_project_dir}, AI={state.ai_code_dir}). Salto raccolta.")
+        # Salta direttamente alla validazione filesystem
+        return _validate_and_detect_structure(state)
     
     prompt = {
         "instruction": """Configurazione Integrazione AI nel Firmware
@@ -197,10 +183,22 @@ Esempio risposta: "Integra il codice da ./analisiAI/code_resnet nel firmware di 
 
     logger.info(f"✓ Configurazione finale: FW={state.firmware_project_dir}, AI={state.ai_code_dir}")
     
+    return _validate_and_detect_structure(state)
+
+
+def _validate_and_detect_structure(state: MasterState) -> MasterState:
+    """
+    Helper interno: espande path, verifica esistenza, rileva layout progetto.
+    Usato sia dal path rapido (idempotency) sia dal path completo.
+    """
     # === ESPANDI I PATH (~ e variabili d'ambiente) ===
     
     firmware_project_expanded = os.path.expanduser(state.firmware_project_dir)
     ai_code_expanded = os.path.expanduser(state.ai_code_dir)
+    
+    # Aggiorna state con path espansi
+    state.firmware_project_dir = firmware_project_expanded
+    state.ai_code_dir = ai_code_expanded
     
     logger.info(f"📂 Path espansi:")
     logger.info(f"  firmware_project_dir: {firmware_project_expanded}")
@@ -296,7 +294,10 @@ def scan_ai_files(state: MasterState, config: RunnableConfig = None) -> MasterSt
         if not state.ai_src_files and not state.ai_header_files:
             raise FileNotFoundError("Nessun file .c o .h trovato")
         
+        state.scan_success = True
+        
     except Exception as e:
+        state.scan_success = False
         state.integration_error_message = f"Errore scansione: {str(e)}"
         logger.error(state.integration_error_message)
     
@@ -318,6 +319,16 @@ def copy_ai_files(state: MasterState, config: RunnableConfig = None) -> MasterSt
             dest_path = os.path.join(state.firmware_inc_dir, filename)
             shutil.copy2(header_file, dest_path)
             logger.info(f"  Copiato: {filename}")
+        
+        # === CHECK X-CUBE-AI MIDDLEWARE ===
+        proj_root = os.path.dirname(state.firmware_src_dir)  # Risali da Src/ al project root
+        middlewares_dir = os.path.join(proj_root, "Middlewares", "ST", "AI")
+        if not os.path.exists(middlewares_dir):
+            logger.warning("⚠️  Cartella Middlewares/ST/AI non trovata nel progetto firmware.")
+            logger.warning("    Il progetto potrebbe non compilare senza le librerie runtime X-CUBE-AI.")
+            logger.warning("    Aggiungi il componente X-CUBE-AI tramite STM32CubeMX (.ioc) o copia manualmente.")
+        else:
+            logger.info("✓ Middlewares X-CUBE-AI rilevati")
         
         state.copy_success = True
         logger.info("✓ Copia completata")
@@ -484,6 +495,12 @@ def verify_integration(state: MasterState, config: RunnableConfig = None) -> Mas
         
         if state.integration_success:
             logger.info("✓ Integrazione verificata")
+            # === AGGIORNA PERSISTENT CONTEXT ===
+            if state.persistent_context is None:
+                state.persistent_context = {}
+            state.persistent_context["last_project_path"] = state.firmware_project_dir
+            state.persistent_context["last_ai_code_dir"] = state.ai_code_dir
+            logger.info(f"💾 Aggiornato persistent_context con path integrazione")
         else:
             logger.error("✗ Verifica integrazione fallita")
         
@@ -497,14 +514,34 @@ def verify_integration(state: MasterState, config: RunnableConfig = None) -> Mas
 
 def finalize_integration(state: MasterState, config: RunnableConfig = None) -> MasterState:
     if state.integration_success:
-        print("✓ INTEGRAZIONE COMPLETATA CON SUCCESSO!")
-        print(f"✓ File AI copiati: {len(state.ai_src_files)} .c, {len(state.ai_header_files)} .h")
-        print(f"✓ main.c modificato")
-        print(f"\nProgetto finale pronto in: {state.firmware_project_dir}")
-        print("\nProssimi passi:")
-        print(f"1. Compila: cd {state.firmware_project_dir} && make -j8")
-        print(f"2. Flash su hardware STM32")
+        logger.info("✓ INTEGRAZIONE COMPLETATA CON SUCCESSO!")
+        summary = {
+            "status": "success",
+            "message": "✅ Integrazione AI nel firmware completata!",
+            "details": {
+                "files_copied_c": len(state.ai_src_files),
+                "files_copied_h": len(state.ai_header_files),
+                "main_c_modified": state.main_modification_success,
+                "project_path": state.firmware_project_dir,
+            },
+            "next_steps": [
+                f"1. Apri il progetto in STM32CubeIDE: {state.firmware_project_dir}",
+                "2. Verifica che X-CUBE-AI Middleware sia configurato nel .ioc",
+                "3. Compila il progetto (Build)",
+                "4. Flash sul target STM32 via ST-LINK",
+            ]
+        }
+        interrupt(summary)
     else:
-        print(f"✗ Integrazione fallita: {state.integration_error_message}")
+        logger.error(f"✗ Integrazione fallita: {state.integration_error_message}")
+        error_summary = {
+            "status": "error",
+            "message": f"❌ Integrazione fallita: {state.integration_error_message}",
+            "details": {
+                "copy_success": state.copy_success,
+                "main_modification_success": state.main_modification_success,
+            }
+        }
+        interrupt(error_summary)
     
     return state
