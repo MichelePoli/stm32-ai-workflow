@@ -273,16 +273,14 @@ Esempio: "Crea progetto MyApp per STM32F401 con CubeIDE"
     state.project_name = state.project_name or "MySTM32Project"
     state.toolchain = state.toolchain or "STM32CubeIDE"
     
-    if state.board_name and (not state.target or state.target == "stm32f401"):
-        # Sincronizza target AI con la board selezionata
-        b_low = state.board_name.lower()
-        targets = ["f0", "f1", "f2", "f3", "f4", "f7", "h5", "h7", "l0", "l1", "l4", "l5", "u5", "g0", "g4", "w5", "c0", "n6"]
-        for t in targets:
-            if t in b_low:
-                state.target = f"stm32{t}"
-                break
+    logger.info(f"✓ Configurazione finale: {state.board_name} ({state.mcu_series})")
     
-    logger.info(f"✓ Configurazione finale: {state.board_name} ({state.mcu_series}) - Target AI: {state.target}")
+    # Sincronizza target per workflow AI (evita discrepanze e problemi di idempotenza)
+    if state.mcu_series:
+        state.target = f"stm32{state.mcu_series.lower()}"
+        state.compression = "high" # Default
+        logger.info(f"🎯 Sincronizzato target AI: {state.target}")
+
     state.timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     return state
 
