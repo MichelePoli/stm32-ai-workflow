@@ -2,7 +2,7 @@
   ******************************************************************************
   * @file    network.c
   * @author  AST Embedded Analytics Research Platform
-  * @date    2026-02-17T11:10:18+0000
+  * @date    2026-02-17T13:45:54+0000
   * @brief   AI Tool Automatic Code Generator for Embedded NN computing
   ******************************************************************************
   * @attention
@@ -35,14 +35,14 @@
 #define AI_NET_OBJ_INSTANCE g_network
  
 #undef AI_NETWORK_MODEL_SIGNATURE
-#define AI_NETWORK_MODEL_SIGNATURE     "0x9810b854c903cb8be4ebf8e0e3c451e4"
+#define AI_NETWORK_MODEL_SIGNATURE     "0xbf0941af31e1ab27d0dbe7daf34fdd44"
 
 #ifndef AI_TOOLS_REVISION_ID
 #define AI_TOOLS_REVISION_ID     ""
 #endif
 
 #undef AI_TOOLS_DATE_TIME
-#define AI_TOOLS_DATE_TIME   "2026-02-17T11:10:18+0000"
+#define AI_TOOLS_DATE_TIME   "2026-02-17T13:45:54+0000"
 
 #undef AI_TOOLS_COMPILE_TIME
 #define AI_TOOLS_COMPILE_TIME    __DATE__ " " __TIME__
@@ -2880,7 +2880,7 @@ AI_NETWORK_OBJ_DECLARE(
     817248, NULL, NULL),
   AI_TENSOR_LIST_IO_OBJ_INIT(AI_FLAG_NONE, AI_NETWORK_IN_NUM, &serving_default_input_10_output),
   AI_TENSOR_LIST_IO_OBJ_INIT(AI_FLAG_NONE, AI_NETWORK_OUT_NUM, &nl_34_output),
-  &conv2d_0_layer, 0xe676ee29, NULL)
+  &conv2d_0_layer, 0xb52b4a63, NULL)
 
 #else
 
@@ -2900,7 +2900,7 @@ AI_NETWORK_OBJ_DECLARE(
   ),
   AI_TENSOR_LIST_IO_OBJ_INIT(AI_FLAG_NONE, AI_NETWORK_IN_NUM, &serving_default_input_10_output),
   AI_TENSOR_LIST_IO_OBJ_INIT(AI_FLAG_NONE, AI_NETWORK_OUT_NUM, &nl_34_output),
-  &conv2d_0_layer, 0xe676ee29, NULL)
+  &conv2d_0_layer, 0xb52b4a63, NULL)
 
 #endif	/*(AI_TOOLS_API_VERSION < AI_TOOLS_API_VERSION_1_5)*/
 
@@ -3301,7 +3301,7 @@ ai_bool ai_network_get_info(
       .params            = AI_STRUCT_INIT,
       .activations       = AI_STRUCT_INIT,
       .n_nodes           = 0,
-      .signature         = 0xe676ee29,
+      .signature         = 0xb52b4a63,
     };
 
     if (!ai_platform_api_get_network_report(network, &r)) return false;
@@ -3349,7 +3349,7 @@ ai_bool ai_network_get_report(
       .map_weights       = AI_STRUCT_INIT,
       .map_activations   = AI_STRUCT_INIT,
       .n_nodes           = 0,
-      .signature         = 0xe676ee29,
+      .signature         = 0xb52b4a63,
     };
 
     if (!ai_platform_api_get_network_report(network, &r)) return false;
