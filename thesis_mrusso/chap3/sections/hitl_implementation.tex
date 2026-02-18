@@ -58,7 +58,7 @@ Example gates:
 Natural language steering to modify workflow direction:
 
 \begin{quote}
-User: \textit{"Actually, I want a smaller model"}
+    User: \textit{"Actually, I want a smaller model"}
 \end{quote}
 
 The system reclassifies this input using structured extraction and updates \texttt{MasterState}:
@@ -76,8 +76,8 @@ This enables flexible, conversational control over the MLOps pipeline without pr
 
 \subsection{State Persistence and Resume Logic}
 
-LangGraph stores checkpoints in a **Redis** database using a hierarchical key structure. Each checkpoint is serialized as a MessagePack or JSON payload:
- 
+LangGraph stores checkpoints in a \textbf{Redis} database using a hierarchical key structure. Each checkpoint is serialized as a MessagePack or JSON payload:
+
 \begin{verbatim}
 checkpoint:{thread_id}:{checkpoint_id} -> {
     "v": 1,
@@ -106,4 +106,4 @@ This architecture supports multi-hour workflows (e.g., overnight NNI experiments
 
 A key UX improvement implemented to enhance high-level decision making is the transition from raw log introspection to \textbf{Synthetic Actionable Summaries}. Traditional toolchain outputs from CubeMX or STEdgeAI can be hundreds of lines long, containing technical noise that obscures critical failures.
 
-The orchestrator now implements heuristic-based log parsing after each tool execution. Instead of presenting the raw output, the agent extracts a 1-line summary (e.g., \textit{" Project generated successfully (STM32H7, 4 peripherals enabled)"} or \textit{"WARNING: Memory Overflow: Flash required 3.2MB/2MB"}). These summaries are stored in the \texttt{MasterState} and used to build context-aware prompts for the user during interrupt points, significantly reducing the cognitive load required to guide the autonomous agent. 
+The orchestrator now implements heuristic-based log parsing after each tool execution. Instead of presenting the raw output, the agent extracts a 1-line summary (e.g., \textit{" Project generated successfully (STM32H7, 4 peripherals enabled)"} or \textit{"WARNING: Memory Overflow: Flash required 3.2MB/2MB"}). These summaries are stored in the \texttt{MasterState} and used to build context-aware prompts for the user during interrupt points, significantly reducing the cognitive load required to guide the autonomous agent.

@@ -3,11 +3,11 @@
 \chapter{STM32 Model Zoo Compatibility Reference}
 \label{app:model_compat_full}
 
-This appendix provides a detailed reference for model-board compatibility across the STM32 family, including both uncompressed (FP32) and quantized (INT8) resource requirements. This matrix was developed to guide the automated resource constraint checking system implemented in the AI Model Discovery workflow.
+This appendix provides a comprehensive reference for model-board compatibility across the STM32 family, including both uncompressed (FP32) and quantized (INT8) resource requirements. This matrix was developed to guide the automated resource constraint checking system implemented in the AI Model Discovery workflow.
 
 \section{Board Specifications}
 
-\begin{table}[h!]
+\begin{table}[H]
     \centering
     \caption{STM32 MCU Memory Specifications}
     \begin{tabular}{|l|c|c|l|}
@@ -26,12 +26,11 @@ This appendix provides a detailed reference for model-board compatibility across
 
 \section{Complete Model Resource Requirements}
 
-\begin{landscape}
-    \begin{table}[h!]
-        \centering
-        \caption{Full Model-Board Compatibility Matrix}
-        \label{tab:model_compat_full}
-        \small
+\begin{table}[H]
+    \centering
+    \caption{Full Model-Board Compatibility Matrix}
+    \label{tab:model_compat_full}
+    \resizebox{\textwidth}{!}{%
         \begin{tabular}{|l|c|c|c|c|c|c|c|c|c|c|}
             \hline
             \textbf{Model}     & \textbf{Input} & \textbf{RAM}    & \textbf{Flash}  & \textbf{RAM}    & \textbf{Flash}  & \textbf{F401} & \textbf{L476}   & \textbf{H743}   & \textbf{U585}   & \textbf{N6} \\
@@ -49,9 +48,9 @@ This appendix provides a detailed reference for model-board compatibility across
             SqueezeNet V1.1    & 224×224        & 1.4 MB          & 2.8 MB          & 350 KB          & 700 KB          & $\times$      & $\times$        & \checkmark      & \checkmark      & \checkmark  \\
             ResNet50 V2        & 224×224        & 6 MB            & 12 MB           & 1.5 MB          & 3 MB            & $\times$      & $\times$        & $\times$        & $\times$        & \checkmark  \\
             \hline
-        \end{tabular}
-    \end{table}
-\end{landscape}
+        \end{tabular}%
+    }
+\end{table}
 
 \section{Compression Benefits}
 
@@ -77,7 +76,7 @@ This compatibility matrix informed the design of the automated \texttt{check\_re
 \section{STM32 MCU Part Numbers Reference}
 \label{app:mcu_part_numbers}
 
-This section provides a full reference of STM32 microcontroller part numbers for direct use with STM32CubeMX CLI commands. Unlike board selectors (e.g., \texttt{NUCLEO-H743ZI}), which may not be available in all CubeMX database versions, part numbers directly reference the microcontroller chip and are universally recognized.
+This section provides a comprehensive reference of STM32 microcontroller part numbers for direct use with STM32CubeMX CLI commands. Unlike board selectors (e.g., \texttt{NUCLEO-H743ZI}), which may not be available in all CubeMX database versions, part numbers directly reference the microcontroller chip and are universally recognized.
 
 \subsection{Part Number Naming Convention}
 
@@ -91,7 +90,7 @@ STM32 part numbers follow the pattern: \texttt{STM32[Family][Series][Variant][Pa
 
 \subsection{F4 Family (Foundation)}
 
-\begin{table}[h!]
+\begin{table}[H]
     \centering
     \caption{STM32F4 MCU Part Numbers}
     \label{tab:f4_parts}
@@ -110,7 +109,7 @@ STM32 part numbers follow the pattern: \texttt{STM32[Family][Series][Variant][Pa
 
 \subsection{L4 Family (Low Power)}
 
-\begin{table}[h!]
+\begin{table}[H]
     \centering
     \caption{STM32L4 MCU Part Numbers}
     \label{tab:l4_parts}
@@ -128,7 +127,7 @@ STM32 part numbers follow the pattern: \texttt{STM32[Family][Series][Variant][Pa
 
 \subsection{H7 Family (High Performance)}
 
-\begin{table}[h!]
+\begin{table}[H]
     \centering
     \caption{STM32H7 MCU Part Numbers}
     \label{tab:h7_parts}
@@ -148,7 +147,7 @@ STM32 part numbers follow the pattern: \texttt{STM32[Family][Series][Variant][Pa
 
 \subsection{U5 Family (Secure Ultra-Low Power)}
 
-\begin{table}[h!]
+\begin{table}[H]
     \centering
     \caption{STM32U5 MCU Part Numbers}
     \label{tab:u5_parts}
@@ -165,7 +164,7 @@ STM32 part numbers follow the pattern: \texttt{STM32[Family][Series][Variant][Pa
 
 \subsection{N6 Family (Neural Processing Unit)}
 
-\begin{table}[h!]
+\begin{table}[H]
     \centering
     \caption{STM32N6 MCU Part Numbers}
     \label{tab:n6_parts}
@@ -192,7 +191,4 @@ project generate
 exit
 \end{verbatim}
 
-This approach is particularly useful in automated workflows where board definitions may be missing or outdated in the installed CubeMX version. The automated fallback mechanism implemented in this work (Section~\ref{sec:firmware_workflow}) leverages part numbers when board-based initialization fails.
-
-\chapter{MKP Benchmark Results}
-%\input{./chap4/section/MKP_table.tex}
+This approach is particularly useful in automated workflows where board definitions may be missing or outdated in the installed CubeMX version. The automated fallback mechanism implemented in this work (Section~\ref{sec:firmware}) leverages part numbers when board-based initialization fails.

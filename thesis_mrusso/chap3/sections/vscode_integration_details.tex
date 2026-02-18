@@ -9,9 +9,9 @@ To bridge the gap between the backend LangGraph orchestrator and the developer's
 The integration follows a client-server architecture where the VS Code extension (TypeScript frontend) communicates with the FastAPI backend (Python) via HTTP streaming. This design provides several advantages:
 
 \begin{itemize}
-    \item \textbf{Technology Separation}: The complex LangGraph orchestration runs in Python, while the UI utilizes VS Code's native TypeScript APIs.
-    \item \textbf{Asynchronous Execution}: Long-running workflows (NNI experiments, model downloads) don't freeze the VS Code interface.
-    \item \textbf{Multi-Client Support}: The same backend can serve VS Code, CLI tools, and web interfaces simultaneously.
+  \item \textbf{Technology Separation}: The complex LangGraph orchestration runs in Python, while the UI utilizes VS Code's native TypeScript APIs.
+  \item \textbf{Asynchronous Execution}: Long-running workflows (NNI experiments, model downloads) don't freeze the VS Code interface.
+  \item \textbf{Multi-Client Support}: The same backend can serve VS Code, CLI tools, and web interfaces simultaneously.
 \end{itemize}
 
 \subsection{Extension Configuration (\texttt{package.json})}
@@ -43,9 +43,9 @@ The extension manifest registers a Chat Participant using VS Code's native chat 
 
 \textbf{Key Parameters:}
 \begin{itemize}
-    \item \texttt{id}: Unique identifier for the chat participant (used internally by VS Code).
-    \item \texttt{name}: The \texttt{@stm32ai} handle users type to invoke the assistant.
-    \item \texttt{isSticky: true}: Enables multi-turn conversations where context (previous messages) is automatically retained across chat interactions.
+  \item \texttt{id}: Unique identifier for the chat participant (used internally by VS Code).
+  \item \texttt{name}: The \texttt{@stm32ai} handle users type to invoke the assistant.
+  \item \texttt{isSticky: true}: Enables multi-turn conversations where context (previous messages) is automatically retained across chat interactions.
 \end{itemize}
 
 \subsection{TypeScript Handler Implementation}
@@ -110,9 +110,9 @@ vscode.chat.createChatParticipant('stm32-ai.assistant', handler);
 
 \textbf{Implementation Details:}
 \begin{itemize}
-    \item \textbf{Cancellation Handling}: The \texttt{CancellationToken} allows users to cancel long-running requests by closing the chat window or clicking the stop button. The backend receives a dropped HTTP connection and gracefully terminates the LangGraph execution.
-    \item \textbf{NDJSON Buffering}: Chunks may contain partial JSON objects. The \texttt{buffer} accumulates incomplete lines until a full newline-delimited JSON object is received.
-    \item \textbf{Typed Responses}: The server emits different event types (\texttt{markdown}, \texttt{progress}, \texttt{error}), each rendered differently in the chat UI.
+  \item \textbf{Cancellation Handling}: The \texttt{CancellationToken} allows users to cancel long-running requests by closing the chat window or clicking the stop button. The backend receives a dropped HTTP connection and gracefully terminates the LangGraph execution.
+  \item \textbf{NDJSON Buffering}: Chunks may contain partial JSON objects. The \texttt{buffer} accumulates incomplete lines until a full newline-delimited JSON object is received.
+  \item \textbf{Typed Responses}: The server emits different event types (\texttt{markdown}, \texttt{progress}, \texttt{error}), each rendered differently in the chat UI.
 \end{itemize}
 
 \subsection{FastAPI Backend: Server-Side Streaming}
@@ -157,9 +157,9 @@ async def stream_chat(request: ChatRequest):
 
 \textbf{Server-Side Features:}
 \begin{itemize}
-    \item \textbf{User Profile Injection}: The \texttt{last\_board} and \texttt{preferred\_compression} from Redis long-term memory pre-populate the state, enabling context chaining across sessions.
-    \item \textbf{Thread-Based Isolation}: Each user+session combination gets a unique \texttt{thread\_id}, ensuring isolated checkpoints in Redis.
-    \item \textbf{NDJSON Encoding}: Each event is serialized as a JSON object followed by \texttt{\textbackslash n}, enabling incremental parsing on the client.
+  \item \textbf{User Profile Injection}: The \texttt{last\_board} and \texttt{preferred\_compression} from Redis long-term memory pre-populate the state, enabling context chaining across sessions.
+  \item \textbf{Thread-Based Isolation}: Each user+session combination gets a unique \texttt{thread\_id}, ensuring isolated checkpoints in Redis.
+  \item \textbf{NDJSON Encoding}: Each event is serialized as a JSON object followed by \texttt{\textbackslash n}, enabling incremental parsing on the client.
 \end{itemize}
 
 \subsection{Communication Protocol}
@@ -176,9 +176,9 @@ The extension and server communicate via a custom NDJSON (Newline Delimited JSON
 
 \textbf{Event Types:}
 \begin{itemize}
-    \item \texttt{progress}: Transient status updates (e.g., ``Analyzing model...''), rendered as bullet points in the chat.
-    \item \texttt{markdown}: Rich-formatted responses supporting bold, code blocks, tables, and links.
-    \item \texttt{error}: Critical failures displayed with red highlighting and error icons.
+  \item \texttt{progress}: Transient status updates (e.g., ``Analyzing model...''), rendered as bullet points in the chat.
+  \item \texttt{markdown}: Rich-formatted responses supporting bold, code blocks, tables, and links.
+  \item \texttt{error}: Critical failures displayed with red highlighting and error icons.
 \end{itemize}
 
 \subsection{Integration Challenges and Solutions}
@@ -206,27 +206,27 @@ The extension and server communicate via a custom NDJSON (Newline Delimited JSON
 The VS Code integration provides several UX improvements over CLI-based interaction:
 
 \begin{itemize}
-    \item \textbf{Context Awareness}: The extension can access the active file (\texttt{vscode.window.activeTextEditor}), enabling future features like ``Analyze the model in this file'' or ``Generate firmware for this .ioc project.''
-    \item \textbf{Inline Documentation}: Markdown responses support clickable file links (e.g., \texttt{file:///path/to/network.c\#L42}), allowing users to jump directly to generated code.
-    \item \textbf{Progress Visibility}: Real-time progress updates reduce perceived latency for long-running operations (model downloads, NNI experiments).
-    \item \textbf{Persistent Chat History}: Multi-turn conversations (\texttt{isSticky: true}) allow iterative refinement (``Actually, I want a smaller model'') without restarting the workflow.
+  \item \textbf{Context Awareness}: The extension can access the active file (\texttt{vscode.window.activeTextEditor}), enabling future features like ``Analyze the model in this file'' or ``Generate firmware for this .ioc project.''
+  \item \textbf{Inline Documentation}: Markdown responses support clickable file links (e.g., \texttt{file:///path/to/network.c\#L42}), allowing users to jump directly to generated code.
+  \item \textbf{Progress Visibility}: Real-time progress updates reduce perceived latency for long-running operations (model downloads, NNI experiments).
+  \item \textbf{Persistent Chat History}: Multi-turn conversations (\texttt{isSticky: true}) allow iterative refinement (``Actually, I want a smaller model'') without restarting the workflow.
 \end{itemize}
 
 \subsection{Deployment and Testing}
 
 \textbf{Development Workflow:}
 \begin{enumerate}
-    \item \textbf{Compilation}: \texttt{npm run compile} transpiles TypeScript to JavaScript in \texttt{./out/extension.js}.
-    \item \textbf{Debug Launch}: \texttt{F5} opens an Extension Development Host window where \texttt{@stm32ai} is available.
-    \item \textbf{Server Startup}: The FastAPI backend must be running (\texttt{python -m src.api.server}) before testing.
+  \item \textbf{Compilation}: \texttt{npm run compile} transpiles TypeScript to JavaScript in \texttt{./out/extension.js}.
+  \item \textbf{Debug Launch}: \texttt{F5} opens an Extension Development Host window where \texttt{@stm32ai} is available.
+  \item \textbf{Server Startup}: The FastAPI backend must be running (\texttt{python -m src.api.server}) before testing.
 \end{enumerate}
 
 \textbf{Testing Scenarios:}
 \begin{itemize}
-    \item \textbf{Firmware Generation}: ``@stm32ai create a project for STM32H743 with STM32CubeIDE''
-    \item \textbf{Model Analysis}: ``@stm32ai analyze MobileNetV2 for STM32F4 with high compression''
-    \item \textbf{NNI Optimization}: ``@stm32ai fine-tune this model on Fruit-360 with 10 trials''
-    \item \textbf{Cancellation Test}: Start a long-running task, then close the chat window to verify graceful termination.
+  \item \textbf{Firmware Generation}: ``@stm32ai create a project for STM32H743 with STM32CubeIDE''
+  \item \textbf{Model Analysis}: ``@stm32ai analyze MobileNetV2 for STM32F4 with high compression''
+  \item \textbf{NNI Optimization}: ``@stm32ai fine-tune this model on Fruit-360 with 10 trials''
+  \item \textbf{Cancellation Test}: Start a long-running task, then close the chat window to verify graceful termination.
 \end{itemize}
 
 \subsection{Future Enhancements}
@@ -234,8 +234,8 @@ The VS Code integration provides several UX improvements over CLI-based interact
 Potential extensions to the VS Code integration:
 
 \begin{itemize}
-    \item \textbf{Syntax Highlighting for .ioc Files}: Custom TextMate grammar for STM32CubeMX configuration files.
-    \item \textbf{Code Action Providers}: Right-click on an \texttt{.h5} model file → ``Analyze for STM32''
-    \item \textbf{Status Bar Integration}: Show active NNI experiments in the VS Code status bar.
-    \item \textbf{Terminal Integration}: Automatically open a terminal and flash firmware to connected STM32 boards via \texttt{st-flash}.
+  \item \textbf{Syntax Highlighting for .ioc Files}: Custom TextMate grammar for STM32CubeMX configuration files.
+  \item \textbf{Code Action Providers}: Right-click on an \texttt{.h5} model file → ``Analyze for STM32''
+  \item \textbf{Status Bar Integration}: Show active NNI experiments in the VS Code status bar.
+  \item \textbf{Terminal Integration}: Automatically open a terminal and flash firmware to connected STM32 boards via \texttt{st-flash}.
 \end{itemize}
