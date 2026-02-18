@@ -1,0 +1,23 @@
+# Dockerfile.triton
+# Immagine personalizzata per Triton con supporto vLLM
+FROM nvcr.io/nvidia/tritonserver:23.10-py3
+
+# Installa dipendenze di sistema e pip
+RUN apt-get update && apt-get install -y \
+    python3-pip \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Installa vLLM e le dipendenze per il backend python
+# Usiamo una versione specifica compatibile con CUDA 12.2 (base di Triton 23.10)
+RUN pip3 install --no-cache-dir \
+    vllm==0.2.7 \
+    triton-python-backend-utils \
+    numpy \
+    sentence-transformers \
+    accelerate
+
+# Esposizione porte standard
+EXPOSE 8000 8001 8002
+
+# L'entrypoint originale di Triton va bene, i comandi sono passati via docker-compose

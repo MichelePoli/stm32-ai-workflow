@@ -23,7 +23,7 @@ import tensorflow as tf
 from typing import Optional, Tuple, List, Literal, Any
 from langchain_core.runnables import RunnableConfig
 import urllib.request
-from src.assistant.utils import get_llm, force_unload_ollama
+from src.assistant.utils import get_llm, force_unload_ollama, get_embeddings
 
 import shutil
 import re
@@ -573,16 +573,12 @@ def retrieve_best_practices_for_architecture(state: MasterState, config: Runnabl
     
     if arch_db_exists:
         try:
-            from langchain_ollama import OllamaEmbeddings
             best_practices = _retrieve_from_chroma(
                 query=f"best practices customization fine-tuning {arch_type}",
                 persist_dir=arch_persist_dir,
                 arch_type=arch_type,
-                embeddings_override=OllamaEmbeddings(
-                    model="nomic-embed-text",
-                    base_url=os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
-                )
-            )          
+                embeddings_override=get_embeddings(model="nomic-embed-text")
+            )
             if best_practices and len(best_practices) > 0:
                 logger.info(f"  ✓ Retrieved {len(best_practices)} docs from cache")
                 state.best_practices_display = _format_practices(best_practices, source=f"CACHE_{arch_type}")
@@ -691,11 +687,7 @@ def _generate_and_cache_with_llm(
             )
             chunks = splitter.split_documents(all_docs)
             
-            from langchain_ollama import OllamaEmbeddings
-            embeddings = OllamaEmbeddings(
-                model="nomic-embed-text",
-                base_url=os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
-            )
+            embeddings = get_embeddings(model="nomic-embed-text")
             
             os.makedirs(persist_dir, exist_ok=True)
             
@@ -1081,10 +1073,7 @@ def _retrieve_from_chroma(
     """Recupera da Chroma DEDICATO per architettura"""
     
     try:
-        from langchain_ollama import OllamaEmbeddings
-        embeddings = embeddings_override or OllamaEmbeddings(
-            model="mistral"
-        )
+        embeddings = embeddings_override or get_embeddings(model="mistral")
         
         vectorstore = Chroma(
             persist_directory=persist_dir,

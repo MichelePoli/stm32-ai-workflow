@@ -31,4 +31,4 @@ EXPOSE 8000
 
 # Command to run the application
 # We use uvicorn to serve the FastAPI app
-CMD ["uvicorn", "src.assistant.app:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "src.api.server:app", "--host", "0.0.0.0", "--port", "8000"]

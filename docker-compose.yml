@@ -59,11 +59,46 @@ services:
       ollama:
         condition: service_healthy
 
+  # Triton Inference Server
+  triton-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.triton
+    container_name: stm32-ai-triton
+    ports:
+      - "8001:8000" # HTTP
+      - "8002:8001" # GRPC
+      - "8003:8002" # Metrics
+    volumes:
+      - ./model_repository:/models
+    environment:
+      - TRITON_MODEL_NAME=TheBloke/Mistral-7B-Instruct-v0.2-GPTQ
+      - DEEPSEEK_MODEL_NAME=TheBloke/deepseek-coder-6.7B-instruct-GPTQ
+      - GPTOSS_MODEL_NAME=TheBloke/starcoder2-15b-v0.1-GPTQ
+      - EMBED_MODEL_NAME=nomic-ai/nomic-embed-text-v1.5
+    command: ["tritonserver", "--model-repository=/models", "--log-verbose=1"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      # Triton health endpoint: /v2/health/ready
+      test: ["CMD", "curl", "-f", "http://localhost:8000/v2/health/ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 20 # vLLM loading can take minutes
+    restart: unless-stopped
+
   langgraph-app:
     build: .
     container_name: stm32-ai-langgraph
     environment:
       - OLLAMA_BASE_URL=http://ollama:11434
+      - USE_TRITON_BACKEND=true
+      - TRITON_BASE_URL=http://triton-server:8000/v1
       - LOCAL_LLM=${MODEL_NAME:-mistral}
       - REDIS_URL=redis://redis:6379
     ports:
@@ -71,8 +106,8 @@ services:
     depends_on:
       ollama:
         condition: service_healthy
-      ollama-pull-models:
-        condition: service_completed_successfully
+      triton-server:
+        condition: service_healthy
       redis:
         condition: service_started
     volumes:
@@ -80,25 +115,6 @@ services:
       - ./data:/app/data
       - ./.env:/app/.env
     restart: unless-stopped
-
-  # Future Triton Inference Server (Placeholder)
-  # triton-server:
-  #   image: nvcr.io/nvidia/tritonserver:23.10-py3
-  #   container_name: stm32-ai-triton
-  #   ports:
-  #     - "8001:8000" # HTTP (mapped to 8001 to avoid conflict with app)
-  #     - "8002:8001" # GRPC
-  #     - "8003:8002" # Metrics
-  #   volumes:
-  #     - ./model_repository:/models
-  #   command: ["tritonserver", "--model-repository=/models"]
-  #   deploy:
-  #     resources:
-  #       reservations:
-  #         devices:
-  #           - driver: nvidia
-  #             count: 1
-  #             capabilities: [gpu]
 
 volumes:
   redis_data:

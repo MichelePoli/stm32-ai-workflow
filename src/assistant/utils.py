@@ -53,18 +53,63 @@ def get_llm(
     base_url = kwargs.pop('base_url', cfg.ollama_base_url)
     num_ctx = kwargs.pop('num_ctx', cfg.llm_context_window)
     
-    llm = ChatOllama(
-        model=model,
-        temperature=temperature,
-        num_ctx=num_ctx,
-        base_url=base_url,
-        **kwargs
-    )
+    # Check for Triton/OpenAI override
+    triton_enabled = os.environ.get("USE_TRITON_BACKEND", "false").lower() == "true"
+    
+    # Triton logic: Support multi-model routing
+    # Models hosted on Triton: mistral, deepseek-r1, gpt-oss-20b
+    triton_models = ["mistral", "deepseek", "gpt-oss"]
+    
+    if triton_enabled and any(m in model.lower() for m in triton_models):
+        from src.assistant.triton_client import ChatTriton
+        triton_url = os.environ.get("TRITON_BASE_URL", "http://triton-server:8000/v1")
+        
+        # Normalize model name for Triton repo (remove version tags if present)
+        triton_model_name = "mistral"
+        if "deepseek" in model.lower(): triton_model_name = "deepseek-r1"
+        elif "gpt-oss" in model.lower(): triton_model_name = "gpt-oss-20b"
+        
+        logger.info(f"🚀 Routing request for '{model}' -> Triton model '{triton_model_name}'")
+        llm = ChatTriton(
+            triton_url=triton_url,
+            model=triton_model_name,
+            temperature=temperature
+        )
+    else:
+        # Fallback to Ollama for embeddings, 20B models, or if Triton is disabled
+        llm = ChatOllama(
+            model=model,
+            temperature=temperature,
+            num_ctx=num_ctx,
+            base_url=base_url,
+            **kwargs
+        )
     
     if structured_schema:
+        # Note: ChatTriton/OpenAI usually supports .with_structured_output too
         return llm.with_structured_output(structured_schema)
     
     return llm
+
+def get_embeddings(config: Optional[dict] = None, **kwargs):
+    """
+    Centralized Embedding initialization.
+    """
+    cfg = Configuration.from_runnable_config(config) if config else Configuration()
+    triton_enabled = os.environ.get("USE_TRITON_BACKEND", "false").lower() == "true"
+    
+    if triton_enabled:
+        from src.assistant.triton_client import TritonEmbeddings
+        triton_url = os.environ.get("TRITON_BASE_URL", "http://triton-server:8000/v1")
+        model = kwargs.get("model", "nomic-embed")
+        
+        logger.info(f"🧬 Routing embedding request -> Triton model '{model}'")
+        return TritonEmbeddings(triton_url=triton_url, model_name=model)
+    else:
+        from langchain_ollama import OllamaEmbeddings
+        base_url = kwargs.get("base_url", cfg.ollama_base_url)
+        model = kwargs.get("model", "nomic-embed-text")
+        return OllamaEmbeddings(model=model, base_url=base_url)
 
 
 def force_unload_ollama(model_name: str = "gpt-oss:20b"):

@@ -22,7 +22,6 @@ from langgraph.graph import START, END, StateGraph
 from langgraph.types import interrupt
 import redis.asyncio as aioredis
 from langgraph.checkpoint.redis.aio import AsyncRedisSaver
-from langchain_ollama import ChatOllama
 from langchain_core.messages import SystemMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
 from pydantic import BaseModel, Field

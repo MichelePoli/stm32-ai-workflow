@@ -3,7 +3,7 @@ echo "Starting model pull..."
 
 # Main chat model
 echo "Pulling mistral..."
-ollama pull mistral:latest
+ollama pull mistral:7b-instruct-v0.3
 
 # Embeddings model
 echo "Pulling nomic-embed-text..."
