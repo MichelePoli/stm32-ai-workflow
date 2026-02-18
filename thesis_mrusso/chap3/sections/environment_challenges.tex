@@ -1,20 +1,20 @@
 \section{Environment and Compatibility Challenges}
 \label{sec:env_challenges}
 
-Implementing a fully autonomous MLOps pipeline for embedded systems requires navigating a complex landscape of software dependencies, legacy constraints, and proprietary toolchain limitations. This section details the specific architectural solutions adopted to address these interoperability challenges.
+Implementing a fully autonomous MLOps pipeline for embedded systems involves addressing a variety of software dependencies, legacy constraints, and proprietary toolchain limitations. This section details the specific architectural solutions adopted to manage these interoperability challenges.
 
 \subsection{Dual-Environment Strategy for Legacy Model Support}
 A critical challenge encountered during the development of the framework was the incompatibility between modern Deep Learning libraries required for the agentic orchestration and the legacy formats often found in embedded AI repositories.
 
 \begin{itemize}
-    \item \textbf{The Conflict}: The NNI optimization engine and the LangGraph orchestrator rely on modern Python environments (e.g., Keras 3.x, PyTorch 2.x) to leverage recent features in varying generic code generation and asynchronous execution. However, a significant portion of pre-trained embedded AI models (e.g., from older STModelZoo releases or academic papers) are serialized in older formats (Keras 2.x H5) which are essentially incompatible with Keras 3.x execution runtimes due to breaking changes in the serialization API.
-    
+    \item \textbf{The Conflict}: The NNI optimization engine and the LangGraph orchestrator rely on modern Python environments (e.g., Keras 3.x, PyTorch 2.x) to utilize recent features in varying generic code generation and asynchronous execution. However, a significant portion of pre-trained embedded AI models (e.g., from older STModelZoo releases or academic papers) are serialized in older formats (Keras 2.x H5) which are essentially incompatible with Keras 3.x execution runtimes due to breaking changes in the serialization API.
+
     \item \textbf{The Solution}: To resolve this, I implemented a \textbf{Dual-Environment Architecture}. The system maintains two distinct virtual environments:
-    \begin{enumerate}
-        \item \textbf{Primary Environment (\texttt{stm32\_agent})}: Hosting the LLM agents, LangGraph orchestrator, and NNI manager. This environment uses the latest libraries for maximum performance and security.
-        \item \textbf{Legacy Environment (\texttt{stm32\_legacy})}: A strictly pinned environment (TensorFlow 2.15, Keras 2.15) dedicated solely to the introspection and analysis of older model files.
-    \end{enumerate}
-    
+          \begin{enumerate}
+              \item \textbf{Primary Environment (\texttt{stm32\_agent})}: Hosting the LLM agents, LangGraph orchestrator, and NNI manager. This environment uses the latest libraries for maximum performance and security.
+              \item \textbf{Legacy Environment (\texttt{stm32\_legacy})}: A strictly pinned environment (TensorFlow 2.15, Keras 2.15) dedicated solely to the introspection and analysis of older model files.
+          \end{enumerate}
+
     \item \textbf{Mechanism}: When the \textit{Model Discovery Agent} identifies a potential candidate model, it does not attempt to load it directly. Instead, it delegates the inspection task to a subprocess running in the \texttt{stm32\_legacy} environment. This subprocess loads the model, extracts its architecture and I/O signature, and returns the metadata as a JSON object to the main orchestrator, effectively bridging the "semantic gap" between software generations without compromising the stability of the main application.
 \end{itemize}
 
@@ -69,7 +69,7 @@ To overcome this without requiring the user to manually convert their models, I 
 This bridge "flattens" the model architecture into standard TFLite operators, which the ST toolchain interprets correctly, thus restoring the autonomous flow for the latest state-of-the-art models.
 
 \subsection{Architectural Constraints on Model Customization}
-While the discovery and profiling workflow (Workflow 2) achieves format-agnostic interoperability—successfully processing \texttt{.h5}, \texttt{.keras}, \texttt{.onnx}, and \texttt{.tflite} artifacts for resource estimation and firmware generation—the structural customization workflow (Workflow 5) introduces a strict dependency on native Keras formats.
+While the discovery and profiling workflow (Workflow 2) achieves format-agnostic interoperability, successfully processing \texttt{.h5}, \texttt{.keras}, \texttt{.onnx}, and \texttt{.tflite} artifacts for resource estimation and firmware generation, the structural customization workflow (Workflow 5) introduces a strict dependency on native Keras formats.
 
 This distinction arises from the technical requirements of neural network "surgical" operations:
 \begin{itemize}
@@ -84,7 +84,7 @@ To maintain system robustness, a format-based validation gate was implemented in
 
 \subsection{Cross-Platform Portability and macOS ARM64 Support}
 
-Developing an orchestration framework for STMicroelectronics toolchains (primarily Linux and Windows-centric) on a macOS ARM64 (Apple Silicon) environment introduced specific portability challenges. To ensure a seamless developer experience across heterogeneous host systems, several architectural adaptations were implemented.
+Developing an orchestration framework for STMicroelectronics toolchains (primarily Linux and Windows-centric) on a macOS ARM64 (Apple Silicon) environment introduced specific portability challenges. To ensure a consistent developer experience across heterogeneous host systems, several architectural adaptations were implemented.
 
 \subsubsection{Path Abstraction and Configuration Management}
 
@@ -98,7 +98,7 @@ A primary barrier to portability was the use of system-specific absolute paths (
 
 The shift to Apple Silicon required a specialized dependency management strategy due to the lack of native ARM64 support for older versions of TensorFlow and specific ST binaries.
 \begin{enumerate}
-    \item \textbf{Clean Environment Strategy}: I developed a \texttt{environment\_clean.yaml} specification that leverages the \texttt{conda-forge} channel to provide consistent ARM64 builds for modern Python libraries (LangGraph, FastAPI) while strictly isolating the legacy x86\_64 toolchains in separate sub-environments.
+    \item \textbf{Clean Environment Strategy}: I developed a \texttt{environment\_clean.yaml} specification that utilizes the \texttt{conda-forge} channel to provide consistent ARM64 builds for modern Python libraries (LangGraph, FastAPI) while strictly isolating the legacy x86\_64 toolchains in separate sub-environments.
     \item \textbf{Acceleration Adapters}: For local development on macOS, the system was configured to detect \texttt{tensorflow-macos} and \texttt{tensorflow-metal} plugins. This enables hardware acceleration on the Mac's Integrated GPU (Metal Performance Shaders) during the model customization phase (Workflow 5), providing a high-performance local alternative to expensive GPU-equipped Linux servers for initial prototyping.
 \end{enumerate}
 

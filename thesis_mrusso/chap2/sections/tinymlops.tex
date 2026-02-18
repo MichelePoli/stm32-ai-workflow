@@ -7,32 +7,32 @@ The rapid proliferation of Artificial Intelligence on embedded systems has neces
 While traditional MLOps focuses on scaling model deployment across cloud clusters, managing petabyte-scale datasets, and orchestrating microservices, TinyMLOps must prioritize high-fidelity hardware awareness. The primary differences are summarized in Table~\ref{tab:mlops_vs_tinymlops}.
 
 \begin{table}[h]
-\centering
-\caption{Comparison between traditional Cloud MLOps and TinyMLOps.}
-\label{tab:mlops_vs_tinymlops}
-\begin{tabular}{|l|l|l|}
-\hline
-\textbf{Feature} & \textbf{Cloud MLOps} & \textbf{TinyMLOps} \\
-\hline
-Target Hardware & GPU Clusters / Data Centers & MCUs (KB-scale RAM) \\
-Optimization & Throughput / Latency & Memory / Energy Efficiency \\
-Deployment Unit & Docker Containers / APIs & Firmware Binary Images \\
-Connectivity & Persistent / High-bandwidth & Intermittent or Offline \\
-Metric Priority & Prediction Accuracy & Accuracy vs. Resource Footprint \\
-\hline
-\end{tabular}
+    \centering
+    \caption{Comparison between traditional Cloud MLOps and TinyMLOps.}
+    \label{tab:mlops_vs_tinymlops}
+    \begin{tabular}{|l|l|l|}
+        \hline
+        \textbf{Feature} & \textbf{Cloud MLOps}        & \textbf{TinyMLOps}              \\
+        \hline
+        Target Hardware  & GPU Clusters / Data Centers & MCUs (KB-scale RAM)             \\
+        Optimization     & Throughput / Latency        & Memory / Energy Efficiency      \\
+        Deployment Unit  & Docker Containers / APIs    & Firmware Binary Images          \\
+        Connectivity     & Persistent / High-bandwidth & Intermittent or Offline         \\
+        Metric Priority  & Prediction Accuracy         & Accuracy vs. Resource Footprint \\
+        \hline
+    \end{tabular}
 \end{table}
 
 \subsubsection{Core Pillars of TinyMLOps}
 
-A comprehensive TinyMLOps framework typically implements three fundamental pillars:
+A systematic TinyMLOps framework typically implements three fundamental pillars:
 
 \begin{itemize}
     \item \textbf{Hardware-Aware Optimization}: Unlike cloud models that can easily scale with more VRAM, embedded models must undergo structural transformations (e.g., quantization, pruning, and "neural surgery") to fit into specific MCU memory profiles.
-    
-    \item \textbf{Integrated Automation ("Plumbing")}: TinyMLOps requires the seamless connection of traditionally disjoint tools—Python-based training environments, C-based firmware toolchains (like STM32Cube), and binary flashing utilities.
-    
-    \item \textbf{Reproducibility}: By defining the end-to-end workflow as a declarative graph (e.g., via LangGraph), I ensure that an optimized model can be reconstructed and re-verified consistently across different hardware revisions.
+
+    \item \textbf{Integrated Automation ("Plumbing")}: TinyMLOps requires the direct integration of traditionally disjoint tools, Python-based training environments, C-based firmware toolchains (like STM32Cube), and binary flashing utilities.
+
+    \item \textbf{Reproducibility}: Defining the end-to-end workflow as a declarative graph (e.g., via LangGraph) ensures that an optimized model can be reconstructed and re-verified consistently across different hardware revisions.
 \end{itemize}
 
-By adopting a TinyMLOps approach, the development of embedded AI transitions from a manual, expert-intensive process to a systematic, automated engineering discipline.
+Adopting a TinyMLOps approach transitions the development of embedded AI from a manual, expert-intensive process to a systematic, automated engineering discipline.

@@ -87,35 +87,35 @@ This proactive guidance reduces user cognitive load and improves first-attempt s
 Algorithm~\ref{alg:rag_multiquery} formalizes the complete RAG retrieval process with iterative reflection and web search augmentation.
 
 \begin{algorithm}[H]
-\caption{RAG Multi-Query Retrieval with Iterative Reflection}
-\label{alg:rag_multiquery}
-\begin{algorithmic}[1]
-\REQUIRE Model architecture $A$, vectorstore $V$, max loops $L = 3$
-\ENSURE Best practices document $D$
-\STATE $queries \gets \text{LLM\_Generate\_Queries}(A)$ \COMMENT{Generate 6 diverse queries}
-\STATE $ranked\_queries \gets \text{LLM\_Rank\_Queries}(queries, A)$
-\STATE $context \gets \text{""}$
-\FOR{$i \gets 1$ to $|ranked\_queries|$}
-    \STATE $weight \gets 1.0 - (i-1) \times 0.05$
-    \STATE $docs \gets V.\text{retrieve}(ranked\_queries[i], k=20)$
-    \FOR{each $doc \in docs$}
+    \caption{RAG Multi-Query Retrieval with Iterative Reflection}
+    \label{alg:rag_multiquery}
+    \begin{algorithmic}[1]
+        \REQUIRE Model architecture $A$, vectorstore $V$, max loops $L = 3$
+        \ENSURE Best practices document $D$
+        \STATE $queries \gets \text{LLM\_Generate\_Queries}(A)$ \COMMENT{Generate 6 diverse queries}
+        \STATE $ranked\_queries \gets \text{LLM\_Rank\_Queries}(queries, A)$
+        \STATE $context \gets \text{""}$
+        \FOR{$i \gets 1$ to $|ranked\_queries|$}
+        \STATE $weight \gets 1.0 - (i-1) \times 0.05$
+        \STATE $docs \gets V.\text{retrieve}(ranked\_queries[i], k=20)$
+        \FOR{each $doc \in docs$}
         \STATE $context \gets context + f"\text{Query } i - \text{weight } weight: doc.\text{content}[0:600]"$
-    \ENDFOR
-\ENDFOR
-\STATE $summary \gets \text{LLM\_Summarize}(context, A)$
-\STATE $iteration \gets 0$
-\WHILE{$iteration < L$}
-    \STATE $gaps \gets \text{LLM\_Reflect}(summary, A)$ \COMMENT{Identify knowledge gaps}
-    \IF{$gaps = \text{null}$}
+        \ENDFOR
+        \ENDFOR
+        \STATE $summary \gets \text{LLM\_Summarize}(context, A)$
+        \STATE $iteration \gets 0$
+        \WHILE{$iteration < L$}
+        \STATE $gaps \gets \text{LLM\_Reflect}(summary, A)$ \COMMENT{Identify knowledge gaps}
+        \IF{$gaps = \text{null}$}
         \RETURN $summary$
-    \ENDIF
-    \STATE $followup\_query \gets \text{LLM\_Generate\_Followup}(gaps)$
-    \STATE $new\_docs \gets V.\text{retrieve}(followup\_query, k=10)$
-    \STATE $summary \gets \text{LLM\_Extend}(summary, new\_docs)$
-    \STATE $iteration \gets iteration + 1$
-\ENDWHILE
-\RETURN $summary$
-\end{algorithmic}
+        \ENDIF
+        \STATE $followup\_query \gets \text{LLM\_Generate\_Followup}(gaps)$
+        \STATE $new\_docs \gets V.\text{retrieve}(followup\_query, k=10)$
+        \STATE $summary \gets \text{LLM\_Extend}(summary, new\_docs)$
+        \STATE $iteration \gets iteration + 1$
+        \ENDWHILE
+        \RETURN $summary$
+    \end{algorithmic}
 \end{algorithm}
 
 \subsection{Modification Intent Classification}
@@ -207,7 +207,7 @@ The core technical contribution of this workflow is the \textit{autonomous gener
     \item Class count discrepancies between model and dataset
     \item Memory constraints on consumer hardware (dataset subsetting, mmap loading)
     \item Port conflicts for NNI Web UI
-    \item Missing NNI API methods across versions (robust fallbacks)
+    \item Missing NNI API methods across versions (reliable fallbacks)
 \end{itemize}
 
 \subsubsection{Prompt Engineering Strategy}
@@ -366,27 +366,27 @@ The subprocess execution isolates NNI's environment from the LangGraph runtime, 
 Algorithm~\ref{alg:nni_retrain} formalizes the complete NNI workflow including automatic best-trial extraction and retraining.
 
 \begin{algorithm}[H]
-\caption{NNI Experiment with Automatic Best-Trial Retraining}
-\label{alg:nni_retrain}
-\begin{algorithmic}[1]
-\REQUIRE Model path $M$, dataset path $D$, search space $S$, max trials $N$
-\ENSURE Retrained best model saved to disk
-\STATE $experiment \gets \text{NNI\_Create}(\text{tuner}=\text{"TPE"}, S, N)$
-\STATE $experiment.\text{run}(\text{wait\_completion}=\text{true})$
-\STATE \COMMENT{Extract best trial manually (robust API-agnostic method)}
-\STATE $trials \gets experiment.\text{list\_trial\_jobs}()$
-\STATE $valid\_trials \gets \{t \in trials \mid t.\text{status} = \text{"SUCCEEDED"}\}$
-\IF{$|valid\_trials| = 0$}
-    \STATE \textbf{error} "No successful trials"
-\ENDIF
-\STATE $best\_trial \gets \arg\max_{t \in valid\_trials} t.\text{finalMetricData}[0].\text{data}$
-\STATE $best\_params \gets best\_trial.\text{hyperParameters}[-1].\text{parameters}$
-\STATE \COMMENT{Retrain with best hyperparameters}
-\STATE $env \gets \{\text{"RETRAIN\_MODE"}: \text{"true"}, \text{"NNI\_PARAMS"}: \text{JSON}(best\_params)\}$
-\STATE $\text{subprocess.run}([\text{"python", "trial.py"}], \text{env}=env)$
-\STATE $best\_model \gets \text{Load}(\text{"best\_model.h5"})$
-\RETURN $best\_model$
-\end{algorithmic}
+    \caption{NNI Experiment with Automatic Best-Trial Retraining}
+    \label{alg:nni_retrain}
+    \begin{algorithmic}[1]
+        \REQUIRE Model path $M$, dataset path $D$, search space $S$, max trials $N$
+        \ENSURE Retrained best model saved to disk
+        \STATE $experiment \gets \text{NNI\_Create}(\text{tuner}=\text{"TPE"}, S, N)$
+        \STATE $experiment.\text{run}(\text{wait\_completion}=\text{true})$
+        \STATE \COMMENT{Extract best trial manually (robust API-agnostic method)}
+        \STATE $trials \gets experiment.\text{list\_trial\_jobs}()$
+        \STATE $valid\_trials \gets \{t \in trials \mid t.\text{status} = \text{"SUCCEEDED"}\}$
+        \IF{$|valid\_trials| = 0$}
+        \STATE \textbf{error} "No successful trials"
+        \ENDIF
+        \STATE $best\_trial \gets \arg\max_{t \in valid\_trials} t.\text{finalMetricData}[0].\text{data}$
+        \STATE $best\_params \gets best\_trial.\text{hyperParameters}[-1].\text{parameters}$
+        \STATE \COMMENT{Retrain with best hyperparameters}
+        \STATE $env \gets \{\text{"RETRAIN\_MODE"}: \text{"true"}, \text{"NNI\_PARAMS"}: \text{JSON}(best\_params)\}$
+        \STATE $\text{subprocess.run}([\text{"python", "trial.py"}], \text{env}=env)$
+        \STATE $best\_model \gets \text{Load}(\text{"best\_model.h5"})$
+        \RETURN $best\_model$
+    \end{algorithmic}
 \end{algorithm}
 
 \subsection{Validation and Model Persistence}

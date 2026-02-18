@@ -9,7 +9,7 @@ To bridge the gap between the backend LangGraph orchestrator and the developer's
 The integration follows a client-server architecture where the VS Code extension (TypeScript frontend) communicates with the FastAPI backend (Python) via HTTP streaming. This design provides several advantages:
 
 \begin{itemize}
-    \item \textbf{Technology Separation}: The complex LangGraph orchestration runs in Python, while the UI leverages VS Code's native TypeScript APIs.
+    \item \textbf{Technology Separation}: The complex LangGraph orchestration runs in Python, while the UI utilizes VS Code's native TypeScript APIs.
     \item \textbf{Asynchronous Execution}: Long-running workflows (NNI experiments, model downloads) don't freeze the VS Code interface.
     \item \textbf{Multi-Client Support}: The same backend can serve VS Code, CLI tools, and web interfaces simultaneously.
 \end{itemize}

@@ -1,7 +1,7 @@
 \section{Validation: Automated Standard Fine-Tuning}
 \label{sec:auto_finetuning_results}
 
-To validate the robustness of the automated decision-making logic described in Chapter 3, a complete end-to-end user session was recorded and analyzed. The objective was to verify:
+To validate the reliability of the automated decision-making logic described in Chapter 3, a complete end-to-end user session was recorded and analyzed. The objective was to verify:
 \begin{enumerate}
     \item The autonomous handling of class-mismatch between pre-trained models and custom datasets.
     \item The efficacy of the anti-overfitting heuristics (layer freezing and dynamic dropout).
@@ -35,22 +35,22 @@ Simultaneously, the NLP parser correctly interpreted the user's customization re
 Despite the reduced dataset size (5000 samples) and the complexity of the 132-class problem, the model achieved convergence within the 10-epoch safety cap.
 
 \begin{table}[h]
-\centering
-\begin{tabular}{|l|c|c|}
-\hline
-\textbf{Metric} & \textbf{Value} & \textbf{Implication} \\
-\hline
-Training Accuracy & 75.52\% & Good learning capacity \\
-\hline
-Validation Accuracy & \textbf{98.10\%} & Excellent generalization (No overfitting) \\
-\hline
-Validation Loss & 0.0786 & High confidence in predictions \\
-\hline
-Inference Time & \textasciitilde30ms & Compatible with Real-Time constraints \\
-\hline
-\end{tabular}
-\caption{Fine-tuning results on MobileNetV1 (0.25) customized for Fruit-360.}
-\label{tab:finetuning_results}
+    \centering
+    \begin{tabular}{|l|c|c|}
+        \hline
+        \textbf{Metric}     & \textbf{Value}      & \textbf{Implication}                      \\
+        \hline
+        Training Accuracy   & 75.52\%             & Good learning capacity                    \\
+        \hline
+        Validation Accuracy & \textbf{98.10\%}    & Excellent generalization (No overfitting) \\
+        \hline
+        Validation Loss     & 0.0786              & High confidence in predictions            \\
+        \hline
+        Inference Time      & \textasciitilde30ms & Compatible with Real-Time constraints     \\
+        \hline
+    \end{tabular}
+    \caption{Fine-tuning results on MobileNetV1 (0.25) customized for Fruit-360.}
+    \label{tab:finetuning_results}
 \end{table}
 
-The significant gap between Training (75\%) and Validation (98\%) accuracy typically suggests underfitting or strong augmentation. However, in this context, it confirms the effectiveness of the injected Dropout (0.4) and Data Augmentation pipeline, which made the training task harder than the validation pass, resulting in a highly robust model ideal for field deployment.
+The significant gap between Training (75\%) and Validation (98\%) accuracy typically suggests underfitting or strong augmentation. However, in this context, it confirms the effectiveness of the injected Dropout (0.4) and Data Augmentation pipeline, which made the training task harder than the validation pass, resulting in a reliable model ideal for field deployment.

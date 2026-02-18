@@ -1,7 +1,7 @@
 \section{System Architecture}
 \label{sec:architecture}
 
-The implemented framework follows a modular, graph-based architecture where autonomous agents orchestrate the entire MLOps pipeline through a stateful execution model. Unlike traditional linear scripts, the system leverages \textbf{LangGraph} to define workflows as directed graphs with conditional routing, enabling complex multi-step processes with human oversight at critical decision points.
+The implemented framework follows a modular, graph-based architecture where autonomous agents orchestrate the entire MLOps pipeline through a stateful execution model. Unlike traditional linear scripts, the system utilizes \textbf{LangGraph} to define workflows as directed graphs with conditional routing, enabling complex multi-step processes with human oversight at critical decision points.
 
 \subsection{Master Orchestrator and State Machine}
 
@@ -13,11 +13,11 @@ User requests are classified into four primary workflow categories:
 
 \begin{enumerate}
     \item \textbf{Firmware Generation} (\texttt{firmware\_flow}): Automates STM32CubeMX project initialization, package installation, and code generation via CLI scripting.
-    
+
     \item \textbf{AI Model Discovery and Optimization} (\texttt{ai\_flow}): Implements a two-tier model discovery system (curated task-based models + iterative web search), followed by neural network customization and hyperparameter optimization with NNI.
-    
+
     \item \textbf{Firmware-AI Integration} (\texttt{integration\_flow}): Merges generated C inference code into the STM32 project structure and verifies build compatibility.
-    
+
     \item \textbf{Web Research} (\texttt{search\_flow}): Provides technical guidance through RAG-enhanced web search with quality evaluation metrics.
 \end{enumerate}
 
@@ -77,7 +77,7 @@ The state persistence layer is implemented using **Redis**, a high-performance i
 
 \begin{enumerate}
     \item \textbf{Short-Term Memory (Session State)}: Managed by LangGraph's checkpointer, this layer stores the transient state of the active workflow graph. It is keyed by a composite \texttt{thread\_id} (user\_id + session\_id) and allows for granular time-travel debugging and fault tolerance within a single conversation.
-    
+
     \item \textbf{Long-Term Memory (User Profile)}: A separate persistent store keyed by \texttt{user\_id}. This layer survives across sessions and retains critical context such as the user's preferred hardware board (\texttt{last\_board}), code generation style, and past project paths. This enables "Context Chaining" not just within a workflow, but across the entire lifecycle of the user's interaction with the system.
 \end{enumerate}
 
@@ -123,7 +123,7 @@ Each of the four primary workflows is implemented as a \textbf{subgraph} with it
 This multi-stage pipeline mirrors the typical embedded AI development lifecycle:
 
 \begin{center}
-\texttt{Hardware Setup → Model Selection → Model Customization → Code Generation → Integration → Testing}
+    \texttt{Hardware Setup → Model Selection → Model Customization → Code Generation → Integration → Testing}
 \end{center}
 
 The graph construction logic resides in four builder functions:

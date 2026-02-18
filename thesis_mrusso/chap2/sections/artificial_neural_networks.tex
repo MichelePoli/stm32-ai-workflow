@@ -1,14 +1,14 @@
 \section{Artificial Neural Networks}
-The scientific quest to create machines capable of emulating human intelligence, formally recognized as \gls{ai}, began in the mid-20th century. While early efforts focused on symbolic AI—where expert knowledge was translated into rigid, rule-based logic—these systems often struggled with the ambiguity and complexity of real-world data environments \cite{Zhang2023AI70Years}. 
+The scientific quest to create machines capable of emulating human intelligence, formally recognized as \gls{ai}, began in the mid-20th century. While early efforts focused on symbolic AI, where expert knowledge was translated into rigid, rule-based logic, these systems often struggled with the ambiguity and complexity of real-world data environments \cite{Zhang2023AI70Years}.
 
 To overcome these limitations, the field shifted toward \gls{ml} in the 1980s. This paradigm emphasized data-driven learning, where algorithms improve their performance through experience rather than explicit programming \cite{Finley2024ClassicalML}. By the 2010s, the advent of \gls{dl} revolutionized the industry. By utilizing multi-layered neural networks, deep learning enabled the automatic extraction of hierarchical features from raw data, leading to unprecedented breakthroughs in computer vision and natural language processing \cite{Azizov2024DecadeDL}.
 
 \subsection{The Perceptron: The Fundamental Building Block}
 The structural foundation of modern neural networks is the perceptron, a computational model inspired by the biological neuron. A perceptron processes input signals by calculating a weighted sum and applying a step function to produce a binary classification \cite{Gabrie2023}:
 \begin{equation}
-y = \text{sign}(\mathbf{w}^\top \mathbf{x} + b)
+    y = \text{sign}(\mathbf{w}^\top \mathbf{x} + b)
 \end{equation}
-where $\mathbf{w}$ represents the weight vector, $\mathbf{x}$ the input, and $b$ the bias. While a single perceptron is limited to linearly separable tasks, stacking multiple neurons into layers—forming a Multilayer Perceptron (MLP)—allows for the approximation of highly non-linear functions, as illustrated in Fig. \ref{fig:perceptron} \cite{Schmid2025, NNWork2025}.
+where $\mathbf{w}$ represents the weight vector, $\mathbf{x}$ the input, and $b$ the bias. While a single perceptron is limited to linearly separable tasks, stacking multiple neurons into layers, forming a Multilayer Perceptron (MLP), allows for the approximation of highly non-linear functions, as illustrated in Fig. \ref{fig:perceptron} \cite{Schmid2025, NNWork2025}.
 
 \begin{figure}[ht]
     \centering
@@ -20,13 +20,13 @@ where $\mathbf{w}$ represents the weight vector, $\mathbf{x}$ the input, and $b$
 \subsection{Optimization and Training}
 Training a neural network is essentially an optimization problem: finding the parameter set $\boldsymbol{\theta}$ that minimizes a cost function $J(\boldsymbol{\theta})$. For regression, a standard metric is the Mean Squared Error (MSE):
 \begin{equation}
-J(\boldsymbol{\theta}) = \frac{1}{n} \sum_{i=1}^{n} (y_i - \hat{y}_i)^2
+    J(\boldsymbol{\theta}) = \frac{1}{n} \sum_{i=1}^{n} (y_i - \hat{y}_i)^2
 \end{equation}
-where $y_i$ is the target and $\hat{y}_i$ is the model's prediction \cite{Gabrie2023}. 
+where $y_i$ is the target and $\hat{y}_i$ is the model's prediction \cite{Gabrie2023}.
 
 Minimization is typically achieved via Gradient Descent, where weights are updated iteratively in the direction of the steepest descent:
 \begin{equation}
-\theta_{t+1} = \theta_t - \alpha \nabla J(\theta_t)
+    \theta_{t+1} = \theta_t - \alpha \nabla J(\theta_t)
 \end{equation}
 The learning rate $\alpha$ is a critical hyperparameter that determines the step size. To handle large-scale datasets efficiently, researchers employ Stochastic Gradient Descent (SGD) and its variants, which estimate gradients using small batches of data. While SGD is effective, it can struggle with local minima and saddle points. To address this, \textbf{Momentum} was introduced to accelerate gradients in the right direction, thus leading to faster converging.
 
@@ -48,7 +48,7 @@ Different data types require specialized neural architectures to capture relevan
 
 Mathematically, for a two-dimensional input image $I$ and a filter kernel $K$ of dimensions $k_1 \times k_2$, the discrete convolution operation at position $(i, j)$ is defined as:
 \begin{equation}
-(I * K)(i, j) = \sum_{m=0}^{k_1-1} \sum_{n=0}^{k_2-1} I(i-m, j-n) K(m, n)
+    (I * K)(i, j) = \sum_{m=0}^{k_1-1} \sum_{n=0}^{k_2-1} I(i-m, j-n) K(m, n)
 \end{equation}
 This sliding window operation computes the dot product between the kernel weights and local input regions, building feature maps that highlight spatial hierarchies.
 
@@ -63,18 +63,18 @@ This is often followed by activation functions like ReLU and pooling layers to d
 
 \textbf{Recurrent Neural Networks (RNNs):} Tailored for sequential data where the current output depends on previous inputs, RNNs maintain a "hidden state" that acts as a memory trace \cite{Schmidt2019}. The hidden state $h_t$ at time step $t$ is updated based on the previous hidden state $h_{t-1}$ and the current input $x_t$ via a non-linear activation function (typically $\tanh$ or ReLU):
 \begin{equation}
-h_t = \sigma(W_h h_{t-1} + W_x x_t + b)
+    h_t = \sigma(W_h h_{t-1} + W_x x_t + b)
 \end{equation}
 Despite their utility, vanilla RNNs struggle with long sequences due to the \textbf{vanishing gradient problem}, where gradients diminish exponentially during Backpropagation Through Time (BPTT).
 
 To mitigate this, \textbf{Long Short-Term Memory (LSTM)} networks introduce a more complex memory cell to regulate information flow \cite{Salehinejad2018}. An LSTM unit maintains a cell state $C_t$ controlled by three gating mechanisms: the forget gate ($f_t$), input gate ($i_t$), and output gate ($o_t$). The formal transition equations are:
 \begin{align}
-f_t &= \sigma(W_f \cdot [h_{t-1}, x_t] + b_f) \\
-i_t &= \sigma(W_i \cdot [h_{t-1}, x_t] + b_i) \\
-\tilde{C}_t &= \tanh(W_C \cdot [h_{t-1}, x_t] + b_C) \\
-C_t &= f_t \odot C_{t-1} + i_t \odot \tilde{C}_t \\
-o_t &= \sigma(W_o \cdot [h_{t-1}, x_t] + b_o) \\
-h_t &= o_t \odot \tanh(C_t)
+    f_t         & = \sigma(W_f \cdot [h_{t-1}, x_t] + b_f)    \\
+    i_t         & = \sigma(W_i \cdot [h_{t-1}, x_t] + b_i)    \\
+    \tilde{C}_t & = \tanh(W_C \cdot [h_{t-1}, x_t] + b_C)     \\
+    C_t         & = f_t \odot C_{t-1} + i_t \odot \tilde{C}_t \\
+    o_t         & = \sigma(W_o \cdot [h_{t-1}, x_t] + b_o)    \\
+    h_t         & = o_t \odot \tanh(C_t)
 \end{align}
 where $\odot$ denotes element-wise multiplication. This architecture allows the network to effectively learn long-term dependencies (Fig. \ref{fig:rnn}) \cite{Lipton2015}.
 
@@ -85,6 +85,4 @@ where $\odot$ denotes element-wise multiplication. This architecture allows the 
     \label{fig:rnn}
 \end{figure}
 
-\subsection{Model Decomposition and Layer-wise Manipulation}
-For Edge AI deployment, traditional "black-box" training is often insufficient. Deploying models on microcontrollers requires a granular understanding of the network's architecture. \textit{Neural Network Surgery} or decomposition refers to the practice of isolating, modifying, or replacing specific layers within a pre-trained model. This technique is essential for domain adaptation—such as replacing the final classification head for a new task—and for hardware optimization, where specific non-linearities or layer types can be replaced with hardware-friendly equivalents (e.g., replacing complex activations with lookup tables or simpler functions). This thesis leverages agentic orchestration to automate these manipulations, ensuring that the model architecture remains compatible with the target STM32 hardware constraints throughout the MLOps lifecycle.
-
+For Edge AI deployment, traditional "black-box" training is often insufficient. Deploying models on microcontrollers requires a detailed understanding of the network's architecture. \textit{Neural Network Surgery} or decomposition refers to isolating, modifying, or replacing specific layers within a pre-trained model. This technique is necessary for domain adaptation, such as replacing the final classification head for a new task, and for hardware optimization, where specific non-linearities or layer types can be replaced with hardware-friendly equivalents (e.g., replacing complex activations with lookup tables or simpler functions). This thesis utilizes agentic orchestration to automate these manipulations, ensuring that compatible architecture is maintained throughout the MLOps lifecycle.

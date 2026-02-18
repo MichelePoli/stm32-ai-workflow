@@ -362,3 +362,115 @@ parent={},%
 %
 }%
 
+\glsdefs@newdocentry{mlops}%
+{%
+name={\acronymfont {\glsentryshort {mlops}}},%
+sort={MLOps},%
+type={main},%
+first={MLOps},%
+firstplural={MLOpss},%
+text={MLOps},%
+plural={MLOpss},%
+description={Machine Learning Operations},%
+descriptionplural={Machine Learning Operations},%
+symbol={\relax },%
+symbolplural={\relax },%
+user1={},%
+user2={},%
+user3={},%
+user4={},%
+user5={},%
+user6={},%
+long={Machine Learning Operations},%
+longplural={Machine Learning Operationss},%
+short={MLOps},%
+shortplural={MLOpss},%
+counter={page},%
+parent={},%
+%
+}%
+
+\glsdefs@newdocentry{ide}%
+{%
+name={\acronymfont {\glsentryshort {ide}}},%
+sort={IDE},%
+type={main},%
+first={IDE},%
+firstplural={IDEs},%
+text={IDE},%
+plural={IDEs},%
+description={Integrated Development Environment},%
+descriptionplural={Integrated Development Environment},%
+symbol={\relax },%
+symbolplural={\relax },%
+user1={},%
+user2={},%
+user3={},%
+user4={},%
+user5={},%
+user6={},%
+long={Integrated Development Environment},%
+longplural={Integrated Development Environments},%
+short={IDE},%
+shortplural={IDEs},%
+counter={page},%
+parent={},%
+%
+}%
+
+\glsdefs@newdocentry{gpu}%
+{%
+name={\acronymfont {\glsentryshort {gpu}}},%
+sort={GPU},%
+type={main},%
+first={GPU},%
+firstplural={GPUs},%
+text={GPU},%
+plural={GPUs},%
+description={Graphics Processing Unit},%
+descriptionplural={Graphics Processing Unit},%
+symbol={\relax },%
+symbolplural={\relax },%
+user1={},%
+user2={},%
+user3={},%
+user4={},%
+user5={},%
+user6={},%
+long={Graphics Processing Unit},%
+longplural={Graphics Processing Units},%
+short={GPU},%
+shortplural={GPUs},%
+counter={page},%
+parent={},%
+%
+}%
+
+\glsdefs@newdocentry{cpu}%
+{%
+name={\acronymfont {\glsentryshort {cpu}}},%
+sort={CPU},%
+type={main},%
+first={CPU},%
+firstplural={CPUs},%
+text={CPU},%
+plural={CPUs},%
+description={Central Processing Unit},%
+descriptionplural={Central Processing Unit},%
+symbol={\relax },%
+symbolplural={\relax },%
+user1={},%
+user2={},%
+user3={},%
+user4={},%
+user5={},%
+user6={},%
+long={Central Processing Unit},%
+longplural={Central Processing Units},%
+short={CPU},%
+shortplural={CPUs},%
+counter={page},%
+parent={},%
+%
+}%
+

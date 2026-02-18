@@ -1,5 +1,6 @@
 \section{Agent Orchestration Frameworks}
-In the landscape of modern artificial intelligence, an \textit{agent} goes beyond a static model; it is defined as an autonomous computational entity capable of sensing its environment, reasoning through complex decision trees, and executing actions to achieve specific objectives. While Large Language Models (LLMs) serve as powerful reasoning engines, their standalone utility is constrained by their inability to interact with the external world or maintain long-term state. To bridge this gap, specific orchestration frameworks have emerged to coordinate the interactions between models, external tools (such as compilers and hardware optimization engines), and persistent databases, effectively transforming a text-generator into a functional system \cite{naveed2024comprehensiveoverviewlargelanguage, su2025daao}.
+In modern artificial intelligence, an \textit{agent} goes beyond a static model; it is defined as an autonomous computational entity capable of sensing its environment, reasoning through complex decision trees, and executing actions to achieve specific objectives.
+While Large Language Models (LLMs) serve as powerful reasoning engines, their standalone utility is constrained by their inability to interact with the external world or maintain long-term state. To bridge this gap, specific orchestration frameworks have emerged to coordinate the interactions between models, external tools (such as compilers and hardware optimization engines), and persistent databases, effectively transforming a text-generator into a functional system \cite{naveed2024comprehensiveoverviewlargelanguage, su2025daao}.
 
 \subsection{LangChain: Modular Composition of LLM Applications}
 LangChain has established itself as a foundational framework for simplifying the construction of LLM-powered applications \cite{langchain}. Its architecture is predicated on the concept of composability, where complex applications are broken down into smaller, modular building blocks. The framework provides high-level abstractions for key components:
@@ -9,12 +10,14 @@ LangChain has established itself as a foundational framework for simplifying the
     \item \textbf{Agents}: Entities that use an LLM as a reasoning engine to determine which actions to take and in what order.
     \item \textbf{Tools}: Interfaces that allow the agent to interact with the outside world, from web searching to code execution.
 \end{enumerate}
-This modularity allows developers to move beyond simple "prompt-response" paradigms, enabling the creation of systems that can retrieve external data (RAG) and interact with APIs. However, typical LangChain implementations act as Directed Acyclic Graphs (DAGs), which can limit the development of highly iterative workflows where an agent needs to loop back, retry, or refine its approach based on dynamic feedback.
+This modularity allows developers to move beyond simple "prompt-response" paradigms, facilitating the creation of systems that can retrieve external data (RAG) and interact with APIs.
+However, typical LangChain implementations act as Directed Acyclic Graphs (DAGs), which can limit the development of highly iterative workflows where an agent needs to loop back, retry, or refine its approach based on dynamic feedback.
 
 \subsection{LangGraph: Cyclic and Stateful Orchestration}
 To address the limitations of linear execution, LangGraph extends the ecosystem by introducing a graph-theoretic approach to orchestration. Unlike the rigid sequences of its predecessor, LangGraph models agentic processes as stateful graphs, where \textbf{nodes} represent computational units (functions or model calls) and \textbf{edges} define the control flow logic \cite{wang2024agentailanggraphmodular, hong2024workflowllm}.
 
-The core innovation of this framework lies in its support for \textbf{cycles}, enabling the definition of iterative loops crucial for sophisticated tasks. For example, in the "Neural Network Surgery" workflow, the system orchestrates an iterative refinement process where the model is optimized (e.g., leveraging the internal search loops of NNI) and validated against constraints until a viable configuration is selected. This "test-and-revise" capability, which may also involve Human-in-the-Loop feedback, is difficult to implement in linear chains but natural in a graph structure. LangGraph treats the agent's execution as a state machine, where decisions govern the transitions between states, allowing for dynamic branching and error recovery.
+The core innovation of this framework lies in its support for \textbf{cycles}, enabling the definition of iterative loops available for complex tasks.
+For example, in the "Neural Network Surgery" workflow, the system orchestrates an iterative refinement process where the model is optimized (e.g., leveraging the internal search loops of NNI) and validated against constraints until a viable configuration is selected. This "test-and-revise" capability, which may also involve Human-in-the-Loop feedback, is difficult to implement in linear chains but natural in a graph structure. LangGraph treats the agent's execution as a state machine, where decisions govern the transitions between states, allowing for dynamic branching and error recovery.
 
 \begin{figure}[ht]
     \centering
@@ -24,13 +27,12 @@ The core innovation of this framework lies in its support for \textbf{cycles}, e
 \end{figure}
 
 \subsection{State Management and Persistence}
-A defining characteristic of robust agentic systems is the ability to maintain context over extended horizons. Modern orchestration frameworks distinguish themselves through sophisticated state management mechanisms, moving away from stateless architectures where every interaction is independent \cite{yu2023stateful}.
+A defining characteristic of reliable agentic systems is the ability to maintain context over extended horizons. Modern orchestration frameworks distinguish themselves through dedicated state management mechanisms, moving away from stateless architectures where every interaction is independent \cite{yu2023stateful}.
 
-In the context of this work, state persistence is achieved through a "checkpointing" system that saves a comprehensive snapshot of the graph's state—including variable values, conversation history, and execution progress—at every step. This architectural choice unlocks critical capabilities for MLOps:
+In the context of this work, state persistence is achieved through a "checkpointing" system that saves a detailed snapshot of the graph's state, including variable values, conversation history, and execution progress, at every step.
+This architectural choice unlocks critical capabilities for MLOps:
 \begin{enumerate}
-    \item \textbf{Fault Tolerance and Recovery}: If a long-running process (like a firmware compilation) fails due to transient errors, the system can resume execution from the last valid checkpoint rather than restarting from scratch.
-    \item \textbf{Human-in-the-loop (HITL)}: The execution can be paused to allow human experts to inspect the state, approve sensitive actions, or manually correct the agent's trajectory before resuming.
-    \item \textbf{Time-Travel Debugging}: Developers can "rewind" the agent's actions to virtually any previous state to diagnose logic errors or test alternative execution paths \cite{wang2025stateful}.
-\end{enumerate}
-These features ensure that the multi-stage conversion and optimization of STM32 models remain coherent, reliable, and auditable, separating a prototype-grade script from a production-ready framework.
+\item \textbf{Fault Tolerance and Recovery}: If a long-running process (like a firmware compilation) fails due to transient errors, the system can resume execution from the last valid checkpoint rather than restarting from scratch.
+\item \textbf{Human-in-the-loop (HITL)}: The execution can be paused to allow human experts to inspect the state, approve sensitive actions, or manually correct the agent's trajectory before resuming.
+\item \textbf{Time-Travel Debugging}: Developers can "rewind" the agent's actions to virtually any previous state to diagnose logic errors or test alternative execution paths \cite{wang2025stateful}.
 

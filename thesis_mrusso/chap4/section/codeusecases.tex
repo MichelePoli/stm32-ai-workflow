@@ -13,8 +13,8 @@ This experiment evaluates the effectiveness of the \textbf{multi-agent code gene
 \noindent \textbf{Orchestrator Decomposition:} The orchestrator identified heterogeneous knowledge requirements and routed to two specialized agents with semantic coupling:
 
 \begin{itemize}
-  \item \textbf{snnTorch Agent:} Generated model.py and utils.py with noise injection and Leaky neurons
-  \item \textbf{NNI Agent:} Generated config.py (search space) and train.py (training loop)
+    \item \textbf{snnTorch Agent:} Generated model.py and utils.py with noise injection and Leaky neurons
+    \item \textbf{NNI Agent:} Generated config.py (search space) and train.py (training loop)
 \end{itemize}
 
 The orchestrator specified: ``train.py should load model from model.py,'' ensuring cross-agent integration without direct communication.
@@ -24,16 +24,16 @@ The orchestrator specified: ``train.py should load model from model.py,'' ensuri
 \noindent \textbf{Query Extension Through Ranked Retrieval:} Both agents employed ranked multi-pass retrieval backed by persistent vectorstores:
 
 \begin{itemize}
-  \item \textbf{snnTorch:} Generated 10 ranked queries (weight 1.00 \( \rightarrow \) 0.55), retrieved 33,432 characters. Priority-1 queries directly addressed core requirements: Gaussian noise, trainable beta, multi-layer architecture, 150 time steps.
-  
-  \item \textbf{NNI:} Generated 10 ranked queries, retrieved 25,263 characters. Agent reasoning: ``Queries 10, 6, 5, 9 cover core requirements... Query 8 is least directly relevant,'' demonstrating contextual filtering of general versus task-specific information.
+    \item \textbf{snnTorch:} Generated 10 ranked queries (weight 1.00 \( \rightarrow \) 0.55), retrieved 33,432 characters. Priority-1 queries directly addressed core requirements: Gaussian noise, trainable beta, multi-layer architecture, 150 time steps.
+
+    \item \textbf{NNI:} Generated 10 ranked queries, retrieved 25,263 characters. Agent reasoning: ``Queries 10, 6, 5, 9 cover core requirements... Query 8 is least directly relevant,'' demonstrating contextual filtering of general versus task-specific information.
 \end{itemize}
 
 \vspace{0.3cm}
 
 \noindent \textbf{Generated Artifacts:} snnTorch agent produced 3,051 characters at 95\% confidence (2 files: utils.py, model.py with noise preprocessing and trainable beta). NNI agent produced 6,102 characters.
 
-Critically, the NNI agent \textbf{expanded the search space to eight hyperparameters} beyond the user's specification: learning\_rate, batch\_size, beta\_input, beta\_hidden, beta\_output, beta\_decay, weight\_decay, and momentum. This expansion demonstrates architectural inference: the agent identified that layer-specific beta tuning, regularization, and optimizer momentum represent high-value optimization dimensions for SNN robustness.
+Critically, the NNI agent \textbf{expanded the search space to eight hyperparameters} beyond the user's specification: learning\_rate, batch\_size, beta\_input, beta\_hidden, beta\_output, beta\_decay, weight\_decay, and momentum. This expansion demonstrates architectural inference: the agent identified that layer-specific beta tuning, regularization, and optimizer momentum represent high-value optimization dimensions for the stability of SNN models.
 
 \vspace{0.3cm}
 
@@ -352,7 +352,7 @@ The generated code demonstrates understanding of core SNN concepts: Leaky IF neu
 \noindent \textbf{Sandbox Execution and Error Detection:} The generated code was executed in a sandboxed Python environment with the following result:
 
 \begin{center}
-\textbf{RuntimeError:} Trying to backward through the graph a second time (or directly access saved tensors after they have already been freed). Saved intermediate values of the graph are freed when you call .backward() or autograd.grad(). Specify retain\_graph=True if you need to backward through the graph a second time or if you need to access saved tensors after calling backward.
+    \textbf{RuntimeError:} Trying to backward through the graph a second time (or directly access saved tensors after they have already been freed). Saved intermediate values of the graph are freed when you call .backward() or autograd.grad(). Specify retain\_graph=True if you need to backward through the graph a second time or if you need to access saved tensors after calling backward.
 \end{center}
 
 The error reveals a critical issue: the model reuses the same LeakyIFNeuron across timesteps, accumulating computation graph references. When calling \texttt{loss.backward()} multiple times (implicitly through the loop structure), PyTorch attempts to free intermediate values that are still referenced, causing the runtime error. The sandbox environment successfully captured this execution failure, providing concrete feedback rather than passing through undetected.
@@ -366,20 +366,20 @@ The error reveals a critical issue: the model reuses the same LeakyIFNeuron acro
 \noindent \textbf{Corrected Execution and Results:} The code was modified to include \\
 \texttt{loss.backward(retain\_graph=True)} \\
 and re-executed in the sandbox.
- The corrected execution produced successful training results:
+The corrected execution produced successful training results:
 
 \begin{center}
-\begin{tabular}{ccc}
-\toprule
-\textbf{Epoch} & \textbf{Loss} & \textbf{Accuracy} \\
-\midrule
-1 & 1.1410 & 0.5625 \\
-2 & 0.9462 & 0.5625 \\
-3 & 0.7899 & 0.5625 \\
-4 & 0.7250 & 0.5000 \\
-5 & 0.6990 & 0.5625 \\
-\bottomrule
-\end{tabular}
+    \begin{tabular}{ccc}
+        \toprule
+        \textbf{Epoch} & \textbf{Loss} & \textbf{Accuracy} \\
+        \midrule
+        1              & 1.1410        & 0.5625            \\
+        2              & 0.9462        & 0.5625            \\
+        3              & 0.7899        & 0.5625            \\
+        4              & 0.7250        & 0.5000            \\
+        5              & 0.6990        & 0.5625            \\
+        \bottomrule
+    \end{tabular}
 \end{center}
 
 The training loop executed successfully, demonstrating that (1) the corrected code generates valid PyTorch computation graphs, (2) loss computation and backpropagation complete without runtime errors, (3) the model trains for 5 epochs with decreasing loss trends, and (4) accuracy stabilizes around 50-56\% (close to random for binary classification on random labels). The corrected results indicate that the core SNN architecture and training loop are functionally correct once the autograd graph issue is resolved.
@@ -443,8 +443,8 @@ The generated implementation correctly: (1) iterates over the temporal dimension
 \noindent \textbf{Sandbox Execution and Validation:} The completed code was executed in a sandboxed in cloud Python environment with synthetic input (100 timesteps of random current, shape \texttt{(100, 1)}):
 
 \begin{center}
-\textbf{Execution Output:}
-\begin{verbatim}
+    \textbf{Execution Output:}
+    \begin{verbatim}
 Shapes: torch.Size([100, 1]) torch.Size([100, 1]) torch.Size([100, 1])
 Total spikes: 38
 \end{verbatim}
@@ -479,10 +479,10 @@ This experiment evaluates the effectiveness of the \textbf{code generation branc
 \noindent \textbf{Code Normalization for Equivalent Input Handling:} Both generated and reference code were normalized to accept \textbf{identical input tensors} despite architectural differences. Generated code expects input shape \( (128, 784) \) and internally initializes membrane states, while reference code expects pre-initialized membrane potentials (\texttt{mem1, spk1, mem2}) as function parameters. Normalization involved:
 
 \begin{itemize}
-  \item \textbf{Input Standardization:} Both models receive \texttt{data = torch.randn(batch\_size, num\_inputs, device=device)} with identical shape and device placement
-  \item \textbf{State Initialization Reconciliation:} Reference code's explicit state parameters were initialized to zero tensors matching generated code's internal initialization (\texttt{mem1\_ref = torch.zeros(batch\_size, num\_hidden, device=device)})
-  \item \textbf{Output Format Alignment:} Both models return spike recordings and membrane potentials stacked across temporal dimension, enabling direct comparison of output shapes and values
-  \item \textbf{Device Consistency:} Both executed on identical device (CUDA if available, CPU fallback) ensuring computational equivalence
+    \item \textbf{Input Standardization:} Both models receive \texttt{data = torch.randn(batch\_size, num\_inputs, device=device)} with identical shape and device placement
+    \item \textbf{State Initialization Reconciliation:} Reference code's explicit state parameters were initialized to zero tensors matching generated code's internal initialization (\texttt{mem1\_ref = torch.zeros(batch\_size, num\_hidden, device=device)})
+    \item \textbf{Output Format Alignment:} Both models return spike recordings and membrane potentials stacked across temporal dimension, enabling direct comparison of output shapes and values
+    \item \textbf{Device Consistency:} Both executed on identical device (CUDA if available, CPU fallback) ensuring computational equivalence
 \end{itemize}
 
 This normalization process transforms heterogeneous implementations into \textbf{functionally comparable artifacts} despite syntactic and architectural differences.
@@ -492,11 +492,11 @@ This normalization process transforms heterogeneous implementations into \textbf
 \noindent \textbf{Performance Metrics and Observed Behavior:} The system measured quantitative characteristics across three dimensions to explore whether performance patterns might provide insights into code correctness:
 
 \begin{itemize}
-  \item \textbf{Forward Pass Latency:} Reference model: \( 0.001485 \) seconds. Generated model: \( 0.504636 \) seconds. Interestingly, the generated model exhibits significantly higher latency, which aligns with its temporal unrolling across 100 timesteps with Lapicque neuron dynamics, whereas the reference executes a single forward pass through simpler layers.
-  
-  \item \textbf{Model Capacity:} Reference model: \( 101,770 \) parameters. Generated model: \( 795,010 \) parameters. The parameter count difference reflects the generated architecture's two-layer design (784 → 1000 → 10) versus the reference's shallower structure, suggesting the generated code may have correctly captured the architectural specification.
-  
-  \item \textbf{Peak Memory Usage:} Reference: \( 0.00 \) MB. Generated: \( 0.06 \) MB. Notably, memory usage remains minimal despite the larger parameter count, which could suggest efficient tensor management.
+    \item \textbf{Forward Pass Latency:} Reference model: \( 0.001485 \) seconds. Generated model: \( 0.504636 \) seconds. Interestingly, the generated model exhibits significantly higher latency, which aligns with its temporal unrolling across 100 timesteps with Lapicque neuron dynamics, whereas the reference executes a single forward pass through simpler layers.
+
+    \item \textbf{Model Capacity:} Reference model: \( 101,770 \) parameters. Generated model: \( 795,010 \) parameters. The parameter count difference reflects the generated architecture's two-layer design (784 → 1000 → 10) versus the reference's shallower structure, suggesting the generated code may have correctly captured the architectural specification.
+
+    \item \textbf{Peak Memory Usage:} Reference: \( 0.00 \) MB. Generated: \( 0.06 \) MB. Notably, memory usage remains minimal despite the larger parameter count, which could suggest efficient tensor management.
 \end{itemize}
 
 \vspace{0.3cm}

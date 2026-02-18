@@ -3,54 +3,54 @@
 \chapter{STM32 Model Zoo Compatibility Reference}
 \label{app:model_compat_full}
 
-This appendix provides a comprehensive reference for model-board compatibility across the STM32 family, including both uncompressed (FP32) and quantized (INT8) resource requirements. This matrix was developed to guide the automated resource constraint checking system implemented in the AI Model Discovery workflow.
+This appendix provides a detailed reference for model-board compatibility across the STM32 family, including both uncompressed (FP32) and quantized (INT8) resource requirements. This matrix was developed to guide the automated resource constraint checking system implemented in the AI Model Discovery workflow.
 
 \section{Board Specifications}
 
 \begin{table}[h!]
-\centering
-\caption{STM32 MCU Memory Specifications}
-\begin{tabular}{|l|c|c|l|}
-\hline
-\textbf{Board} & \textbf{RAM} & \textbf{Flash} & \textbf{Primary Use Case} \\
-\hline
-STM32F401RE & 64 KB & 256 KB & TinyML, Audio, Sensors \\
-STM32L476 & 128 KB & 1 MB & Low Power Vision \\
-STM32H743ZI & 1 MB & 2 MB & Vision, Object Detection \\
-STM32H747I & 1 MB & 2 MB & Vision, Dual Core \\
-STM32U585 & 786 KB & 2 MB & Secure AI \\
-STM32N6570 & 5 MB & 4 MB & Advanced Vision, NPU \\
-\hline
-\end{tabular}
+    \centering
+    \caption{STM32 MCU Memory Specifications}
+    \begin{tabular}{|l|c|c|l|}
+        \hline
+        \textbf{Board} & \textbf{RAM} & \textbf{Flash} & \textbf{Primary Use Case} \\
+        \hline
+        STM32F401RE    & 64 KB        & 256 KB         & TinyML, Audio, Sensors    \\
+        STM32L476      & 128 KB       & 1 MB           & Low Power Vision          \\
+        STM32H743ZI    & 1 MB         & 2 MB           & Vision, Object Detection  \\
+        STM32H747I     & 1 MB         & 2 MB           & Vision, Dual Core         \\
+        STM32U585      & 786 KB       & 2 MB           & Secure AI                 \\
+        STM32N6570     & 5 MB         & 4 MB           & Advanced Vision, NPU      \\
+        \hline
+    \end{tabular}
 \end{table}
 
 \section{Complete Model Resource Requirements}
 
 \begin{landscape}
-\begin{table}[h!]
-\centering
-\caption{Full Model-Board Compatibility Matrix}
-\label{tab:model_compat_full}
-\small
-\begin{tabular}{|l|c|c|c|c|c|c|c|c|c|c|}
-\hline
-\textbf{Model} & \textbf{Input} & \textbf{RAM} & \textbf{Flash} & \textbf{RAM} & \textbf{Flash} & \textbf{F401} & \textbf{L476} & \textbf{H743} & \textbf{U585} & \textbf{N6} \\
- & \textbf{Size} & \textbf{(FP32)} & \textbf{(FP32)} & \textbf{(INT8)} & \textbf{(INT8)} &  &  &  &  &  \\
-\hline
-ST MNIST & 28×28 & 20 KB & 100 KB & 5 KB & 25 KB & \checkmark & \checkmark & \checkmark & \checkmark & \checkmark \\
-FD-MobileNet 0.25 & 96×96 & 320 KB & 720 KB & 80 KB & 180 KB & $\times$ & \checkmark & \checkmark & \checkmark & \checkmark \\
-MobileNet V1 0.25 & 128×128 & 480 KB & 880 KB & 120 KB & 220 KB & $\times$ & \textasciitilde & \checkmark & \checkmark & \checkmark \\
-MobileNet V2 0.35 & 128×128 & 600 KB & 1.1 MB & 150 KB & 280 KB & $\times$ & \textasciitilde & \checkmark & \checkmark & \checkmark \\
-ResNet V1 8 & 32×32 & 320 KB & 680 KB & 80 KB & 170 KB & $\times$ & \checkmark & \checkmark & \checkmark & \checkmark \\
-ResNet V1 32 & 32×32 & 800 KB & 1.8 MB & 200 KB & 450 KB & $\times$ & $\times$ & \checkmark & \checkmark & \checkmark \\
-MobileNet V2 0.5 & 224×224 & 1.1 MB & 2 MB & 280 KB & 500 KB & $\times$ & $\times$ & \checkmark & \checkmark & \checkmark \\
-MobileNet V2 1.0 & 224×224 & 2.4 MB & 4.8 MB & 600 KB & 1.2 MB & $\times$ & $\times$ & \textasciitilde & \textasciitilde & \checkmark \\
-EfficientNet Lite0 & 224×224 & 1.8 MB & 3.6 MB & 450 KB & 900 KB & $\times$ & $\times$ & \textasciitilde & \textasciitilde & \checkmark \\
-SqueezeNet V1.1 & 224×224 & 1.4 MB & 2.8 MB & 350 KB & 700 KB & $\times$ & $\times$ & \checkmark & \checkmark & \checkmark \\
-ResNet50 V2 & 224×224 & 6 MB & 12 MB & 1.5 MB & 3 MB & $\times$ & $\times$ & $\times$ & $\times$ & \checkmark \\
-\hline
-\end{tabular}
-\end{table}
+    \begin{table}[h!]
+        \centering
+        \caption{Full Model-Board Compatibility Matrix}
+        \label{tab:model_compat_full}
+        \small
+        \begin{tabular}{|l|c|c|c|c|c|c|c|c|c|c|}
+            \hline
+            \textbf{Model}     & \textbf{Input} & \textbf{RAM}    & \textbf{Flash}  & \textbf{RAM}    & \textbf{Flash}  & \textbf{F401} & \textbf{L476}   & \textbf{H743}   & \textbf{U585}   & \textbf{N6} \\
+                               & \textbf{Size}  & \textbf{(FP32)} & \textbf{(FP32)} & \textbf{(INT8)} & \textbf{(INT8)} &               &                 &                 &                 &             \\
+            \hline
+            ST MNIST           & 28×28          & 20 KB           & 100 KB          & 5 KB            & 25 KB           & \checkmark    & \checkmark      & \checkmark      & \checkmark      & \checkmark  \\
+            FD-MobileNet 0.25  & 96×96          & 320 KB          & 720 KB          & 80 KB           & 180 KB          & $\times$      & \checkmark      & \checkmark      & \checkmark      & \checkmark  \\
+            MobileNet V1 0.25  & 128×128        & 480 KB          & 880 KB          & 120 KB          & 220 KB          & $\times$      & \textasciitilde & \checkmark      & \checkmark      & \checkmark  \\
+            MobileNet V2 0.35  & 128×128        & 600 KB          & 1.1 MB          & 150 KB          & 280 KB          & $\times$      & \textasciitilde & \checkmark      & \checkmark      & \checkmark  \\
+            ResNet V1 8        & 32×32          & 320 KB          & 680 KB          & 80 KB           & 170 KB          & $\times$      & \checkmark      & \checkmark      & \checkmark      & \checkmark  \\
+            ResNet V1 32       & 32×32          & 800 KB          & 1.8 MB          & 200 KB          & 450 KB          & $\times$      & $\times$        & \checkmark      & \checkmark      & \checkmark  \\
+            MobileNet V2 0.5   & 224×224        & 1.1 MB          & 2 MB            & 280 KB          & 500 KB          & $\times$      & $\times$        & \checkmark      & \checkmark      & \checkmark  \\
+            MobileNet V2 1.0   & 224×224        & 2.4 MB          & 4.8 MB          & 600 KB          & 1.2 MB          & $\times$      & $\times$        & \textasciitilde & \textasciitilde & \checkmark  \\
+            EfficientNet Lite0 & 224×224        & 1.8 MB          & 3.6 MB          & 450 KB          & 900 KB          & $\times$      & $\times$        & \textasciitilde & \textasciitilde & \checkmark  \\
+            SqueezeNet V1.1    & 224×224        & 1.4 MB          & 2.8 MB          & 350 KB          & 700 KB          & $\times$      & $\times$        & \checkmark      & \checkmark      & \checkmark  \\
+            ResNet50 V2        & 224×224        & 6 MB            & 12 MB           & 1.5 MB          & 3 MB            & $\times$      & $\times$        & $\times$        & $\times$        & \checkmark  \\
+            \hline
+        \end{tabular}
+    \end{table}
 \end{landscape}
 
 \section{Compression Benefits}
@@ -77,7 +77,7 @@ This compatibility matrix informed the design of the automated \texttt{check\_re
 \section{STM32 MCU Part Numbers Reference}
 \label{app:mcu_part_numbers}
 
-This section provides a comprehensive reference of STM32 microcontroller part numbers for direct use with STM32CubeMX CLI commands. Unlike board selectors (e.g., \texttt{NUCLEO-H743ZI}), which may not be available in all CubeMX database versions, part numbers directly reference the microcontroller chip and are universally recognized.
+This section provides a full reference of STM32 microcontroller part numbers for direct use with STM32CubeMX CLI commands. Unlike board selectors (e.g., \texttt{NUCLEO-H743ZI}), which may not be available in all CubeMX database versions, part numbers directly reference the microcontroller chip and are universally recognized.
 
 \subsection{Part Number Naming Convention}
 
@@ -92,91 +92,91 @@ STM32 part numbers follow the pattern: \texttt{STM32[Family][Series][Variant][Pa
 \subsection{F4 Family (Foundation)}
 
 \begin{table}[h!]
-\centering
-\caption{STM32F4 MCU Part Numbers}
-\label{tab:f4_parts}
-\small
-\begin{tabular}{|l|c|c|c|l|}
-\hline
-\textbf{Part Number} & \textbf{RAM} & \textbf{Flash} & \textbf{Package} & \textbf{Notes} \\
-\hline
-STM32F401RETx & 96 KB & 512 KB & LQFP64 & Nucleo F401RE \\
-STM32F401VETx & 96 KB & 512 KB & LQFP100 & Extended GPIO \\
-STM32F411RETx & 128 KB & 512 KB & LQFP64 & Nucleo F411RE \\
-STM32F446RETx & 128 KB & 512 KB & LQFP64 & Nucleo F446RE \\
-\hline
-\end{tabular}
+    \centering
+    \caption{STM32F4 MCU Part Numbers}
+    \label{tab:f4_parts}
+    \small
+    \begin{tabular}{|l|c|c|c|l|}
+        \hline
+        \textbf{Part Number} & \textbf{RAM} & \textbf{Flash} & \textbf{Package} & \textbf{Notes} \\
+        \hline
+        STM32F401RETx        & 96 KB        & 512 KB         & LQFP64           & Nucleo F401RE  \\
+        STM32F401VETx        & 96 KB        & 512 KB         & LQFP100          & Extended GPIO  \\
+        STM32F411RETx        & 128 KB       & 512 KB         & LQFP64           & Nucleo F411RE  \\
+        STM32F446RETx        & 128 KB       & 512 KB         & LQFP64           & Nucleo F446RE  \\
+        \hline
+    \end{tabular}
 \end{table}
 
 \subsection{L4 Family (Low Power)}
 
 \begin{table}[h!]
-\centering
-\caption{STM32L4 MCU Part Numbers}
-\label{tab:l4_parts}
-\small
-\begin{tabular}{|l|c|c|c|l|}
-\hline
-\textbf{Part Number} & \textbf{RAM} & \textbf{Flash} & \textbf{Package} & \textbf{Notes} \\
-\hline
-STM32L476RGTx & 128 KB & 1 MB & LQFP64 & Nucleo L476RG \\
-STM32L476VGTx & 128 KB & 1 MB & LQFP100 & Discovery L476 \\
-STM32L4R5ZITx & 640 KB & 2 MB & LQFP144 & Extended RAM \\
-\hline
-\end{tabular}
+    \centering
+    \caption{STM32L4 MCU Part Numbers}
+    \label{tab:l4_parts}
+    \small
+    \begin{tabular}{|l|c|c|c|l|}
+        \hline
+        \textbf{Part Number} & \textbf{RAM} & \textbf{Flash} & \textbf{Package} & \textbf{Notes} \\
+        \hline
+        STM32L476RGTx        & 128 KB       & 1 MB           & LQFP64           & Nucleo L476RG  \\
+        STM32L476VGTx        & 128 KB       & 1 MB           & LQFP100          & Discovery L476 \\
+        STM32L4R5ZITx        & 640 KB       & 2 MB           & LQFP144          & Extended RAM   \\
+        \hline
+    \end{tabular}
 \end{table}
 
 \subsection{H7 Family (High Performance)}
 
 \begin{table}[h!]
-\centering
-\caption{STM32H7 MCU Part Numbers}
-\label{tab:h7_parts}
-\small
-\begin{tabular}{|l|c|c|c|l|}
-\hline
-\textbf{Part Number} & \textbf{RAM} & \textbf{Flash} & \textbf{Package} & \textbf{Notes} \\
-\hline
-STM32H743ZITx & 1 MB & 2 MB & LQFP144 & Nucleo H743ZI \\
-STM32H743VITx & 1 MB & 2 MB & LQFP100 & Compact \\
-STM32H753ZITx & 1 MB & 2 MB & LQFP144 & With Crypto \\
-STM32H747XIHx & 1 MB & 2 MB & TFBGA240 & Dual Core (M7+M4) \\
-STM32H7A3ZITx & 1.4 MB & 2 MB & LQFP144 & Extended RAM \\
-\hline
-\end{tabular}
+    \centering
+    \caption{STM32H7 MCU Part Numbers}
+    \label{tab:h7_parts}
+    \small
+    \begin{tabular}{|l|c|c|c|l|}
+        \hline
+        \textbf{Part Number} & \textbf{RAM} & \textbf{Flash} & \textbf{Package} & \textbf{Notes}    \\
+        \hline
+        STM32H743ZITx        & 1 MB         & 2 MB           & LQFP144          & Nucleo H743ZI     \\
+        STM32H743VITx        & 1 MB         & 2 MB           & LQFP100          & Compact           \\
+        STM32H753ZITx        & 1 MB         & 2 MB           & LQFP144          & With Crypto       \\
+        STM32H747XIHx        & 1 MB         & 2 MB           & TFBGA240         & Dual Core (M7+M4) \\
+        STM32H7A3ZITx        & 1.4 MB       & 2 MB           & LQFP144          & Extended RAM      \\
+        \hline
+    \end{tabular}
 \end{table}
 
 \subsection{U5 Family (Secure Ultra-Low Power)}
 
 \begin{table}[h!]
-\centering
-\caption{STM32U5 MCU Part Numbers}
-\label{tab:u5_parts}
-\small
-\begin{tabular}{|l|c|c|c|l|}
-\hline
-\textbf{Part Number} & \textbf{RAM} & \textbf{Flash} & \textbf{Package} & \textbf{Notes} \\
-\hline
-STM32U575ZITxQ & 786 KB & 2 MB & LQFP144 & TrustZone \\
-STM32U585AIIxQ & 786 KB & 2 MB & UFBGA169 & IoT Discovery \\
-\hline
-\end{tabular}
+    \centering
+    \caption{STM32U5 MCU Part Numbers}
+    \label{tab:u5_parts}
+    \small
+    \begin{tabular}{|l|c|c|c|l|}
+        \hline
+        \textbf{Part Number} & \textbf{RAM} & \textbf{Flash} & \textbf{Package} & \textbf{Notes} \\
+        \hline
+        STM32U575ZITxQ       & 786 KB       & 2 MB           & LQFP144          & TrustZone      \\
+        STM32U585AIIxQ       & 786 KB       & 2 MB           & UFBGA169         & IoT Discovery  \\
+        \hline
+    \end{tabular}
 \end{table}
 
 \subsection{N6 Family (Neural Processing Unit)}
 
 \begin{table}[h!]
-\centering
-\caption{STM32N6 MCU Part Numbers}
-\label{tab:n6_parts}
-\small
-\begin{tabular}{|l|c|c|c|l|}
-\hline
-\textbf{Part Number} & \textbf{RAM} & \textbf{Flash} & \textbf{Package} & \textbf{Notes} \\
-\hline
-STM32N657X0HxQ & $\sim$5 MB & $\sim$4 MB & BGA361 & Integrated NPU \\
-\hline
-\end{tabular}
+    \centering
+    \caption{STM32N6 MCU Part Numbers}
+    \label{tab:n6_parts}
+    \small
+    \begin{tabular}{|l|c|c|c|l|}
+        \hline
+        \textbf{Part Number} & \textbf{RAM} & \textbf{Flash} & \textbf{Package} & \textbf{Notes} \\
+        \hline
+        STM32N657X0HxQ       & $\sim$5 MB   & $\sim$4 MB     & BGA361           & Integrated NPU \\
+        \hline
+    \end{tabular}
 \end{table}
 
 \subsection{CubeMX CLI Usage}

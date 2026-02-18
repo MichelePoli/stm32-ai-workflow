@@ -64,7 +64,7 @@ The automation logic was refined as follows:
 \begin{enumerate}
     \item \textbf{Template-Based Injection}: Instead of initializing a raw project, the agent identifies the matching template for the user's board.
     \item \textbf{Lean Scripting}: The generated CubeMX script uses the \texttt{config load "<template.ioc>"} command directly. Crucially, by omitting the \texttt{load <MCU>} command, the tool skips the architectural negotiation phase and its associated interactive dialogs.
-    \item \textbf{Project Decoupling}: The \texttt{project name} and \texttt{project path} commands are then used to dynamically re-target the template to the specific user directory, ensuring that the final output is a clean, unique project while benefiting from the pre-validated "silent" configuration.
+    \item \textbf{Project Decoupling}: The \texttt{project name} and \texttt{project path} commands are then used to dynamically re-target the template to the specific user directory, ensuring that the final output is a clean, unique project while utilizing the pre-validated "silent" configuration.
 \end{enumerate}
 
 Generated output includes initialization code (\texttt{main.c}, \texttt{stm32f4xx\_hal\_msp.c}), linker scripts, and IDE project files.
@@ -74,7 +74,7 @@ Generated output includes initialization code (\texttt{main.c}, \texttt{stm32f4x
 After successful generation, the \texttt{decide\_continue\_to\_ai()} node presents an interrupt:
 
 \begin{quote}
-\textit{"Firmware project created. Do you want to proceed with AI model selection?"}
+    \textit{"Firmware project created. Do you want to proceed with AI model selection?"}
 \end{quote}
 
 The user's response is classified via LLM, allowing transitions between workflows (firmware $\rightarrow$ AI analysis) or workflow termination.
