@@ -44,21 +44,49 @@ class ChatTriton(BaseChatModel):
     def with_structured_output(self, schema: Any, **kwargs: Any) -> RunnableSerializable:
         """
         Supporta l'output strutturato forzando il modello a restituire JSON.
-        Nota: Triton/vLLM non sempre supportano 'response_format={'type': 'json_object'}',
-        quindi usiamo un prompt rinforzato e parsing manuale.
+        Inietta le istruzioni di schema nel system prompt e valida il JSON parsed
+        in un'istanza Pydantic, così i caller possono usare result.route ecc.
         """
         from langchain_core.output_parsers import JsonOutputParser
+        from langchain_core.runnables import RunnableLambda
+        import re
+
         parser = JsonOutputParser(pydantic_object=schema)
 
-        def _format_prompt(messages: List[BaseMessage]) -> List[BaseMessage]:
-            # Aggiungi le istruzioni del parser al messaggio di sistema
-            if isinstance(messages[0], SystemMessage):
-                messages[0].content += f"\n\nReturn ONLY a valid JSON object matching this schema:\n{parser.get_format_instructions()}"
+        def _inject_schema(messages: List[BaseMessage]) -> List[BaseMessage]:
+            """Inject JSON schema instructions into the system message."""
+            schema_instructions = (
+                f"\n\nYou MUST respond with ONLY a valid JSON object (no markdown, no explanation) "
+                f"matching this schema:\n{parser.get_format_instructions()}"
+            )
+            messages = list(messages)  # don't mutate caller's list
+            if messages and isinstance(messages[0], SystemMessage):
+                messages[0] = SystemMessage(content=messages[0].content + schema_instructions)
             else:
-                messages.insert(0, SystemMessage(content=f"Return ONLY a valid JSON object matching this schema:\n{parser.get_format_instructions()}"))
+                messages.insert(0, SystemMessage(content=schema_instructions))
             return messages
 
-        chain = RunnableLambda(_format_prompt) | self | parser
+        def _extract_json(ai_message) -> str:
+            """Strip markdown fences Mistral sometimes wraps around JSON."""
+            text = ai_message.content if hasattr(ai_message, 'content') else str(ai_message)
+            # Remove ```json ... ``` or ``` ... ``` fences
+            text = re.sub(r'^```(?:json)?\s*', '', text.strip(), flags=re.IGNORECASE)
+            text = re.sub(r'\s*```$', '', text.strip())
+            return text
+
+        def _to_pydantic(data: dict) -> Any:
+            """Convert parsed dict to Pydantic model instance for attribute access."""
+            if isinstance(data, dict) and hasattr(schema, 'model_validate'):
+                return schema.model_validate(data)
+            return data
+
+        chain = (
+            RunnableLambda(_inject_schema)
+            | self
+            | RunnableLambda(_extract_json)
+            | parser
+            | RunnableLambda(_to_pydantic)
+        )
         return chain
 
     def _generate(

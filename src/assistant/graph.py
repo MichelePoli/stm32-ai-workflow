@@ -306,6 +306,11 @@ def route_request(state: MasterState, config: RunnableConfig = None) -> MasterSt
             HumanMessage(content=f"Richiesta: {state.message}{user_info}")
         ])
         
+        # Normalize: support both Pydantic model (result.route) and dict (result['route'])
+        # JsonOutputParser can return a dict even when given pydantic_object=...
+        if isinstance(result, dict):
+            result = RouteDecision(**result)
+        
         state.route = result.route
         
         logger.info(f"✓ Route selezionata: {result.route}")
