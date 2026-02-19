@@ -1430,22 +1430,27 @@ Write your modifications in natural language (or leave empty for defaults):
     # --- Passo 1: Prova a usare il messaggio iniziale ---
     initial_mods_detected = False
     if not state.user_response:
-        # Prova a estrarre modifiche dal messaggio iniziale, ma verifica con confidence
-        res = llm_extractor.invoke([
-            SystemMessage(content="""Extract modifications from this message. 
+        try:
+            res = llm_extractor.invoke([
+                SystemMessage(content="""Extract modifications from this message. 
 STRICT RULES:
 1. If the message does NOT contain explicit neural network modification requests (like freeze layers, add dropout, change input, etc.), return an EMPTY modifications list. 
 2. Do NOT invent modifications based on examples provided in the prompt.
 3. If the user just says 'yes', 'si', or 'ok' without specifying WHAT to change, return EMPTY.
 4. ONLY extract: freeze_layers, freeze_almost_all, change_output_layer, add_dropout, change_input_shape, change_learning_rate, add_resizing_layer."""),
-            HumanMessage(content=f"Messaggio: {state.message}")
-        ])
-        if res.modifications and res.confidence >= 0.7:
-            state.user_custom_modifications = state.message
-            initial_mods_detected = True
-            logger.info(f"🤖 Modifiche rilevate nel messaggio iniziale (confidence: {res.confidence:.0%}).")
-        else:
-            logger.info(f"ℹ️ Nessuna modifica nel messaggio iniziale (confidence: {res.confidence:.0%}), chiedo all'utente.")
+                HumanMessage(content=f"Messaggio: {state.message}")
+            ])
+            # res might be a raw dict if Pydantic validation failed in _to_pydantic
+            mods = res.modifications if hasattr(res, 'modifications') else res.get('modifications', [])
+            conf = res.confidence if hasattr(res, 'confidence') else res.get('confidence', 0.0)
+            if mods and conf >= 0.7:
+                state.user_custom_modifications = state.message
+                initial_mods_detected = True
+                logger.info(f"🤖 Modifiche rilevate nel messaggio iniziale (confidence: {conf:.0%}).")
+            else:
+                logger.info(f"ℹ️ Nessuna modifica nel messaggio iniziale (confidence: {conf:.0%}), chiedo all'utente.")
+        except Exception as e:
+            logger.warning(f"⚠️ Rilevamento iniziale modifiche fallito: {e}. Procedo con interrupt.")
 
     # --- Passo 2: Verifica e Interrupt ---
     if not initial_mods_detected:
@@ -1461,7 +1466,7 @@ Esempi:
             
             # logger.info("⏸️ Interrupting for customization details.")
             # resume_value = interrupt(prompt)
-            
+
             # # Usa il return value di interrupt() come priorità (compatibilità LangGraph Studio)
             # if resume_value and str(resume_value).strip():
             #     user_modifications = str(resume_value).strip()
@@ -1564,7 +1569,17 @@ STRICT RULES:
             HumanMessage(content=llm_prompt)
         ])
         
+        # Guard: _to_pydantic falls back to raw dict when Mistral returns incomplete JSON.
+        # In that case, raise so the except block below gives the user a clean fallback
+        # instead of crashing on `result.modifications` AttributeError.
+        if isinstance(result, dict):
+            raise ValueError(
+                f"LLM returned an incomplete/empty JSON object (missing required fields). "
+                f"Raw response: {result}"
+            )
+        
         logger.info("  ✓ LLM parsing successful")
+
 
         # ===== VALIDAZIONE: change_input_shape INCOMPATIBILE? =====
         model_name = state.selected_model.get('name', '') if state.selected_model else ''

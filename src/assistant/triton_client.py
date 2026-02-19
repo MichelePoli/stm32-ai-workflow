@@ -75,9 +75,21 @@ class ChatTriton(BaseChatModel):
             return text
 
         def _to_pydantic(data: dict) -> Any:
-            """Convert parsed dict to Pydantic model instance for attribute access."""
+            """Convert parsed dict to Pydantic model instance for attribute access.
+            
+            Falls back to returning the raw dict if validation fails (e.g. Mistral returned
+            an incomplete / empty JSON). This prevents a ValidationError from crashing
+            inside the chain — the caller's try/except block will handle it instead.
+            """
             if isinstance(data, dict) and hasattr(schema, 'model_validate'):
-                return schema.model_validate(data)
+                try:
+                    return schema.model_validate(data)
+                except Exception as ve:
+                    logger.warning(
+                        f"⚠️ with_structured_output: Pydantic validation failed for {schema.__name__ if hasattr(schema, '__name__') else schema} "
+                        f"(LLM returned incomplete JSON). Raw dict returned for caller to handle. Error: {ve}"
+                    )
+                    return data  # return raw dict; caller's try/except will deal with it
             return data
 
         chain = (
@@ -88,6 +100,7 @@ class ChatTriton(BaseChatModel):
             | RunnableLambda(_to_pydantic)
         )
         return chain
+
 
     def _generate(
         self,

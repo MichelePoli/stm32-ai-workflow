@@ -94,6 +94,10 @@ def get_llm(
 def get_embeddings(config: Optional[dict] = None, **kwargs):
     """
     Centralized Embedding initialization.
+    
+    When USE_TRITON_BACKEND=true, uses TritonEmbeddings (nomic-embed on Triton).
+    The nomic-embed model is configured with KIND_CPU in config.pbtxt to avoid
+    VRAM contention with the LLM model running on GPU.
     """
     cfg = Configuration.from_runnable_config(config) if config else Configuration()
     triton_enabled = os.environ.get("USE_TRITON_BACKEND", "false").lower() == "true"
@@ -102,14 +106,18 @@ def get_embeddings(config: Optional[dict] = None, **kwargs):
         from src.assistant.triton_client import TritonEmbeddings
         triton_url = os.environ.get("TRITON_BASE_URL", "http://triton-server:8000/v1")
         model = kwargs.get("model", "nomic-embed")
-        
         logger.info(f"🧬 Routing embedding request -> Triton model '{model}'")
         return TritonEmbeddings(triton_url=triton_url, model_name=model)
     else:
         from langchain_ollama import OllamaEmbeddings
         base_url = kwargs.get("base_url", cfg.ollama_base_url)
         model = kwargs.get("model", "nomic-embed-text")
+        logger.info(f"🧬 Routing embedding request -> Ollama model '{model}'")
         return OllamaEmbeddings(model=model, base_url=base_url)
+
+
+
+
 
 
 def force_unload_ollama(model_name: str = "gpt-oss:20b"):
