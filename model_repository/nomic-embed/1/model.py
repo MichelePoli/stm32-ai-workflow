@@ -12,13 +12,13 @@ except ImportError:
 class TritonPythonModel:
     def initialize(self, args):
         self.model_config = json.loads(args['model_config'])
-        print(f"🚀 Inizializzazione Nomic-Embed (Ready: {SENTENCE_TRANSFORMERS_AVAILABLE})")
+        print(f"[INIT] Inizializzazione Nomic-Embed (Ready: {SENTENCE_TRANSFORMERS_AVAILABLE})")
         
         if SENTENCE_TRANSFORMERS_AVAILABLE:
             model_name = os.environ.get("EMBED_MODEL_NAME", "nomic-ai/nomic-embed-text-v1.5")
             self.model = SentenceTransformer(model_name, trust_remote_code=True)
         else:
-            print("⚠️ sentence_transformers non trovato.")
+            print("[WARN] sentence_transformers non trovato.")
             self.model = None
 
     def execute(self, requests):
@@ -38,4 +38,4 @@ class TritonPythonModel:
         return responses
 
     def finalize(self):
-        print("👋 Pulizia Nomic-Embed backend in corso...")
+        print("[CLEANUP] Pulizia Nomic-Embed backend in corso...")

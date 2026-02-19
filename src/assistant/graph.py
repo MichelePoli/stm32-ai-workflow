@@ -385,27 +385,36 @@ def route_decision(state: MasterState) -> Literal["firmware_flow", "ai_flow", "i
 
 
 def clarify_request(state: MasterState, config: RunnableConfig = None) -> MasterState:
-    """Gestisce richieste non chiare"""
+    """Gestisce richieste non chiare chiedendo all'utente"""
     prompt = {
-        "instruction": "La tua richiesta non è chiara. Specifica cosa vuoi fare (1-4):",
+        "instruction": "Non ho capito bene cosa vuoi fare. Scegli un'opzione:",
         "options": {
-            "1": "Generare firmware STM32",
-            "2": "Analizzare modello AI",
-            "3": "Integrare AI nel firmware",
-            "4": "Ricerca informazioni online"
+            "1": "Generare un nuovo progetto firmware STM32",
+            "2": "Analizzare o scaricare un modello AI (X-CUBE-AI)",
+            "3": "Integrare un modello AI in un progetto esistente",
+            "4": "Cercare informazioni o guide online",
+            "5": "Annulla e torna alla chat generale"
         }
     }
-    # user_choice = interrupt(prompt)
-    user_choice = "2" # BYPASS
     
-    # Default: option 2 (AI analysis)
-    if not user_choice or str(user_choice).strip() == "":
-        user_choice = "2"
+    # Interrupt attende che l'utente scelga un'opzione dall'estensione VS Code
+    user_choice = interrupt(prompt)
     
-    choice_map = {"1": "firmware", "2": "ai_analysis", "3": "integration", "4": "web_research"}
-    state.route = choice_map.get(str(user_choice), "firmware")
+    choice_map = {
+        "1": "firmware", 
+        "2": "ai_analysis", 
+        "3": "integration", 
+        "4": "web_research",
+        "5": "chat"
+    }
     
-    logger.info(f"✓ Chiarimento ricevuto: {state.route}")
+    state.route = choice_map.get(str(user_choice), "chat")
+    
+    # Aggiorniamo il messaggio in modo che al prossimo passo il router capisca l'intento
+    if state.route != "chat":
+        state.message = f"Voglio procedere con: {state.route}"
+    
+    logger.info(f"✓ Chiarimento ricevuto dall'utente: {state.route}")
     return state
 
 # ============================================================================
@@ -958,11 +967,27 @@ builder.add_edge("finalize_integration", END)
 builder.add_edge("general_chat", END)
 
 # === REDIS CLIENTS ===
+# Helper per risolvere l'URL di Redis (Docker vs Local)
+def get_redis_url():
+    # Priorità 1: Variabile d'ambiente REDIS_URL (es: redis://redis:6379)
+    env_url = os.environ.get("REDIS_URL")
+    if env_url:
+        return env_url
+    
+    # Priorità 2: Check se siamo in Docker (servizio "redis" invece di "localhost")
+    if os.path.exists("/.dockerenv"):
+        return "redis://redis:6379"
+    
+    # Fallback: Localhost
+    return "redis://localhost:6379"
+
+REDIS_URL_FOR_APP = get_redis_url()
+
 # Client per il profilo utente (stringhe/JSON) - Async
-redis_client = aioredis.Redis(host="localhost", port=6379, db=0, decode_responses=True)
+redis_client = aioredis.from_url(REDIS_URL_FOR_APP, decode_responses=True)
 
 # Client per il checkpointer (raw bytes) - Async
-checkpointer_redis = aioredis.Redis(host="localhost", port=6379, db=0, decode_responses=False)
+checkpointer_redis = aioredis.from_url(REDIS_URL_FOR_APP, decode_responses=False)
 
 # Nota: memory e graph devono essere inizializzati dentro un event loop (es: startup di FastAPI)
 # per evitare "RuntimeError: no running event loop"

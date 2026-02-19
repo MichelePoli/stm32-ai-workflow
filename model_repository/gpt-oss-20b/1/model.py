@@ -12,7 +12,7 @@ except ImportError:
 class TritonPythonModel:
     def initialize(self, args):
         self.model_config = json.loads(args['model_config'])
-        print(f"🚀 Inizializzazione GPT-OSS 20B (Ready: {VLLM_AVAILABLE})")
+        print(f"[INIT] Inizializzazione GPT-OSS 20B (Ready: {VLLM_AVAILABLE})")
         
         # Carica il modello pesante
         model_name = os.environ.get("GPTOSS_MODEL_NAME", "bigcode/starcoder2-15b") # Esempio per 20B (StarCoder2)
@@ -21,15 +21,16 @@ class TritonPythonModel:
             self.llm = LLM(
                 model=model_name,
                 trust_remote_code=True,
-                # Use 0.7 to allow Triton's scheduler to swap models dynamically.
-                # Triton will unload other models from VRAM as needed.
-                gpu_memory_utilization=0.7,
-                max_model_len=4096,
-                quantization="gptq" # Fondamentale per farlo stare in 16GB
+                # Usa 0.6 per stare in ~9.6GB. 
+                # Attenzione: richiede lo sload di Mistral/DeepSeek (35%+35%+60% > 100%)
+                gpu_memory_utilization=0.6,
+                max_model_len=2048,
+                quantization="gptq", # Fondamentale per farlo stare in 16GB
+                dtype="float16" # Obbligatorio per GPTQ
             )
             self.sampling_params = SamplingParams(temperature=0.2, max_tokens=2048)
         else:
-            print("⚠️ vLLM non trovato.")
+            print("[WARN] vLLM non trovato.")
             self.llm = None
 
     def execute(self, requests):
@@ -49,4 +50,4 @@ class TritonPythonModel:
         return responses
 
     def finalize(self):
-        print("👋 Pulizia GPT-OSS 20B backend in corso...")
+        print("[CLEANUP] Pulizia GPT-OSS 20B backend in corso...")

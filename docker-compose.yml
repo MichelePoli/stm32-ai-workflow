@@ -5,7 +5,7 @@ services:
     image: redis/redis-stack-server:latest
     container_name: stm32-ai-redis
     ports:
-      - "6379:6379"
+      - "6380:6379"  # 6379 is used by host Redis
     volumes:
       - redis_data:/data
     restart: always
@@ -14,8 +14,8 @@ services:
     image: minio/minio:latest
     container_name: stm32-ai-minio
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "9002:9000"  # 9000 is used by host MinIO
+      - "9003:9001"  # 9001 is used by host MinIO
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
@@ -28,7 +28,7 @@ services:
     image: ollama/ollama:latest
     container_name: stm32-ai-ollama
     ports:
-      - "11434:11434"
+      - "11435:11434"  # 11434 is used by host Ollama
     volumes:
       - ollama_data:/root/.ollama
     # GPU Support (Comment out if using CPU only)
@@ -72,11 +72,11 @@ services:
     volumes:
       - ./model_repository:/models
     environment:
-      - TRITON_MODEL_NAME=TheBloke/Mistral-7B-Instruct-v0.2-GPTQ
+      - TRITON_MODEL_NAME=thesven/Mistral-7B-Instruct-v0.3-GPTQ
       - DEEPSEEK_MODEL_NAME=TheBloke/deepseek-coder-6.7B-instruct-GPTQ
-      - GPTOSS_MODEL_NAME=TheBloke/starcoder2-15b-v0.1-GPTQ
+      - GPTOSS_MODEL_NAME=TechxGenus/starcoder2-15b-instruct-GPTQ
       - EMBED_MODEL_NAME=nomic-ai/nomic-embed-text-v1.5
-    command: ["tritonserver", "--model-repository=/models", "--log-verbose=1"]
+    command: ["tritonserver", "--model-repository=/models", "--model-control-mode=explicit", "--log-verbose=1"]
     deploy:
       resources:
         reservations:
