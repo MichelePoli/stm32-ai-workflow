@@ -560,7 +560,8 @@ def retrieve_best_practices_for_architecture(state: MasterState, config: Runnabl
     arch_type = _detect_architecture_type(model_name)
     logger.info(f"🔍 Model: {model_name} → Architecture: {arch_type}")
     
-    base_persist_dir = "./chroma_docs"
+    ai_output_dir = getattr(config, "ai_output_dir", os.path.expanduser("~/stm32-ai-workflow/st_ai_output"))
+    base_persist_dir = os.path.join(ai_output_dir, "chroma_docs")
     arch_persist_dir = os.path.join(base_persist_dir, arch_type)
     
     # ===== STEP 1: Check cache =====
@@ -1562,25 +1563,30 @@ IMPORTANT RULES:
 Return JSON with modifications list."""
         
         # Invoke LLM
-        result: ParsedModificationsPlan = structured_llm.invoke([
-            SystemMessage(content="""You are a neural network customization expert. 
+        try:
+            result: ParsedModificationsPlan = structured_llm.invoke([
+                SystemMessage(content="""You are a neural network customization expert. 
 STRICT RULES:
 1. Parse ONLY what is explicitly requested in the USER REQUEST.
 2. DO NOT add 'change_input_shape' or 'add_resizing_layer' unless specifically mentioned (e.g., 'change input to...', 'make it flexible', 'add resizing').
 3. If the request is 'freeze first 5 layers and add 0.4 dropout', modifications MUST ONLY contain 'freeze_layers' and 'add_dropout'.
 4. Match parameters accurately. Return valid JSON only."""),
-            HumanMessage(content=llm_prompt)
-        ])
-        
-        # Guard: _to_pydantic falls back to raw dict when Mistral returns incomplete JSON.
-        # In that case, raise so the except block below gives the user a clean fallback
-        # instead of crashing on `result.modifications` AttributeError.
-        if isinstance(result, dict):
-            raise ValueError(
-                f"LLM returned an incomplete/empty JSON object (missing required fields). "
-                f"Raw response: {result}"
-            )
-        
+                HumanMessage(content=llm_prompt)
+            ])
+            
+            # Guard: _to_pydantic falls back to raw dict when Mistral returns incomplete JSON.
+            # In that case, raise so the except block below gives the user a clean fallback
+            # instead of crashing on `result.modifications` AttributeError.
+            if isinstance(result, dict):
+                raise ValueError(
+                    f"LLM returned an incomplete/empty JSON object (missing required fields). "
+                    f"Raw response: {result}"
+                )
+        except Exception as e:
+            # Catch Langchain OutputParserException and others, re-raise as ValueError
+            # to be caught by the outer fallback block
+            raise ValueError(f"Invalid JSON/Parsing error from LLM: {str(e)}")
+            
         logger.info("  ✓ LLM parsing successful")
 
 

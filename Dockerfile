@@ -1,34 +1,61 @@
-# Use an official Python runtime as a parent image
-FROM python:3.11-slim
+# ============================================================
+# Dockerfile — STM32 AI LangGraph Application Server
+# 
+# Uses ubuntu:22.04 (same base as host) so that host-mounted
+# binaries (Miniconda, stedgeai) run without glibc mismatches.
+# User 'mrusso' is created with the same UID (1002) as the host
+# user to avoid permission issues on mounted volumes.
+# ============================================================
 
-# Set environment variables
+FROM ubuntu:22.04
+
+# Prevent interactive apt prompts
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Python / process settings
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-# Set work directory
-WORKDIR /app
-
-# Install system dependencies
+# Install system deps
 RUN apt-get update && apt-get install -y \
+    python3.11 \
+    python3.11-dev \
+    python3-pip \
     build-essential \
     curl \
     git \
     libhdf5-dev \
+    libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements file
-COPY requirements.txt .
+# Make python3 and pip point to 3.11
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1 \
+    && update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1
 
-# Install python dependencies
+# Create user with same UID as host (1002) so mounted volumes have correct perms
+ARG USER_UID=1002
+ARG USER_GID=1002
+RUN groupadd -g $USER_GID mrusso && \
+    useradd -u $USER_UID -g $USER_GID -m -s /bin/bash mrusso
+
+# Working directory — matches host path for absolute path consistency
+WORKDIR /home/mrusso/stm32-ai-workflow
+
+# Install Python dependencies as root first
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy source code
+# Copy source (will be overridden by volume mount in dev mode)
 COPY src/ src/
 COPY .env .env
 
-# Expose port
+# Switch to host-matching user
+USER mrusso
+
+# Expose FastAPI port
 EXPOSE 8000
 
-# Command to run the application
-# We use uvicorn to serve the FastAPI app
-CMD ["uvicorn", "src.api.server:app", "--host", "0.0.0.0", "--port", "8000"]
+# Use watchfiles for hot-reload during development
+CMD ["python3", "-m", "uvicorn", "src.api.server:app", \
+     "--host", "0.0.0.0", "--port", "8000", \
+     "--reload", "--reload-dir", "src"]

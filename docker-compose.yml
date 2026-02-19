@@ -95,12 +95,17 @@ services:
   langgraph-app:
     build: .
     container_name: stm32-ai-langgraph
+    user: "1002:1002"   # Same UID as host user 'mrusso' for volume permissions
+    working_dir: /home/mrusso/stm32-ai-workflow  # Matches host path — critical for absolute paths
     environment:
       - OLLAMA_BASE_URL=http://ollama:11434
       - USE_TRITON_BACKEND=true
-      - TRITON_BASE_URL=http://triton-server:8000/v1
+      - TRITON_BASE_URL=http://triton-server:8000/v1  # Docker internal network
       - LOCAL_LLM=${MODEL_NAME:-mistral}
       - REDIS_URL=redis://redis:6379
+      # System path first for uvicorn/python, then Miniconda so subprocesses find it
+      - PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/home/mrusso/miniconda3/bin:/home/mrusso/miniconda3/envs/stm32/bin
+      - HOME=/home/mrusso
     ports:
       - "8000:8000"
     depends_on:
@@ -111,10 +116,32 @@ services:
       redis:
         condition: service_started
     volumes:
-      - ./src:/app/src
-      - ./data:/app/data
-      - ./.env:/app/.env
+      # Source code (hot-reload)
+      - ./src:/home/mrusso/stm32-ai-workflow/src
+      - ./.env:/home/mrusso/stm32-ai-workflow/.env
+      # ── Host tools (read-only mounts) ──────────────────────────────────────
+      # Miniconda: makes 'stm32' and 'stm32_legacy' envs available in container
+      - /home/mrusso/miniconda3:/home/mrusso/miniconda3:ro
+      # stedgeai CLI: X-CUBE-AI analysis / code generation tool
+      - /home/mrusso/stm32-ai_utilities:/home/mrusso/stm32-ai_utilities:ro
+      # ── Persistent data (read-write) ────────────────────────────────────────
+      # AI models downloaded from STM32 Model Zoo
+      - /home/mrusso/.stm32_ai_models:/home/mrusso/.stm32_ai_models
+      # STM32CubeMX project output (generated firmware, datasets)
+      - /home/mrusso/stm32-ai-workflow/STM32CubeMX:/home/mrusso/stm32-ai-workflow/STM32CubeMX
+      # stedgeai workspace and output
+      - /home/mrusso/stm32-ai-workflow/st_ai_ws:/home/mrusso/stm32-ai-workflow/st_ai_ws
+      - /home/mrusso/stm32-ai-workflow/st_ai_output:/home/mrusso/stm32-ai-workflow/st_ai_output
+    # GPU access so Keras/TF training subprocesses can use the GPU
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
     restart: unless-stopped
+
 
 volumes:
   redis_data:

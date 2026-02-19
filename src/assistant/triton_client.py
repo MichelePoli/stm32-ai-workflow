@@ -252,7 +252,7 @@ class ChatTriton(BaseChatModel):
             # Probe: wait until the OpenAI /v1/chat/completions route is actually live.
             # A READY registry state does NOT guarantee the HTTP endpoint is registered yet
             # (CUDA graph capturing can finish *after* the status flip).
-            self._wait_for_endpoint_live(timeout=60)
+            self._wait_for_endpoint_live(timeout=120)
             logger.info(f"✅ Modello {self.model_name} caricato e endpoint live.")
         except Exception as e:
             logger.error(f"❌ Errore durante caricamento Triton: {e}")
