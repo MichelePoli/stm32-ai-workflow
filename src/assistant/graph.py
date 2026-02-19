@@ -199,6 +199,10 @@ def route_request(state: MasterState, config: RunnableConfig = None) -> MasterSt
     """Router principale che classifica tra firmware, AI, integration, web_research"""
     
     logger.info(f"🔀 Routing messaggio: {state.message[:80]}...")
+    
+    # Clear transient response so stale integration/finalizer summaries don't persist
+    # across sessions (they would otherwise be re-emitted by server.py for every node).
+    state.response = ""
 
     
     # === GESTIONE RESET TOTALE ===

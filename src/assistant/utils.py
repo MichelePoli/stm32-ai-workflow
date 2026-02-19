@@ -105,15 +105,16 @@ def get_embeddings(config: Optional[dict] = None, **kwargs):
     if triton_enabled:
         from src.assistant.triton_client import TritonEmbeddings
         triton_url = os.environ.get("TRITON_BASE_URL", "http://triton-server:8000/v1")
-        model = kwargs.get("model", "nomic-embed")
+        model = kwargs.get("model", "nomic-embed")  # Must match the Triton model repo folder name
         logger.info(f"🧬 Routing embedding request -> Triton model '{model}'")
         return TritonEmbeddings(triton_url=triton_url, model_name=model)
     else:
         from langchain_ollama import OllamaEmbeddings
         base_url = kwargs.get("base_url", cfg.ollama_base_url)
-        model = kwargs.get("model", "nomic-embed-text")
+        model = kwargs.get("model", "nomic-embed-text")  # Standard Ollama model name
         logger.info(f"🧬 Routing embedding request -> Ollama model '{model}'")
         return OllamaEmbeddings(model=model, base_url=base_url)
+
 
 
 

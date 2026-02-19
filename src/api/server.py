@@ -204,6 +204,7 @@ async def stream_chat(request: ChatRequest):
 
                             # Mappa node_name → etichetta leggibile per il progress bar
                             NODE_LABELS = {
+                                # workflow 1 - firmware generation
                                 "route_request": "🔀 Analisi richiesta",
                                 "collect_project_info": "📋 Raccolta info progetto",
                                 "search_and_install_stm32_package": "📦 Verifica package STM32",
@@ -218,12 +219,28 @@ async def stream_chat(request: ChatRequest):
                                 "inspect_model_architecture": "🔍 Ispezione architettura",
                                 "ask_modification_intent": "🛠️ Intenzione modifica modello",
                                 "retrieve_best_practices_for_architecture": "📚 Best practices architettura",
+                                # Workflow 5 – customization
+                                "gather_user_modifications": "📝 Descrizione modifiche",
+                                "ask_and_parse_user_modifications": "🧩 Parsing modifiche",
+                                "collect_modification_confirmation": "✅ Conferma modifiche",
+                                "apply_user_customization": "🔧 Applicazione customizzazione",
+                                "ask_optimization_preference": "⚙️ Preferenza ottimizzazione",
+                                "fine_tune_customized_model": "🎓 Fine-tuning modello",
+                                "validate_customized_model": "✔️ Validazione modello customizzato",
+                                "save_customized_model_final": "💾 Salvataggio modello finale",
+                                "ask_continue_after_customization": "🔀 Continuare con analisi AI?",
+                                # Workflow 7 – dataset
+                                "decide_data_source": "🗄️ Sorgente dati",
+                                "select_predefined_dataset": "📊 Selezione dataset",
+                                "download_dataset": "⬇️ Download dataset",
+                                # Workflow 2 – AI analysis
                                 "apply_modifications": "✏️ Applicazione modifiche",
                                 "run_analyze": "📊 Analisi STEdgeAI",
                                 "check_resource_constraints": "⚖️ Verifica risorse MCU",
                                 "run_validate": "✔️ Validazione modello",
                                 "run_generate": "🏗️ Generazione codice AI",
                                 "finalize_analysis": "✅ Finalizzazione analisi",
+                                # Workflow 3 – integration
                                 "decide_continue_to_integration": "🔀 Decisione: integrazione",
                                 "collect_integration_info": "📋 Raccolta info integrazione",
                                 "scan_ai_files": "🔍 Scansione file AI",
@@ -231,6 +248,7 @@ async def stream_chat(request: ChatRequest):
                                 "modify_main_c": "✏️ Modifica main.c",
                                 "verify_integration": "✔️ Verifica integrazione",
                                 "finalize_integration": "✅ Finalizzazione integrazione",
+                                # General chat
                                 "general_chat": "💬 Risposta chat",
                             }
                             label = NODE_LABELS.get(node_name, node_name.replace("_", " ").capitalize())

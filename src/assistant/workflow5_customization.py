@@ -574,7 +574,7 @@ def retrieve_best_practices_for_architecture(state: MasterState, config: Runnabl
                 query=f"best practices customization fine-tuning {arch_type}",
                 persist_dir=arch_persist_dir,
                 arch_type=arch_type,
-                embeddings_override=get_embeddings(model="nomic-embed-text")
+                embeddings_override=get_embeddings(model="nomic-embed")
             )
             if best_practices and len(best_practices) > 0:
                 logger.info(f"  ✓ Retrieved {len(best_practices)} docs from cache")
@@ -684,7 +684,7 @@ def _generate_and_cache_with_llm(
             )
             chunks = splitter.split_documents(all_docs)
             
-            embeddings = get_embeddings(model="nomic-embed-text")
+            embeddings = get_embeddings(model="nomic-embed")
             
             os.makedirs(persist_dir, exist_ok=True)
             
@@ -1470,16 +1470,13 @@ Esempi:
 """,
             }
             
-            # logger.info("⏸️ Interrupting for customization details.")
-            # resume_value = interrupt(prompt)
+            logger.info("⏸️ Interrupting for customization details.")
+            resume_value = interrupt(prompt)
 
-            # # Usa il return value di interrupt() come priorità (compatibilità LangGraph Studio)
-            # if resume_value and str(resume_value).strip():
-            #     user_modifications = str(resume_value).strip()
-            # else:
-            #     user_modifications = extract_user_response(state.user_response)
-            logger.info("⏭️  BYPASS: Selezione automatica modifiche -> 'freeze first 5 layers and add 0.4 dropout'")
-            user_modifications = "freeze first 5 layers and add 0.4 dropout"
+            if resume_value and str(resume_value).strip():
+                user_modifications = str(resume_value).strip()
+            else:
+                user_modifications = extract_user_response(state.user_response)
         else:
             user_modifications = extract_user_response(state.user_response)
         
@@ -1665,10 +1662,10 @@ STRICT RULES:
             },
             "training_recommendation": {
                 "learning_rate": 0.0001,
-                "epochs": 5,
+                "epochs": 15,  # Bumped from 5: more training improves accuracy even in fallback
                 "batch_size": 32,
                 "optimizer": "adam",
-                "notes": "Fallback - LLM error"
+                "notes": "Fallback - LLM error (default config)"
             }
         }
         
@@ -1848,9 +1845,9 @@ Training Recommendation:{train_text}
     from src.assistant.utils import extract_user_response
     resume_value = None
     if not state.user_response or state.user_response.strip() == "":
-        # resume_value = interrupt(confirmation_prompt)
-        logger.info("⏭️  BYPASS: Conferma modifiche automatica -> 'si'")
-        user_response = "si"
+        logger.info("⏸️ Interrupting for modification confirmation.")
+        resume_value = interrupt(confirmation_prompt)
+        user_response = str(resume_value).strip() if resume_value else ""
     else:
         # Usa il return value di interrupt() come priorità (compatibilità LangGraph Studio),
         # altrimenti usa state.user_response (compatibilità server.py/VS Code)
@@ -3620,10 +3617,7 @@ try:
         'total_params': int(model.count_params()),
     }}
     
-    # Stampa summary
-    print("=== MODEL SUMMARY ===")
-    model.summary(print_fn=print)
-    print("=== END SUMMARY ===")
+    # model.summary() omitted to reduce subprocess log verbosity
     
     print(f"SUCCESS: " + json.dumps(info))
     
