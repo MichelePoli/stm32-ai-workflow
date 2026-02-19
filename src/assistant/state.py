@@ -14,7 +14,9 @@ class MasterState:
     message: str = ""
     route: str = ""
     user_response: str = "" # Landing field for Human-in-the-Loop responses
+    response: str = ""  # Rich markdown response to stream back to the UI (set by workflow finalizers)
     reset_profile: bool = False # Flag for total Long-Term Memory wipe
+
     
     # === CONFIGURAZIONE (riempiti da route_request) ===
     st_email: str = ""

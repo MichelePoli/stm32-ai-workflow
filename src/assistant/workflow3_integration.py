@@ -540,33 +540,26 @@ def verify_integration(state: MasterState, config: RunnableConfig = None) -> Mas
 def finalize_integration(state: MasterState, config: RunnableConfig = None) -> MasterState:
     if state.integration_success:
         logger.info("✓ INTEGRAZIONE COMPLETATA CON SUCCESSO!")
-        summary = {
-            "status": "success",
-            "message": "✅ Integrazione AI nel firmware completata!",
-            "details": {
-                "files_copied_c": len(state.ai_src_files),
-                "files_copied_h": len(state.ai_header_files),
-                "main_c_modified": state.main_modification_success,
-                "project_path": state.firmware_project_dir,
-            },
-            "next_steps": [
-                f"1. Apri il progetto in STM32CubeIDE: {state.firmware_project_dir}",
-                "2. Verifica che X-CUBE-AI Middleware sia configurato nel .ioc",
-                "3. Compila il progetto (Build)",
-                "4. Flash sul target STM32 via ST-LINK",
-            ]
-        }
-        interrupt(summary)
+        next_steps = "\n".join([
+            f"1. Apri il progetto in STM32CubeIDE: `{state.firmware_project_dir}`",
+            "2. Verifica che X-CUBE-AI Middleware sia configurato nel `.ioc`",
+            "3. Compila il progetto (**Build**)",
+            "4. Flash sul target STM32 via ST-LINK",
+        ])
+        state.response = (
+            f"✅ **Integrazione AI nel firmware completata con successo!**\n\n"
+            f"**File copiati:** {len(state.ai_src_files)} .c · {len(state.ai_header_files)} .h\n"
+            f"**main.c modificato:** {'✓' if state.main_modification_success else '✗'}\n"
+            f"**Progetto:** `{state.firmware_project_dir}`\n\n"
+            f"**Prossimi passi:**\n{next_steps}"
+        )
     else:
         logger.error(f"✗ Integrazione fallita: {state.integration_error_message}")
-        error_summary = {
-            "status": "error",
-            "message": f"❌ Integrazione fallita: {state.integration_error_message}",
-            "details": {
-                "copy_success": state.copy_success,
-                "main_modification_success": state.main_modification_success,
-            }
-        }
-        interrupt(error_summary)
+        state.response = (
+            f"❌ **Integrazione fallita:** {state.integration_error_message}\n\n"
+            f"- Copia file: {'✓' if state.copy_success else '✗'}\n"
+            f"- Modifica main.c: {'✓' if state.main_modification_success else '✗'}"
+        )
     
     return state
+

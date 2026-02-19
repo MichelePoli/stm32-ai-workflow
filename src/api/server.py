@@ -195,21 +195,69 @@ async def stream_chat(request: ChatRequest):
                                 value = getattr(interrupt_data, 'value', interrupt_data)
                                 if isinstance(value, dict) and "instruction" in value:
                                     prompt_msg = f"⏸️ **AZIONE RICHIESTA**:\n\n{value['instruction']}\n\n"
+                                    if "suggestion" in value:
+                                        prompt_msg += f"> 💡 {value['suggestion']}\n\n"
                                     yield json.dumps({"type": "markdown", "content": prompt_msg}) + "\n"
                                 else:
                                     yield json.dumps({"type": "markdown", "content": "⏸️ In attesa di input dell'utente...\n\n"}) + "\n"
                                 continue
 
-                            display_name = node_name.replace("_", " ").capitalize()
-                            yield json.dumps({"type": "progress", "content": display_name}) + "\n"
+                            # Mappa node_name → etichetta leggibile per il progress bar
+                            NODE_LABELS = {
+                                "route_request": "🔀 Analisi richiesta",
+                                "collect_project_info": "📋 Raccolta info progetto",
+                                "search_and_install_stm32_package": "📦 Verifica package STM32",
+                                "generate_cubemx_script": "📝 Generazione script CubeMX",
+                                "execute_generation": "⚙️ Generazione firmware",
+                                "finalize_project": "✅ Finalizzazione firmware",
+                                "decide_continue_to_ai": "🔀 Decisione: analisi AI",
+                                "collect_analysis_info": "📋 Raccolta info analisi AI",
+                                "choose_ai_task": "🎯 Selezione task AI",
+                                "choose_ai_model": "🧠 Selezione modello AI",
+                                "download_model": "⬇️ Download modello",
+                                "inspect_model_architecture": "🔍 Ispezione architettura",
+                                "ask_modification_intent": "🛠️ Intenzione modifica modello",
+                                "retrieve_best_practices_for_architecture": "📚 Best practices architettura",
+                                "apply_modifications": "✏️ Applicazione modifiche",
+                                "run_analyze": "📊 Analisi STEdgeAI",
+                                "check_resource_constraints": "⚖️ Verifica risorse MCU",
+                                "run_validate": "✔️ Validazione modello",
+                                "run_generate": "🏗️ Generazione codice AI",
+                                "finalize_analysis": "✅ Finalizzazione analisi",
+                                "decide_continue_to_integration": "🔀 Decisione: integrazione",
+                                "collect_integration_info": "📋 Raccolta info integrazione",
+                                "scan_ai_files": "🔍 Scansione file AI",
+                                "copy_ai_files": "📂 Copia file AI nel firmware",
+                                "modify_main_c": "✏️ Modifica main.c",
+                                "verify_integration": "✔️ Verifica integrazione",
+                                "finalize_integration": "✅ Finalizzazione integrazione",
+                                "general_chat": "💬 Risposta chat",
+                            }
+                            label = NODE_LABELS.get(node_name, node_name.replace("_", " ").capitalize())
+                            yield json.dumps({"type": "progress", "content": label}) + "\n"
                             
-                            if node_name == "route_request" and "route" in node_state:
-                                 route = node_state["route"]
-                                 msg = f"🔍 Ho analizzato la tua richiesta: **{route.replace('_', ' ')}**."
-                                 yield json.dumps({"type": "markdown", "content": f"{msg}\n\n"}) + "\n"
+                            if node_name == "route_request" and isinstance(node_state, dict) and "route" in node_state:
+                                route = node_state["route"]
+                                msg = f"🔍 Ho analizzato la tua richiesta: **{route.replace('_', ' ')}**."
+                                yield json.dumps({"type": "markdown", "content": f"{msg}\n\n"}) + "\n"
                             
-                            if "message" in node_state and node_name != "route_request" and node_name != "__interrupt__":
-                                 yield json.dumps({"type": "markdown", "content": f"{node_state['message']}\n\n"}) + "\n"
+                            # Emetti output testuale solo da nodi che producono risposte finali
+                            if isinstance(node_state, dict):
+                                # Risposta workflow finalizers (finalize_integration etc.)
+                                if node_state.get("response"):
+                                    yield json.dumps({"type": "markdown", "content": f"{node_state['response']}\n\n"}) + "\n"
+                                # Chat generale: risposta salvata in state.message
+                                elif node_name == "general_chat" and node_state.get("message"):
+                                    yield json.dumps({"type": "markdown", "content": f"{node_state['message']}\n\n"}) + "\n"
+                                # Firmware finalizer
+                                elif node_name == "finalize_project" and node_state.get("firmware_project_path"):
+                                    path = node_state["firmware_project_path"]
+                                    yield json.dumps({"type": "markdown", "content": f"✓ Progetto firmware generato: `{path}`\n\n"}) + "\n"
+                                # AI analysis finalizer
+                                elif node_name == "finalize_analysis" and node_state.get("ai_code_dir"):
+                                    yield json.dumps({"type": "markdown", "content": f"✓ Analisi AI completata! Codice generato in: `{node_state['ai_code_dir']}`\n\n"}) + "\n"
+
+
                 
                 except asyncio.TimeoutError:
                     # Heartbeat: manda un pacchetto vuoto o un progress silenzioso
