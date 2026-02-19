@@ -505,52 +505,37 @@ Rispondi SOLO con la parola, senza altro testo.
 def decide_continue_to_integration(state: MasterState, config: RunnableConfig = None) -> MasterState:
     """
     Nodo di decisione dopo finalize_analysis.
-    Chiede all'utente se vuole continuare con l'integrazione, a meno che il
-    messaggio originale non lo abbia già richiesto esplicitamente.
+    Chiede SEMPRE all'utente se vuole continuare con l'integrazione.
+    Non usa fast-path LLM sul messaggio originale perché il contesto
+    precedente potrebbe essere ambiguo (es. messaggio AI != intent integrazione).
     """
     
     logger.info("📋 Decisione: Continuare verso integrazione?")
     
     from src.assistant.utils import extract_user_response, get_llm
-    cfg = Configuration.from_runnable_config(config)
     llm = get_llm(config)
     
     classification_prompt = """Analizza la risposta dell'utente e rispondi SOLO con una di queste due parole:
     
 Se l'utente vuole integrare il codice nel firmware / procedere con l'unione -> CONTINUARE
-Se l'utente vuole fermarsi / ha finito / non menziona l'integrazione -> TERMINARE
+Se l'utente vuole fermarsi / ha finito -> TERMINARE
 
 Rispondi SOLO con la parola, senza altro testo.
 """
 
-    # --- Passo 1: Fast-path SOLO se il messaggio originale richiede esplicitamente l'integrazione ---
-    initial_continue = False
-    if not state.user_response:
-        res = llm.invoke([
-            SystemMessage(content=classification_prompt),
-            HumanMessage(content=f"Messaggio: {state.message}")
-        ])
-        decision_text = res.content.strip().upper()
-        if "CONTINUARE" in decision_text:
-            initial_continue = True
-            logger.info("🤖 Intento di integrazione esplicito rilevato nel messaggio iniziale.")
-
-    if initial_continue:
-        logger.info("✓ CONTINUE - Going to Integration (detected from original message)")
-        state.route = "continue_to_integration"
-        return state
-
-    # --- Passo 2: Chiedi sempre all'utente ---
+    # --- Interrupt: chiedi SEMPRE all'utente ---
+    # Non usiamo fast-path LLM sul messaggio originale: il messaggio iniziale
+    # riguardava l'AI/firmware, non l'integrazione, e causerebbe falsi CONTINUARE.
     if not state.user_response:
         prompt = {
-            "instruction": "✅ Analisi AI completata! Vuoi continuare con l'integrazione del codice AI nel firmware o terminare qui?",
+            "instruction": "✅ Analisi AI completata! Vuoi continuare con l'integrazione del codice AI nel firmware (STM32CubeMX merge) o terminare qui?",
         }
         logger.info("⏸️ Chiedendo all'utente se continuare con l'integrazione...")
         resume_value = interrupt(prompt)
     else:
         resume_value = None
 
-    # --- Passo 3: Classifica la risposta ---
+    # --- Classifica la risposta ---
     if resume_value and str(resume_value).strip():
         user_text = str(resume_value).strip()
     else:

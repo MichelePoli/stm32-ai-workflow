@@ -456,19 +456,16 @@ def ask_modification_intent(state, config: RunnableConfig = None):
     
     cfg = Configuration.from_runnable_config(config)
     
-    # === ESTRATTORE LLM ===
     from src.assistant.utils import extract_user_response, get_llm
     llm = get_llm(config)
     llm_classifier = llm.with_structured_output(ModificationDecision)
     
-    # --- Passo 1: Prova a usare il messaggio iniziale ---
+    # --- Passo 1: Fast-path SOLO se il messaggio originale chiede ESPLICITAMENTE modifiche ---
+    # Se l'LLM dice wants_modifications=False (anche con alta confidenza) chiediamo comunque:
+    # l'utente potrebbe non aver menzionato modifiche nel messaggio di avvio AI.
     initial_intent = None
     if not state.user_response:
-        # Pulisci il messaggio per il controllo
         msg_clean = state.message.lower().strip()
-        
-        # Se il messaggio è un trigger generico (es. "ai", "@assistant ai"), 
-        # non tentiamo l'inferenza automatica: dobbiamo chiedere.
         generic_triggers = ["ai", "ai_analysis", "analyze", "modello", "model", "start ai"]
         is_generic = any(t == msg_clean for t in generic_triggers) or msg_clean.startswith("@")
         
@@ -477,16 +474,17 @@ def ask_modification_intent(state, config: RunnableConfig = None):
                 SystemMessage(content=modification_decision_instructions),
                 HumanMessage(content=f"Messaggio: {state.message}")
             ])
-            # Se la confidenza è molto alta (es. > 0.9), evitiamo l'interrupt.
-            # Altrimenti (anche se è 0.8) chiediamo conferma.
-            if res.confidence > 0.9:
-                initial_intent = res.wants_modifications
-                logger.info(f"🤖 Intento rilevato nel messaggio iniziale: {initial_intent} (Conf: {res.confidence})")
+            # Fast-path SOLO se vuole esplicitamente modificare (True con alta confidenza)
+            if res.wants_modifications and res.confidence > 0.9:
+                initial_intent = True
+                logger.info(f"🤖 Intento di modifica esplicito rilevato (Conf: {res.confidence}), salto interrupt.")
             else:
-                logger.info(f"🤔 Intento incerto nel messaggio iniziale (Conf: {res.confidence}), richiedo conferma.")
+                logger.info(f"🤔 Intento non esplicito (wants={res.wants_modifications}, Conf: {res.confidence}), chiedo conferma.")
 
-    # --- Passo 2: Verifica e Interrupt ---
-    if initial_intent is None:
+    if initial_intent is True:
+        decision = ModificationDecision(wants_modifications=True, reasoning="Detected in initial message", confidence=1.0)
+    else:
+        # --- Passo 2: Interrupt – chiedi all'utente ---
         resume_value = None
         if not state.user_response:
             prompt = {
@@ -498,33 +496,25 @@ Opzioni:
 
 Cosa preferisci? (si/no)""",
             }
-            # Suggerimento se ha mai fatto modifiche
             has_modified = state.persistent_context.get("last_workflow") == "customization" if state.persistent_context else False
             if has_modified:
                 prompt["suggestion"] = "💡 L'ultima volta hai personalizzato il modello. Vuoi farlo di nuovo?"
-
-        if not state.user_response:
-            # logger.info("⏸️ Interrupting for modification intent.")
+            
+            logger.info("⏸️ Interrupting for modification intent.")
             # resume_value = interrupt(prompt)
-            logger.info("⏭️  BYPASS: Selezione automatica modifica -> 'si'")
             user_text = "si"
+
+        # Dopo la ripresa
+        if resume_value and str(resume_value).strip():
+            user_text = str(resume_value).strip().lower()
         else:
-            # Dopo la ripresa: usa interrupt return value come priorità
-            if resume_value and str(resume_value).strip():
-                user_text = str(resume_value).strip().lower()
-            else:
-                user_text = extract_user_response(state.user_response).lower()
+            user_text = extract_user_response(state.user_response).lower()
         state.user_response = ""
         
-        # Riapplica LLM sulla risposta specifica
         decision = llm_classifier.invoke([
             SystemMessage(content=modification_decision_instructions),
             HumanMessage(content=f"Risposta utente: {user_text}")
         ])
-    else:
-        # Usiamo l'intento rilevato inizialmente
-        # Creiamo un oggetto finto o usiamo direttamente i dati
-        decision = ModificationDecision(wants_modifications=initial_intent, reasoning="Detected in initial message", confidence=1.0)
 
     # === SALVA NELLO STATE ===
     state.wants_model_modifications = decision.wants_modifications
@@ -532,6 +522,7 @@ Cosa preferisci? (si/no)""",
     
     logger.info(f"✓ Decisione finale: wants_modifications={state.wants_model_modifications}")
     return state
+
 
 def decide_after_inspection(state) -> Literal["retrieve_best_practices_for_architecture", "run_analyze"]:
     """Decide se procedere a customizzazione o diretto ad analyze"""
