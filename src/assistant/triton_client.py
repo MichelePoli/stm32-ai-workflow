@@ -67,12 +67,28 @@ class ChatTriton(BaseChatModel):
             return messages
 
         def _extract_json(ai_message) -> str:
-            """Strip markdown fences Mistral sometimes wraps around JSON."""
+            """Find and extract the first JSON object from the LLM response.
+            
+            This is more robust than just stripping fences, as it handles Mistral
+            putting text before or after the JSON block.
+            """
             text = ai_message.content if hasattr(ai_message, 'content') else str(ai_message)
-            # Remove ```json ... ``` or ``` ... ``` fences
+            
+            # Find first { and last }
+            start = text.find('{')
+            end = text.rfind('}')
+            
+            if start != -1 and end != -1 and end > start:
+                return text[start:end+1]
+                
+            # Fallback to fence stripping logic for non-dict JSON (if ever used)
             text = re.sub(r'^```(?:json)?\s*', '', text.strip(), flags=re.IGNORECASE)
             text = re.sub(r'\s*```$', '', text.strip())
+            # stampa sul terminale text per vedere se funziona:
+            print("text: ", text)
+            
             return text
+
 
         def _to_pydantic(data: dict) -> Any:
             """Convert parsed dict to Pydantic model instance for attribute access.

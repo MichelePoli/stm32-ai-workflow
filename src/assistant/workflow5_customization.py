@@ -516,12 +516,18 @@ Cosa preferisci? (si/no)""",
             HumanMessage(content=f"Risposta utente: {user_text}")
         ])
 
+        # Guard: In case LLM returns non-dict or validation fails (via triton_client _to_pydantic)
+        if not hasattr(decision, "wants_modifications"):
+            logger.warning(f"⚠️ Classification failed/invalid (type: {type(decision)}). Defaulting to NO modifications.")
+            decision = ModificationDecision(wants_modifications=False, reasoning="Classification error fallback", confidence=0.0)
+
     # === SALVA NELLO STATE ===
     state.wants_model_modifications = decision.wants_modifications
     state.modification_intent_confidence = decision.confidence
     
     logger.info(f"✓ Decisione finale: wants_modifications={state.wants_model_modifications}")
     return state
+
 
 
 def decide_after_inspection(state) -> Literal["retrieve_best_practices_for_architecture", "run_analyze"]:
