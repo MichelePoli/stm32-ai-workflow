@@ -69,32 +69,47 @@ class ChatTriton(BaseChatModel):
         **kwargs: Any,
     ) -> ChatResult:
         
-        openai_messages = self._convert_messages(messages)
-        
         # Ensure model is loaded in EXPLICIT mode
         self._ensure_model_loaded()
         
-        # Retry specifically for 404: Triton marks model READY before its OpenAI
-        # HTTP route is fully registered (race condition after CUDA graph capture).
+        # Format messages into a single prompt string for the PROMPT/RESPONSE
+        # tensor interface exposed by our Python backend's execute() method.
+        # Triton Python backend does NOT expose /v1/chat/completions - only
+        # the native /v2/models/{model}/infer endpoint is available.
+        prompt = self._format_prompt(messages)
+        
+        # Native Triton v2 inference with retry for server-side transient errors
+        base_url = self.triton_url.rstrip("/").removesuffix("/v1")
+        infer_url = f"{base_url}/v2/models/{self.model_name}/infer"
+        payload = {
+            "inputs": [
+                {
+                    "name": "PROMPT",
+                    "shape": [1, 1],
+                    "datatype": "BYTES",
+                    "data": [prompt]
+                }
+            ]
+        }
+        
         import time
-        from openai import NotFoundError
         max_retries = 5
         for attempt in range(max_retries):
             try:
-                response = self.client.chat.completions.create(
-                    model=self.model_name,
-                    messages=openai_messages,
-                    temperature=self.temperature,
-                    max_tokens=self.max_tokens,
-                    stop=stop,
-                    stream=False
+                req = urllib.request.Request(
+                    infer_url,
+                    data=json.dumps(payload).encode(),
+                    headers={"Content-Type": "application/json"}
                 )
-                content = response.choices[0].message.content
-                return ChatResult(generations=[ChatGeneration(message=AIMessage(content=content))])
-            except NotFoundError as e:
+                with urllib.request.urlopen(req, timeout=120) as response:
+                    res_body = json.loads(response.read())
+                    output_data = res_body["outputs"][0]["data"][0]
+                    content = output_data if isinstance(output_data, str) else output_data.decode("utf-8")
+                    return ChatResult(generations=[ChatGeneration(message=AIMessage(content=content))])
+            except Exception as e:
                 if attempt < max_retries - 1:
-                    wait = 3 * (attempt + 1)  # 3s, 6s, 9s...
-                    logger.warning(f"⚠️ 404 on inference attempt {attempt+1}/{max_retries}, endpoint not yet live. Retrying in {wait}s...")
+                    wait = 3 * (attempt + 1)
+                    logger.warning(f"⚠️ Inference attempt {attempt+1}/{max_retries} failed ({e}), retrying in {wait}s...")
                     time.sleep(wait)
                 else:
                     raise
@@ -106,44 +121,17 @@ class ChatTriton(BaseChatModel):
         run_manager: Optional[CallbackManagerForLLMRun] = None,
         **kwargs: Any,
     ) -> Iterator[ChatGenerationChunk]:
-        
-        openai_messages = self._convert_messages(messages)
-        
-        # Ensure model is loaded in EXPLICIT mode
-        self._ensure_model_loaded()
-        
-        # Same 404 retry logic as _generate (race condition guard)
-        import time
-        from openai import NotFoundError
-        max_retries = 5
-        stream = None
-        for attempt in range(max_retries):
-            try:
-                stream = self.client.chat.completions.create(
-                    model=self.model_name,
-                    messages=openai_messages,
-                    temperature=self.temperature,
-                    max_tokens=self.max_tokens,
-                    stop=stop,
-                    stream=True
-                )
-                break  # Success – exit retry loop
-            except NotFoundError:
-                if attempt < max_retries - 1:
-                    wait = 3 * (attempt + 1)
-                    logger.warning(f"⚠️ 404 on stream attempt {attempt+1}/{max_retries}, retrying in {wait}s...")
-                    time.sleep(wait)
-                else:
-                    raise
-        
-        for chunk in stream:
-            if chunk.choices and chunk.choices[0].delta.content:
-                content = chunk.choices[0].delta.content
-                yield ChatGenerationChunk(message=AIMessage(content=content))
-                if run_manager:
-                    run_manager.on_llm_new_token(content)
+        # Triton Python backend does not support true streaming.
+        # Fall back to full generation and yield the result as a single chunk.
+        result = self._generate(messages, stop, run_manager, **kwargs)
+        content = result.generations[0].message.content
+        yield ChatGenerationChunk(message=AIMessage(content=content))
+        if run_manager:
+            run_manager.on_llm_new_token(content)
+
 
     def _convert_messages(self, messages: List[BaseMessage]) -> List[Dict[str, str]]:
+        """Convert to OpenAI-style message dicts (kept for with_structured_output path)."""
         openai_msgs = []
         for m in messages:
             role = "user"
@@ -151,6 +139,22 @@ class ChatTriton(BaseChatModel):
             elif isinstance(m, AIMessage): role = "assistant"
             openai_msgs.append({"role": role, "content": m.content})
         return openai_msgs
+
+    def _format_prompt(self, messages: List[BaseMessage]) -> str:
+        """
+        Format a list of LangChain messages into a single prompt string
+        suitable for the Triton Python backend PROMPT tensor.
+        """
+        prompt = ""
+        for m in messages:
+            if isinstance(m, SystemMessage):
+                prompt += f"System: {m.content}\n"
+            elif isinstance(m, HumanMessage):
+                prompt += f"User: {m.content}\n"
+            elif isinstance(m, AIMessage):
+                prompt += f"Assistant: {m.content}\n"
+        prompt += "Assistant: "
+        return prompt
 
     def _ensure_model_loaded(self) -> None:
         """
@@ -230,36 +234,35 @@ class ChatTriton(BaseChatModel):
 
     def _wait_for_endpoint_live(self, timeout: int = 60) -> None:
         """
-        Probe the /v1/chat/completions endpoint with a trivial request until it
-        stops returning 404.  This bridges the gap between Triton's repository
-        state flipping to READY and the HTTP route actually being registered
-        (CUDA graph capturing can keep the process busy for ~14 s after the
-        state flip, during which every request gets a 404).
+        Probe the native Triton v2 infer endpoint until it stops returning errors.
+        This bridges the gap between Triton's repository state flipping to READY
+        and the model's execute() method actually being ready to handle requests
+        (the Python backend stub needs a moment to become fully operational).
         """
         import time
-        from openai import NotFoundError, APIError
 
-        probe_messages = [{"role": "user", "content": "hi"}]
+        base_url = self.triton_url.rstrip("/").removesuffix("/v1")
+        infer_url = f"{base_url}/v2/models/{self.model_name}/infer"
+        probe_payload = json.dumps({
+            "inputs": [{"name": "PROMPT", "shape": [1, 1], "datatype": "BYTES", "data": ["hi"]}]
+        }).encode()
+
         start = time.time()
         attempt = 0
         while time.time() - start < timeout:
             attempt += 1
             try:
-                self.client.chat.completions.create(
-                    model=self.model_name,
-                    messages=probe_messages,
-                    max_tokens=1,
-                    temperature=0,
-                    stream=False,
+                req = urllib.request.Request(
+                    infer_url, data=probe_payload,
+                    headers={"Content-Type": "application/json"}
                 )
-                logger.info(f"✅ Endpoint /v1/chat/completions live after {attempt} probe(s).")
-                return  # Endpoint is up
-            except NotFoundError:
-                logger.debug(f"   Endpoint probe {attempt}: still 404, waiting 3s...")
-                time.sleep(3)
-            except Exception:
-                # Any other error (timeout, connection refused) – endpoint not up yet
-                time.sleep(3)
+                with urllib.request.urlopen(req, timeout=10) as response:
+                    response.read()  # discard result
+                logger.info(f"✅ Triton v2 infer endpoint live after {attempt} probe(s).")
+                return
+            except Exception as e:
+                logger.debug(f"   Endpoint probe {attempt}: not ready yet ({e}), waiting 2s...")
+                time.sleep(2)
         logger.warning(f"⚠️ Endpoint probe timed out after {timeout}s – proceeding anyway.")
 
     def _unload_model(self, base_url: str, model_to_unload: str) -> None:

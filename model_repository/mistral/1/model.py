@@ -88,7 +88,7 @@ class TritonPythonModel:
         responses = []
         for request in requests:
             input_tensor = pb_utils.get_input_tensor_by_name(request, "PROMPT")
-            prompt = input_tensor.as_numpy()[0].decode("utf-8")
+            prompt = input_tensor.as_numpy().flat[0].decode("utf-8")
 
             if VLLM_AVAILABLE:
                 outputs = self.llm.generate([prompt], self.sampling_params)
