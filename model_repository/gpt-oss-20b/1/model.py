@@ -26,7 +26,8 @@ class TritonPythonModel:
                 gpu_memory_utilization=0.6,
                 max_model_len=2048,
                 quantization="gptq", # Fondamentale per farlo stare in 16GB
-                dtype="float16" # Obbligatorio per GPTQ
+                dtype="float16", # Obbligatorio per GPTQ
+                enforce_eager=True,  # Skip CUDA graph capture to avoid race with Triton HTTP routes
             )
             self.sampling_params = SamplingParams(temperature=0.2, max_tokens=2048)
         else:
@@ -51,3 +52,20 @@ class TritonPythonModel:
 
     def finalize(self):
         print("[CLEANUP] Pulizia GPT-OSS 20B backend in corso...")
+        if VLLM_AVAILABLE and hasattr(self, 'llm') and self.llm is not None:
+            try:
+                import torch
+                import gc
+                # vllm.model_executor.parallel_utils was removed in vLLM >= 0.4.x
+                try:
+                    from vllm.distributed.parallel_state import destroy_model_parallel
+                    destroy_model_parallel()
+                except ImportError:
+                    pass  # Not needed on single-GPU setups
+                del self.llm
+                gc.collect()
+                torch.cuda.empty_cache()
+                torch.cuda.synchronize()
+                print("[CLEANUP] VRAM liberata con successo per GPT-OSS 20B.")
+            except Exception as e:
+                print(f"[CLEANUP] Errore durante pulizia: {e}")

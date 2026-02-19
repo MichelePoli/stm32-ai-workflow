@@ -74,17 +74,30 @@ class ChatTriton(BaseChatModel):
         # Ensure model is loaded in EXPLICIT mode
         self._ensure_model_loaded()
         
-        response = self.client.chat.completions.create(
-            model=self.model_name,
-            messages=openai_messages,
-            temperature=self.temperature,
-            max_tokens=self.max_tokens,
-            stop=stop,
-            stream=False
-        )
-        
-        content = response.choices[0].message.content
-        return ChatResult(generations=[ChatGeneration(message=AIMessage(content=content))])
+        # Retry specifically for 404: Triton marks model READY before its OpenAI
+        # HTTP route is fully registered (race condition after CUDA graph capture).
+        import time
+        from openai import NotFoundError
+        max_retries = 5
+        for attempt in range(max_retries):
+            try:
+                response = self.client.chat.completions.create(
+                    model=self.model_name,
+                    messages=openai_messages,
+                    temperature=self.temperature,
+                    max_tokens=self.max_tokens,
+                    stop=stop,
+                    stream=False
+                )
+                content = response.choices[0].message.content
+                return ChatResult(generations=[ChatGeneration(message=AIMessage(content=content))])
+            except NotFoundError as e:
+                if attempt < max_retries - 1:
+                    wait = 3 * (attempt + 1)  # 3s, 6s, 9s...
+                    logger.warning(f"⚠️ 404 on inference attempt {attempt+1}/{max_retries}, endpoint not yet live. Retrying in {wait}s...")
+                    time.sleep(wait)
+                else:
+                    raise
 
     def _stream(
         self,
@@ -99,14 +112,29 @@ class ChatTriton(BaseChatModel):
         # Ensure model is loaded in EXPLICIT mode
         self._ensure_model_loaded()
         
-        stream = self.client.chat.completions.create(
-            model=self.model_name,
-            messages=openai_messages,
-            temperature=self.temperature,
-            max_tokens=self.max_tokens,
-            stop=stop,
-            stream=True
-        )
+        # Same 404 retry logic as _generate (race condition guard)
+        import time
+        from openai import NotFoundError
+        max_retries = 5
+        stream = None
+        for attempt in range(max_retries):
+            try:
+                stream = self.client.chat.completions.create(
+                    model=self.model_name,
+                    messages=openai_messages,
+                    temperature=self.temperature,
+                    max_tokens=self.max_tokens,
+                    stop=stop,
+                    stream=True
+                )
+                break  # Success – exit retry loop
+            except NotFoundError:
+                if attempt < max_retries - 1:
+                    wait = 3 * (attempt + 1)
+                    logger.warning(f"⚠️ 404 on stream attempt {attempt+1}/{max_retries}, retrying in {wait}s...")
+                    time.sleep(wait)
+                else:
+                    raise
         
         for chunk in stream:
             if chunk.choices and chunk.choices[0].delta.content:
@@ -158,9 +186,13 @@ class ChatTriton(BaseChatModel):
         try:
             with urllib.request.urlopen(req, timeout=10) as response:
                 pass
-            # Attendiamo che diventi effettivamente READY
+            # Attendiamo che diventi READY nel registry
             self._wait_for_status(base_url, self.model_name, "READY", timeout=180)
-            logger.info(f"✅ Modello {self.model_name} caricato con successo.")
+            # Probe: wait until the OpenAI /v1/chat/completions route is actually live.
+            # A READY registry state does NOT guarantee the HTTP endpoint is registered yet
+            # (CUDA graph capturing can finish *after* the status flip).
+            self._wait_for_endpoint_live(timeout=60)
+            logger.info(f"✅ Modello {self.model_name} caricato e endpoint live.")
         except Exception as e:
             logger.error(f"❌ Errore durante caricamento Triton: {e}")
 
@@ -195,6 +227,40 @@ class ChatTriton(BaseChatModel):
     def _is_model_ready(self, base_url: str, model_name: str) -> bool:
         """Shorthand per verificare se un modello è READY."""
         return self._check_model_status(base_url, model_name) == "READY"
+
+    def _wait_for_endpoint_live(self, timeout: int = 60) -> None:
+        """
+        Probe the /v1/chat/completions endpoint with a trivial request until it
+        stops returning 404.  This bridges the gap between Triton's repository
+        state flipping to READY and the HTTP route actually being registered
+        (CUDA graph capturing can keep the process busy for ~14 s after the
+        state flip, during which every request gets a 404).
+        """
+        import time
+        from openai import NotFoundError, APIError
+
+        probe_messages = [{"role": "user", "content": "hi"}]
+        start = time.time()
+        attempt = 0
+        while time.time() - start < timeout:
+            attempt += 1
+            try:
+                self.client.chat.completions.create(
+                    model=self.model_name,
+                    messages=probe_messages,
+                    max_tokens=1,
+                    temperature=0,
+                    stream=False,
+                )
+                logger.info(f"✅ Endpoint /v1/chat/completions live after {attempt} probe(s).")
+                return  # Endpoint is up
+            except NotFoundError:
+                logger.debug(f"   Endpoint probe {attempt}: still 404, waiting 3s...")
+                time.sleep(3)
+            except Exception:
+                # Any other error (timeout, connection refused) – endpoint not up yet
+                time.sleep(3)
+        logger.warning(f"⚠️ Endpoint probe timed out after {timeout}s – proceeding anyway.")
 
     def _unload_model(self, base_url: str, model_to_unload: str) -> None:
         """Invia comando di scaricamento."""

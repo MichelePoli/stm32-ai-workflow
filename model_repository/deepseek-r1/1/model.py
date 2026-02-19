@@ -59,6 +59,7 @@ class TritonPythonModel:
                 max_model_len=2048,
                 quantization="gptq",
                 dtype="float16",
+                enforce_eager=True,  # Skip CUDA graph capture to avoid race with Triton HTTP routes
             )
             self.sampling_params = SamplingParams(temperature=0.3, max_tokens=1024)
         else:
@@ -87,9 +88,12 @@ class TritonPythonModel:
             try:
                 import torch
                 import gc
-                from vllm.model_executor.parallel_utils.parallel_state import destroy_model_parallel
-                
-                destroy_model_parallel()
+                # vllm.model_executor.parallel_utils was removed in vLLM >= 0.4.x
+                try:
+                    from vllm.distributed.parallel_state import destroy_model_parallel
+                    destroy_model_parallel()
+                except ImportError:
+                    pass  # Not needed on single-GPU setups
                 del self.llm
                 gc.collect()
                 torch.cuda.empty_cache()
