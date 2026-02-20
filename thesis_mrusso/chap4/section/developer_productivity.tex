@@ -6,14 +6,15 @@ A key dimension for evaluating the framework's impact is quantifying the reducti
 
 \subsection{Methodology}
 
-The time estimates for manual workflows are derived from three complementary sources:
+Given the challenges of conducting a large-scale empirical developer study, the time estimates for the manual workflows were established using an analytical evaluation methodology inspired by the \textbf{Keystroke-Level Model (KLM)} and \textbf{GOMS} frameworks \cite{card1980keystroke, baek2014evaluating}. By decomposing the manual development lifecycle - such as navigating the STM32CubeMX GUI, configuring peripheral clock trees, and manually porting Keras artifacts into the X-CUBE-AI generator - into discrete operative steps (e.g., pointing, clicking, mental preparation, and system response times), we established a rigorous baseline for an expert user. These analytical estimates were then cross-referenced with three complementary sources to ensure validity:
+
 \begin{enumerate}
     \item \textbf{Official STMicroelectronics Documentation}: Tutorial completion times from STM32Cube.AI user manuals and CubeMX getting-started guides\cite{st_cubemx_manual}.
     \item \textbf{Industry Benchmarks}: Published research on MLOps automation impact, specifically studies reporting 30\% operational efficiency gains and 70\% deployment time reduction through CI/CD automation\cite{mlops_productivity_2024, embedded_ml_cicd_2025}.
     \item \textbf{Development Log Analysis}: Timestamped conversations from the integration debugging process documented in project notes, reflecting real-world challenges such as Keras version conflicts and NNI API troubleshooting.
 \end{enumerate}
 
-Automated workflow timings are reported as median execution times observed during test runs on a development workstation (Intel i7-12700K, 32GB RAM, NVIDIA RTX 3070).
+In contrast, the automated workflow timings are reported as empirical median execution times observed during test runs on a development workstation (Intel i7-12700K, 32GB RAM, NVIDIA RTX 3070), providing a direct comparison against the theoretical manual baseline.
 
 \subsection{Comparative Time Analysis}
 
