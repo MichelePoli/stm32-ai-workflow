@@ -1,10 +1,6 @@
-\subsection{Language Model Selection and Task-Specific Benchmarking}
+The performance and reliability of an agentic workflow depend on the reasoning capabilities and specialized training of the underlying Large Language Models (LLMs). In my framework, rather than using a single general-purpose model, I adopted a multi-model strategy where different LLMs are assigned to specific nodes based on their strengths.
 
-The performance and reliability of an agentic workflow are heavily dependent on the reasoning capabilities and specialized training of the underlying Large Language Models (LLMs). In my framework, rather than relying on a single general-purpose model, I adopted a multi-model strategy where different LLMs are assigned to specific nodes based on their strengths.
-
-\subsubsection{Benchmark of Local Models via Ollama}
-
-I evaluated five local models served through the Ollama backend, characterizing them across different task types as summarized in Table~\ref{tab:llm_comparison}.
+During the initial characterization phase, I evaluated five local models served through the Ollama backend. These models were tested across different task types as summarized in Table~\ref{tab:llm_comparison}. This benchmarking was necessary to identify the optimal ensemble for the final production deployment on Triton.
 
 \begin{table}[h]
     \centering
@@ -17,7 +13,7 @@ I evaluated five local models served through the Ollama backend, characterizing 
         DeepSeek-R1    & 7B            & Reasoning, Debugging       & RAG Evaluation (LLM-as-a-Judge) \\
         Llama3-Groq    & 8B            & Structured Formats (JSON)  & Workflow Routing                \\
         Qwen 2.5       & 7B            & Coding and Mathematics     & C Selection Logic               \\
-        Mistral        & 7B            & Summarization, Versatility & Search Summarization            \\
+        Mistral        & 7B            & Summarization, Multi-task  & Search Summarization            \\
         GPT-OSS        & 20B           & Code Density, Context      & NNI Script Generation           \\
         \hline
     \end{tabular}
@@ -30,11 +26,11 @@ The rationale for model assignment is driven by the specific computational requi
 \begin{itemize}
     \item \textbf{High-Density Code Generation}: While distilled reasoning models like \textbf{DeepSeek-R1} (7B) offer structured logic, I found that \textbf{GPT-OSS} (20B) provides superior results for generating complex NNI trial scripts. The higher parameter count translates to a broader knowledge of Python libraries and fewer syntax hallucinations.
 
-    \item \textbf{Inference Latency vs. Reasoning Tokens}: Empirically, \textbf{GPT-OSS} demonstrated lower wall-clock execution times compared to \textbf{DeepSeek-R1}. This is primarily due to the absence of the "thinking" (Chain-of-Thought) token overhead; while R1 generates hundreds of internal reasoning tokens before outputting code, the 20B model generates the final script directly with high zero-shot accuracy.
+    \item \textbf{Inference Latency vs. Reasoning Tokens}: Empirically, \textbf{GPT-OSS} showed lower wall-clock execution times compared to \textbf{DeepSeek-R1}. This is primarily due to the absence of the "thinking" (Chain-of-Thought) token overhead; while R1 generates internal reasoning tokens before outputting code, the 20B model generates the final script directly with high zero-shot accuracy.
 
     \item \textbf{Structured Output and Routing}: The routing nodes require strict JSON compliance. \textbf{Llama3-Groq} (8B) was retained for this role due to its high instruction-following performance in low-latency scenarios.
 
-    \item \textbf{Specialized Evaluation}: \textbf{DeepSeek-R1} is reserved for the \textit{LLM-as-a-Judge} role in my evaluation suite. Its ability to articulate reasoning is vital for interpreting quality metrics (e.g., faithfulness, relevancy), where the "thinking" overhead is an acceptable trade-off for explainability.
+    \item \textbf{Specialized Evaluation}: \textbf{DeepSeek-R1} is reserved for the \textit{LLM-as-a-Judge} role in my evaluation suite. Its ability to articulate reasoning is important for interpreting quality metrics (e.g., faithfulness, relevancy), where the "thinking" overhead is an acceptable trade-off for explainability.
 \end{itemize}
 
 This tiered LLM architecture ensures that the agentic logic remains reliable while optimizing the hardware resources of the development server.

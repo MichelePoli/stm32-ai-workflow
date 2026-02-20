@@ -40,9 +40,9 @@ ChromaDB (\url{https://www.trychroma.com/}) stores embedded documentation for RA
 
 Embeddings are generated using \texttt{all-MiniLM-L6-v2} (384-dimensional vectors).
 
-\subsection{Ollama for Local LLM Serving}
+\subsection{Ollama: Developmental Inference and Benchmarking}
 
-Ollama (\url{https://ollama.com}) hosts language models locally, ensuring:
+During the initial development and model-characterization phase, \textbf{Ollama} (\url{https://ollama.com}) was used to host and evaluate candidate language models locally. This setup provided several advantages for prototyping:
 
 \begin{itemize}
     \item \textbf{Privacy}: No external API calls for sensitive code/data
@@ -50,13 +50,11 @@ Ollama (\url{https://ollama.com}) hosts language models locally, ensuring:
     \item \textbf{Cost Control}: No per-token charges for experimentation
 \end{itemize}
 
-The framework uses model-specific selection:
-\begin{itemize}
-    \item \texttt{mistral:latest} (7B) for routing and classification (low latency)
-    \item \texttt{qwen3:latest} (20B) for tool orchestration and web search
-    \item \texttt{gpt-oss:20b} for code generation (large context window: 8192 tokens)
-    \item \texttt{deepseek-r1:latest} for RAG evaluation (chain-of-thought reasoning)
-\end{itemize}
+The insights gained from these local benchmarks (detailed in Section \ref{sec:llm_selection}) guided the final selection of models for the production environment.
+
+\subsection{NVIDIA Triton Inference Server}
+
+In the final architecture, \textbf{NVIDIA Triton Inference Server} serves as the primary inference backend. By centralizing model execution, Triton allows for dynamic resource allocation and concurrent request batching, overcoming the single-user GPU locking limitations encountered with local per-container engines. The server provides standardized API endpoints (OpenAI-compatible) and manages the dynamic loading of the task-specific models identified during the prototyping phase.
 
 \subsection{STEdgeAI CLI}
 
@@ -70,9 +68,7 @@ stedgeai generate --model <model.h5> --compression <high>
 
 Generates optimized C code compatible with X-CUBE-AI runtime library (v9.x).
 
-\subsection{NNI (Neural Network Intelligence)}
-
-Microsoft's hyperparameter optimization framework (\url{https://nni.readthedocs.io}). The framework generates NNI experiment code programmatically rather than using NNI's built-in YAML configuration, enabling:
+Microsoft's hyperparameter optimization framework (\url{https://nni.readthedocs.io}). The framework generates NNI experiment code programmatically rather than using NNI's built-in YAML configuration, allowing for:
 
 \begin{itemize}
     \item Dynamic search space construction based on model architecture
@@ -80,4 +76,4 @@ Microsoft's hyperparameter optimization framework (\url{https://nni.readthedocs.
     \item Programmatic best-trial extraction and auto-retrain
 \end{itemize}
 
-Supported tuners: TPE (Tree-structured Parzen Estimator), Random, Grid Search, SMAC.
+Supported tuners include: TPE (Tree-structured Parzen Estimator), Random Search, Grid Search, and SMAC.
