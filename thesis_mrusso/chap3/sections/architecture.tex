@@ -4,7 +4,7 @@
 The implemented framework follows a modular, graph-based architecture where autonomous agents orchestrate the entire MLOps pipeline through a stateful execution model. Unlike traditional linear scripts, the system utilizes \textbf{LangGraph} to define workflows as directed graphs with conditional routing, enabling complex multi-step processes with human oversight at decision points.
 
 \subsection{Containerized Deployment and GPU Decoupling}
-To ensure scalability and efficient resource management in a multi-user environment, the entire architecture is containerized using Docker. A major architectural shift from early development was the transition from local per-container inference engines (such as Ollama) to a centralized \textbf{NVIDIA Triton Inference Server}. 
+To ensure scalability and efficient resource management in a multi-user environment, the entire architecture is containerized using Docker. A major architectural shift from early development was the transition from local per-container inference engines (such as Ollama) to a centralized \textbf{NVIDIA Triton Inference Server}.
 
 Running individual Ollama instances required locking a specific GPU for a single user throughout their session, preventing resource sharing. By decoupling the multi-agent pipeline from the inference engine, the user's LangGraph container requires only CPU and RAM. The Triton server acts as a centralized backend that receives requests via standardized APIs (compatible with the OpenAI format) and manages the GPU dynamically. This allows multiple LangChain instances to share resources simultaneously, drastically improving system scalability for future cluster deployments.
 
@@ -86,7 +86,7 @@ To maintain the stability of the model registry, the framework implements a \tex
 
 \subsection{Configuration Management}
 
-Runtime parameters are managed through a dedicated \texttt{Configuration} class (\texttt{configuration.py}) that loads settings from:
+Runtime parameters are managed through a dedicated \texttt{Configuration} class (\texttt{configuration.\allowbreak py}) that loads settings from:
 
 \begin{itemize}
     \item \textbf{Environment Variables}: ST credentials (\texttt{ST\_EMAIL}, \texttt{ST\_PASSWORD}), API keys
