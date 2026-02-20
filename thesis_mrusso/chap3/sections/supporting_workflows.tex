@@ -7,29 +7,20 @@ In addition to the four primary workflows, the framework includes two auxiliary 
 
 This workflow acts as an \textbf{Automated Pipeline Validator} and data augmentation source. While modern Generative AI (like Stable Diffusion) is often used for data expansion, this module implements deterministic Digital Signal Processing (DSP) and statistical simulation to serve two critical architectural roles:
 
-\begin{enumerate}
-    \item \textbf{Pipeline Sanity Check}: Before fine-tuning on large external datasets (which may contain corruption or domain shifts), the system generates "perfect" synthetic samples (e.g., clean sine waves, white noise) to validate the integrity of the training loop and the model's capacity to learn basic patterns.
-    \item \textbf{Sensor Simulation}: For embedded sensors (accelerometers, microphones), mathematical models (chirps, drift simulation) often provide more controllable test cases than scarce real-world anomaly data.
-\end{enumerate}
+This module serves two critical architectural roles. 
 
-Key features include:
-\begin{itemize}
-    \item \textbf{Requirement Collection}: Extracts signal parameters (frequency, duration, noise floor) from user specifications via LLM parsing.
-    \item \textbf{DSP Generation Engine}: Uses NumPy-based vectorized operations to generate time-series data with precise control over signal-to-noise ratio (SNR).
-    \item \textbf{Standardized Output}: Produces artifacts in the exact \texttt{.npy} format expected by the Fine-Tuning Workflow (Workflow 5), confirming interface compatibility.
-\end{itemize}
+First, it acts as a pipeline sanity check; before fine-tuning on large external datasets, which may contain hidden corruption or domain shifts, the system generates mathematically ``perfect'' synthetic samples (such as clean sine waves or pure white noise) to systematically validate the integrity of the training loop and confirm the model's fundamental capacity to learn basic patterns. 
+
+Second, it provides highly controlled sensor simulation. For embedded applications utilizing accelerometers or microphones, mathematical models like chirps or drift simulations often provide much more reliable and controllable test cases than scarce real-world anomaly data.
+
+Key features of this module include automated requirement collection, where signal parameters such as frequency, duration, and noise floor are dynamically extracted from user specifications via LLM parsing. The module then uses a DSP generation engine, utilizing NumPy-based vectorized operations to instantly generate complex time-series data with precise, programmatic control over the signal-to-noise ratio. In the end, it produces standardized output artifacts in the exact \texttt{.npy} format expected by the Fine-Tuning Workflow (Workflow 5), firmly confirming interface compatibility across the entire pipeline.
 
 \subsection{Workflow 7: Dataset Selection and Format Conversion}
 
 This workflow curates and converts publicly available datasets for embedded AI tasks:
 
-\begin{itemize}
-    \item \textbf{Dynamic Dataset Registry}: Queries a multi-tier catalog managed through external JSON files (\texttt{predefined\_datasets.json} and \texttt{dataset\_mapping.json}). This architecture decouples the knowledge base from the logic, enabling runtime updates of available datasets and their task-based recommendations.
-    \item \textbf{Download and Cache}: Fetches datasets from Kaggle, UCI ML Repository, or GitHub
-    \item \textbf{Format Standardization}: Converts to NumPy arrays with shape \texttt{(N, H, W, C)} for images or \texttt{(N, T, F)} for time series.
-    \item \textbf{Generic Vision Processor}: Automatically discovers image files within heterogeneous directory structures, inferring labels from parent subdirectories. This feature enables zero-configuration processing of arbitrary vision datasets (e.g., Fruit-360) by handling archive extraction and automatic conversion to memory-efficient \texttt{.npy} formats with a capped sampling limit (up to 5,000 images) to prevent RAM exhaustion.
-    \item \textbf{Train/Val/Test Splitting}: Applies stratified splits (default 70/15/15).
-    \item \textbf{Audio Preprocessing}: Converts audio datasets to spectrograms via STFT for vision model compatibility.
-\end{itemize}
+This workflow automates several critical dataset operations. It relies on a dynamic dataset registry, querying a multi-tier catalog managed through external JSON files (\texttt{predefined\_datasets.json} and \texttt{dataset\_mapping.json}); this architecture smartly decouples the core knowledge base from the execution logic, enabling smooth runtime updates. The workflow automatically handles the downloading and aggressive caching of datasets from repositories like Kaggle or UCI ML, before moving to format standardization, where it rigorously converts data into standard NumPy arrays, \texttt{(N, H, W, C)} for images or \texttt{(N, T, F)} for time series. A generic vision processor automatically discovers image files within heterogeneous directory structures and smartly infers labels from parent subdirectories, enabling the zero-configuration processing of arbitrary vision datasets (e.g., Fruit-360) and capping extraction to 5,000 images to prevent RAM exhaustion. 
+
+Finally, the system automatically applies stratified train/validation/test splits (defaulting to 70/15/15) and performs necessary audio preprocessing, such as converting audio datasets directly into spectrograms via STFT to ensure complete vision model compatibility.
 
 The converted dataset is saved to \texttt{./dataset\_output/} and path is recorded in \texttt{MasterState} for consumption by Workflow 5.

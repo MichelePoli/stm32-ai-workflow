@@ -2,15 +2,15 @@
 \section{Redis Dual-Memory Architecture}
 \label{sec:redis_architecture}
 
-The framework utilizes a dual-layer memory system built on Redis, providing both transient workflow state persistence and long-term user context retention. This architecture is essential for supporting Human-in-the-Loop workflows and multi-session context chaining.
+The framework utilizes a dual-layer memory system built on Redis, providing both transient workflow state persistence and long-term user context retention. This architecture is necessary for supporting Human-in-the-Loop workflows and multi-session context chaining.
 
 \subsection{Architectural Overview}
 
 Unlike traditional stateless APIs, the framework maintains two levels of memory:
 
 \begin{enumerate}
-    \item \textbf{Short-Term Memory (Session State)}: Managed by LangGraph's checkpointing system via \texttt{AsyncRedisSaver}. Stores the transient state of the active workflow graph, enabling fault tolerance and HITL interrupt/resume.
-    \item \textbf{Long-Term Memory (User Profile)}: A custom persistent storage layer keyed by \texttt{user\_id}. Survives across sessions and retains context such as preferred hardware boards, code generation style, and past project paths.
+  \item \textbf{Short-Term Memory (Session State)}: Managed by LangGraph's checkpointing system via \texttt{AsyncRedisSaver}. Stores the transient state of the active workflow graph, enabling fault tolerance and HITL interrupt/resume.
+  \item \textbf{Long-Term Memory (User Profile)}: A custom persistent storage layer keyed by \texttt{user\_id}. Survives across sessions and retains context such as preferred hardware boards, code generation style, and past project paths.
 \end{enumerate}
 
 This dual-layer design enables \textbf{Context Chaining}, where outputs from previous sessions (e.g., the specific MCU target selected during \texttt{firmware\_flow}) automatically pre-populate input context for future workflows (e.g., \texttt{ai\_flow}), eliminating redundant user data entry.
@@ -29,9 +29,9 @@ checkpoint:{user_id}:{session_id}:{checkpoint_id}
 
 \textbf{Components:}
 \begin{itemize}
-    \item \texttt{user\_id}: Unique identifier for the user (e.g., ``michele'', ``user123'')
-    \item \texttt{session\_id}: Session identifier (e.g., ``vscode-session'', ``cli-2024-02-10'')
-    \item \texttt{checkpoint\_id}: Timestamp-based unique ID for each state snapshot (managed by LangGraph)
+  \item \texttt{user\_id}: Unique identifier for the user (e.g., ``michele'', ``user123'')
+  \item \texttt{session\_id}: Session identifier (e.g., ``vscode-session'', ``cli-2024-02-10'')
+  \item \texttt{checkpoint\_id}: Timestamp-based unique ID for each state snapshot (managed by LangGraph)
 \end{itemize}
 
 \textbf{Example Keys:}
@@ -43,9 +43,9 @@ checkpoint:john:cli-session:1707575500000
 
 This structure ensures:
 \begin{itemize}
-    \item \textbf{User Isolation}: Different users never share checkpoints
-    \item \textbf{Session Multiplexing}: A single user can run multiple independent workflows simultaneously (e.g., one in VS Code, one in CLI)
-    \item \textbf{Temporal Ordering}: Checkpoint IDs are timestamped, enabling time-travel debugging
+  \item \textbf{User Isolation}: Different users never share checkpoints
+  \item \textbf{Session Multiplexing}: A single user can run multiple independent workflows simultaneously (e.g., one in VS Code, one in CLI)
+  \item \textbf{Temporal Ordering}: Checkpoint IDs are timestamped, enabling time-travel debugging
 \end{itemize}
 
 \subsubsection{Long-Term Memory (User Profiles)}
@@ -89,13 +89,13 @@ The profile value is a JSON-serialized dictionary containing persistent user pre
 
 \textbf{Profile Fields:}
 \begin{itemize}
-    \item \texttt{last\_board}: The most recently used STM32 board (e.g., ``STM32H743ZI''), used to pre-fill firmware generation requests
-    \item \texttt{preferred\_compression}: Default quantization level (``low'', ``medium'', ``high'', ``very\_high'')
-    \item \texttt{code\_style}: Preferred code verbosity (``minimal'', ``standard'', ``verbose'') for generated C code
-    \item \texttt{last\_project\_paths}: History of firmware project directories for quick re-selection
-    \item \texttt{model\_registry\_contributions}: User-submitted models awaiting validation (transactional registration flow)
-    \item \texttt{session\_count}: Total number of sessions (for analytics)
-    \item \texttt{last\_active}: Timestamp of last interaction (for inactive user cleanup)
+  \item \texttt{last\_board}: The most recently used STM32 board (e.g., ``STM32H743ZI''), used to pre-fill firmware generation requests
+  \item \texttt{preferred\_compression}: Default quantization level (``low'', ``medium'', ``high'', ``very\_high'')
+  \item \texttt{code\_style}: Preferred code verbosity (``minimal'', ``standard'', ``verbose'') for generated C code
+  \item \texttt{last\_project\_paths}: History of firmware project directories for quick re-selection
+  \item \texttt{model\_registry\_contributions}: User-submitted models awaiting validation (transactional registration flow)
+  \item \texttt{session\_count}: Total number of sessions (for analytics)
+  \item \texttt{last\_active}: Timestamp of last interaction (for inactive user cleanup)
 \end{itemize}
 
 \subsection{LangGraph Integration: \texttt{AsyncRedisSaver}}
@@ -155,9 +155,9 @@ Each time a graph node completes execution, LangGraph automatically persists the
 
 \textbf{Key Fields:}
 \begin{itemize}
-    \item \texttt{channel\_values}: The complete \texttt{MasterState} object with all 50+ attributes
-    \item \texttt{parent\_config}: Reference to the previous checkpoint (for time-travel)
-    \item \texttt{ts}: Timestamp for ordering checkpoints
+  \item \texttt{channel\_values}: The complete \texttt{MasterState} object with all 50+ attributes
+  \item \texttt{parent\_config}: Reference to the previous checkpoint (for time-travel)
+  \item \texttt{ts}: Timestamp for ordering checkpoints
 \end{itemize}
 
 \subsection{Server-Side Profile Management}
@@ -215,35 +215,35 @@ The dual-memory architecture enables powerful cross-session workflows:
 
 \textbf{Day 1 - Session 1 (VS Code):}
 \begin{enumerate}
-    \item User: ``@stm32ai run NNI experiment on MobileNetV2 for Fruit-360''
-    \item Framework launches NNI (20 trials, estimated 12 hours)
-    \item After 2 hours, user closes VS Code
-    \item \textbf{Short-Term Memory} saves checkpoint: \texttt{route = "nni\_optimization"}, \texttt{nni\_status = "running"}
-    \item \textbf{Long-Term Memory} saves: \texttt{last\_board = "STM32H7"}, \texttt{session\_count++}
+  \item User: ``@stm32ai run NNI experiment on MobileNetV2 for Fruit-360''
+  \item Framework launches NNI (20 trials, estimated 12 hours)
+  \item After 2 hours, user closes VS Code
+  \item \textbf{Short-Term Memory} saves checkpoint: \texttt{route = "nni\_optimization"}, \texttt{nni\_status = "running"}
+  \item \textbf{Long-Term Memory} saves: \texttt{last\_board = "STM32H7"}, \texttt{session\_count++}
 \end{enumerate}
 
 \textbf{Day 2 - Session 2 (CLI):}
 \begin{enumerate}
-    \item User reconnects via CLI with same \texttt{user\_id + session\_id}
-    \item \texttt{graph.aget\_state(config)} retrieves the checkpoint from Day 1
-    \item \textbf{Automatic Resume}: The graph detects \texttt{current\_state.next = ["check\_nni\_status"]} and resumes execution
-    \item NNI results are retrieved from disk, best model is saved, and integration proceeds
+  \item User reconnects via CLI with same \texttt{user\_id + session\_id}
+  \item \texttt{graph.aget\_state(config)} retrieves the checkpoint from Day 1
+  \item \textbf{Automatic Resume}: The graph detects \texttt{current\_state.next = ["check\_nni\_status"]} and resumes execution
+  \item NNI results are retrieved from disk, best model is saved, and integration proceeds
 \end{enumerate}
 
 \subsubsection{Example: Board Preference Pre-Fill}
 
 \textbf{Session A (Firmware Generation):}
 \begin{enumerate}
-    \item User: ``Create project for STM32H743''
-    \item Firmware generated successfully
-    \item Profile updated: \texttt{last\_board = "STM32H743ZI"}
+  \item User: ``Create project for STM32H743''
+  \item Firmware generated successfully
+  \item Profile updated: \texttt{last\_board = "STM32H743ZI"}
 \end{enumerate}
 
 \textbf{Session B (AI Model Selection, 1 week later):}
 \begin{enumerate}
-    \item User: ``Analyze MobileNetV2''
-    \item \textbf{Context Chaining}: The \texttt{collect\_analysis\_info()} node checks \texttt{state.last\_board} and auto-populates \texttt{target\_mcu = "stm32h743"}
-    \item No need for user to re-specify hardware → \textbf{Eliminated 1 clarification roundtrip}
+  \item User: ``Analyze MobileNetV2''
+  \item \textbf{Context Chaining}: The \texttt{collect\_analysis\_info()} node checks \texttt{state.last\_board} and auto-populates \texttt{target\_mcu = "stm32h743"}
+  \item No need for user to re-specify hardware → \textbf{Eliminated 1 clarification roundtrip}
 \end{enumerate}
 
 \subsection{HITL Resume Logic}
@@ -253,45 +253,46 @@ The short-term memory checkpoint enables continuous Human-in-the-Loop workflows:
 \subsubsection{Interrupt Flow}
 
 \begin{enumerate}
-    \item Node calls \texttt{interrupt(\{type: "decision\_request", message: "Proceed to AI?"\})}
-    \item LangGraph suspends execution and saves checkpoint with \texttt{next = ["decide\_continue\_to\_ai"]}
-    \item Control returns to API server, which sends a JSON event to VS Code
-    \item User sees: ``Firmware generated. Continue with AI model selection? [Yes/No]''
+  \item Node calls \texttt{interrupt(\{type: "decision\_request", message: "Proceed to AI?"\})}
+  \item LangGraph suspends execution and saves checkpoint with \texttt{next = ["decide\_continue\_to\_ai"]}
+  \item Control returns to API server, which sends a JSON event to VS Code
+  \item User sees: ``Firmware generated. Continue with AI model selection? [Yes/No]''
 \end{enumerate}
 
 \subsubsection{Resume Flow}
 
 \begin{enumerate}
-    \item User types: ``Yes, use high compression''
-    \item VS Code sends \texttt{POST /stream} with \texttt{messages: [\{role: "user", content: "Yes, use high compression"\}]}
-    \item Server calls \texttt{graph.aget\_state(config)} and detects \texttt{current\_state.next = ["decide\_continue\_to\_ai"]}
-    \item Server injects user response: \texttt{await graph.aupdate\_state(config, \{"user\_response": "Yes, use high compression"\})}
-    \item Graph resumes from \texttt{decide\_continue\_to\_ai} node, which parses the response via LLM and routes accordingly
+  \item User types: ``Yes, use high compression''
+  \item VS Code sends \texttt{POST /stream} with \texttt{messages: [\{role: "user", content: "Yes, use high compression"\}]}
+  \item Server calls \texttt{graph.aget\_state(config)} and detects \texttt{current\_state.next = ["decide\_continue\_to\_ai"]}
+  \item Server injects user response: \texttt{await graph.aupdate\_state(config, \{"user\_response": "Yes, use high compression"\})}
+  \item Graph resumes from \texttt{decide\_continue\_to\_ai} node, which parses the response via LLM and routes accordingly
 \end{enumerate}
 
 \subsection{Performance Considerations}
 
 \subsubsection{Redis I/O Overhead}
 
-Checkpoint writes add latency (~5-20ms per node transition). Mitigations:
-\begin{itemize}
-    \item \textbf{Async I/O}: \texttt{AsyncRedisSaver} uses non-blocking Redis operations
-    \item \textbf{Local Redis}: Development uses \texttt{redis://localhost} to minimize network overhead
-    \item \textbf{Batching}: LangGraph coalesces multiple state updates within a single node before writing
-\end{itemize}
+Checkpoint writes inherently add latency to the execution pipeline, typically in the range of 5 to 20 milliseconds per node transition. To mitigate this overhead, the framework employs several strategies. 
+
+First, the \texttt{AsyncRedisSaver} heavily relies on non-blocking asynchronous I/O operations to prevent the main event loop from stalling. 
+
+Second, during development and local deployments, the system defaults to connecting via \texttt{redis://localhost}, significantly minimizing network transit latency. 
+
+Finally, LangGraph optimizes writes by coalescing multiple internal state updates that occur within a single node's execution context, performing a single consolidated write operation before transitioning to the next graph node.
 
 \subsubsection{Memory Footprint and Evolution of Data Persistence}
 
-During early development, the system attempted to store large artifacts (such as generated firmware zips, serialized models, and base64 images) directly within the Redis state. However, this approach presented technical bottlenecks, as Redis string size limits and synchronization overhead slowed down the orchestration loop. 
+During early development, the system attempted to store large artifacts (such as generated firmware zips, serialized models, and base64 images) directly within the Redis state. However, this approach presented technical bottlenecks, as Redis string size limits and synchronization overhead slowed down the orchestration loop.
 
-To resolve this, the architectural design evolved toward a hybrid persistence model leveraging \textbf{Container Persistent Volumes}. Instead of using an intermediate database for heavy files, the system writes artifacts directly to persistent storage volumes mapped to individual container instances. This strategy perfectly aligns with a Cloud-Native architecture: in a future Kubernetes deployment, each user will operate within a dedicated namespace with dynamically provisioned PersistentVolumeClaims (PVCs). 
+To resolve this, the architectural design evolved toward a hybrid persistence model using \textbf{Container Persistent Volumes}. Instead of using an intermediate database for heavy files, the system writes artifacts directly to persistent storage volumes mapped to individual container instances. This strategy perfectly aligns with a Cloud-Native architecture: in a future Kubernetes deployment, each user will operate within a dedicated namespace with dynamically provisioned PersistentVolumeClaims (PVCs).
 
 Redis is now strictly limited to maintaining the lightweight conversational checkpointing of the LangGraph execution thread, while the storage of project files is handled natively by the file system. This simplifies the architecture, improves I/O performance, and guarantees environment isolation without relying on database abstractions.
 
 \subsection{Security Considerations}
 
-\begin{itemize}
-    \item \textbf{Credential Storage}: User profiles may store ST credentials (for STEdgeAI login). Production deployments should encrypt sensitive fields using AES-256 before storing in Redis.
-    \item \textbf{Access Control}: Redis \texttt{ACL} (Access Control Lists) restrict which clients can read/write specific key patterns (e.g., \texttt{user:*:profile} only accessible to authenticated users).
-    \item \textbf{TTL for Inactive Users}: Profiles expire after 1 year of inactivity to comply with GDPR data minimization principles.
-\end{itemize}
+Given that user profiles may store sensitive information, such as STMicroelectronics developer credentials required for STEdgeAI cloud authentication, the framework must adhere to strict security practices. In production deployments, it is imperative to encrypt sensitive fields using solid algorithms like AES-256 before persisting them in the Redis data store. 
+
+Also, access control should be strictly enforced using Redis ACL (Access Control Lists) to restrict client permissions, ensuring that specific key patterns (e.g., \texttt{user:*:profile}) are only accessible to authenticated and authorized services. 
+
+Finally, to comply with GDPR data minimization principles and prevent indefinite data retention, user profiles are configured with a Time-To-Live (TTL) expiration policy, ensuring they are automatically purged after one year of complete inactivity.

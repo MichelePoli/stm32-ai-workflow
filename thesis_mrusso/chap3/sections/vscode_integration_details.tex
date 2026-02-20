@@ -2,17 +2,15 @@
 \section{VS Code Extension: Interactive IDE Integration}
 \label{sec:vscode_extension}
 
-To bridge the gap between the backend LangGraph orchestrator and the developer's daily workflow, a custom Visual Studio Code extension was developed. This extension transforms the framework from a command-line tool into a real-time, context-aware assistant embedded directly in the Integrated Development Environment (IDE).
+To connect between the backend LangGraph orchestrator and the developer's daily workflow, a custom Visual Studio Code extension was developed. This extension transforms the framework from a command-line tool into a real-time, context-aware assistant embedded directly in the Integrated Development Environment (IDE).
 
 \subsection{Architecture Overview}
 
-The integration follows a client-server architecture where the VS Code extension (TypeScript frontend) communicates with the FastAPI backend (Python) via HTTP streaming. This design provides several advantages:
+The integration follows a client-server architecture where the VS Code extension (TypeScript frontend) communicates with the FastAPI backend (Python) via HTTP streaming. This design provides several distinct advantages. Primarily, it enforces a clean separation of technologies: the complex LangGraph orchestration is executed in a dedicated Python environment, while the user interface uses VS Code's native TypeScript APIs. 
 
-\begin{itemize}
-  \item \textbf{Technology Separation}: The complex LangGraph orchestration runs in Python, while the UI utilizes VS Code's native TypeScript APIs.
-  \item \textbf{Asynchronous Execution}: Long-running workflows (NNI experiments, model downloads) don't freeze the VS Code interface.
-  \item \textbf{Multi-Client Support}: The same backend can serve VS Code, CLI tools, and web interfaces simultaneously.
-\end{itemize}
+Also, the use of asynchronous execution ensures that long-running workflows, such as NNI hyperparameter optimization experiments or large model downloads, do not freeze the VS Code interface, maintaining a responsive developer experience. 
+
+Finally, this decoupled approach inherently supports multi-client architecture, allowing the same backend to simultaneously serve the VS Code extension, command-line interfaces, and potential future web dashboards.
 
 \subsection{Extension Configuration (\texttt{package.json})}
 
@@ -43,9 +41,9 @@ The extension manifest registers a Chat Participant using VS Code's native chat 
 
 \textbf{Key Parameters:}
 \begin{itemize}
-  \item \texttt{id}: Unique identifier for the chat participant (used internally by VS Code).
-  \item \texttt{name}: The \texttt{@stm32ai} handle users type to invoke the assistant.
-  \item \texttt{isSticky: true}: Enables multi-turn conversations where context (previous messages) is automatically retained across chat interactions.
+    \item \texttt{id}: Unique identifier for the chat participant (used internally by VS Code).
+    \item \texttt{name}: The \texttt{@stm32ai} handle users type to invoke the assistant.
+    \item \texttt{isSticky: true}: Enables multi-turn conversations where context (previous messages) is automatically retained across chat interactions.
 \end{itemize}
 
 \subsection{TypeScript Handler Implementation}
@@ -109,11 +107,14 @@ vscode.chat.createChatParticipant('stm32-ai.assistant', handler);
 \end{lstlisting}
 
 \textbf{Implementation Details:}
-\begin{itemize}
-  \item \textbf{Cancellation Handling}: The \texttt{CancellationToken} allows users to cancel long-running requests by closing the chat window or clicking the stop button. The backend receives a dropped HTTP connection and gracefully terminates the LangGraph execution.
-  \item \textbf{NDJSON Buffering}: Chunks may contain partial JSON objects. The \texttt{buffer} accumulates incomplete lines until a full newline-delimited JSON object is received.
-  \item \textbf{Typed Responses}: The server emits different event types (\texttt{markdown}, \texttt{progress}, \texttt{error}), each rendered differently in the chat UI.
-\end{itemize}
+
+The handler implementation incorporates several critical functionalities to ensure robustness and a smooth user experience. 
+
+First, it implements graceful cancellation handling via the \texttt{CancellationToken}; this allows users to abort long-running requests simply by closing the chat window or clicking a stop button, which in turn drops the HTTP connection and signals the backend to terminate the LangGraph execution. 
+
+Second, to handle the unreliability of network streams where chunks might contain partial JSON objects, the extension utilizes NDJSON buffering. A \texttt{buffer} string accumulates incoming data until a complete, newline-delimited JSON object is successfully parsed. 
+
+Finally, the handler processes typed responses dynamically; the server emits distinct event types (such as \texttt{markdown}, \texttt{progress}, or \texttt{error}), and the frontend routing logic renders each type using the appropriate UI components within the VS Code chat view.
 
 \subsection{FastAPI Backend: Server-Side Streaming}
 
@@ -157,9 +158,9 @@ async def stream_chat(request: ChatRequest):
 
 \textbf{Server-Side Features:}
 \begin{itemize}
-  \item \textbf{User Profile Injection}: The \texttt{last\_board} and \texttt{preferred\_compression} from Redis long-term memory pre-populate the state, enabling context chaining across sessions.
-  \item \textbf{Thread-Based Isolation}: Each user+session combination gets a unique \texttt{thread\_id}, ensuring isolated checkpoints in Redis.
-  \item \textbf{NDJSON Encoding}: Each event is serialized as a JSON object followed by \texttt{\textbackslash n}, enabling incremental parsing on the client.
+    \item \textbf{User Profile Injection}: The \texttt{last\_board} and \texttt{preferred\_compression} from Redis long-term memory pre-populate the state, enabling context chaining across sessions.
+    \item \textbf{Thread-Based Isolation}: Each user+session combination gets a unique \texttt{thread\_id}, ensuring isolated checkpoints in Redis.
+    \item \textbf{NDJSON Encoding}: Each event is serialized as a JSON object followed by \texttt{\textbackslash n}, enabling incremental parsing on the client.
 \end{itemize}
 
 \subsection{Communication Protocol}
@@ -176,9 +177,9 @@ The extension and server communicate via a custom NDJSON (Newline Delimited JSON
 
 \textbf{Event Types:}
 \begin{itemize}
-  \item \texttt{progress}: Transient status updates (e.g., ``Analyzing model...''), rendered as bullet points in the chat.
-  \item \texttt{markdown}: Rich-formatted responses supporting bold, code blocks, tables, and links.
-  \item \texttt{error}: Critical failures displayed with red highlighting and error icons.
+    \item \texttt{progress}: Transient status updates (e.g., ``Analyzing model...''), rendered as bullet points in the chat.
+    \item \texttt{markdown}: Rich-formatted responses supporting bold, code blocks, tables, and links.
+    \item \texttt{error}: Critical failures displayed with red highlighting and error icons.
 \end{itemize}
 
 \subsection{Integration Challenges and Solutions}
@@ -203,30 +204,25 @@ The extension and server communicate via a custom NDJSON (Newline Delimited JSON
 
 \subsection{Developer Experience Benefits}
 
-The VS Code integration provides several UX improvements over CLI-based interaction:
+The VS Code integration provides several significant user experience improvements over traditional CLI-based interactions. By operating directly within the IDE, the assistant gains context awareness; it can access the active file via \texttt{vscode.window.activeTextEditor}, which paves the way for advanced features like automated analysis of currently open models or direct firmware generation for active \texttt{.ioc} projects. 
 
-\begin{itemize}
-  \item \textbf{Context Awareness}: The extension can access the active file (\texttt{vscode.window.activeTextEditor}), enabling future features like ``Analyze the model in this file'' or ``Generate firmware for this .ioc project.''
-  \item \textbf{Inline Documentation}: Markdown responses support clickable file links (e.g., \texttt{file:///path/to/network.c\#L42}), allowing users to jump directly to generated code.
-  \item \textbf{Progress Visibility}: Real-time progress updates reduce perceived latency for long-running operations (model downloads, NNI experiments).
-  \item \textbf{Persistent Chat History}: Multi-turn conversations (\texttt{isSticky: true}) allow iterative refinement (``Actually, I want a smaller model'') without restarting the workflow.
-\end{itemize}
+In addition, the assistant delivers inline documentation where markdown responses can embed clickable file links (e.g., \texttt{file:///path/to/network.c\#L42}), allowing the developer to intuitively jump straight to generated code segments. During long-running operations such as model downloads or NNI experiments, real-time progress visibility prevents the perception of system freezes and keeps the user informed of the pipeline status. Lastly, the implementation of persistent chat history via the \texttt{isSticky: true} parameter enables multi-turn, contextual conversations, allowing developers to iteratively refine their requests (e.g., "Actually, I want a smaller model") without restarting the entire workflow.
 
 \subsection{Deployment and Testing}
 
 \textbf{Development Workflow:}
 \begin{enumerate}
-  \item \textbf{Compilation}: \texttt{npm run compile} transpiles TypeScript to JavaScript in \texttt{./out/extension.js}.
-  \item \textbf{Debug Launch}: \texttt{F5} opens an Extension Development Host window where \texttt{@stm32ai} is available.
-  \item \textbf{Server Startup}: The FastAPI backend must be running (\texttt{python -m src.api.server}) before testing.
+    \item \textbf{Compilation}: \texttt{npm run compile} transpiles TypeScript to JavaScript in \texttt{./out/extension.js}.
+    \item \textbf{Debug Launch}: \texttt{F5} opens an Extension Development Host window where \texttt{@stm32ai} is available.
+    \item \textbf{Server Startup}: The FastAPI backend must be running (\texttt{python -m src.api.server}) before testing.
 \end{enumerate}
 
 \textbf{Testing Scenarios:}
 \begin{itemize}
-  \item \textbf{Firmware Generation}: ``@stm32ai create a project for STM32H743 with STM32CubeIDE''
-  \item \textbf{Model Analysis}: ``@stm32ai analyze MobileNetV2 for STM32F4 with high compression''
-  \item \textbf{NNI Optimization}: ``@stm32ai fine-tune this model on Fruit-360 with 10 trials''
-  \item \textbf{Cancellation Test}: Start a long-running task, then close the chat window to verify graceful termination.
+    \item \textbf{Firmware Generation}: ``@stm32ai create a project for STM32H743 with STM32CubeIDE''
+    \item \textbf{Model Analysis}: ``@stm32ai analyze MobileNetV2 for STM32F4 with high compression''
+    \item \textbf{NNI Optimization}: ``@stm32ai fine-tune this model on Fruit-360 with 10 trials''
+    \item \textbf{Cancellation Test}: Start a long-running task, then close the chat window to verify graceful termination.
 \end{itemize}
 
 \subsection{Future Enhancements}
@@ -234,8 +230,8 @@ The VS Code integration provides several UX improvements over CLI-based interact
 Potential extensions to the VS Code integration:
 
 \begin{itemize}
-  \item \textbf{Syntax Highlighting for .ioc Files}: Custom TextMate grammar for STM32CubeMX configuration files.
-  \item \textbf{Code Action Providers}: Right-click on an \texttt{.h5} model file → ``Analyze for STM32''
-  \item \textbf{Status Bar Integration}: Show active NNI experiments in the VS Code status bar.
-  \item \textbf{Terminal Integration}: Automatically open a terminal and flash firmware to connected STM32 boards via \texttt{st-flash}.
+    \item \textbf{Syntax Highlighting for .ioc Files}: Custom TextMate grammar for STM32CubeMX configuration files.
+    \item \textbf{Code Action Providers}: Right-click on an \texttt{.h5} model file → ``Analyze for STM32''
+    \item \textbf{Status Bar Integration}: Show active NNI experiments in the VS Code status bar.
+    \item \textbf{Terminal Integration}: Automatically open a terminal and flash firmware to connected STM32 boards via \texttt{st-flash}.
 \end{itemize}

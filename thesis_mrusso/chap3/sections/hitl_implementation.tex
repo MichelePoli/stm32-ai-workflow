@@ -41,24 +41,13 @@ The framework distinguishes two HITL patterns:
 \subsubsection{Human-as-Gate}
 Binary approval for risky operations (e.g., firmware flashing, model deployment):
 
-\begin{itemize}
-    \item Workflow suspends before action
-    \item User reviews proposed operation
-    \item Explicit "approve" or "reject" required to proceed
-\end{itemize}
-
-Example gates:
-\begin{itemize}
-    \item After firmware generation (proceed to AI workflow?)
-    \item After model selection (accept this model or search again?)
-    \item After NNI completion (deploy best model?)
-\end{itemize}
+In this pattern, the workflow automatically suspends immediately before executing any high-risk action. The user is then granted the opportunity to thoroughly review the proposed operation and must provide an explicit ``approve'' or ``reject'' command to proceed. Typical examples of these critical gates include confirming the continuation to the AI workflow after firmware generation, accepting a specific neural network model or requesting a broader search during model selection, and granting final approval to deploy the optimized model after NNI completion.
 
 \subsubsection{Human-as-Instructor}
 Natural language steering to modify workflow direction:
 
 \begin{quote}
-    User: \textit{"Actually, I want a smaller model"}
+  User: \textit{"Actually, I want a smaller model"}
 \end{quote}
 
 The system reclassifies this input using structured extraction and updates \texttt{MasterState}:
@@ -91,19 +80,12 @@ checkpoint:{thread_id}:{checkpoint_id} -> {
 }
 \end{verbatim}
 
-When resuming after an interrupt:
-\begin{enumerate}
-    \item Client sends user input via API (\texttt{POST /threads/\{thread\_id\}/runs})
-    \item LangGraph loads latest checkpoint for \texttt{thread\_id}
-    \item Deserializes \texttt{MasterState}
-    \item Injects user input into state
-    \item Resumes execution from next node in graph
-\end{enumerate}
+The resume process begins when the client sends the user's input via the API (\texttt{POST /threads/\{thread\_id\}/runs}). Upon receiving this request, LangGraph retrieves the latest stored checkpoint corresponding to the specific \texttt{thread\_id}. It then selectively deserializes the \texttt{MasterState}, injects the new user input directly into this state configuration, and smoothly resumes continuous execution from the next designated node in the computational graph.
 
 This architecture supports multi-hour workflows (e.g., overnight NNI experiments) with continuous resume capability.
 
 \subsection{Actionable Reporting and Synthetic Summaries}
 
-A key UX improvement implemented to enhance high-level decision making is the transition from raw log introspection to \textbf{Synthetic Actionable Summaries}. Traditional toolchain outputs from CubeMX or STEdgeAI can be hundreds of lines long, containing technical noise that obscures critical failures.
+A key UX improvement implemented to improve high-level decision making is the transition from raw log introspection to \textbf{Synthetic Actionable Summaries}. Traditional toolchain outputs from CubeMX or STEdgeAI can be hundreds of lines long, containing technical noise that obscures critical failures.
 
 The orchestrator now implements heuristic-based log parsing after each tool execution. Instead of presenting the raw output, the agent extracts a 1-line summary (e.g., \textit{" Project generated successfully (STM32H7, 4 peripherals enabled)"} or \textit{"WARNING: Memory Overflow: Flash required 3.2MB/2MB"}). These summaries are stored in the \texttt{MasterState} and used to build context-aware prompts for the user during interrupt points, significantly reducing the cognitive load required to guide the autonomous agent.

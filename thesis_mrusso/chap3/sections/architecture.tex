@@ -23,13 +23,13 @@ User requests are classified into four primary workflow categories:
 
     \item \textbf{Firmware-AI Integration} (\texttt{integration\_flow}): Merges generated C inference code into the STM32 project structure and verifies build compatibility.
 
-    \item \textbf{Web Research} (\texttt{search\_flow}): Provides technical guidance through RAG-enhanced web search with quality evaluation metrics.
+    \item \textbf{Web Research} (\texttt{search\_flow}): Provides technical guidance through RAG-improved web search with quality evaluation metrics.
 \end{enumerate}
 
 \clearpage
 \begin{figure}[p]
     \centering
-    \centerline{\includegraphics[height=0.9\textheight]{PART1.png}}
+    \centerline{\includegraphics[height=0.9\textheight]{chap3/figures/PART1.png}}
     \caption{Global system flowchart - Part 1: System initialization, routing, and AI/Firmware selection workflows.}
     \label{fig:global_flowchart_part1}
 \end{figure}
@@ -86,26 +86,11 @@ To maintain the stability of the model registry, the framework implements a \tex
 
 \subsection{Configuration Management}
 
-Runtime parameters are managed through a dedicated \texttt{Configuration} class (\texttt{configuration.\allowbreak py}) that loads settings from:
+Runtime parameters are managed through a dedicated \texttt{Configuration} class (\texttt{configuration.\allowbreak py}) that dynamically loads settings from a prioritized hierarchy of sources. \textbf{Environment Variables} are used for sensitive data such as STMicroelectronics credentials (\texttt{ST\_EMAIL}, \texttt{ST\_PASSWORD}) and API keys, while a local \textbf{Config File} (\texttt{config.json}) defines system-specific paths including the STM32CubeMX binary location, the STM32Cube repository path, and AI output directories. 
 
-\begin{itemize}
-    \item \textbf{Environment Variables}: ST credentials (\texttt{ST\_EMAIL}, \texttt{ST\_PASSWORD}), API keys
-    \item \textbf{Config File}: \texttt{config.json} for paths (CubeMX binary, STM32Cube repository, AI output directories)
-    \item \textbf{LangGraph Runtime Config}: Passed via \texttt{config} parameter to each node
-\end{itemize}
+In addition, the \textbf{LangGraph Runtime Config} enables the injection of per-request settings directly into each workflow node via the \texttt{config} parameter.
 
-Critical configuration parameters include:
-
-\begin{itemize}
-    \item \texttt{local\_llm}: Language model ID (default: \texttt{mistral:latest})
-    \item \texttt{llm\_temperature}: Sampling temperature (0.0 for deterministic routing, 0.2 for code generation)
-    \item \texttt{llm\_context\_window}: Token limit (4096–8192 depending on task complexity)
-    \item \texttt{cubemx\_path}: Absolute path to STM32CubeMX CLI executable
-    \item \texttt{ai\_target}: Target MCU for STEdgeAI tooling (e.g., \texttt{stm32h743})
-    \item \texttt{ai\_compression}: Quantization level (\texttt{low}, \texttt{medium}, \texttt{high}, \texttt{very\_high})
-\end{itemize}
-
-The configuration is validated at runtime using Pydantic validators, ensuring all required paths exist and credentials are correctly formatted before workflow execution begins.
+The framework relies on several critical parameters to govern its behavior: \texttt{local\_llm} defines the language model identifier (defaulting to \texttt{mistral:latest}), while \texttt{llm\_temperature} balances deterministic routing ($0.0$) with creative code generation ($0.2$). The \texttt{llm\_context\_window} manages token limits (typically $4096$--$8192$), and \texttt{cubemx\_path} points to the absolute location of the STM32CubeMX CLI. For AI-specific workflows, the \texttt{ai\_target} specifies the target MCU (e.g., \texttt{stm32h743}), and \texttt{ai\_compression} sets the desired quantization level ranging from \texttt{low} to \texttt{very\_high}. All parameters are validated at runtime using \textbf{Pydantic validators}, ensuring that required paths exist and credentials are correctly formatted before the orchestrator initiates any workflow execution.
 
 \subsection{Graph Topology and Node Composition}
 
@@ -123,21 +108,21 @@ This multi-stage pipeline mirrors the typical embedded AI development lifecycle:
     \texttt{Hardware Setup → Model Selection → Model Customization → Code Generation → Integration → Testing}
 \end{center}
 
-The graph construction logic resides in four builder functions:
+The graph construction logic resides in four primary "injection" functions:
 
 \begin{itemize}
-    \item \texttt{build\_firmware\_graph()}: Firmware workflow (Workflow 1)
-    \item \texttt{build\_ai\_analysis\_graph()}: AI discovery + customization (Workflows 2, 5, 6, 7)
-    \item \texttt{build\_integration\_graph()}: Firmware-AI integration (Workflow 3)
-    \item \texttt{build\_web\_search\_graph()}: Web research (Workflow 4)
+    \item \texttt{inject\_firmware\_nodes()}: Firmware workflow (Workflow 1)
+    \item \texttt{inject\_ai\_analysis\_nodes()}: AI discovery, customization, and data management (Workflows 2, 5, 6, 7)
+    \item \texttt{inject\_integration\_nodes()}: Firmware-AI integration and verification (Workflow 3)
+    \item \texttt{inject\_web\_search\_nodes()}: Web research and RAG support (Workflow 4)
 \end{itemize}
 
-Each builder function assembles nodes, defines conditional edges, and sets up interrupt points for human approval.
+Each function encapsulates the node definitions and internal routing logic for its respective domain, adding them to the master \texttt{StateGraph} builder.
 
 \clearpage
 \begin{figure}[p]
     \centering
-    \centerline{\includegraphics[height=0.9\textheight]{PART2.png}}
+    \centerline{\includegraphics[height=0.9\textheight]{chap3/figures/PART2.png}}
     \caption{Global system flowchart - Part 2: Model customization, STEdgeAI analysis, and firmware integration workflows.}
     \label{fig:global_flowchart_part2}
 \end{figure}
@@ -145,18 +130,11 @@ Each builder function assembles nodes, defines conditional edges, and sets up in
 
 \subsection{Logging and Observability}
 
-The system implements structured logging across all workflow nodes with severity levels:
+The system implements a multi-tier observability strategy, combining structured backend logging with real-time progress streaming. Technical logs are managed via the standard Python \texttt{logging} library with distinct severity levels.
 
-\begin{itemize}
-    \item \texttt{DEBUG}: Detailed execution traces (LLM prompts, API responses, state transitions)
-    \item \texttt{INFO}: High-level progress indicators (workflow entry, node completion)
-    \item \texttt{WARNING}: Non-fatal issues (low LLM confidence, fallback activations)
-    \item \texttt{ERROR}: Recoverable failures (API timeouts, invalid user input)
-\end{itemize}
+\textbf{DEBUG} logs provide detailed execution traces, including LLM prompt-response pairs and internal state transitions, while \textbf{INFO} logs track high-level operational events such as workflow entry, node completion, and subprocess execution. \textbf{WARNING} logs are reserved for non-fatal anomalies, such as low LLM confidence scores or active fallback mechanisms, and \textbf{ERROR} logs capture recoverable failures, including API timeouts or malformed user inputs requiring re-interaction.
 
-Log entries include contextual metadata such as workflow name, current node, and relevant state variables, enabling rapid debugging of complex multi-step executions.
-
-Additionally, the framework emits progress updates to the LangGraph API server, which can be consumed by frontend clients (e.g., Gradio UI, REST API consumers) for real-time status visualization.
+A specific architectural feature is the log interception mechanism: logs generated by critical nodes, such as training status or hardware configuration, are captured by a dedicated \texttt{QueueHandler} and streamed to the client using the \textbf{Newline Delimited JSON (NDJSON)} format. This allows frontend clients, such as the \textit{Gradio UI} or the \textbf{VS Code extension}, to provide immediate status visualization and progress bars, transforming a complex multi-step backend process into a transparent and interactive user experience.
 
 \subsection{Interactive IDE Integration: VS Code Extension}
 
@@ -164,20 +142,23 @@ To connect the MLOps orchestration with the developer's daily workflow, a custom
 
 \subsubsection{Client-Server Communication via FastAPI}
 
-The extension communicates with the LangGraph orchestrator through a lightweight \textbf{FastAPI backend} (\texttt{server.py}). This architectural choice provides several benefits:
-\begin{itemize}
-    \item \textbf{Asynchronous Event Streaming}: The server uses an \texttt{event\_generator} function that leverages Python's \texttt{asyncio} to stream graph events to the client in real-time. Each node execution in the graph triggers a JSON event containing progress updates, partial markdown responses, or routing decisions.
-    \item \textbf{Decoupled Execution}: The complex neural network computations and toolchain invocations run in a dedicated Python process, preventing the VS Code frontend from freezing during intensive tasks.
-    \item \textbf{API-Driven Extensibility}: The same backend can simultaneously serve multiple clients (CLI, Web UI, IDE), ensuring a consistent project state across different views.
-\end{itemize}
+The integration relies on a lightweight \textbf{FastAPI backend} (\texttt{server.py}) to mediate between the IDE extension and the LangGraph orchestrator.
+
+This decoupled approach ensures that resource-intensive tasks, such as neural network optimization or toolchain executions, run in a dedicated Python process, preventing the VS Code frontend from blocking during complex operations.
+
+Communication is handled through an \texttt{event\_generator} function using Python's \texttt{asyncio} to stream graph events incrementally. As each node executes, the server emits JSON packets containing progress updates, markdown responses, or routing decisions, which the extension parses to update the UI. This API-driven design also ensures extensibility, allowing the same backend to serve diverse clients, such as CLI tools or web interfaces, while maintaining a consistent system state.
 
 \subsubsection{VS Code Chat Participant API}
 
-The frontend is implemented using the \textbf{VS Code Chat Participant API}, which allows the assistant to participate in the native GitHub Copilot-style chat interface. The extension handles the following event stream logic:
-\begin{itemize}
-    \item \textbf{Progress Reporting}: Server-emitted \texttt{progress} events are rendered as real-time bullet points (e.g., \textit{"Routing to AI Flow..."}, \textit{"Downloading MobileNetV2..."}), providing the user with visibility into the assistant's internal reasoning steps.
-    \item \textbf{Markdown Rendering}: Final reports and intermediate task lists are streamed as Markdown, allowing for rich formatting, code blocks, and clickable file links.
-    \item \textbf{Cancellation Handling}: The extension propagates VS Code cancellation tokens to the Python server, allowing the backend to gracefully interrupt long-running LangGraph executions if the user closes the chat session.
-\end{itemize}
+The frontend is based on the \textbf{VS Code Chat Participant API}, which integrates the assistant directly into the native chat interface, similar to GitHub Copilot. Instead of providing static responses, the extension handles a dynamic event stream: \texttt{progress} events are rendered as real-time status updates (e.g., \textit{``Routing to AI Flow...''}), providing immediate feedback on active backend operations.
 
-By embedding the assistant within the IDE, the framework gains access to the local file system context, enabling features like automatic path resolution for \texttt{.ioc} files and direct opening of generated C source code upon completion of the integration workflow.
+Final reports and intermediate task lists are transmitted as \textbf{Markdown}, enabling the display of code blocks, tables, and clickable links to local files. A critical aspect of the integration is cancellation management: the extension propagates VS Code \textit{cancellation tokens} to the Python server, allowing the backend to terminate ongoing LangGraph executions if the user closes the session or cancels the request.
+
+As shown in Figure \ref{fig:vscode_chat}, these status updates provide the user with immediate operational transparency during long-running tasks. This deep integration within the IDE grants the framework access to the local file system context, simplifying operations such as automatic path resolution for \texttt{.ioc} files or direct opening of generated C source code upon completion of the integration workflow.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.9\textwidth]{chap3/figures/firmware_vsCode.png}
+    \caption{Interactive assistant interface within VS Code. The progress reporting shows real-time feedback from the LangGraph backend during the firmware generation workflow.}
+    \label{fig:vscode_chat}
+\end{figure}
