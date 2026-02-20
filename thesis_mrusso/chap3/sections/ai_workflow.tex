@@ -5,7 +5,7 @@ The AI Model Discovery workflow (Workflow 2) automates the selection, profiling,
 
 \subsection{Analysis Parameters Collection}
 
-The workflow begins by extracting critical deployment parameters from the user's natural language input using structured LLM extraction. The \texttt{collect\_analysis\_info()} node invokes an Ollama-based model (Mistral 7B) with a Pydantic schema to parse:
+The workflow begins by extracting critical deployment parameters from the user's natural language input using structured LLM extraction. The \texttt{collect\_analysis\_info()} node invokes a Triton-backed model (Mistral 7B) with a Pydantic schema to parse:
 
 \begin{itemize}
     \item \textbf{Target MCU}: The specific microcontroller family (e.g., \texttt{stm32h743}, \texttt{stm32f401}, \texttt{stm32u5}) that defines available hardware accelerators and memory profiles
@@ -17,7 +17,7 @@ Example extraction:
 \begin{lstlisting}[language=python, caption={Parameter extraction from user input}, label={lst:param_extraction}]
 # User: "I need a model for image classification on STM32H7 with high compression"
 
-llm_extractor = ChatOllama(model="mistral:latest").with_structured_output(AnalysisInfoExtraction)
+llm_extractor = ChatTriton(model="mistral").with_structured_output(AnalysisInfoExtraction)
 result = llm_extractor.invoke([
     SystemMessage(content=analysis_info_instructions),
     HumanMessage(content=state.message)
@@ -131,7 +131,7 @@ If GitHub search yields no results (e.g., for domain-specific tasks like audio k
 \begin{lstlisting}[language=python, caption={Google Search for pretrained models}, label={lst:google_search}]
 query = f"pretrained {task} model Keras .h5 STM32 edge AI"
 agent = Agent(
-    model=Ollama(id="qwen3:latest"),
+    model=ChatTriton(model="qwen3"),
     tools=[GoogleSearchTools()],
     instructions="Find downloadable .h5 Keras models suitable for embedded deployment"
 )
@@ -219,7 +219,7 @@ Generated artifacts include:
     \item \texttt{network\_config.h}: MCU-specific memory layout and hardware acceleration flags
 \end{itemize}
 
-Crucially, \textbf{quantization is applied during this generation phase} (via the \texttt{--compression} flag), not during training. This allows the framework to:
+Importantly, \textbf{quantization is applied during this generation phase} (via the \texttt{--compression} flag), not during training. This allows the framework to:
 \begin{enumerate}
     \item Discover and evaluate models in high-precision (FP32) format
     \item Dynamically select quantization level based on target MCU constraints

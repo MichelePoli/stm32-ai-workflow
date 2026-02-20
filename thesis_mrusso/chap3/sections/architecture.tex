@@ -1,7 +1,12 @@
 \section{System Architecture}
 \label{sec:architecture}
 
-The implemented framework follows a modular, graph-based architecture where autonomous agents orchestrate the entire MLOps pipeline through a stateful execution model. Unlike traditional linear scripts, the system utilizes \textbf{LangGraph} to define workflows as directed graphs with conditional routing, enabling complex multi-step processes with human oversight at critical decision points.
+The implemented framework follows a modular, graph-based architecture where autonomous agents orchestrate the entire MLOps pipeline through a stateful execution model. Unlike traditional linear scripts, the system utilizes \textbf{LangGraph} to define workflows as directed graphs with conditional routing, enabling complex multi-step processes with human oversight at decision points.
+
+\subsection{Containerized Deployment and GPU Decoupling}
+To ensure scalability and efficient resource management in a multi-user environment, the entire architecture is containerized using Docker. A major architectural shift from early development was the transition from local per-container inference engines (such as Ollama) to a centralized \textbf{NVIDIA Triton Inference Server}. 
+
+Running individual Ollama instances required locking a specific GPU for a single user throughout their session, preventing resource sharing. By decoupling the multi-agent pipeline from the inference engine, the user's LangGraph container requires only CPU and RAM. The Triton server acts as a centralized backend that receives requests via standardized APIs (compatible with the OpenAI format) and manages the GPU dynamically. This allows multiple LangChain instances to share resources simultaneously, drastically improving system scalability for future cluster deployments.
 
 \subsection{Master Orchestrator and State Machine}
 
@@ -34,11 +39,11 @@ The routing decision is performed by an LLM-based classifier that analyzes the u
 
 \begin{lstlisting}[language=Python, caption={LLM-based routing logic from graph.py}, label={lst:routing}]
 # From src/assistant/graph.py - route_request()
-llm_router = ChatOllama(model="mistral:latest").with_structured_output(RouteDecision)
+llm_router = ChatTriton(model="mistral").with_structured_output(RouteDecision)
 
 result = llm_router.invoke([
     SystemMessage(content=router_instructions),
-    HumanMessage(content=f"Richiesta: {state.message}")
+    HumanMessage(content=f"Request: {state.message}")
 ])
 
 state.route = result.route  # "firmware", "ai_analysis", "integration", or "web_research"
@@ -63,7 +68,7 @@ All workflow data is stored in a single \texttt{MasterState} object defined in \
     \item \textbf{Web Research}: Query history, search results, evaluation scores
 \end{itemize}
 
-This persistent state model enables \textbf{Context Chaining}, a critical architectural feature where outputs from upstream workflows (e.g., the specific MCU target selected during \texttt{firmware\_flow}) automatically populate the input context for downstream workflows (\texttt{ai\_flow}). This eliminates redundant user data entry and prevents configuration mismatches, such as selecting an AI model incompatible with the previously generated firmware board. The state object acts as a \textit{single source of truth}, synchronizing project parameters across heterogeneous toolchains (CubeMX, STEdgeAI, TensorFlow).
+This persistent state model enables \textbf{Context Chaining}, a key architectural feature where outputs from upstream workflows (e.g., the specific MCU target selected during \texttt{firmware\_flow}) automatically populate the input context for downstream workflows (\texttt{ai\_flow}). This eliminates redundant user data entry and prevents configuration mismatches, such as selecting an AI model incompatible with the previously generated firmware board. The state object acts as a \textit{single source of truth}, synchronizing project parameters across heterogeneous toolchains (CubeMX, STEdgeAI, TensorFlow).
 
 LangGraph automatically persists this state at every node transition through a checkpointing mechanism, enabling:
 
@@ -163,7 +168,7 @@ Additionally, the framework emits progress updates to the LangGraph API server, 
 
 \subsection{Interactive IDE Integration: VS Code Extension}
 
-To bridge the gap between complex MLOps orchestration and the developer's daily workflow, a custom \textbf{Visual Studio Code Extension} was developed to act as the primary interface for the assistant. This integration transforms the framework from a disconnected backend service into a real-time, context-aware companion integrated directly into the Integrated Development Environment (IDE).
+To connect the MLOps orchestration with the developer's daily workflow, a custom \textbf{Visual Studio Code Extension} acts as the primary interface for the assistant. This integration transforms the framework from a disconnected backend service into a real-time, context-aware companion embedded directly within the Integrated Development Environment (IDE), completely eliminating previous dependencies on external interfaces like LangSmith.
 
 \subsubsection{Client-Server Communication via FastAPI}
 

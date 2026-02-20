@@ -10,7 +10,7 @@ The \texttt{collect\_project\_info()} node extracts hardware specifications from
 \begin{lstlisting}[language=Python, caption={Firmware project info extraction}]
 # User: "Create a project for STM32F401 with STM32CubeIDE, name MyApp"
 
-llm_extractor = ChatOllama(model="mistral:latest").with_structured_output(ProjectInfoExtraction)
+llm_extractor = ChatTriton(model="mistral").with_structured_output(ProjectInfoExtraction)
 result = llm_extractor.invoke([
     SystemMessage(content=project_info_extraction_instructions),
     HumanMessage(content=state.message)
@@ -63,7 +63,7 @@ The agent maintains a repository of pre-validated \texttt{.ioc} templates, one f
 The automation logic was refined as follows:
 \begin{enumerate}
     \item \textbf{Template-Based Injection}: Instead of initializing a raw project, the agent identifies the matching template for the user's board.
-    \item \textbf{Lean Scripting}: The generated CubeMX script uses the \texttt{config load "<template.ioc>"} command directly. Crucially, by omitting the \texttt{load <MCU>} command, the tool skips the architectural negotiation phase and its associated interactive dialogs.
+    \item \textbf{Lean Scripting}: The generated CubeMX script uses the \texttt{config load "<template.ioc>"} command directly. Importantly, by omitting the \texttt{load <MCU>} command, the tool skips the architectural negotiation phase and its associated interactive dialogs.
     \item \textbf{Project Decoupling}: The \texttt{project name} and \texttt{project path} commands are then used to dynamically re-target the template to the specific user directory, ensuring that the final output is a clean, unique project while utilizing the pre-validated "silent" configuration.
 \end{enumerate}
 

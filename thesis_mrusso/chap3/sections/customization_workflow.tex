@@ -32,7 +32,7 @@ The system maintains a ChromaDB vectorstore indexed with documentation from:
     \item STMicroelectronics application notes on Edge AI optimization
 \end{itemize}
 
-Text is embedded using \texttt{OllamaEmbeddings} with the local \texttt{mistral} model and stored locally in \texttt{\textasciitilde/.cache/chroma\_db/architecture\_best\_practices}.
+Text is embedded using \texttt{TritonEmbeddings} with the local \texttt{nomic-embed} model and stored locally in \texttt{\textasciitilde/.cache/chroma\_db/architecture\_best\_practices}.
 
 \subsubsection{LLM-Generated Technical Guidance}
 \label{sec:llm_generation}
@@ -43,7 +43,7 @@ To ensure reliable access to best practices without dependence on external netwo
 # From workflow5_customization.py
 
 def _generate_and_cache_with_llm(model_name, arch_type):
-    llm = ChatOllama(model="mistral", temperature=0.3)
+    llm = ChatTriton(model="mistral", temperature=0.3)
     
     prompt = f"""
     You are an expert embedded AI engineer.
@@ -127,7 +127,7 @@ The \texttt{ask\_modification\_intent()} node uses a two-stage LLM interaction:
 A structured classifier determines whether the user wants to modify the model at all:
 
 \begin{lstlisting}[language=Python, caption={Modification intent detection}, label={lst:intent}]
-llm_intent = ChatOllama(model="mistral:latest").with_structured_output(ModificationDecision)
+llm_intent = ChatTriton(model="mistral").with_structured_output(ModificationDecision)
 
 result = llm_intent.invoke([
     SystemMessage(content=modification_decision_instructions),
@@ -146,7 +146,7 @@ If modifications are desired, a second LLM call extracts structured modification
 \begin{lstlisting}[language=Python, caption={Natural language → structured modification params}, label={lst:mod_extraction}]
 # User: "Freeze all layers except the last 5, add 30% dropout, use learning rate 1e-4"
 
-llm_extractor = ChatOllama(model="gpt-oss:20b").with_structured_output(ModelModification)
+llm_extractor = ChatTriton(model="mistral").with_structured_output(ModelModification)
 result = llm_extractor.invoke([
     SystemMessage(content=model_modification_instructions),
     HumanMessage(content=user_response)
@@ -328,23 +328,20 @@ This file implements a single training trial:
 
 To prevent GPU OOM errors when transitioning from LLM inference to NNI training, the system implements explicit resource cleanup:
 
-\begin{lstlisting}[language=Python, caption={Ollama model unloading before NNI}, label={lst:gpu_cleanup}]
-def force_unload_ollama(model_name: str = "gpt-oss:20b"):
+\begin{lstlisting}[language=Python, caption={Triton model unloading before NNI}, label={lst:gpu_cleanup}]
+def force_unload_triton(model_name: str = "mistral"):
     """
-    Force Ollama to unload the model from GPU to free up VRAM for TensorFlow/NNI.
-    Sends a request with keep_alive=0.
+    Force Triton to unload the model from GPU to free up VRAM for TensorFlow/NNI.
+    Sends a repository management request.
     """
-    url = "http://localhost:11434/api/generate"
-    data = {"model": model_name, "keep_alive": 0}
+    url = f"http://localhost:8000/v2/repository/models/{model_name}/unload"
     
-    req = urllib.request.Request(
-        url,
-        data=json.dumps(data).encode('utf-8'),
-        headers={'Content-Type': 'application/json'}
-    )
-    
-    with urllib.request.urlopen(req) as response:
-        logger.info(f"Ollama model '{model_name}' unloaded to free VRAM for NNI.")
+    req = urllib.request.Request(url, method='POST')
+    try:
+        with urllib.request.urlopen(req) as response:
+            logger.info(f"Triton model '{model_name}' unloaded to free VRAM for NNI.")
+    except Exception as e:
+        logger.error(f"Failed to unload Triton model: {e}")
 \end{lstlisting}
 
 This function is called in the \texttt{finally} block of \texttt{generate\_nni\_experiment()} to guarantee VRAM release even if code generation fails.
@@ -373,7 +370,7 @@ Algorithm~\ref{alg:nni_retrain} formalizes the complete NNI workflow including a
         \ENSURE Retrained best model saved to disk
         \STATE $experiment \gets \text{NNI\_Create}(\text{tuner}=\text{"TPE"}, S, N)$
         \STATE $experiment.\text{run}(\text{wait\_completion}=\text{true})$
-        \STATE \COMMENT{Extract best trial manually (robust API-agnostic method)}
+        \STATE \COMMENT{Extract best trial manually (stable API-agnostic method)}
         \STATE $trials \gets experiment.\text{list\_trial\_jobs}()$
         \STATE $valid\_trials \gets \{t \in trials \mid t.\text{status} = \text{"SUCCEEDED"}\}$
         \IF{$|valid\_trials| = 0$}

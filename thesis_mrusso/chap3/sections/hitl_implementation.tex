@@ -18,7 +18,7 @@ def decide_continue_to_ai(state, config):
     })
     
     # User responses are classified via LLM
-    llm_parser = ChatOllama(model="mistral:latest").with_structured_output(DecisionExtraction)
+    llm_parser = ChatTriton(model="mistral").with_structured_output(DecisionExtraction)
     result = llm_parser.invoke([
         SystemMessage(content=decision_extraction_instructions),
         HumanMessage(content=user_response)
@@ -100,7 +100,7 @@ When resuming after an interrupt:
     \item Resumes execution from next node in graph
 \end{enumerate}
 
-This architecture supports multi-hour workflows (e.g., overnight NNI experiments) with seamless resume capability.
+This architecture supports multi-hour workflows (e.g., overnight NNI experiments) with continuous resume capability.
 
 \subsection{Actionable Reporting and Synthetic Summaries}
 

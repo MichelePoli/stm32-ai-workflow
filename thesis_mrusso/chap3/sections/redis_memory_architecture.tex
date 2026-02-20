@@ -2,7 +2,7 @@
 \section{Redis Dual-Memory Architecture}
 \label{sec:redis_architecture}
 
-The framework utilizes a dual-layer memory system built on Redis, providing both transient workflow state persistence and long-term user context retention. This architecture is critical for supporting Human-in-the-Loop workflows and multi-session context chaining.
+The framework utilizes a dual-layer memory system built on Redis, providing both transient workflow state persistence and long-term user context retention. This architecture is essential for supporting Human-in-the-Loop workflows and multi-session context chaining.
 
 \subsection{Architectural Overview}
 
@@ -248,7 +248,7 @@ The dual-memory architecture enables powerful cross-session workflows:
 
 \subsection{HITL Resume Logic}
 
-The short-term memory checkpoint enables seamless Human-in-the-Loop workflows:
+The short-term memory checkpoint enables continuous Human-in-the-Loop workflows:
 
 \subsubsection{Interrupt Flow}
 
@@ -280,31 +280,13 @@ Checkpoint writes add latency (~5-20ms per node transition). Mitigations:
     \item \textbf{Batching}: LangGraph coalesces multiple state updates within a single node before writing
 \end{itemize}
 
-\subsubsection{Memory Footprint}
+\subsubsection{Memory Footprint and Evolution of Data Persistence}
 
-Large states (e.g., with embedded base64 images) can exceed Redis string size limits (512MB). Mitigations:
-\begin{itemize}
-    \item \textbf{File References}: Store large artifacts (models, datasets) on disk and reference paths in state
-    \item \textbf{Lazy Loading}: Only load \texttt{persistent\_context} fields when explicitly accessed
-\end{itemize}
+During early development, the system attempted to store large artifacts (such as generated firmware zips, serialized models, and base64 images) directly within the Redis state. However, this approach presented technical bottlenecks, as Redis string size limits and synchronization overhead slowed down the orchestration loop. 
 
-\subsection{Deployment and Scaling}
+To resolve this, the architectural design evolved toward a hybrid persistence model leveraging \textbf{Container Persistent Volumes}. Instead of using an intermediate database for heavy files, the system writes artifacts directly to persistent storage volumes mapped to individual container instances. This strategy perfectly aligns with a Cloud-Native architecture: in a future Kubernetes deployment, each user will operate within a dedicated namespace with dynamically provisioned PersistentVolumeClaims (PVCs). 
 
-\textbf{Development:} Single Redis instance on \texttt{localhost:6379}
-
-\textbf{Production:} Redis Cluster or Redis Sentinel for:
-\begin{itemize}
-    \item \textbf{High Availability}: Automatic failover if primary node crashes
-    \item \textbf{Horizontal Scaling}: Sharding checkpoints across multiple nodes
-    \item \textbf{Data Persistence}: \texttt{RDB} snapshots + \texttt{AOF} (Append-Only File) for durability
-\end{itemize}
-
-\textbf{Cloud Alternatives:}
-\begin{itemize}
-    \item \textbf{AWS ElastiCache (Redis)}: Managed Redis with automated backups
-    \item \textbf{Azure Cache for Redis}: Enterprise-grade Redis with geo-replication
-    \item \textbf{Upstash Redis}: Serverless Redis for low-cost deployments
-\end{itemize}
+Redis is now strictly limited to maintaining the lightweight conversational checkpointing of the LangGraph execution thread, while the storage of project files is handled natively by the file system. This simplifies the architecture, improves I/O performance, and guarantees environment isolation without relying on database abstractions.
 
 \subsection{Security Considerations}
 
