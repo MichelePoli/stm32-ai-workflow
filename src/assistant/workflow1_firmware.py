@@ -51,6 +51,10 @@ class ProjectInfoExtraction(BaseModel):
         default=None,
         description="Toolchain da usare (es: STM32CubeIDE, Keil, IAR)"
     )
+    peripheral_config: Optional[List[str]] = Field(
+        default_factory=list,
+        description="Lista di pin o periferiche da attivare (es: ['set_pin PA5 GPIO_Output', 'set_peripheral TIM1'])"
+    )
 
 project_info_extraction_instructions = """Sei un estrattore di informazioni per la configurazione di progetti STM32.
 
@@ -79,6 +83,8 @@ Rispondi SEMPRE in formato JSON valido, anche se alcuni campi sono null.
 **Note Speciali:**
 - Se l'utente dice "usa la precedente", "come l'altra volta", "quella di ieri", "usa il profilo" -> imposta `board_name` come "USE_PROFILE".
 - Altrimenti estrai i dati reali.
+- Se l'utente menziona pin o timer specifici, estraili come comandi CubeMX (es: "attiva il pin PA5 come output" -> "set_pin PA5 GPIO_Output", "usa il timer 1" -> "set_peripheral TIM1").
+- I file .ioc NON sono obbligatori se viene specificata la board.
 
 Esempi:
 - Input: "Crea un progetto per STM32F401 con CubeIDE, nome MyApp"
@@ -207,6 +213,8 @@ Esempio: "Crea progetto MyApp per STM32F401 con CubeIDE"
         if res.project_name: state.project_name = res.project_name
         if res.toolchain: state.toolchain = res.toolchain
         if res.ioc_file_path: state.ioc_file_path = res.ioc_file_path
+        if hasattr(res, 'peripheral_config') and res.peripheral_config:
+            state.peripheral_config = res.peripheral_config
 
 
     # --- Passo 2: Verifica e Interrupt ---
@@ -598,7 +606,22 @@ def generate_cubemx_script(state: MasterState, config: RunnableConfig = None) ->
     lines += [
         f"project name {state.project_name}",
         f'project toolchain "{state.toolchain}"',
-        f"project path {state.firmware_project_path}",
+        f"project path {state.firmware_project_path}"
+    ]
+
+    # Iniezione custom peripheral config
+    if hasattr(state, 'peripheral_config') and state.peripheral_config:
+        logger.info(f"🔧 Iniezione {len(state.peripheral_config)} comandi di configurazione periferiche")
+        for cmd in state.peripheral_config:
+            # Pulisci e normalizza comando
+            clean_cmd = cmd.strip()
+            # Accettiamo solo comandi sicuri/conosciuti
+            if not any(clean_cmd.startswith(prefix) for prefix in ["set_pin", "set_peripheral", "config"]):
+                logger.warning(f"⚠️  Comando periferica ignorato (formato non valido): {clean_cmd}")
+                continue
+            lines.append(clean_cmd)
+
+    lines += [
         "project generate",
         "exit"
     ]

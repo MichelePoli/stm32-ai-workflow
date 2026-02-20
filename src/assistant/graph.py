@@ -321,7 +321,8 @@ def route_request(state: MasterState, config: RunnableConfig = None) -> MasterSt
         logger.info(f"  Confidence: {result.confidence:.2f}")
         logger.info(f"  Reasoning: {result.reasoning}")
         
-        if result.confidence < 0.6:
+        confidence_threshold = 0.4 if result.route == "chat" else 0.6
+        if result.confidence < confidence_threshold:
             logger.warning(f"⚠️  Bassa confidence ({result.confidence:.2f}), richiedo clarify")
             state.route = "unknown"
         

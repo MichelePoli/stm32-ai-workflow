@@ -197,6 +197,9 @@ async def stream_chat(request: ChatRequest):
                                     prompt_msg = f"⏸️ **AZIONE RICHIESTA**:\n\n{value['instruction']}\n\n"
                                     if "suggestion" in value:
                                         prompt_msg += f"> 💡 {value['suggestion']}\n\n"
+                                    if "options" in value and isinstance(value["options"], dict):
+                                        for key, text in value["options"].items():
+                                            prompt_msg += f"* **{key}**: {text}\n"
                                     yield json.dumps({"type": "markdown", "content": prompt_msg}) + "\n"
                                 else:
                                     yield json.dumps({"type": "markdown", "content": "⏸️ In attesa di input dell'utente...\n\n"}) + "\n"
@@ -229,6 +232,10 @@ async def stream_chat(request: ChatRequest):
                                 "validate_customized_model": "✔️ Validazione modello customizzato",
                                 "save_customized_model_final": "💾 Salvataggio modello finale",
                                 "ask_continue_after_customization": "🔀 Continuare con analisi AI?",
+                                # Workflow 6 – synthetic data
+                                "ask_synthetic_data_requirements": "🧪 Requisiti dati sintetici",
+                                "generate_synthetic_samples": "⚙️ Generazione dati sintetici",
+                                "validate_synthetic_data": "✔️ Validazione dati sintetici",
                                 # Workflow 7 – dataset
                                 "decide_data_source": "🗄️ Sorgente dati",
                                 "select_predefined_dataset": "📊 Selezione dataset",
@@ -248,6 +255,11 @@ async def stream_chat(request: ChatRequest):
                                 "modify_main_c": "✏️ Modifica main.c",
                                 "verify_integration": "✔️ Verifica integrazione",
                                 "finalize_integration": "✅ Finalizzazione integrazione",
+                                # Workflow 4 – web search
+                                "classify_search": "🔀 Classificazione ricerca",
+                                "execute_web_search": "🌐 Esecuzione ricerca web",
+                                "summarize_search_results": "📝 Creazione riassunto",
+                                "finalize_search": "✅ Finalizzazione ricerca",
                                 # General chat
                                 "general_chat": "💬 Risposta chat",
                             }
