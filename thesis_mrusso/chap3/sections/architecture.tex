@@ -78,15 +78,7 @@ LangGraph automatically persists this state at every node transition through a c
     \item \textbf{Time-Travel Debugging}: Replay past executions to diagnose workflow errors
 \end{enumerate}
 
-The state persistence layer is implemented using \textbf{Redis}, a high-performance in-memory data store, chosen for its low latency and native support for asynchronous operations. The framework adopts a \textbf{Dual-Layer Memory Architecture}:
-
-\begin{enumerate}
-    \item \textbf{Short-Term Memory (Session State)}: Managed by LangGraph's checkpointer, this layer stores the transient state of the active workflow graph. It is keyed by a composite \texttt{thread\_id} (user\_id + session\_id) and allows for granular time-travel debugging and fault tolerance within a single conversation.
-
-    \item \textbf{Long-Term Memory (User Profile)}: A separate persistent store keyed by \texttt{user\_id}. This layer survives across sessions and retains critical context such as the user's preferred hardware board (\texttt{last\_board}), code generation style, and past project paths. This enables "Context Chaining" not just within a workflow, but across the entire lifecycle of the user's interaction with the system.
-\end{enumerate}
-
-The state is serialized as JSON and stored asynchronously in Redis, decoupling the persistence overhead from the real-time execution loop.
+A detailed analysis of the underlying storage infrastructure and the dual-layer memory management logic is provided in Section \ref{sec:redis_architecture}.
 
 \subsubsection{System Integrity and Transactional Registration}
 
