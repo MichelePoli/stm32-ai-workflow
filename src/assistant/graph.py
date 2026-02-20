@@ -292,6 +292,17 @@ def route_request(state: MasterState, config: RunnableConfig = None) -> MasterSt
         state.target = cfg.ai_target
         state.compression = cfg.ai_compression
         
+        # Sincronizza lo stato con la memoria a lungo termine se non già impostato
+        # All'inizio di ogni richiesta, sincronizza i dati del tuo profilo (come la board salvata) con le variabili di lavoro del grafo
+        if state.persistent_context:
+            if not state.board_name: 
+                state.board_name = state.persistent_context.get("board_name")
+                if state.board_name: logger.info(f"🔄 Board caricata da memoria: {state.board_name}")
+            if not state.mcu_series: 
+                state.mcu_series = state.persistent_context.get("mcu_series")
+            if not state.project_name:
+                state.project_name = state.persistent_context.get("project_name")
+        
         logger.info(f"✓ Configurazione caricata")
         
         # === ROUTING LLM ===
@@ -346,20 +357,31 @@ def general_chat(state: MasterState, config: RunnableConfig = None) -> MasterSta
             temperature=0.7 # Leggermente più alta per chat
         )
         
-        # Costruisci il prompt includendo la memoria storica
-        user_memory = json.dumps(state.persistent_context, indent=2) if state.persistent_context else "Nessuna informazione precedente disponibile."
+        # Costruisci un sommario della situazione attuale (memoria a breve + lungo termine)
+        session_info = {
+            "board_attuale": state.board_name or "Non ancora selezionata",
+            "mcu_serie": state.mcu_series or "Non rilevata",
+            "progetto_path": state.firmware_project_path or "Nessun progetto generato",
+            "modello_ai": state.selected_model.get("name") if state.selected_model else "Nessuno",
+            "ultimo_workflow": state.route,
+            "data_ultima_operazione": state.timestamp
+        }
         
-        instructions = f"""Sei l'Assistente AI per STM32. 
+        user_memory = json.dumps(state.persistent_context, indent=2) if state.persistent_context else "Nessuna info storica."
+        current_context = json.dumps(session_info, indent=2)
         
-        Ecco le INFORMAZIONI SUL CONTESTO UTENTE (usale per rispondere a domande come "cosa stavo facendo?" o "quale board uso?"):
-        {user_memory}
-        
-        ISTRUZIONI:
-        1. Se l'utente chiede informazioni sul suo passato o sul progetto attuale, USA ESPLICITAMENTE i dati nel JSON sopra.
-        2. Non inventare informazioni se non sono presenti nel contesto.
-        3. Rispondi in modo amichevole e professionale.
-        4. Parla sempre in ITALIANO.
-        """
+        instructions = f"""Sei l'Assistente AI ESPERTO per STM32. 
+
+REGOLE ESSENZIALI:
+1. RISPONDI SOLO all'ultima domanda dell'utente.
+2. NON generare mai 'User:', 'Assistant:' o riepiloghi di conversazione.
+3. Se non conosci informazioni sulla board o sul progetto dai dati sotto, chiedi all'utente.
+4. Rispondi in ITALIANO tecnico e conciso.
+
+DATI DI CONTESTO:
+- Memoria Storica: {user_memory}
+- Sessione Corrente: {current_context}
+"""
         
         logger.info(f"🧠 Context injected into Chat Prompt: {user_memory}")
         

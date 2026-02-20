@@ -97,7 +97,11 @@ async def stream_chat(request: ChatRequest):
     # 3. Definisci lo stato iniziale
     initial_state = {
         "message": last_user_message,
-        "persistent_context": user_profile
+        "persistent_context": user_profile,
+        "reset_profile": False, # Reset sticky flag
+        "user_response": "",
+        "response": "",
+        "route": ""
     }
     
     if request.context:
@@ -150,7 +154,11 @@ async def stream_chat(request: ChatRequest):
 
             if current_state.next and not is_workflow_trigger:
                 logger.info(f"🔄 Resuming thread {composite_thread_id} from interrupt")
-                await graph.aupdate_state(config, {"user_response": last_user_message}) 
+                await graph.aupdate_state(config, {
+                    "user_response": last_user_message,
+                    "reset_profile": False,
+                    "response": ""
+                }) 
                 stream_input = None
             else:
                 initial_state["user_response"] = ""
@@ -299,21 +307,27 @@ async def stream_chat(request: ChatRequest):
                 state = final_snapshot.values
                 is_finished = len(final_snapshot.next) == 0
                 
+                # Estraiamo i valori correnti dallo stato
                 new_profile = {
                     "board_name": state.get("board_name"),
                     "mcu_series": state.get("mcu_series"),
-                    "last_workflow": state.get("route"),
                     "last_model": state.get("selected_model"),
                     "last_project_path": state.get("firmware_project_path") or state.get("firmware_project_dir"),
+                    "last_workflow": state.get("route"),
                     "timestamp": state.get("timestamp")
                 }
-                new_profile = {k: v for k, v in new_profile.items() if v is not None}
+                
+                # Rimuovi solo i None e le stringhe vuote, ma mantieni tutto il resto (incluso F401)
+                new_profile = {k: v for k, v in new_profile.items() if v is not None and v != ""}
+                
+                # Unisci con il profilo esistente (nuovi valori vincono)
                 updated_profile = {**user_profile, **new_profile}
                 
                 if state.get("reset_profile"):
                     updated_profile = {}
                 
                 await redis_client.set(user_profile_key, json.dumps(updated_profile))
+                logger.info(f"💾 Profilo salvato per {request.user_id}: {json.dumps(updated_profile)}")
                 
                 if is_finished:
                     yield json.dumps({"type": "status", "event": "completed", "thread_id": composite_thread_id}) + "\n"

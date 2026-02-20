@@ -5,7 +5,7 @@ import platform
 import re
 import json
 import logging
-from typing import Optional, Literal
+from typing import Optional, Literal, List
 from datetime import datetime
 
 from pydantic import BaseModel, Field
@@ -260,6 +260,8 @@ Esempio: "Crea progetto MyApp per STM32F401 con CubeIDE"
         
         if res.project_name: state.project_name = res.project_name
         if res.toolchain: state.toolchain = res.toolchain
+        if hasattr(res, 'peripheral_config') and res.peripheral_config:
+            state.peripheral_config = res.peripheral_config
 
     # --- Passo 3: Finalizzazione ---
     if not state.board_name:

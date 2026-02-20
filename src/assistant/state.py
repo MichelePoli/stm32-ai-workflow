@@ -34,10 +34,10 @@ class MasterState:
     
     # === WORKFLOW 1: STM32 FIRMWARE GENERATION ===
     ioc_file_path: Optional[str] = None
-    board_name: Optional[str] = "STM32F401VCHx"
-    mcu_series: str = ""
-    project_name: str = "MySTM32Project"
-    toolchain: str = "STM32CubeIDE"
+    board_name: Optional[str] = None
+    mcu_series: Optional[str] = None
+    project_name: Optional[str] = None
+    toolchain: Optional[str] = None
     
     # Package Installation
     package_installation_success: bool = False
