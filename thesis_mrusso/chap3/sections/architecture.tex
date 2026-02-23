@@ -6,7 +6,11 @@ The implemented framework follows a modular, graph-based architecture where auto
 \subsection{Containerized Deployment and GPU Decoupling}
 To ensure scalability and efficient resource management in a multi-user environment, the entire architecture is containerized using Docker. A major architectural shift from early development was the transition from local per-container inference engines (such as Ollama) to a centralized \textbf{NVIDIA Triton Inference Server}.
 
-Running individual Ollama instances required locking a specific GPU for a single user throughout their session, preventing resource sharing. By decoupling the multi-agent pipeline from the inference engine, the user's LangGraph container requires only CPU and RAM. The Triton server acts as a centralized backend that receives requests via standardized APIs (compatible with the OpenAI format) and manages the GPU dynamically. This allows multiple LangChain instances to share resources simultaneously, drastically improving system scalability for future cluster deployments.
+Running individual Ollama instances required locking a specific GPU for a single user throughout their session, preventing resource sharing. By decoupling the multi-agent pipeline from the inference engine, the user's LangGraph container requires only CPU and RAM. The Triton server acts as a centralized backend that receives requests via standardized APIs and manages the GPU dynamically.
+
+To operate within limited hardware constraints, in particular the 16 GB VRAM capacity of the NVIDIA A4000 GPU used in testing, the system implements an \textbf{Explicit Model Control} strategy. By launching Triton with the \texttt{--model-control-mode=explicit} flag, the orchestrator prevents the automatic loading of all LLMs at startup, which would otherwise lead to immediate Out-of-Memory (OOM) errors.
+
+Instead, the custom \texttt{ChatTriton} client acts as a VRAM traffic controller, utilizing the Triton V2 Repository API (\texttt{/v2/repository/models/\{model\}/load} and \texttt{/unload}) to perform \textbf{Dynamic Model Swapping}. Before each inference task, the system unloads currently inactive heavy models and verifies the availability of CUDA context for the required model, ensuring that only one Large Language Model is resident in VRAM at any given time while maintaining shared system-wide access.
 
 \subsection{Master Orchestrator and State Machine}
 
@@ -90,7 +94,9 @@ Runtime parameters are managed through a dedicated \texttt{Configuration} class 
 
 In addition, the \textbf{LangGraph Runtime Config} enables the injection of per-request settings directly into each workflow node via the \texttt{config} parameter.
 
-The framework relies on several critical parameters to govern its behavior: \texttt{local\_llm} defines the language model identifier (defaulting to \texttt{mistral:latest}), while \texttt{llm\_temperature} balances deterministic routing ($0.0$) with creative code generation ($0.2$). The \texttt{llm\_context\_window} manages token limits (typically $4096$--$8192$), and \texttt{cubemx\_path} points to the absolute location of the STM32CubeMX CLI. For AI-specific workflows, the \texttt{ai\_target} specifies the target MCU (e.g., \texttt{stm32h743}), and \texttt{ai\_compression} sets the desired quantization level ranging from \texttt{low} to \texttt{very\_high}. All parameters are validated at runtime using \textbf{Pydantic validators}, ensuring that required paths exist and credentials are correctly formatted before the orchestrator initiates any workflow execution.
+The framework relies on several important parameters to govern its behavior: \texttt{local\_llm} defines the language model identifier (defaulting to \texttt{mistral:latest}), while \texttt{llm\_temperature} balances deterministic routing ($0.0$) with creative code generation ($0.2$). The \texttt{llm\_context\_window} manages token limits, typically $4096$--$8192$, and \texttt{cubemx\_path} points to the absolute location of the STM32CubeMX CLI. 
+
+For AI-specific workflows, the \texttt{ai\_target} specifies the target MCU (e.g., \texttt{stm32h743}), and \texttt{ai\_compression} sets the desired quantization level ranging from \texttt{low} to \texttt{very\_high}. All parameters are validated at runtime using \textbf{Pydantic validators}, to ensure that required paths exist and credentials are correctly formatted before the orchestrator starts any workflow execution.
 
 \subsection{Graph Topology and Node Composition}
 

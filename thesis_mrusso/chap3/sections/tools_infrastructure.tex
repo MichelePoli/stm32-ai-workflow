@@ -47,7 +47,11 @@ The insights gained from these local benchmarks (detailed in Section \ref{sec:ll
 
 \subsection{NVIDIA Triton Inference Server}
 
-In the final architecture, \textbf{NVIDIA Triton Inference Server} serves as the primary inference backend. By centralizing model execution, Triton allows for dynamic resource allocation and concurrent request batching, overcoming the single-user GPU locking limitations encountered with local per-container engines. The server provides standardized API endpoints (OpenAI-compatible) and manages the dynamic loading of the task-specific models identified during the prototyping phase.
+In the final architecture, \textbf{NVIDIA Triton Inference Server} serves as the primary inference backend. By centralizing model execution, Triton allows for dynamic resource allocation and concurrent request batching, overcoming the single-user GPU locking limitations encountered with local per-container engines. The server provides standardized API endpoints (OpenAI-compatible) and manages the dynamic loading of task-specific models.
+
+The efficiency of this centralized backend is further improved by the integration of \textbf{vLLM}, a high-throughput LLM serving engine that implements \textbf{PagedAttention}. This architecture addresses the management of \textbf{Video RAM (VRAM)}, the specialized high-bandwidth memory fundamental for Large Language Model (LLM) performance. 
+
+Traditional VRAM management for transformers often leads to memory fragmentation in the Key-Value (KV) cache, as large contiguous memory blocks are pre-allocated for possible maximum context lengths. By using PagedAttention, vLLM partitions the KV cache into small, non-contiguous physical pages, similar to virtual memory paging in operating systems. This strategy allows the framework to dynamically allocate memory as needed, substantially reducing fragmentation and allowing the processing of complex firmware code generation tasks with larger context windows on limited 16 GB VRAM hardware compared to standard inference backends.
 
 \subsection{STEdgeAI CLI}
 
