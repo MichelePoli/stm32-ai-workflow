@@ -5,14 +5,9 @@ The framework integrates multiple specialized tools to enable end-to-end MLOps a
 
 \subsection{Agno Framework for Agent Orchestration}
 
-Agno (\url{https://github.com/agno-agi/agno}) provides a lightweight agent framework with first-class tool support. The system uses Agno's pre-built tool kits:
+Agno (\url{https://github.com/agno-agi/agno}) provides a lightweight agent framework with first-class tool support. The system smoothly integrates several of Agno's solid pre-built tool kits to reliably expand the agents' capabilities. For primary web connectivity, it utilizes TavilyTools, an advanced search engine explicitly optimized for LLM consumption, alongside GoogleSearchTools for broad Custom Search Engine integration and DuckDuckGoTools to provide a privacy-focused alternative.
 
-\begin{itemize}
-    \item \textbf{TavilyTools}: Advanced web search optimized for LLM consumption
-    \item \textbf{ArxivTools}: Academic paper retrieval from arXiv repository
-    \item \textbf{GoogleSearchTools}: Google Custom Search Engine integration
-    \item \textbf{DuckDuckGoTools}: Privacy-focused web search
-\end{itemize}
+In addition, it strategically uses ArxivTools specifically to rapidly access and retrieve highly relevant academic machine learning papers directly from the arXiv repository.
 
 Agno agents execute tool-augmented reasoning loops transparently, logging all tool invocations for debugging.
 
@@ -21,10 +16,10 @@ Agno agents execute tool-augmented reasoning loops transparently, logging all to
 DeepEval (\url{https://github.com/confident-ai/deepeval}) implements the "LLM-as-a-Judge" paradigm for automated evaluation. The framework employs four core metrics:
 
 \begin{enumerate}
-    \item \textbf{Faithfulness}: $\frac{\text{Grounded Claims}}{\text{Total Claims}}$
-    \item \textbf{Answer Relevancy}: $\frac{\text{Relevant Statements}}{\text{Total Statements}}$
-    \item \textbf{Contextual Relevancy}: $\frac{\text{Useful Retrieved Docs}}{\text{Total Retrieved Docs}}$
-    \item \textbf{Hallucination}: $1 - \frac{\text{Contradicted/Unsupported Claims}}{\text{Total Claims}}$
+  \item \textbf{Faithfulness}: $\frac{\text{Grounded Claims}}{\text{Total Claims}}$
+  \item \textbf{Answer Relevancy}: $\frac{\text{Relevant Statements}}{\text{Total Statements}}$
+  \item \textbf{Contextual Relevancy}: $\frac{\text{Useful Retrieved Docs}}{\text{Total Retrieved Docs}}$
+  \item \textbf{Hallucination}: $1 - \frac{\text{Contradicted/Unsupported Claims}}{\text{Total Claims}}$
 \end{enumerate}
 
 Evaluation is performed using DeepSeek-R1 (chain-of-thought reasoning model) to maximize interpretability.
@@ -34,21 +29,19 @@ Evaluation is performed using DeepSeek-R1 (chain-of-thought reasoning model) to 
 ChromaDB (\url{https://www.trychroma.com/}) stores embedded documentation for RAG retrieval. Two vectorstores are maintained:
 
 \begin{itemize}
-    \item \textbf{Architecture Best Practices}: Transfer learning guides, optimization techniques
-    \item \textbf{STM32 Documentation}: Hardware constraints, peripheral configurations
+  \item \textbf{Architecture Best Practices}: Transfer learning guides, optimization techniques
+  \item \textbf{STM32 Documentation}: Hardware constraints, peripheral configurations
 \end{itemize}
 
 Embeddings are generated using \texttt{all-MiniLM-L6-v2} (384-dimensional vectors).
 
 \subsection{Ollama: Developmental Inference and Benchmarking}
 
-During the initial development and model-characterization phase, \textbf{Ollama} (\url{https://ollama.com}) was used to host and evaluate candidate language models locally. This setup provided several advantages for prototyping:
+During the initial development and model-characterization phase, \textbf{Ollama} (\url{https://ollama.com}) was used to host and evaluate candidate language models locally. This setup provided several distinct advantages specifically tailored for rapid prototyping. Primarily, it guaranteed strict data privacy by completely eliminating the need for external API calls when processing sensitive embedded source code or proprietary datasets.
 
-\begin{itemize}
-    \item \textbf{Privacy}: No external API calls for sensitive code/data
-    \item \textbf{Latency Predictability}: Local inference without network dependency
-    \item \textbf{Cost Control}: No per-token charges for experimentation
-\end{itemize}
+Also, it offered high latency predictability by forcefully executing all model inference entirely on-device, entirely free from external web network bottlenecks.
+
+Finally, it inherently provided strict localized cost control, allowing for unbounded daily experimentation without accumulating any per-token charges.
 
 The insights gained from these local benchmarks (detailed in Section \ref{sec:llm_selection}) guided the final selection of models for the production environment.
 
@@ -68,12 +61,8 @@ stedgeai generate --model <model.h5> --compression <high>
 
 Generates optimized C code compatible with X-CUBE-AI runtime library (v9.x).
 
-Microsoft's hyperparameter optimization framework (\url{https://nni.readthedocs.io}). The framework generates NNI experiment code programmatically rather than using NNI's built-in YAML configuration, allowing for:
+Microsoft's hyperparameter optimization framework (\url{https://nni.readthedocs.io}). The framework intelligently generates all NNI experiment code programmatically rather than relying on NNI's built-in static YAML configuration parsing. This dynamic execution strategy explicitly enables on-the-fly search space construction deeply tailored to the exact specifications of the Keras model architecture under automated optimization.
 
-\begin{itemize}
-    \item Dynamic search space construction based on model architecture
-    \item Custom trial logic (memory optimization, adaptive layer replacement)
-    \item Programmatic best-trial extraction and auto-retrain
-\end{itemize}
+Also, it directly allows for the smooth embedding of custom trial logic, such as aggressive memory footprint optimization techniques and adaptive layer replacement mechanisms, while simultaneously facilitating programmatic execution for optimal best-trial extraction and immediate autonomous retraining.
 
 Supported tuners include: TPE (Tree-structured Parzen Estimator), Random Search, Grid Search, and SMAC.

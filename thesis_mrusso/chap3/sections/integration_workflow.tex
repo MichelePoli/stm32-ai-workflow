@@ -19,12 +19,7 @@ The generated \texttt{network.c/h} files from STEdgeAI are copied into the firmw
 \-- CMakeLists.txt  <- Modified to include AI sources
 \end{verbatim}
 
-The \texttt{CMakeLists.txt} is automatically updated to:
-\begin{enumerate}
-    \item Add \texttt{network.c} to \texttt{add\_executable()}
-    \item Include X-CUBE-AI header paths
-    \item Link against \texttt{libai\_runtime.a}
-\end{enumerate}
+The \texttt{CMakeLists.txt} is automatically updated to integrate these new components by adding the \texttt{network.c} file to the \texttt{add\_executable()} directive, including the necessary X-CUBE-AI header paths, and explicitly linking the project against the \texttt{libai\_runtime.a} static library.
 
 \subsection{Application Code Template}
 

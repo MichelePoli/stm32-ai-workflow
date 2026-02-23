@@ -1,24 +1,17 @@
 \section{Neural Network Customization and NNI Code Generation}
 \label{sec:customization}
 
-Once a base model has been discovered and profiled, users may require architectural modifications to meet specific project constraints or improve performance for their target task. Workflow 5 implements an autonomous customization pipeline that combines \textit{RAG-enhanced best practice retrieval}, \textit{natural language intent parsing}, and \textit{LLM-driven code generation} to produce executable NNI hyperparameter optimization experiments without manual scripting.
+Once a base model has been discovered and profiled, users may require architectural modifications to meet specific project constraints or improve performance for their target task. Workflow 5 implements an autonomous customization pipeline that combines \textit{RAG-improved best practice retrieval}, \textit{natural language intent parsing}, and \textit{LLM-driven code generation} to produce executable NNI hyperparameter optimization experiments without manual scripting.
 
 \subsection{Model Architecture Inspection}
 
-The customization workflow begins with detailed introspection of the downloaded model file via the \texttt{inspect\_model\_architecture()} node. This analysis extracts:
-
-\begin{itemize}
-    \item \textbf{Layer-by-layer architecture}: Type (Conv2D, Dense, Dropout), parameters, output shapes
-    \item \textbf{Input/output specifications}: Expected tensor shapes and data types
-    \item \textbf{Trainable parameter count}: Used to estimate fine-tuning memory requirements
-    \item \textbf{Framework version}: Keras 2.x vs 3.x for compatibility routing
-\end{itemize}
+The customization workflow begins with detailed introspection of the downloaded model file via the \texttt{inspect\_model\_architecture()} node. This analysis extracts several key features, including the layer-by-layer architectural details such as layer types (Conv2D, Dense, Dropout), their parameters, and output shapes. It also identifies the expected input and output tensor shapes along with their data types, calculates the total trainable parameter count to accurately estimate fine-tuning memory requirements, and detects the framework version (for example, Keras 2.x versus Keras 3.x) to ensure proper compatibility routing.
 
 For Keras 2.x models incompatible with the primary environment, inspection is delegated to the legacy \texttt{stm32\_legacy} subprocess (see Section~\ref{sec:ai_workflow}).
 
 The extracted architecture is formatted as a human-readable summary and presented to the user, enabling informed decision-making on which layers to freeze, which to replace, and where to introduce regularization.
 
-\subsection{RAG-Enhanced Modification Planning}
+\subsection{RAG-Improved Modification Planning}
 
 Before soliciting user modifications, the system proactively retrieves best practices tailored to the specific model architecture via the \texttt{retrieve\_best\_practices\_for\_architecture()} function:
 
@@ -27,9 +20,9 @@ Before soliciting user modifications, the system proactively retrieves best prac
 The system maintains a ChromaDB vectorstore indexed with documentation from:
 
 \begin{itemize}
-    \item Official Keras/TensorFlow guides on transfer learning
-    \item Academic papers on efficient fine-tuning techniques (LoRA, adapter layers, etc.)
-    \item STMicroelectronics application notes on Edge AI optimization
+  \item Official Keras/TensorFlow guides on transfer learning
+  \item Academic papers on efficient fine-tuning techniques (LoRA, adapter layers, etc.)
+  \item STMicroelectronics application notes on Edge AI optimization
 \end{itemize}
 
 Text is embedded using \texttt{TritonEmbeddings} with the local \texttt{nomic-embed} model and stored locally in \texttt{\textasciitilde/.cache/chroma\_db/architecture\_best\_practices}.
@@ -64,58 +57,52 @@ def _generate_and_cache_with_llm(model_name, arch_type):
     save_to_vectorstore(content, arch_type)
 \end{lstlisting}
 
-This approach provides three key advantages:
-\begin{enumerate}
-    \item \textbf{Deterministic Availability}: Eliminates ``403 Forbidden'' and timeout errors common with web scrapers.
-    \item \textbf{Structured Consistency}: Enforces a strict checklist format (Strategy, Hyperparameters, Quantization) that is easier for the user to parse than unstructured HTML.
-    \item \textbf{Search Efficiency}: First-run generation takes \textasciitilde15 seconds; subsequent retrievals are instantaneous via the vector cache.
-\end{enumerate}
+This generative approach provides three key advantages. 
+
+First, it ensures deterministic availability by eliminating the ``403 Forbidden'' and timeout errors commonly associated with web scrapers. 
+
+Second, it guarantees structured consistency by enforcing a strict, easily parsable checklist format covering strategy, hyperparameters, and quantization details instead of relying on unpredictable, unstructured HTML. 
+
+Finally, it maximizes search efficiency; while the initial generation may take approximately 15 seconds, all subsequent retrievals are instantaneous thanks to the local vector cache.
 
 \subsubsection{LLM Synthesis}
 
-The top-5 most relevant documents (by cosine similarity) are passed to an LLM along with the user's architecture description. The LLM synthesizes a concise recommendation covering:
-
-\begin{itemize}
-    \item Which layers to freeze (e.g., "Freeze first 80\% of convolutional backbone for feature extraction stability")
-    \item Suitable dropout rates based on dataset size
-    \item Recommended learning rate ranges for the optimizer
-    \item Warnings about potential overfitting risks
-\end{itemize}
+The top-five most relevant documents, ranked by cosine similarity, are passed to the language model alongside the user's specific architecture description. The LLM then synthesizes a concise recommendation covering critical aspects such as exactly which layers to freeze (e.g., suggesting to freeze the first 80\% of a convolutional backbone to ensure feature extraction stability), the most suitable dropout rates based on the available dataset size, the recommended learning rate ranges for the optimizer, and targeted warnings regarding potential overfitting risks.
 
 This proactive guidance reduces user cognitive load and improves first-attempt success rate for fine-tuning.
 
 Algorithm~\ref{alg:rag_multiquery} formalizes the complete RAG retrieval process with iterative reflection and web search augmentation.
 
 \begin{algorithm}[H]
-    \caption{RAG Multi-Query Retrieval with Iterative Reflection}
-    \label{alg:rag_multiquery}
-    \begin{algorithmic}[1]
-        \REQUIRE Model architecture $A$, vectorstore $V$, max loops $L = 3$
-        \ENSURE Best practices document $D$
-        \STATE $queries \gets \text{LLM\_Generate\_Queries}(A)$ \COMMENT{Generate 6 diverse queries}
-        \STATE $ranked\_queries \gets \text{LLM\_Rank\_Queries}(queries, A)$
-        \STATE $context \gets \text{""}$
-        \FOR{$i \gets 1$ to $|ranked\_queries|$}
-        \STATE $weight \gets 1.0 - (i-1) \times 0.05$
-        \STATE $docs \gets V.\text{retrieve}(ranked\_queries[i], k=20)$
-        \FOR{each $doc \in docs$}
-        \STATE $context \gets context + f"\text{Query } i - \text{weight } weight: doc.\text{content}[0:600]"$
-        \ENDFOR
-        \ENDFOR
-        \STATE $summary \gets \text{LLM\_Summarize}(context, A)$
-        \STATE $iteration \gets 0$
-        \WHILE{$iteration < L$}
-        \STATE $gaps \gets \text{LLM\_Reflect}(summary, A)$ \COMMENT{Identify knowledge gaps}
-        \IF{$gaps = \text{null}$}
-        \RETURN $summary$
-        \ENDIF
-        \STATE $followup\_query \gets \text{LLM\_Generate\_Followup}(gaps)$
-        \STATE $new\_docs \gets V.\text{retrieve}(followup\_query, k=10)$
-        \STATE $summary \gets \text{LLM\_Extend}(summary, new\_docs)$
-        \STATE $iteration \gets iteration + 1$
-        \ENDWHILE
-        \RETURN $summary$
-    \end{algorithmic}
+  \caption{RAG Multi-Query Retrieval with Iterative Reflection}
+  \label{alg:rag_multiquery}
+  \begin{algorithmic}[1]
+    \REQUIRE Model architecture $A$, vectorstore $V$, max loops $L = 3$
+    \ENSURE Best practices document $D$
+    \STATE $queries \gets \text{LLM\_Generate\_Queries}(A)$ \COMMENT{Generate 6 diverse queries}
+    \STATE $ranked\_queries \gets \text{LLM\_Rank\_Queries}(queries, A)$
+    \STATE $context \gets \text{""}$
+    \FOR{$i \gets 1$ to $|ranked\_queries|$}
+    \STATE $weight \gets 1.0 - (i-1) \times 0.05$
+    \STATE $docs \gets V.\text{retrieve}(ranked\_queries[i], k=20)$
+    \FOR{each $doc \in docs$}
+    \STATE $context \gets context + f"\text{Query } i - \text{weight } weight: doc.\text{content}[0:600]"$
+    \ENDFOR
+    \ENDFOR
+    \STATE $summary \gets \text{LLM\_Summarize}(context, A)$
+    \STATE $iteration \gets 0$
+    \WHILE{$iteration < L$}
+    \STATE $gaps \gets \text{LLM\_Reflect}(summary, A)$ \COMMENT{Identify knowledge gaps}
+    \IF{$gaps = \text{null}$}
+    \RETURN $summary$
+    \ENDIF
+    \STATE $followup\_query \gets \text{LLM\_Generate\_Followup}(gaps)$
+    \STATE $new\_docs \gets V.\text{retrieve}(followup\_query, k=10)$
+    \STATE $summary \gets \text{LLM\_Extend}(summary, new\_docs)$
+    \STATE $iteration \gets iteration + 1$
+    \ENDWHILE
+    \RETURN $summary$
+  \end{algorithmic}
 \end{algorithm}
 
 \subsection{Modification Intent Classification}
@@ -165,62 +152,45 @@ result = llm_extractor.invoke([
 
 Supported modifications include:
 \begin{itemize}
-    \item \texttt{freeze\_layers}: "all", "none", "first\_N", "all\_except\_last\_N", "custom"
-    \item \texttt{num\_classes}: Replace output layer for different classification tasks
-    \item \texttt{dropout\_rate}: Add dropout regularization (0.0–0.8)
-    \item \texttt{learning\_rate}: Override default optimizer LR
-    \item \texttt{additional\_layers}: Specify custom layers (e.g., "BatchNormalization", "GlobalAveragePooling2D")
+  \item \texttt{freeze\_layers}: "all", "none", "first\_N", "all\_except\_last\_N", "custom"
+  \item \texttt{num\_classes}: Replace output layer for different classification tasks
+  \item \texttt{dropout\_rate}: Add dropout regularization (0.0–0.8)
+  \item \texttt{learning\_rate}: Override default optimizer LR
+  \item \texttt{additional\_layers}: Specify custom layers (e.g., "BatchNormalization", "GlobalAveragePooling2D")
 \end{itemize}
 
 \subsection{Standard Fine-Tuning Path}
 \label{sec:standard_fine_tuning}
 
-While NNI provides comprehensive hyperparameter optimization, users often require a faster, single-trial training session for rapid verification. Workflow 5 implements a ``Standard Fine-Tuning'' path (\texttt{fine\_tune\_customized\_model}) that prioritizes rapid feedback and resource-aware stability.
+While NNI provides detailed hyperparameter optimization, users often require a faster, single-trial training session for rapid verification. Workflow 5 implements a ``Standard Fine-Tuning'' path (\texttt{fine\_tune\_customized\_model}) that prioritizes rapid feedback and resource-aware stability.
 
 \subsubsection{Anti-Overfitting Logic}
 
-Large pre-trained models (e.g., MobileNetV2) are prone to catastrophic forgetting and overfitting when applied to small or specialized datasets like Fruit-360. To mitigate this, the system applies three automated strategies:
+Large pre-trained models (e.g., MobileNetV2) are highly prone to catastrophic forgetting and severe overfitting when applied to small or specialized datasets like Fruit-360. To effectively mitigate this, the system applies three automated strategies. 
 
-\begin{itemize}
-    \item \textbf{Dynamic Sampling Escalation}: Instead of training on the full dataset (which might lead to OOM or excessive latency), the system employs a capped sampling strategy (5000 images). This ensures a balanced representation across classes while maintaining execution speed.
-    \item \textbf{Proactive Regularization}: The system automatically inserts a \texttt{Dropout} layer (default rate 0.3) during the final layer replacement phase. This rate is dynamic; if the user specifies a custom value (e.g., 0.4) in their natural language intent, the system prioritizes the explicit instruction over the safety default.
-    \item \textbf{Epoch Capping}: Standard runs are capped at 10 epochs to provide a quick ``sanity check'' before expensive optimization loops are triggered.
-\end{itemize}
+First, it employs a dynamic sampling escalation strategy that caps dataset usage (e.g., at 5000 images) to balance class representation while preventing memory exhaustion and excessive latency. 
+
+Second, the system proactively inserts a regularization \texttt{Dropout} layer (with a default rate of 0.3) during the final layer replacement phase; importantly, if the user explicitly specifies a custom dropout rate in their natural language prompt, the system overrides the safety default in favor of the user's instruction. Lastly, the system implements epoch capping, strictly limiting standard training runs to 10 epochs to act as a rapid ``sanity check'' before triggering any computationally expensive optimization loops.
 
 \subsubsection{Real-time Observability and Fault Tolerance}
 
-To bridge the gap between headless subprocesses and the interactive agent web UI, the fine-tuning execution engine provides high-fidelity logging:
+To effectively connect between headless background subprocesses and the interactive agent web UI, the fine-tuning execution engine provides high-fidelity, real-time observability. It utilizes asynchronous log streaming via \texttt{subprocess.Popen} with non-blocking pipe selection to instantly stream training metrics, such as epochs, loss, and accuracy, directly to the user's console. To maintain stability, the engine features adaptive timeouts, intelligently adjusting the maximum allowed execution window (e.g., 1200s) based on the model's complexity and the estimated dataset size. 
 
-\begin{itemize}
-    \item \textbf{Asynchronous Log Streaming}: Using \texttt{subprocess.Popen} with non-blocking pipe selection, training logs (epochs, loss, accuracy) are streamed in real-time to the user's console.
-    \item \textbf{Adaptive Timeouts}: The execution window is dynamically adjusted (e.g., 1200s) based on the estimated dataset size and model complexity to prevent premature termination.
-    \item \textbf{Class Mismatch Rescue}: If the dataset contains a different number of classes than the pre-trained model (e.g., 132 vs 1000), the system automatically performs an architectural surgery by replacing the final \texttt{Dense} layer and adjusting the output tensor shape before commencing training.
-\end{itemize}
+Also, the system includes a class mismatch rescue mechanism; if it detects that the loaded dataset contains a different number of classes than the pre-trained model (for instance, 132 versus 1000), it automatically performs an architectural adjustment by replacing the final \texttt{Dense} layer and dynamically resizing the output tensor before commencing any training.
 
 \subsection{NNI Code Generation: Architecture and Prompt Engineering}
 
-The core technical contribution of this workflow is the \textit{autonomous generation of complete NNI experiment code} from high-level specifications. Unlike template-based code generators that rely on rigid fill-in-the-blank patterns, this system employs a large language model (GPT-OSS:20b with 8192 context window) to synthesize production-ready Python scripts capable of handling edge cases such as:
+The core technical contribution of this workflow is the \textit{autonomous generation of complete NNI experiment code} from high-level specifications. Unlike rigid, template-based code generators that rely on simple fill-in-the-blank patterns, this system employs a large language model (GPT-OSS:20b with an 8192-token context window) to dynamically synthesize production-ready Python scripts. These scripts are solid enough to handle complex edge cases such as sparse versus categorical label formats, input shape mismatches requiring dynamic image resizing, and class count discrepancies between the base model and the target dataset. 
 
-\begin{itemize}
-    \item Sparse vs. categorical label formats
-    \item Input shape mismatches requiring dynamic resizing
-    \item Class count discrepancies between model and dataset
-    \item Memory constraints on consumer hardware (dataset subsetting, mmap loading)
-    \item Port conflicts for NNI Web UI
-    \item Missing NNI API methods across versions (reliable fallbacks)
-\end{itemize}
+Also, the generated code gracefully manages memory constraints on consumer hardware through dataset subsetting and memory-mapping, resolves port conflicts for the NNI Web UI, and implements reliable fallbacks for missing NNI API methods across different library versions.
 
 \subsubsection{Prompt Engineering Strategy}
 
-The \texttt{generate\_nni\_experiment()} function in \texttt{nni\_optimization/generator.py} constructs a \textasciitilde480-line prompt that embeds:
+The \texttt{generate\_nni\_experiment()} function in \texttt{nni\_optimization/generator.py} constructs a highly detailed, 480-line prompt designed to ensure accurate generation. The prompt heavily features context injection, providing the LLM with exact model metadata (such as name, tensor shapes, layer count, and file path) along with detailed dataset specifications. It enforces explicit constraints, strictly prohibiting the use of placeholder paths, the omission of required files, and the hallucination of non-existent API methods. To guide the output structure, the prompt includes detailed working code templates for both \texttt{manager.py} and \texttt{trial.py}, annotated with inline comments that explain computationally critical sections. 
 
-\begin{enumerate}
-    \item \textbf{Context Injection}: Model metadata (name, input/output shapes, layer count, file path) and dataset metadata (path, shape, num\_classes, source format)
-    \item \textbf{Explicit Constraints}: Prohibitions against placeholder paths, hallucinated API methods, and file omissions
-    \item \textbf{Working Code Templates}: Full \texttt{manager.py} and \texttt{trial.py} examples with inline comments explaining each critical section
-    \item \textbf{Error Prevention Rules}: Specific warnings about NNI API inconsistencies (e.g., \texttt{experiment.get\_best\_trial()} does not exist in some versions)
-    \item \textbf{Output Format Specification}: Enforced use of \texttt{\# FILE:} markers for multi-file generation
-\end{enumerate}
+Also, it embeds specific error prevention rules regarding known NNI API inconsistencies (for example, explicitly warning that \texttt{experiment.get\_best\_trial()} does not exist in certain versions). 
+
+Finally, it mandates a strict output format specification, requiring the LLM to use explicit \texttt{\# FILE:} markers to successfully generate multi-file outputs.
 
 A representative excerpt from the prompt:
 
@@ -282,12 +252,7 @@ for i, match in enumerate(file_matches):
 # Result: {"manager.py": "import nni\n...", "trial.py": "import sys\n..."}
 \end{lstlisting}
 
-The parser handles variations in LLM output:
-\begin{itemize}
-    \item Optional spaces after \texttt{\#} or \texttt{FILE:}
-    \item Markdown code fences inside file content (\texttt{```python ... ```})
-    \item Trailing comments after filename
-\end{itemize}
+The parser is intentionally designed to robustly handle common minor variations in the LLM's raw output string. It effectively ignores optional spacing around the hash or \texttt{FILE:} markers, securely strips away any markdown code fences (like \texttt{```python}) that might wrap the file content, and correctly identifies and discards trailing comments mistakenly appended after the filename.
 
 If no markers are found, the entire output is saved as \texttt{main.py} (fallback for single-file tasks).
 
@@ -299,29 +264,29 @@ The typical output structure for an NNI experiment:
 This file orchestrates the entire hyperparameter search:
 
 \begin{itemize}
-    \item \textbf{Environment Setup}: Fixes CUDA library paths for Conda environments (lines 192-196)
-    \item \textbf{Search Space Definition}: Defines hyperparameter ranges (learning\_rate, batch\_size, optimizer, freeze\_backbone)
-    \item \textbf{Experiment Configuration}: Sets tuner (TPE/Random), max trials, trial concurrency, GPU usage
-    \item \textbf{Port Hunting}: Scans for free ports (8080–8100) to avoid conflicts (lines 226-235)
-    \item \textbf{Experiment Execution}: Launches trials with \texttt{experiment.run(wait\_completion=True)}
-    \item \textbf{Best Trial Extraction}: Manually iterates \texttt{experiment.list\_trial\_jobs()} to find highest-accuracy trial (lines 244-253)
-    \item \textbf{Auto-Retrain}: Re-runs \texttt{trial.py} with best hyperparameters in \texttt{RETRAIN\_MODE} to save final model
+  \item \textbf{Environment Setup}: Fixes CUDA library paths for Conda environments (lines 192-196)
+  \item \textbf{Search Space Definition}: Defines hyperparameter ranges (learning\_rate, batch\_size, optimizer, freeze\_backbone)
+  \item \textbf{Experiment Configuration}: Sets tuner (TPE/Random), max trials, trial concurrency, GPU usage
+  \item \textbf{Port Hunting}: Scans for free ports (8080–8100) to avoid conflicts (lines 226-235)
+  \item \textbf{Experiment Execution}: Launches trials with \texttt{experiment.run(wait\_completion=True)}
+  \item \textbf{Best Trial Extraction}: Manually iterates \texttt{experiment.list\_trial\_jobs()} to find highest-accuracy trial (lines 244-253)
+  \item \textbf{Auto-Retrain}: Re-runs \texttt{trial.py} with best hyperparameters in \texttt{RETRAIN\_MODE} to save final model
 \end{itemize}
 
 \paragraph{\texttt{trial.py}}
 This file implements a single training trial:
 
 \begin{itemize}
-    \item \textbf{Mode Detection}: Checks \texttt{RETRAIN\_MODE} environment variable to determine behavior
-    \item \textbf{Parameter Loading}: Retrieves hyperparameters from NNI API or environment variable
-    \item \textbf{Data Loading}: Memory-mapped NumPy array loading (\texttt{mmap\_mode='r'}) to avoid RAM exhaustion
-    \item \textbf{Dataset Subsetting}: Uses only 50\% of data to fit in consumer RAM (lines 373-381)
-    \item \textbf{Label Format Fix}: Detects sparse labels (shape \texttt{(N, 1)}) and converts to categorical (one-hot)
-    \item \textbf{Adaptive Output Layer}: Replaces final Dense layer if class count mismatches (lines 400-408)
-    \item \textbf{Transfer Learning Logic}: Freezes backbone layers if \texttt{freeze\_backbone = True}
-    \item \textbf{Dynamic Preprocessing}: Resizes input images to match model's expected shape via TensorFlow Dataset API
-    \item \textbf{Data Augmentation}: Applies random flips, rotations, zoom during training
-    \item \textbf{Result Reporting}: Sends \texttt{val\_accuracy} to NNI or saves \texttt{best\_model.h5} (retrain mode)
+  \item \textbf{Mode Detection}: Checks \texttt{RETRAIN\_MODE} environment variable to determine behavior
+  \item \textbf{Parameter Loading}: Retrieves hyperparameters from NNI API or environment variable
+  \item \textbf{Data Loading}: Memory-mapped NumPy array loading (\texttt{mmap\_mode='r'}) to avoid RAM exhaustion
+  \item \textbf{Dataset Subsetting}: Uses only 50\% of data to fit in consumer RAM (lines 373-381)
+  \item \textbf{Label Format Fix}: Detects sparse labels (shape \texttt{(N, 1)}) and converts to categorical (one-hot)
+  \item \textbf{Adaptive Output Layer}: Replaces final Dense layer if class count mismatches (lines 400-408)
+  \item \textbf{Transfer Learning Logic}: Freezes backbone layers if \texttt{freeze\_backbone = True}
+  \item \textbf{Dynamic Preprocessing}: Resizes input images to match model's expected shape via TensorFlow Dataset API
+  \item \textbf{Data Augmentation}: Applies random flips, rotations, zoom during training
+  \item \textbf{Result Reporting}: Sends \texttt{val\_accuracy} to NNI or saves \texttt{best\_model.h5} (retrain mode)
 \end{itemize}
 
 \subsubsection{Memory Management and GPU Offloading}
@@ -351,11 +316,11 @@ This function is called in the \texttt{finally} block of \texttt{generate\_nni\_
 Once the NNI scripts are generated and saved to \texttt{./nni\_experiment/}, the \texttt{optimize\_hyperparameters\_with\_nni()} function executes them:
 
 \begin{enumerate}
-    \item \textbf{Validation}: Checks that both \texttt{manager.py} and \texttt{trial.py} exist and are syntactically valid Python
-    \item \textbf{Subprocess Launch}: Spawns \texttt{python manager.py} in a separate process to avoid blocking the LangGraph event loop
-    \item \textbf{Output Streaming}: Captures stdout/stderr in real-time for user feedback
-    \item \textbf{Completion Detection}: Waits for subprocess termination (blocking until experiment finishes)
-    \item \textbf{Model Retrieval}: Locates \texttt{best\_model.h5} in the NNI output directory and stores path in state
+  \item \textbf{Validation}: Checks that both \texttt{manager.py} and \texttt{trial.py} exist and are syntactically valid Python
+  \item \textbf{Subprocess Launch}: Spawns \texttt{python manager.py} in a separate process to avoid blocking the LangGraph event loop
+  \item \textbf{Output Streaming}: Captures stdout/stderr in real-time for user feedback
+  \item \textbf{Completion Detection}: Waits for subprocess termination (blocking until experiment finishes)
+  \item \textbf{Model Retrieval}: Locates \texttt{best\_model.h5} in the NNI output directory and stores path in state
 \end{enumerate}
 
 The subprocess execution isolates NNI's environment from the LangGraph runtime, preventing library conflicts and allowing independent GPU scheduling.
@@ -363,27 +328,27 @@ The subprocess execution isolates NNI's environment from the LangGraph runtime, 
 Algorithm~\ref{alg:nni_retrain} formalizes the complete NNI workflow including automatic best-trial extraction and retraining.
 
 \begin{algorithm}[H]
-    \caption{NNI Experiment with Automatic Best-Trial Retraining}
-    \label{alg:nni_retrain}
-    \begin{algorithmic}[1]
-        \REQUIRE Model path $M$, dataset path $D$, search space $S$, max trials $N$
-        \ENSURE Retrained best model saved to disk
-        \STATE $experiment \gets \text{NNI\_Create}(\text{tuner}=\text{"TPE"}, S, N)$
-        \STATE $experiment.\text{run}(\text{wait\_completion}=\text{true})$
-        \STATE \COMMENT{Extract best trial manually (stable API-agnostic method)}
-        \STATE $trials \gets experiment.\text{list\_trial\_jobs}()$
-        \STATE $valid\_trials \gets \{t \in trials \mid t.\text{status} = \text{"SUCCEEDED"}\}$
-        \IF{$|valid\_trials| = 0$}
-        \STATE \textbf{error} "No successful trials"
-        \ENDIF
-        \STATE $best\_trial \gets \arg\max_{t \in valid\_trials} t.\text{finalMetricData}[0].\text{data}$
-        \STATE $best\_params \gets best\_trial.\text{hyperParameters}[-1].\text{parameters}$
-        \STATE \COMMENT{Retrain with best hyperparameters}
-        \STATE $env \gets \{\text{"RETRAIN\_MODE"}: \text{"true"}, \text{"NNI\_PARAMS"}: \text{JSON}(best\_params)\}$
-        \STATE $\text{subprocess.run}([\text{"python", "trial.py"}], \text{env}=env)$
-        \STATE $best\_model \gets \text{Load}(\text{"best\_model.h5"})$
-        \RETURN $best\_model$
-    \end{algorithmic}
+  \caption{NNI Experiment with Automatic Best-Trial Retraining}
+  \label{alg:nni_retrain}
+  \begin{algorithmic}[1]
+    \REQUIRE Model path $M$, dataset path $D$, search space $S$, max trials $N$
+    \ENSURE Retrained best model saved to disk
+    \STATE $experiment \gets \text{NNI\_Create}(\text{tuner}=\text{"TPE"}, S, N)$
+    \STATE $experiment.\text{run}(\text{wait\_completion}=\text{true})$
+    \STATE \COMMENT{Extract best trial manually (stable API-agnostic method)}
+    \STATE $trials \gets experiment.\text{list\_trial\_jobs}()$
+    \STATE $valid\_trials \gets \{t \in trials \mid t.\text{status} = \text{"SUCCEEDED"}\}$
+    \IF{$|valid\_trials| = 0$}
+    \STATE \textbf{error} "No successful trials"
+    \ENDIF
+    \STATE $best\_trial \gets \arg\max_{t \in valid\_trials} t.\text{finalMetricData}[0].\text{data}$
+    \STATE $best\_params \gets best\_trial.\text{hyperParameters}[-1].\text{parameters}$
+    \STATE \COMMENT{Retrain with best hyperparameters}
+    \STATE $env \gets \{\text{"RETRAIN\_MODE"}: \text{"true"}, \text{"NNI\_PARAMS"}: \text{JSON}(best\_params)\}$
+    \STATE $\text{subprocess.run}([\text{"python", "trial.py"}], \text{env}=env)$
+    \STATE $best\_model \gets \text{Load}(\text{"best\_model.h5"})$
+    \RETURN $best\_model$
+  \end{algorithmic}
 \end{algorithm}
 
 \subsection{Validation and Model Persistence}

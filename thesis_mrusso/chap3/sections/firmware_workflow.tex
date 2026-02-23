@@ -27,23 +27,16 @@ Alternatively, users can specify an existing \texttt{.ioc} configuration file pa
 The \texttt{search\_and\_install\_stm32\_package()} function automates the download of the required STM32Cube firmware package from GitHub. This step is critical for headless operations: unlike the STM32CubeIDE/MX GUI, which interactively prompts the user to download missing packages, the CLI mode fails abruptly with a "Project loading error" if the required MCU package is missing from the repository. To resolve this:
 
 \begin{enumerate}
-    \item The agent constructs the repository URL based on the MCU series (e.g., \texttt{STM32CubeF4} for F4 series).
-    \item It clones the repository directly to \texttt{\textasciitilde/STM32Cube/Repository/}.
-    \item It verifies the presence of required HAL files and device headers before proceeding.
+  \item The agent constructs the repository URL based on the MCU series (e.g., \texttt{STM32CubeF4} for F4 series).
+  \item It clones the repository directly to \texttt{\textasciitilde/STM32Cube/Repository/}.
+  \item It verifies the presence of required HAL files and device headers before proceeding.
 \end{enumerate}
 
 This proactive provisioning eliminates the manual "STM32CubeMX Updater" dependency and prevents blocking errors in the automated pipeline.
 
-\subsection{CubeMX Script Generation and Execution}
+STM32CubeMX supports headless operation via the \texttt{-s} (script mode) command-line flag. The \texttt{generate\_cubemx\_script()} node creates a dedicated \texttt{.script} file that orchestrates the entire generation process. This script first loads the initial \texttt{.ioc} file (if provided by the user) or falls back to a default board template. It then systematically configures the necessary micro-controller peripherals, such as GPIO, UART, or I2C, based on the specific requirements extracted during the project info collection phase. 
 
-STM32CubeMX supports headless operation via \texttt{-s} (script mode). The \texttt{generate\_cubemx\_script()} node creates a \texttt{.script} file that:
-
-\begin{itemize}
-    \item Loads the \texttt{.ioc} file (if provided) or board template
-    \item Configures peripherals (GPIO, UART, I2C, etc.) based on user requirements
-    \item Sets code generation parameters (toolchain, output directory)
-    \item Triggers \texttt{generate code} command
-\end{itemize}
+Finally, the script sets the target code generation parameters, including the selected toolchain and the destination output directory, before triggering the final \texttt{generate code} command.
 
 The \texttt{execute\_generation()} node then invokes CubeMX:
 
@@ -60,12 +53,7 @@ To resolve the interactive pop-up issues described in Section \ref{subsec:gui_lo
 
 The agent maintains a repository of pre-validated \texttt{.ioc} templates, one for each supported chip family (e.g., \texttt{STM32H7A3ZITx.ioc}, \texttt{STM32U585AIIxQ.ioc}). These files are configured manually once in the GUI to satisfy the "recommendation wizards" (e.g., MPU regions defined, TrustZone context set to Non-Secure).
 
-The automation logic was refined as follows:
-\begin{enumerate}
-    \item \textbf{Template-Based Injection}: Instead of initializing a raw project, the agent identifies the matching template for the user's board.
-    \item \textbf{Lean Scripting}: The generated CubeMX script uses the \texttt{config load "<template.ioc>"} command directly. Importantly, by omitting the \texttt{load <MCU>} command, the tool skips the architectural negotiation phase and its associated interactive dialogs.
-    \item \textbf{Project Decoupling}: The \texttt{project name} and \texttt{project path} commands are then used to dynamically re-target the template to the specific user directory, ensuring that the final output is a clean, unique project while utilizing the pre-validated "silent" configuration.
-\end{enumerate}
+The automation logic was subsequently refined to rely on template-based injection. Instead of initializing a raw, unconfigured project, the orchestration agent first identifies the pre-validated template corresponding to the user's specific development board. The generated CubeMX script utilizes a lean scripting approach by executing a direct \texttt{config load "<template.ioc>"} command; critically, by deliberately omitting the standard \texttt{load <MCU>} directive, the tool gracefully skips the architectural negotiation phase and bypasses the interactive, GUI-blocking dialogs. To ensure isolation, project decoupling connects the template to the user's workflow: the \texttt{project name} and \texttt{project path} commands are executed to dynamically re-target the loaded template to the user's specific directory. This guarantees that the final output is a clean, uniquely named project while smoothly inheriting the pre-validated "silent" configuration.
 
 Generated output includes initialization code (\texttt{main.c}, \texttt{stm32f4xx\_hal\_msp.c}), linker scripts, and IDE project files.
 
@@ -74,7 +62,7 @@ Generated output includes initialization code (\texttt{main.c}, \texttt{stm32f4x
 After successful generation, the \texttt{decide\_continue\_to\_ai()} node presents an interrupt:
 
 \begin{quote}
-    \textit{"Firmware project created. Do you want to proceed with AI model selection?"}
+  \textit{"Firmware project created. Do you want to proceed with AI model selection?"}
 \end{quote}
 
 The user's response is classified via LLM, allowing transitions between workflows (firmware $\rightarrow$ AI analysis) or workflow termination.

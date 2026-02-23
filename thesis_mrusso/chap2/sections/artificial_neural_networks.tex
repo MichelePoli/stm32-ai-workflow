@@ -32,7 +32,7 @@ The learning rate $\alpha$ is a critical hyperparameter that determines the step
 
 However, the current standard for training deep neural networks is \textbf{Adam (Adaptive Moment Estimation)} \cite{kingma2014adam}. Adam combines the advantages of two other extensions of stochastic gradient descent: Adaptive Gradient Algorithm (AdaGrad) and Root Mean Square Propagation (RMSProp). It computes adaptive learning rates for each parameter by maintaining exponentially decaying averages of past gradients ($m_t$, first moment) and squared gradients ($v_t$, second moment). This allows the algorithm to handle sparse gradients on noisy problems, making it highly suitable for large-scale data and parameter-heavy models like LLMs.
 
-The efficiency of this process relies on the backpropagation algorithm (Fig. \ref{fig:back}), which leverages the chain rule of calculus to propagate errors from the output layer back to the input, enabling automated weight updates in complex computational graphs \cite{NNWork2025}.
+The efficiency of this process relies on the backpropagation algorithm (Fig. \ref{fig:back}), which uses the chain rule of calculus to propagate errors from the output layer back to the input, enabling automated weight updates in complex computational graphs \cite{NNWork2025}.
 
 \begin{figure}[ht]
     \centering

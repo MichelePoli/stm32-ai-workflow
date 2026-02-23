@@ -8,8 +8,8 @@ The AI Model Discovery workflow (Workflow 2) automates the selection, profiling,
 The workflow begins by extracting critical deployment parameters from the user's natural language input using structured LLM extraction. The \texttt{collect\_analysis\_info()} node invokes a Triton-backed model (Mistral 7B) with a Pydantic schema to parse:
 
 \begin{itemize}
-    \item \textbf{Target MCU}: The specific microcontroller family (e.g., \texttt{stm32h743}, \texttt{stm32f401}, \texttt{stm32u5}) that defines available hardware accelerators and memory profiles
-    \item \textbf{Compression Level}: Quantization aggressiveness (\texttt{low}, \texttt{medium}, \texttt{high}, \texttt{very\_high}) that trades accuracy for reduced model size
+  \item \textbf{Target MCU}: The specific microcontroller family (e.g., \texttt{stm32h743}, \texttt{stm32f401}, \texttt{stm32u5}) that defines available hardware accelerators and memory profiles
+  \item \textbf{Compression Level}: Quantization aggressiveness (\texttt{low}, \texttt{medium}, \texttt{high}, \texttt{very\_high}) that trades accuracy for reduced model size
 \end{itemize}
 
 Example extraction:
@@ -38,25 +38,23 @@ The model discovery system implements a hierarchical search strategy designed to
 
 The first tier presents a curated catalog of models managed through a dynamic JSON registry (\texttt{predefined\_models.json}). This registry decouples the model implementation from the discovery logic, allowing the knowledge base to be updated without code modifications. Models are optimized for common embedded AI tasks such as Image Classification (MobileNet family, EfficientNet-Lite), Object Detection (SSD, YOLO-Nano), and Human Activity Recognition.
 
-Each entry includes a technical description, a validated download URL, and metadata regarding the model's footprint. The \texttt{choose\_predefined\_taskbased\_model()} node:
+Each entry in this registry includes a technical description, a validated download URL, and critical metadata regarding the model's memory footprint. When interacting with the user, the \texttt{choose\_predefined\_taskbased\_model()} node performs three main actions. 
+
+First, it dynamically builds a task selection menu directly from the available categories in the registry. Concurrently, it employs LLM intent parsing, using dynamically generated instructions, to correctly classify the user's requested task. 
+
+Finally, before presenting options, it executes a proactive compatibility check, cross-referencing each candidate model's footprint against the strict limits of the target MCU.
 
 \begin{enumerate}
-    \item \textbf{Dynamic Menu Generation}: Dynamically builds the task selection menu from the categories available in the registry.
-    \item \textbf{LLM Intent Parsing}: Classifies user task using dynamic instructions passed to the LLM.
-    \item \textbf{Proactive Compatibility Check}: Cross-references each model's footprint against the target MCU's limits.
-\end{enumerate}
-
-\begin{enumerate}
-    \item Classifies user task using LLM intent detection (\texttt{TaskSelectionExtraction} schema)
-    \item Filters \texttt{PREDEFINED\_MODELS} by task type
-    \item \textbf{Proactive Compatibility Check}: Before presenting options, the system cross-references each model's uncompressed footprint against the target MCU's Flash memory. Models are dynamically labeled as:
-    \begin{itemize}
-        \item \textbf{Fits} ($\checkmark$): Model fits natively ($<1.0\times$ flash limit).
-        \item \textbf{Compressible} (\textwarning): Model requires quantization ($<4.0\times$ overflow).
-        \item \textbf{Too Large} (\texttimes): Model exceeds physical limits even with max compression ($>8.0\times$ overflow).
-    \end{itemize}
-    \item Presents the context-aware list to the user via interrupt.
-    \item On acceptance, downloads model file and proceeds to profiling.
+  \item Classifies user task using LLM intent detection (\texttt{TaskSelectionExtraction} schema)
+  \item Filters \texttt{PREDEFINED\_MODELS} by task type
+  \item \textbf{Proactive Compatibility Check}: Before presenting options, the system cross-references each model's uncompressed footprint against the target MCU's Flash memory. Models are dynamically labeled as:
+        \begin{itemize}
+          \item \textbf{Fits} ($\checkmark$): Model fits natively ($<1.0\times$ flash limit).
+          \item \textbf{Compressible} (\textwarning): Model requires quantization ($<4.0\times$ overflow).
+          \item \textbf{Too Large} (\texttimes): Model exceeds physical limits even with max compression ($>8.0\times$ overflow).
+        \end{itemize}
+  \item Presents the context-aware list to the user via interrupt.
+  \item On acceptance, downloads model file and proceeds to profiling.
 \end{enumerate}
 
 This tier achieves \textasciitilde 70\% user acceptance rate for standard tasks, bypassing web search complexity.
@@ -69,60 +67,60 @@ If the user rejects curated models or requests custom architectures, the system 
 The \texttt{search\_h5\_file\_in\_repo\_hybrid()} function implements a depth-limited recursive search of public GitHub repositories (e.g., \texttt{keras-team/keras-applications}, \texttt{qubvel/segmentation\_models}) to locate compatible \texttt{.h5} model files:
 
 \begin{algorithm}[H]
-\caption{Hybrid GitHub Model Search}
-\label{alg:github_search}
-\begin{algorithmic}[1]
-\REQUIRE Task description \(T\), target MCU \(M\), max depth \(D = 5\)
-\ENSURE List of candidate \texttt{.h5} files with metadata
-\STATE \(candidates \gets []\)
-\STATE \(repo\_contents \gets \text{GitHub API}(\text{repo\_path})\)
-\FOR{each \(item \in repo\_contents\)}
+  \caption{Hybrid GitHub Model Search}
+  \label{alg:github_search}
+  \begin{algorithmic}[1]
+    \REQUIRE Task description \(T\), target MCU \(M\), max depth \(D = 5\)
+    \ENSURE List of candidate \texttt{.h5} files with metadata
+    \STATE \(candidates \gets []\)
+    \STATE \(repo\_contents \gets \text{GitHub API}(\text{repo\_path})\)
+    \FOR{each \(item \in repo\_contents\)}
     \IF{\(item.\text{type} = \text{"file"}\) \AND \(item.\text{name}.\text{endswith}(\text{".h5"})\)}
-        \STATE \(candidates.\text{append}(\{path, url, size\})\)
+    \STATE \(candidates.\text{append}(\{path, url, size\})\)
     \ELSIF{\(item.\text{type} = \text{"dir"}\) \AND \(depth < D\)}
-        \STATE \(candidates.\text{extend}(\text{scan\_repo}(item.\text{path}, depth + 1))\)
+    \STATE \(candidates.\text{extend}(\text{scan\_repo}(item.\text{path}, depth + 1))\)
     \ENDIF
-\ENDFOR
-\STATE \(best\_model \gets \text{LLM\_rank}(candidates, T, M)\) \COMMENT{Use LLM to select most relevant}
-\RETURN \(best\_model\)
-\end{algorithmic}
+    \ENDFOR
+    \STATE \(best\_model \gets \text{LLM\_rank}(candidates, T, M)\) \COMMENT{Use LLM to select most relevant}
+    \RETURN \(best\_model\)
+  \end{algorithmic}
 \end{algorithm}
 
 The LLM ranking step (\texttt{llm\_select\_best\_model()}) uses structured output to evaluate candidates based on:
 \begin{itemize}
-    \item File name similarity to task keywords (e.g., "mobilenet" for image classification)
-    \item Repository README content (if available) describing model purpose
-    \item File size as proxy for model complexity (prefer smaller for embedded)
+  \item File name similarity to task keywords (e.g., "mobilenet" for image classification)
+  \item Repository README content (if available) describing model purpose
+  \item File size as proxy for model complexity (prefer smaller for embedded)
 \end{itemize}
 
 Algorithm~\ref{alg:model_search} formalizes the complete iterative search strategy with human-in-the-loop approval gates and task-based fallback.
 
 \begin{algorithm}[H]
-\caption{Iterative Model Search with Task-Based Fallback}
-\label{alg:model_search}
-\begin{algorithmic}[1]
-\REQUIRE User task $T$, target MCU $M$, max iterations $N_{max} = 3$
-\ENSURE Selected model path or default model
-\STATE $iteration \gets 0$
-\WHILE{$iteration < N_{max}$}
+  \caption{Iterative Model Search with Task-Based Fallback}
+  \label{alg:model_search}
+  \begin{algorithmic}[1]
+    \REQUIRE User task $T$, target MCU $M$, max iterations $N_{max} = 3$
+    \ENSURE Selected model path or default model
+    \STATE $iteration \gets 0$
+    \WHILE{$iteration < N_{max}$}
     \IF{$iteration = 0$}
-        \STATE $candidates \gets \text{GitHub\_Search}(T, M)$ \COMMENT{Primary search}
+    \STATE $candidates \gets \text{GitHub\_Search}(T, M)$ \COMMENT{Primary search}
     \ELSE
-        \STATE $candidates \gets \text{Google\_Search}(T, M)$ \COMMENT{Fallback}
+    \STATE $candidates \gets \text{Google\_Search}(T, M)$ \COMMENT{Fallback}
     \ENDIF
     \STATE $best\_model \gets \text{LLM\_Rank}(candidates, T, M)$
     \STATE \textbf{interrupt}() \COMMENT{Human approval gate}
     \STATE $user\_response \gets \text{Get\_User\_Input}()$
     \STATE $decision \gets \text{LLM\_Parse}(user\_response)$
     \IF{$decision.\text{accepted} = \text{true}$}
-        \RETURN $best\_model$
+    \RETURN $best\_model$
     \ENDIF
     \STATE $iteration \gets iteration + 1$
-\ENDWHILE
-\STATE \COMMENT{After 3 failed attempts: use task-based default}
-\STATE $default\_model \gets \text{PREDEFINED\_MODELS}[T]$
-\RETURN $default\_model$
-\end{algorithmic}
+    \ENDWHILE
+    \STATE \COMMENT{After 3 failed attempts: use task-based default}
+    \STATE $default\_model \gets \text{PREDEFINED\_MODELS}[T]$
+    \RETURN $default\_model$
+  \end{algorithmic}
 \end{algorithm}
 
 \paragraph{Google Search Fallback}
@@ -140,20 +138,13 @@ results = agent.run(query)
 
 The agent parses search results to extract direct download links, filtering out:
 \begin{itemize}
-    \item Tutorial pages without model artifacts
-    \item Commercial model marketplaces requiring payment
-    \item Incompatible formats (ONNX, TFLite without .h5 availability)
+  \item Tutorial pages without model artifacts
+  \item Commercial model marketplaces requiring payment
+  \item Incompatible formats (ONNX, TFLite without .h5 availability)
 \end{itemize}
 
 \paragraph{Iteration Control and Task-Based Default}
-The \texttt{model\_selection\_routing()} function tracks search attempts via \texttt{state.search\_iteration\_count}:
-
-\begin{itemize}
-    \item \textbf{Iterations 1-3}: User can reject results and trigger another search
-    \item \textbf{After 3 failed attempts}: System automatically selects the "Task-Based Default" from \texttt{PREDEFINED\_MODELS} corresponding to the classified task
-\end{itemize}
-
-This fallback ensures workflow termination even for obscure tasks, preventing infinite search loops.
+To prevent infinite search loops and ensure workflow termination, the \texttt{model\_selection\_routing()} function actively tracks search attempts via the \texttt{state.search\_iteration\_count} variable. During the first three iterations, the user retains the ability to reject the retrieved results, which automatically triggers a refined follow-up search. However, if three consecutive attempts fail to secure user approval or find valid artifacts, the system automatically falls back to selecting a "Task-Based Default" model from the \texttt{PREDEFINED\_MODELS} registry corresponding to the initially classified task, guaranteeing that the pipeline can reliably proceed even for highly obscure or poorly documented requests.
 
 \subsection{STEdgeAI CLI Integration}
 
@@ -171,19 +162,13 @@ stedgeai analyze --model <model.h5> --target <stm32h743>
 This command performs static analysis without target hardware, generating a profiling report with:
 
 \begin{itemize}
-    \item \textbf{RAM Usage}: Tensor buffer sizes, activation memory, working memory
-    \item \textbf{Flash Usage}: Weight storage requirements after quantization
-    \item \textbf{MACC Count}: Million multiply-accumulate operations per inference (proxy for latency)
-    \item \textbf{Estimated Latency}: For reference MCU at typical clock speeds
+  \item \textbf{RAM Usage}: Tensor buffer sizes, activation memory, working memory
+  \item \textbf{Flash Usage}: Weight storage requirements after quantization
+  \item \textbf{MACC Count}: Million multiply-accumulate operations per inference (proxy for latency)
+  \item \textbf{Estimated Latency}: For reference MCU at typical clock speeds
 \end{itemize}
 
-If RAM/Flash usage exceeds the MCU capabilities, the system triggers an \textbf{Autonomous Resource Optimization Loop}. Instead of halting execution to request user intervention, the workflow intelligently attempts to "rescue" the model by escalating the compression level:
-
-\begin{enumerate}
-    \item \textbf{Escalation Strategy}: The agent automatically increments the quantization aggressiveness (\texttt{medium} $\rightarrow$ \texttt{high} $\rightarrow$ \texttt{very\_high}).
-    \item \textbf{Re-Analysis}: The \texttt{stedgeai analyze} command is re-executed with the new \texttt{--compression} flag.
-    \item \textbf{Self-Evaluation}: The system re-evaluates the updated memory footprint. If the model now fits, the workflow proceeds autonomously; otherwise, it attempts a further escalation until the physical limit of the board is reached.
-\end{enumerate}
+If the requested model's RAM or Flash usage exceeds the target MCU's capabilities, the system triggers an \textbf{Autonomous Resource Optimization Loop}. Instead of halting execution to request manual user intervention, the workflow intelligently attempts to "rescue" the deployment. The agent automatically increments the quantization aggressiveness (escalating from \texttt{medium} to \texttt{high}, and finally to \texttt{very\_high}). With each escalation, the \texttt{stedgeai analyze} command is re-executed using the updated \texttt{--compression} flag. The system then self-evaluates the newly generated memory footprint; if the compressed model successfully fits within the hardware limits, the workflow proceeds autonomously. If not, it continues the escalation process until reaching the physical limits of the board.
 
 This autonomous behavior highlights the transition from a traditional toolchain to an \textit{agentic framework}, where the AI orchestrator takes independent responsibility for solving technical deployment constraints.
 
@@ -198,9 +183,9 @@ stedgeai validate --model <model.h5> --target <stm32h743>
 
 This step executes the model validation cycle, producing a text report that confirms:
 \begin{itemize}
-    \item \textbf{Model Integrity}: Verification that the model graph is correctly interpretable by the target runtime
-    \item \textbf{Memory Allocation}: Confirmation that activation buffers fit within the target RAM
-    \item \textbf{Execution Correctness}: Validation of operator support on the specific MCU series
+  \item \textbf{Model Integrity}: Verification that the model graph is correctly interpretable by the target runtime
+  \item \textbf{Memory Allocation}: Confirmation that activation buffers fit within the target RAM
+  \item \textbf{Execution Correctness}: Validation of operator support on the specific MCU series
 \end{itemize}
 
 \subsubsection{Phase 3: C Code Generation}
@@ -214,17 +199,14 @@ stedgeai generate --model <model.h5> --target <stm32h743>
 
 Generated artifacts include:
 \begin{itemize}
-    \item \texttt{network.c/h}: Neural network implementation with fixed-point arithmetic
-    \item \texttt{network\_data.c}: Quantized weights and biases as const arrays
-    \item \texttt{network\_config.h}: MCU-specific memory layout and hardware acceleration flags
+  \item \texttt{network.c/h}: Neural network implementation with fixed-point arithmetic
+  \item \texttt{network\_data.c}: Quantized weights and biases as const arrays
+  \item \texttt{network\_config.h}: MCU-specific memory layout and hardware acceleration flags
 \end{itemize}
 
-Importantly, \textbf{quantization is applied during this generation phase} (via the \texttt{--compression} flag), not during training. This allows the framework to:
-\begin{enumerate}
-    \item Discover and evaluate models in high-precision (FP32) format
-    \item Dynamically select quantization level based on target MCU constraints
-    \item Delegate low-level optimization (bit-width selection, activation scaling) to STMicroelectronics' tooling
-\end{enumerate}
+Importantly, \textbf{quantization is applied during this generation phase} (via the \texttt{--compression} flag), rather than during the actual training process. This architectural choice provides significant flexibility: it allows the framework to discover and natively evaluate models in high-precision format (FP32), while delaying the decision on quantization levels until the exact target MCU constraints are known. 
+
+Consequently, the complex, low-level optimizations, such as bit-width selection and activation scaling, are entirely delegated to STMicroelectronics' specialized tooling, ensuring maximum compatibility and efficiency on the target silicon.
 
 The \texttt{--compression} value is derived from the user's original input (parsed in \texttt{collect\_analysis\_info()}) or adjusted based on profiling results from Phase 1.
 
@@ -233,8 +215,8 @@ The \texttt{--compression} value is derived from the user's original input (pars
 A significant challenge encountered during development was incompatibility between modern Keras 3.x (required for LangGraph/NNI) and legacy Keras 2.x models (prevalent in STModelZoo and academic repositories). To resolve this, the framework implements a \textbf{dual-environment architecture}:
 
 \begin{itemize}
-    \item \textbf{Primary Environment} (\texttt{stm32\_agent}): Hosts LLM agents, LangGraph, and NNI with latest dependencies
-    \item \textbf{Legacy Environment} (\texttt{stm32\_legacy}): Pinned to TensorFlow 2.15 + Keras 2.15 for model inspection
+  \item \textbf{Primary Environment} (\texttt{stm32\_agent}): Hosts LLM agents, LangGraph, and NNI with latest dependencies
+  \item \textbf{Legacy Environment} (\texttt{stm32\_legacy}): Pinned to TensorFlow 2.15 + Keras 2.15 for model inspection
 \end{itemize}
 
 When the system detects a Keras 2.x model file (based on HDF5 metadata), the \texttt{download\_model\_to\_cache()} function spawns a subprocess in the legacy environment:
