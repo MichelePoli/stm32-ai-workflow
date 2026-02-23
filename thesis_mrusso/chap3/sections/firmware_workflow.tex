@@ -1,7 +1,7 @@
 \section{STM32 Firmware Generation Workflow}
 \label{sec:firmware}
-
-Workflow 1 automates the initialization of STM32CubeMX projects through CLI-driven scripting, eliminating manual GUI interaction and ensuring reproducible firmware project structure.
+Having defined the overall architecture, this section examines the specific functional characteristics of each workflow within the graph and the nodes that compose them.
+Workflow 1, in particular, automates the initialization of STM32CubeMX projects through CLI-driven scripting, eliminating manual GUI interaction and ensuring reproducible firmware project structure.
 
 \subsection{Project Information Collection}
 
@@ -22,34 +22,28 @@ result = llm_extractor.invoke([
 
 Alternatively, users can specify an existing \texttt{.ioc} configuration file path, bypassing project creation.
 
-\subsection{STM32Cube Package Installation}
+\subsection{Automated MCU Package Management}
 
-The \texttt{search\_and\_install\_stm32\_package()} function automates the download of the required STM32Cube firmware package from GitHub. This step is critical for headless operations: unlike the STM32CubeIDE/MX GUI, which interactively prompts the user to download missing packages, the CLI mode fails abruptly with a "Project loading error" if the required MCU package is missing from the repository. To resolve this:
+The \texttt{search\_and\_install\_stm32\_package()} function automates the download of required STM32Cube firmware packages from GitHub. This step is key for headless operations; unlike the STM32CubeIDE/MX GUI, which prompts the user to download missing packages, the CLI mode fails abruptly with a "Project loading error" if the MCU package is missing from the local repository.
 
-\begin{enumerate}
-  \item The agent constructs the repository URL based on the MCU series (e.g., \texttt{STM32CubeF4} for F4 series).
-  \item It clones the repository directly to \texttt{\textasciitilde/STM32Cube/Repository/}.
-  \item It verifies the presence of required HAL files and device headers before proceeding.
-\end{enumerate}
+To address this, the system first identifies the repository URL based on the MCU series (e.g., \texttt{STM32CubeF4} for F4 devices). The agent then clones the repository directly into the \texttt{\textasciitilde/STM32Cube/Repository/} folder and verifies the installation of HAL files and device headers. This automated provisioning removes the dependency on the manual STM32CubeMX Updater and avoids blocking errors during the generation process.
 
-This proactive provisioning eliminates the manual "STM32CubeMX Updater" dependency and prevents blocking errors in the automated pipeline.
+\subsection{Headless Generation and CLI Scripting}
 
-STM32CubeMX supports headless operation via the \texttt{-s} (script mode) command-line flag. The \texttt{generate\_cubemx\_script()} node creates a dedicated \texttt{.script} file that orchestrates the entire generation process. This script first loads the initial \texttt{.ioc} file (if provided by the user) or falls back to a default board template. It then systematically configures the necessary micro-controller peripherals, such as GPIO, UART, or I2C, based on the specific requirements extracted during the project info collection phase. 
+STM32CubeMX supports headless operation via the \texttt{-s} (script mode) command-line flag. The \texttt{generate\_cubemx\_script()} node creates a \texttt{.script} file that manages the entire generation process. This script loads either a user-provided \texttt{.ioc} file or a default board template, then configures micro-controller peripherals such as GPIO, UART, or I2C based on the requirements defined in the collection phase.
 
-Finally, the script sets the target code generation parameters, including the selected toolchain and the destination output directory, before triggering the final \texttt{generate code} command.
-
-The \texttt{execute\_generation()} node then invokes CubeMX:
+The script also sets code generation parameters, including the toolchain and the destination directory, before triggering the \texttt{generate code} command. Once the script is ready, the \texttt{execute\_generation()} node invokes CubeMX using the command:
 
 \begin{verbatim}
 <cubemx_path> -q <script_file.script>
 \end{verbatim}
 
-\textbf{Note on Headless Licensing:} A significant deployment challenge verified in the testing environment (using X11 forwarding) is that STM32CubeMX CLI requires a one-time GUI acceptance of the license agreement on first run. Failure to perform this manual initialization (or using \texttt{xvfb-run} without prior acceptance) causes the generation to hang indefinitely. The orchestrated workflow assumes this pre-configuration has been satisfied on the server agent.
+\textbf{Note on Headless Licensing:} A deployment challenge identified during testing is that the STM32CubeMX CLI requires a one-time GUI acceptance of the license agreement. If this manual step is skipped, or if \texttt{xvfb-run} is used without prior initialization, the generation process hangs indefinitely. The current workflow assumes that this license has already been accepted on the server hosting the agent.
 
 \subsection{Overcoming GUI Dependencies: The Pre-seeded IOC Strategy}
 \label{subsec:preseeded_ioc}
 
-To resolve the interactive pop-up issues described in Section \ref{subsec:gui_locked_features}, the firmware workflow was refactored to move away from generic board-based loading (\texttt{load <MCU>}) towards a \textbf{Pre-seeded IOC Strategy}.
+To resolve the interactive pop-up issues described in Section \ref{subsec:gui_locked_features}, the firmware workflow was refactored to move away from generic board-based loading (\texttt{load <MCU>}) towards a \textbf{Pre-seeded IOC Strategy} for particular chip families.
 
 The agent maintains a repository of pre-validated \texttt{.ioc} templates, one for each supported chip family (e.g., \texttt{STM32H7A3ZITx.ioc}, \texttt{STM32U585AIIxQ.ioc}). These files are configured manually once in the GUI to satisfy the "recommendation wizards" (e.g., MPU regions defined, TrustZone context set to Non-Secure).
 

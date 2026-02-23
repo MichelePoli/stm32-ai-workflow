@@ -57,11 +57,11 @@ def _generate_and_cache_with_llm(model_name, arch_type):
     save_to_vectorstore(content, arch_type)
 \end{lstlisting}
 
-This generative approach provides three key advantages. 
+This generative approach provides three key advantages.
 
-First, it ensures deterministic availability by eliminating the ``403 Forbidden'' and timeout errors commonly associated with web scrapers. 
+First, it ensures deterministic availability by eliminating the ``403 Forbidden'' and timeout errors commonly associated with web scrapers.
 
-Second, it guarantees structured consistency by enforcing a strict, easily parsable checklist format covering strategy, hyperparameters, and quantization details instead of relying on unpredictable, unstructured HTML. 
+Second, it guarantees structured consistency by enforcing a strict, easily parsable checklist format covering strategy, hyperparameters, and quantization details instead of relying on unpredictable, unstructured HTML.
 
 Finally, it maximizes search efficiency; while the initial generation may take approximately 15 seconds, all subsequent retrievals are instantaneous thanks to the local vector cache.
 
@@ -166,29 +166,29 @@ While NNI provides detailed hyperparameter optimization, users often require a f
 
 \subsubsection{Anti-Overfitting Logic}
 
-Large pre-trained models (e.g., MobileNetV2) are highly prone to catastrophic forgetting and severe overfitting when applied to small or specialized datasets like Fruit-360. To effectively mitigate this, the system applies three automated strategies. 
+Large pre-trained models (e.g., MobileNetV2) are highly prone to catastrophic forgetting and severe overfitting when applied to small or specialized datasets like Fruit-360. To effectively mitigate this, the system applies three automated strategies.
 
-First, it employs a dynamic sampling escalation strategy that caps dataset usage (e.g., at 5000 images) to balance class representation while preventing memory exhaustion and excessive latency. 
+First, it employs a dynamic sampling escalation strategy that caps dataset usage (e.g., at 5000 images) to balance class representation while preventing memory exhaustion and excessive latency.
 
 Second, the system proactively inserts a regularization \texttt{Dropout} layer (with a default rate of 0.3) during the final layer replacement phase; importantly, if the user explicitly specifies a custom dropout rate in their natural language prompt, the system overrides the safety default in favor of the user's instruction. Lastly, the system implements epoch capping, strictly limiting standard training runs to 10 epochs to act as a rapid ``sanity check'' before triggering any computationally expensive optimization loops.
 
 \subsubsection{Real-time Observability and Fault Tolerance}
 
-To effectively connect between headless background subprocesses and the interactive agent web UI, the fine-tuning execution engine provides high-fidelity, real-time observability. It utilizes asynchronous log streaming via \texttt{subprocess.Popen} with non-blocking pipe selection to instantly stream training metrics, such as epochs, loss, and accuracy, directly to the user's console. To maintain stability, the engine features adaptive timeouts, intelligently adjusting the maximum allowed execution window (e.g., 1200s) based on the model's complexity and the estimated dataset size. 
+To effectively connect between headless background subprocesses and the interactive agent web UI, the fine-tuning execution engine provides high-fidelity, real-time observability. It utilizes asynchronous log streaming via \texttt{subprocess.Popen} with non-blocking pipe selection to instantly stream training metrics, such as epochs, loss, and accuracy, directly to the user's console. To maintain stability, the engine features adaptive timeouts, intelligently adjusting the maximum allowed execution window (e.g., 1200s) based on the model's complexity and the estimated dataset size.
 
 Also, the system includes a class mismatch rescue mechanism; if it detects that the loaded dataset contains a different number of classes than the pre-trained model (for instance, 132 versus 1000), it automatically performs an architectural adjustment by replacing the final \texttt{Dense} layer and dynamically resizing the output tensor before commencing any training.
 
 \subsection{NNI Code Generation: Architecture and Prompt Engineering}
 
-The core technical contribution of this workflow is the \textit{autonomous generation of complete NNI experiment code} from high-level specifications. Unlike rigid, template-based code generators that rely on simple fill-in-the-blank patterns, this system employs a large language model (GPT-OSS:20b with an 8192-token context window) to dynamically synthesize production-ready Python scripts. These scripts are solid enough to handle complex edge cases such as sparse versus categorical label formats, input shape mismatches requiring dynamic image resizing, and class count discrepancies between the base model and the target dataset. 
+The core technical contribution of this workflow is the \textit{autonomous generation of complete NNI experiment code} from high-level specifications. Unlike rigid, template-based code generators that rely on simple fill-in-the-blank patterns, this system employs a large language model (GPT-OSS:20b with an 8192-token context window) to dynamically synthesize production-ready Python scripts. These scripts are solid enough to handle complex edge cases such as sparse versus categorical label formats, input shape mismatches requiring dynamic image resizing, and class count discrepancies between the base model and the target dataset.
 
 Also, the generated code gracefully manages memory constraints on consumer hardware through dataset subsetting and memory-mapping, resolves port conflicts for the NNI Web UI, and implements reliable fallbacks for missing NNI API methods across different library versions.
 
 \subsubsection{Prompt Engineering Strategy}
 
-The \texttt{generate\_nni\_experiment()} function in \texttt{nni\_optimization/generator.py} constructs a highly detailed, 480-line prompt designed to ensure accurate generation. The prompt heavily features context injection, providing the LLM with exact model metadata (such as name, tensor shapes, layer count, and file path) along with detailed dataset specifications. It enforces explicit constraints, strictly prohibiting the use of placeholder paths, the omission of required files, and the hallucination of non-existent API methods. To guide the output structure, the prompt includes detailed working code templates for both \texttt{manager.py} and \texttt{trial.py}, annotated with inline comments that explain computationally critical sections. 
+The \texttt{generate\_nni\_experiment()} function in \texttt{nni\_optimization/generator.py} constructs a highly detailed, 480-line prompt designed to ensure accurate generation. The prompt heavily features context injection, providing the LLM with exact model metadata (such as name, tensor shapes, layer count, and file path) along with detailed dataset specifications. It enforces explicit constraints, strictly prohibiting the use of placeholder paths, the omission of required files, and the hallucination of non-existent API methods. To guide the output structure, the prompt includes detailed working code templates for both \texttt{manager.py} and \texttt{trial.py}, annotated with inline comments that explain computationally critical sections.
 
-Also, it embeds specific error prevention rules regarding known NNI API inconsistencies (for example, explicitly warning that \texttt{experiment.get\_best\_trial()} does not exist in certain versions). 
+Also, it embeds specific error prevention rules regarding known NNI API inconsistencies (for example, explicitly warning that \texttt{experiment.get\_best\_trial()} does not exist in certain versions).
 
 Finally, it mandates a strict output format specification, requiring the LLM to use explicit \texttt{\# FILE:} markers to successfully generate multi-file outputs.
 

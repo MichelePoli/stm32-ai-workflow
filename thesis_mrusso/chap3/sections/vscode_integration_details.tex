@@ -6,9 +6,9 @@ To connect between the backend LangGraph orchestrator and the developer's daily 
 
 \subsection{Architecture Overview}
 
-The integration follows a client-server architecture where the VS Code extension (TypeScript frontend) communicates with the FastAPI backend (Python) via HTTP streaming. This design provides several distinct advantages. Primarily, it enforces a clean separation of technologies: the complex LangGraph orchestration is executed in a dedicated Python environment, while the user interface uses VS Code's native TypeScript APIs. 
+The integration follows a client-server architecture where the VS Code extension (TypeScript frontend) communicates with the FastAPI backend (Python) via HTTP streaming. This design provides several distinct advantages. Primarily, it enforces a clean separation of technologies: the complex LangGraph orchestration is executed in a dedicated Python environment, while the user interface uses VS Code's native TypeScript APIs.
 
-Also, the use of asynchronous execution ensures that long-running workflows, such as NNI hyperparameter optimization experiments or large model downloads, do not freeze the VS Code interface, maintaining a responsive developer experience. 
+Also, the use of asynchronous execution ensures that long-running workflows, such as NNI hyperparameter optimization experiments or large model downloads, do not freeze the VS Code interface, maintaining a responsive developer experience.
 
 Finally, this decoupled approach inherently supports multi-client architecture, allowing the same backend to simultaneously serve the VS Code extension, command-line interfaces, and potential future web dashboards.
 
@@ -41,9 +41,9 @@ The extension manifest registers a Chat Participant using VS Code's native chat 
 
 \textbf{Key Parameters:}
 \begin{itemize}
-    \item \texttt{id}: Unique identifier for the chat participant (used internally by VS Code).
-    \item \texttt{name}: The \texttt{@stm32ai} handle users type to invoke the assistant.
-    \item \texttt{isSticky: true}: Enables multi-turn conversations where context (previous messages) is automatically retained across chat interactions.
+  \item \texttt{id}: Unique identifier for the chat participant (used internally by VS Code).
+  \item \texttt{name}: The \texttt{@stm32ai} handle users type to invoke the assistant.
+  \item \texttt{isSticky: true}: Enables multi-turn conversations where context (previous messages) is automatically retained across chat interactions.
 \end{itemize}
 
 \subsection{TypeScript Handler Implementation}
@@ -108,11 +108,11 @@ vscode.chat.createChatParticipant('stm32-ai.assistant', handler);
 
 \textbf{Implementation Details:}
 
-The handler implementation incorporates several critical functionalities to ensure robustness and a smooth user experience. 
+The handler implementation incorporates several critical functionalities to ensure robustness and a smooth user experience.
 
-First, it implements graceful cancellation handling via the \texttt{CancellationToken}; this allows users to abort long-running requests simply by closing the chat window or clicking a stop button, which in turn drops the HTTP connection and signals the backend to terminate the LangGraph execution. 
+First, it implements graceful cancellation handling via the \texttt{CancellationToken}; this allows users to abort long-running requests simply by closing the chat window or clicking a stop button, which in turn drops the HTTP connection and signals the backend to terminate the LangGraph execution.
 
-Second, to handle the unreliability of network streams where chunks might contain partial JSON objects, the extension utilizes NDJSON buffering. A \texttt{buffer} string accumulates incoming data until a complete, newline-delimited JSON object is successfully parsed. 
+Then, to handle the unreliability of network streams where chunks might contain partial JSON objects, the extension utilizes NDJSON buffering. A \texttt{buffer} string accumulates incoming data until a complete, newline-delimited JSON object is successfully parsed.
 
 Finally, the handler processes typed responses dynamically; the server emits distinct event types (such as \texttt{markdown}, \texttt{progress}, or \texttt{error}), and the frontend routing logic renders each type using the appropriate UI components within the VS Code chat view.
 
@@ -156,12 +156,13 @@ async def stream_chat(request: ChatRequest):
     return StreamingResponse(event_generator(), media_type="application/x-ndjson")
 \end{lstlisting}
 
-\textbf{Server-Side Features:}
-\begin{itemize}
-    \item \textbf{User Profile Injection}: The \texttt{last\_board} and \texttt{preferred\_compression} from Redis long-term memory pre-populate the state, enabling context chaining across sessions.
-    \item \textbf{Thread-Based Isolation}: Each user+session combination gets a unique \texttt{thread\_id}, ensuring isolated checkpoints in Redis.
-    \item \textbf{NDJSON Encoding}: Each event is serialized as a JSON object followed by \texttt{\textbackslash n}, enabling incremental parsing on the client.
-\end{itemize}
+The server-side implementation incorporates several key features to enhance the user experience and ensure data isolation.
+User Profile Injection allows the system to pre-populate the state with parameters like \texttt{last\_board} and \texttt{preferred\_compression} from Redis long-term memory, enabling context chaining across independent sessions.
+
+To maintain security and state consistency, Thread-Based Isolation assigns a unique \texttt{thread\_id} to each user and session combination, ensuring isolated checkpoints in Redis.
+
+Finally, the use of NDJSON Encoding serializes each event as a JSON object followed by a newline (\texttt{\textbackslash n}), which allows the VS Code extension to parse the stream incrementally and provide real-time updates.
+
 
 \subsection{Communication Protocol}
 
@@ -175,63 +176,22 @@ The extension and server communicate via a custom NDJSON (Newline Delimited JSON
 {"type": "error", "content": "Model exceeds STM32F4 Flash limit"}
 \end{verbatim}
 
-\textbf{Event Types:}
+where:
 \begin{itemize}
-    \item \texttt{progress}: Transient status updates (e.g., ``Analyzing model...''), rendered as bullet points in the chat.
-    \item \texttt{markdown}: Rich-formatted responses supporting bold, code blocks, tables, and links.
-    \item \texttt{error}: Critical failures displayed with red highlighting and error icons.
+  \item \texttt{progress} represents transient status updates (e.g., ``Routing to AI Flow...'', ``Analyzing model...''), rendered as bullet points in the chat.
+  \item \texttt{markdown} represents rich-formatted responses supporting bold, code blocks, tables, and links.
+  \item \texttt{error} represents critical failures displayed with red highlighting and error icons.
 \end{itemize}
-
-\subsection{Integration Challenges and Solutions}
-
-\subsubsection{Challenge 1: LangGraph \texttt{config} Propagation}
-
-\textbf{Problem:} During initial integration, the subgraph nodes did not receive the \texttt{config} dictionary, causing crashes when accessing \texttt{config["configurable"]["user\_id"]}.
-
-\textbf{Solution:} Modified all node function signatures to include \texttt{config: dict = None} with default value \texttt{None}. Nodes check \texttt{if config and "configurable" in config} before accessing nested keys.
-
-\subsubsection{Challenge 2: Infinite Clarification Loop}
-
-\textbf{Problem:} Strict configuration validation caused the router to repeatedly request clarification (``Please specify target board'') even after the user provided input, creating a \texttt{router → clarify → router} loop.
-
-\textbf{Solution:} Relaxed validation logic to allow \texttt{None} values for non-critical parameters. The router now proceeds with workflow execution and requests missing data via HITL interrupts later in the pipeline.
-
-\subsubsection{Challenge 3: Model Download URL 404 Errors}
-
-\textbf{Problem:} The STM32 ModelZoo GitHub repository URLs hardcoded in \texttt{predefined\_models.json} returned 404 errors due to repository restructuring.
-
-\textbf{Solution:} Implemented fallback to GitHub search API when primary URL fails. The \texttt{search\_h5\_file\_in\_repo\_hybrid()} function scans repository contents recursively to locate valid \texttt{.h5} files.
 
 \subsection{Developer Experience Benefits}
 
-The VS Code integration provides several significant user experience improvements over traditional CLI-based interactions. By operating directly within the IDE, the assistant gains context awareness; it can access the active file via \texttt{vscode.window.activeTextEditor}, which paves the way for advanced features like automated analysis of currently open models or direct firmware generation for active \texttt{.ioc} projects. 
+The VS Code integration provides significant user experience advantages over traditional CLI-based interactions or the native LangGraph web interface (accessible via the \texttt{langgraph dev} command, which is primarily designed for graph debugging rather than end-user workflows). By operating directly within the IDE, the assistant gains context awareness; leveraging the \texttt{vscode.window.activeTextEditor} API enables advanced features such as the automated analysis of currently open models and direct firmware generation for active \texttt{.ioc} projects.
 
-In addition, the assistant delivers inline documentation where markdown responses can embed clickable file links (e.g., \texttt{file:///path/to/network.c\#L42}), allowing the developer to intuitively jump straight to generated code segments. During long-running operations such as model downloads or NNI experiments, real-time progress visibility prevents the perception of system freezes and keeps the user informed of the pipeline status. Lastly, the implementation of persistent chat history via the \texttt{isSticky: true} parameter enables multi-turn, contextual conversations, allowing developers to iteratively refine their requests (e.g., "Actually, I want a smaller model") without restarting the entire workflow.
+Then, the assistant facilitates inline documentation by embedding clickable file links (e.g., \texttt{file:///path/to/network.c\#L42}) within markdown responses, allowing developers to navigate intuitively to generated code segments. Moreover, during long-running operations, such as model downloads or NNI experiments, real-time progress visibility prevents the perception of system freezes and keeps the user informed of the pipeline's status.
+
 
 \subsection{Deployment and Testing}
 
-\textbf{Development Workflow:}
-\begin{enumerate}
-    \item \textbf{Compilation}: \texttt{npm run compile} transpiles TypeScript to JavaScript in \texttt{./out/extension.js}.
-    \item \textbf{Debug Launch}: \texttt{F5} opens an Extension Development Host window where \texttt{@stm32ai} is available.
-    \item \textbf{Server Startup}: The FastAPI backend must be running (\texttt{python -m src.api.server}) before testing.
-\end{enumerate}
+The development workflow for the extension involves three main steps. First, the compilation process uses \texttt{npm run compile} to transpile TypeScript source code into executable JavaScript in the \texttt{./out/extension.js} directory. Then, a debug session is initiated using \texttt{F5}, which opens an Extension Development Host environment where the \texttt{@stm32ai} handle becomes available. Finally, before beginning any tests, the FastAPI backend must be launched via the \texttt{python -m src.api.server} command.
 
-\textbf{Testing Scenarios:}
-\begin{itemize}
-    \item \textbf{Firmware Generation}: ``@stm32ai create a project for STM32H743 with STM32CubeIDE''
-    \item \textbf{Model Analysis}: ``@stm32ai analyze MobileNetV2 for STM32F4 with high compression''
-    \item \textbf{NNI Optimization}: ``@stm32ai fine-tune this model on Fruit-360 with 10 trials''
-    \item \textbf{Cancellation Test}: Start a long-running task, then close the chat window to verify graceful termination.
-\end{itemize}
-
-\subsection{Future Enhancements}
-
-Potential extensions to the VS Code integration:
-
-\begin{itemize}
-    \item \textbf{Syntax Highlighting for .ioc Files}: Custom TextMate grammar for STM32CubeMX configuration files.
-    \item \textbf{Code Action Providers}: Right-click on an \texttt{.h5} model file → ``Analyze for STM32''
-    \item \textbf{Status Bar Integration}: Show active NNI experiments in the VS Code status bar.
-    \item \textbf{Terminal Integration}: Automatically open a terminal and flash firmware to connected STM32 boards via \texttt{st-flash}.
-\end{itemize}
+To verify the correct operation of the system, several testing scenarios were executed. These included firmware generation requests (e.g., ``@stm32ai create a project for STM32H743 with STM32CubeIDE''), model analysis commands (e.g., ``@stm32ai analyze MobileNetV2 for STM32F4 with high compression''), and NNI optimization triggers. Additionally, a specific test was performed to verify that closing the chat window correctly triggers the \texttt{CancellationToken}, resulting in the graceful termination of long-running tasks.

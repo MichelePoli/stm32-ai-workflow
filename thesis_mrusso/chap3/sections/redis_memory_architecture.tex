@@ -17,22 +17,16 @@ This dual-layer design enables \textbf{Context Chaining}, where outputs from pre
 
 \subsection{Redis Key Structure Design}
 
-The framework uses a hierarchical key naming convention to organize data in Redis:
+The framework uses a hierarchical key naming convention to organize data in Redis, ensuring clear separation between transient checkpoints and persistent profiles.
 
 \subsubsection{Short-Term Memory (LangGraph Checkpoints)}
 
 LangGraph checkpoints are stored using a composite key structure:
-
 \begin{verbatim}
 checkpoint:{user_id}:{session_id}:{checkpoint_id}
 \end{verbatim}
 
-\textbf{Components:}
-\begin{itemize}
-  \item \texttt{user\_id}: Unique identifier for the user (e.g., ``michele'', ``user123'')
-  \item \texttt{session\_id}: Session identifier (e.g., ``vscode-session'', ``cli-2024-02-10'')
-  \item \texttt{checkpoint\_id}: Timestamp-based unique ID for each state snapshot (managed by LangGraph)
-\end{itemize}
+The key is composed of three primary elements: the \texttt{user\_id} (e.g., ``michele''), which serves as the unique identifier for the user; the \texttt{session\_id} (e.g., ``vscode-session''), which identifies the specific interface or session instance; and the \texttt{checkpoint\_id}, a timestamp-based unique ID managed automatically by LangGraph for each state snapshot.
 
 \textbf{Example Keys:}
 \begin{verbatim}
@@ -41,26 +35,16 @@ checkpoint:michele:vscode-session:1707575455789
 checkpoint:john:cli-session:1707575500000
 \end{verbatim}
 
-This structure ensures:
-\begin{itemize}
-  \item \textbf{User Isolation}: Different users never share checkpoints
-  \item \textbf{Session Multiplexing}: A single user can run multiple independent workflows simultaneously (e.g., one in VS Code, one in CLI)
-  \item \textbf{Temporal Ordering}: Checkpoint IDs are timestamped, enabling time-travel debugging
-\end{itemize}
+
+This hierarchical organization ensures strict User Isolation, preventining different users from sharing or accessing each other's checkpoints. Furthermore, it supports Session Multiplexing, allowing a single user to run multiple independent workflows simultaneously across different clients like VS Code and CLI. Since checkpoint IDs are timestamped, the system also maintains a clear temporal ordering, which enables critical features like time-travel debugging.
 
 \subsubsection{Long-Term Memory (User Profiles)}
 
-User profiles are stored with a simpler key structure:
-
+User profiles follow a simpler key structure for direct access:
 \begin{verbatim}
 user:{user_id}:profile
 \end{verbatim}
-
-\textbf{Example Keys:}
-\begin{verbatim}
-user:michele:profile
-user:john:profile
-\end{verbatim}
+Example keys for this layer include \texttt{user:michele:profile} and \texttt{user:john:profile}.
 
 \textbf{Profile Schema:}
 The profile value is a JSON-serialized dictionary containing persistent user preferences:
@@ -153,12 +137,7 @@ Each time a graph node completes execution, LangGraph automatically persists the
 }
 \end{verbatim}
 
-\textbf{Key Fields:}
-\begin{itemize}
-  \item \texttt{channel\_values}: The complete \texttt{MasterState} object with all 50+ attributes
-  \item \texttt{parent\_config}: Reference to the previous checkpoint (for time-travel)
-  \item \texttt{ts}: Timestamp for ordering checkpoints
-\end{itemize}
+where \textbf{key fields} are \texttt{channel\_values} which contains the complete \texttt{MasterState} object with all 50+ attributes, \texttt{parent\_config} which is the reference to the previous checkpoint (for time-travel) and \texttt{ts} which is the timestamp for ordering checkpoints.
 
 \subsection{Server-Side Profile Management}
 
@@ -273,13 +252,7 @@ The short-term memory checkpoint enables continuous Human-in-the-Loop workflows:
 
 \subsubsection{Redis I/O Overhead}
 
-Checkpoint writes inherently add latency to the execution pipeline, typically in the range of 5 to 20 milliseconds per node transition. To mitigate this overhead, the framework employs several strategies. 
-
-First, the \texttt{AsyncRedisSaver} heavily relies on non-blocking asynchronous I/O operations to prevent the main event loop from stalling. 
-
-Second, during development and local deployments, the system defaults to connecting via \texttt{redis://localhost}, significantly minimizing network transit latency. 
-
-Finally, LangGraph optimizes writes by coalescing multiple internal state updates that occur within a single node's execution context, performing a single consolidated write operation before transitioning to the next graph node.
+Checkpoint writes inherently add latency to the execution pipeline, typically in the range of 5 to 20 milliseconds per node transition. To mitigate this overhead, the framework employs several strategies, such as the use of non-blocking asynchronous I/O operations in the \texttt{AsyncRedisSaver} to prevent main event loop stalls. Furthermore, network transit latency is minimized during development by defaulting to a local \texttt{redis://localhost} connection. LangGraph further optimizes this process by consolidating multiple internal state updates from a single node's execution context into a single write operation before transitioning to the next stage of the graph.
 
 \subsubsection{Memory Footprint and Evolution of Data Persistence}
 
@@ -291,8 +264,8 @@ Redis is now strictly limited to maintaining the lightweight conversational chec
 
 \subsection{Security Considerations}
 
-Given that user profiles may store sensitive information, such as STMicroelectronics developer credentials required for STEdgeAI cloud authentication, the framework must adhere to strict security practices. In production deployments, it is imperative to encrypt sensitive fields using solid algorithms like AES-256 before persisting them in the Redis data store. 
+Given that user profiles may store sensitive information, such as STMicroelectronics developer credentials required for STEdgeAI cloud authentication, the framework must adhere to strict security practices. In production deployments, it is imperative to encrypt sensitive fields using solid algorithms like AES-256 before persisting them in the Redis data store.
 
-Also, access control should be strictly enforced using Redis ACL (Access Control Lists) to restrict client permissions, ensuring that specific key patterns (e.g., \texttt{user:*:profile}) are only accessible to authenticated and authorized services. 
+Also, access control should be strictly enforced using Redis ACL (Access Control Lists) to restrict client permissions, ensuring that specific key patterns (e.g., \texttt{user:*:profile}) are only accessible to authenticated and authorized services.
 
 Finally, to comply with GDPR data minimization principles and prevent indefinite data retention, user profiles are configured with a Time-To-Live (TTL) expiration policy, ensuring they are automatically purged after one year of complete inactivity.
