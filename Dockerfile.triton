@@ -1,28 +1,44 @@
 # Dockerfile.triton
 # Custom Triton image with vLLM + sentence-transformers support
-# Using 24.08 which ships with PyTorch 2.4+ and vLLM 0.5.3+
+
+# We use the official NVIDIA Triton Inference Server base image.
+# Version 24.08 is chosen because it includes compatible CUDA 12.x and PyTorch 2.4+ builds.
 FROM nvcr.io/nvidia/tritonserver:24.08-py3
 
-# Fix ASCII codec issues in Python backend stubs
+# Set environment variables to ensure Python handles UTF-8 characters correctly.
+# This prevents crashes when the LLM outputs non-ASCII symbols or specific technical characters.
 ENV PYTHONIOENCODING=utf-8
 ENV LC_ALL=C.UTF-8
 ENV LANG=C.UTF-8
 
-# Install system deps
+# Update the package manager and install essential system tools:
+# - python3-pip: needed to install ML libraries like vLLM.
+# - curl: required for the healthcheck probe (pinging the /v2/health/ready endpoint).
+# The cleanup command (rm -rf /var/lib/apt/lists/*) reduces the final image size.
 RUN apt-get update && apt-get install -y \
     python3-pip \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python ML dependencies (PyTorch 2.4+ already in base image)
+# Install the Python ML dependencies required for the inference backend.
+# --no-cache-dir is used to keep the Docker image slim by not caching downloaded packages.
 RUN pip3 install --no-cache-dir \
+    # vLLM: the high-performance engine used for LLM inference (Mistral, DeepSeek).
     vllm==0.6.3.post1 \
+    # numpy: fundamental library for numerical and array operations.
     numpy \
+    # sentence-transformers: library used specifically for the Embedding models (Nomic).
     sentence-transformers==3.3.1 \
+    # einops: useful for Einstein operations, required by several transformer architectures.
     einops \
+    # accelerate: HuggingFace library for efficient weights loading and device mapping.
     accelerate
 
-# Standard Triton ports
+# Expose Triton's default communication ports:
+# - 8000: HTTP port (used by our API bridge for load/unload commands).
+# - 8001: gRPC port (for standard inference requests).
+# - 8002: Metrics port (for performance monitoring).
 EXPOSE 8000 8001 8002
 
-# Entrypoint from base image, commands via docker-compose
+# The entrypoint is inherited from the BASE image. 
+# The specific start command is defined in the docker-compose.yml.

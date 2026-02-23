@@ -5,7 +5,8 @@ import os
 import shutil
 import tempfile
 
-# Impostazione per vLLM (se installato nel container)
+# vLLM (Virtual Large Language Model) is our high-performance inference engine.
+# We import LLM for the model engine and SamplingParams for generation settings.
 try:
     from vllm import LLM, SamplingParams
     VLLM_AVAILABLE = True
@@ -15,13 +16,15 @@ except ImportError:
 
 def _patch_mistral_config(model_name):
     """
-    Workaround per bug tra transformers>=4.45 e vLLM<=0.6.x:
-    MistralConfig definisce head_dim=None come attributo esplicito.
-    vLLM fa getattr(config, "head_dim", fallback) che ritorna None
-    invece del fallback, causando TypeError: int * NoneType.
-
-    Soluzione: scarichiamo il config.json, settiamo head_dim=128,
-    e restituiamo il path locale patchato.
+    WORKAROUND for a known bug between transformers>=4.45 and vLLM<=0.6.x.
+    
+    MistralConfig defines head_dim=None which causes vLLM to fail during 
+    the attention layer initialization (TypeError: int * NoneType).
+    
+    We fix this by:
+    1. Downloading the config.json from HuggingFace.
+    2. Calculating the correct head_dim (hidden_size // num_attention_heads).
+    3. Patching the JSON locally and returning the local directory path.
     """
     from huggingface_hub import snapshot_download
 
@@ -58,32 +61,38 @@ def _patch_mistral_config(model_name):
 class TritonPythonModel:
     def initialize(self, args):
         """
-        Inizializzato quando il modello viene caricato.
+        Called when the model is LOADED into Triton via the repository API.
         """
         self.model_config = json.loads(args['model_config'])
-        print(f"[INIT] Inizializzazione Mistral con vLLM Backend (Available: {VLLM_AVAILABLE})")
+        print(f"[INIT] Initializing Mistral with vLLM Backend (Available: {VLLM_AVAILABLE})")
 
         model_name = os.environ.get("TRITON_MODEL_NAME", "mistralai/Mistral-7B-Instruct-v0.2")
 
         if VLLM_AVAILABLE:
-            # Patch config per risolvere head_dim=None bug
+            # Step 1: Patch the config to resolve the head_dim=None bug found during benchmaring.
             local_model_path = _patch_mistral_config(model_name)
 
+            # Step 2: Initialize vLLM with memory-efficient parameters.
             self.llm = LLM(
                 model=local_model_path,
                 trust_remote_code=True,
+                # On our A4000 (16GB), we limit VRAM usage to ~45% for the weight loading
+                # to leave enough room for the KV cache and peak activations.
                 gpu_memory_utilization=0.45,
-                max_model_len=2048,  # Ridotto per KV cache (4096 richiede troppa VRAM)
-                quantization="gptq",
+                # We limit the maximum sequence length to 2048 to keep the KV cache size
+                # small, as increasing this significantly increases VRAM consumption.
+                max_model_len=2048, 
+                quantization="gptq", # Use GPTQ 4-bit quantization for Mistral 7B.
                 dtype="float16",
             )
+            # Sampling defaults used for all firmware-related generations.
             self.sampling_params = SamplingParams(temperature=0.7, max_tokens=1024)
         else:
             print("[WARN] vLLM non trovato nel container Triton. Caricare Dockerfile.triton!")
 
     def execute(self, requests):
         """
-        Eseguito per ogni richiesta di inferenza.
+        Executed for every inference request sent to /v2/models/mistral/infer.
         """
         responses = []
         for request in requests:
@@ -109,13 +118,15 @@ class TritonPythonModel:
                 import gc
                 from vllm.model_executor.parallel_utils.parallel_state import destroy_model_parallel
                 
-                # Prova a distruggere lo stato parallelo e liberare memoria
+                # Forcefully destroy the model parallel state to terminate GPU workers.
                 destroy_model_parallel()
+                # Delete the LLM object and trigger Python's Garbage Collector.
                 del self.llm
                 gc.collect()
+                # Empty the CUDA cache to return allocated VRAM back to the OS/NVIDIA Driver.
                 torch.cuda.empty_cache()
                 torch.cuda.synchronize()
-                print("[CLEANUP] VRAM liberata con successo per Mistral.")
+                print("[CLEANUP] VRAM successfully released for Mistral swapping.")
             except Exception as e:
                 print(f"[CLEANUP] Errore durante pulizia: {e}")
 

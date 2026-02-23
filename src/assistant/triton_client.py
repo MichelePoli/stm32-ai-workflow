@@ -17,8 +17,11 @@ logger = logging.getLogger(__name__)
 
 class ChatTriton(BaseChatModel):
     """
-    LangChain wrapper for Nvidia Triton Inference Server (via OpenAI-compatible API).
-    Assuming Triton is running vLLM or similar python wrapper that exposes /v1/chat/completions.
+    LangChain wrapper for Nvidia Triton Inference Server.
+    
+    This class bridges the gap between LangChain's standardized interface and Triton's 
+    Specialized Inference API. It handles model lifecycle management (load/unload)
+    to operate within limited VRAM constraints (16GB on NVIDIA A4000).
     """
     client: Any = None
     model_name: str = "mistral"
@@ -43,9 +46,13 @@ class ChatTriton(BaseChatModel):
 
     def with_structured_output(self, schema: Any, **kwargs: Any) -> RunnableSerializable:
         """
-        Supporta l'output strutturato forzando il modello a restituire JSON.
-        Inietta le istruzioni di schema nel system prompt e valida il JSON parsed
-        in un'istanza Pydantic, così i caller possono usare result.route ecc.
+        Enables structured output by forcing the model to return JSON.
+        
+        This method:
+        1. Injects JSON schema instructions into the system prompt.
+        2. Routes the request through the LLM.
+        3. Extracts the JSON block from the potentially noisy string response.
+        4. Validates and parses the JSON into the requested Pydantic schema.
         """
         from langchain_core.output_parsers import JsonOutputParser
         from langchain_core.runnables import RunnableLambda
@@ -126,13 +133,13 @@ class ChatTriton(BaseChatModel):
         **kwargs: Any,
     ) -> ChatResult:
         
-        # Ensure model is loaded in EXPLICIT mode
+        # 1. ORCHESTRATE VRAM: Ensure the target model is loaded in Triton's memory.
+        # Since Triton is in EXPLICIT mode, it won't load the model until requested.
         self._ensure_model_loaded()
         
-        # Format messages into a single prompt string for the PROMPT/RESPONSE
-        # tensor interface exposed by our Python backend's execute() method.
-        # Triton Python backend does NOT expose /v1/chat/completions - only
-        # the native /v2/models/{model}/infer endpoint is available.
+        # 2. PROMPT FORMATTING: Triton's Python backend using vLLM expects a raw text 
+        # string in the "PROMPT" input tensor. We collapse the list of chat messages 
+        # (System, Human, AI) into a single formatted string.
         prompt = self._format_prompt(messages)
         
         # Native Triton v2 inference with retry for server-side transient errors
@@ -215,20 +222,24 @@ class ChatTriton(BaseChatModel):
 
     def _ensure_model_loaded(self) -> None:
         """
-        Garantisce che il modello sia caricato in Triton (modalità EXPLICIT).
-        Gestisce lo swapping mutualmente esclusivo per non superare i 16GB di VRAM.
-        Su A4000 (16GB), manteniamo solo UN modello LLM attivo alla volta.
+        Guarantees that the requested model is READY in Triton (EXPLICIT mode).
+        
+        On an NVIDIA A4000 (16GB VRAM), serving multiple 7B+ LLMs simultaneously 
+        results in Out-of-Memory (OOM). This method implements a "Model Swapping" 
+        algorithm with mutual exclusion: only ONE heavy LLM resides in VRAM at a time.
         """
         base_url = self.triton_url.rstrip("/").removesuffix("/v1")
         
         # Lista di tutti i modelli LLM (escludendo nomic-embed che è piccolo)
         all_llms = ["mistral", "deepseek-r1", "gpt-oss-20b"]
         
-        # 1. Verifica se il modello richiesto è già pronto
+        # Stage 1: Check if the model is already in READY state to avoid re-loading overhead.
         if self._is_model_ready(base_url, self.model_name):
             return
 
-        # 2. Unload aggressivo di TUTTI gli altri LLM e attesa sincronizzazione
+        # Stage 2: MUTUAL EXCLUSION SWAPPING. 
+        # Unload all other active LLMs. We wait for each to be COMPLETED unloaded 
+        # before continuing, as GPU memory release is asynchronous.
         for model in all_llms:
             if model != self.model_name:
                 # Controlliamo se è caricato o in fase di caricamento
@@ -250,7 +261,7 @@ class ChatTriton(BaseChatModel):
             # Attendiamo che diventi READY nel registry
             self._wait_for_status(base_url, self.model_name, "READY", timeout=180)
             # Probe: wait until the OpenAI /v1/chat/completions route is actually live.
-            # A READY registry state does NOT guarantee the HTTP endpoint is registered yet
+            # A READY registry state does NOT guarantee the HTTP endpoint is registered yet !
             # (CUDA graph capturing can finish *after* the status flip).
             self._wait_for_endpoint_live(timeout=120)
             logger.info(f"✅ Modello {self.model_name} caricato e endpoint live.")
