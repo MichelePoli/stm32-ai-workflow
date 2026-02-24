@@ -1,62 +1,86 @@
 \section{STM32 Firmware Generation Workflow}
 \label{sec:firmware}
+
 Having defined the overall architecture, this section examines the specific functional characteristics of each workflow within the graph and the nodes that compose them.
-Workflow 1, in particular, automates the initialization of STM32CubeMX projects through CLI-driven scripting, eliminating manual GUI interaction and ensuring reproducible firmware project structure.
+Workflow 1 automates the initialization of STM32CubeMX projects through CLI-driven scripting, removing the need for manual GUI interaction and producing a reproducible firmware project structure.
 
 \subsection{Project Information Collection}
 
-The \texttt{collect\_project\_info()} node extracts hardware specifications from natural language using structured LLM extraction:
+The \texttt{collect\_project\_info()} node extracts hardware specifications from the user's natural language input. Parsing is delegated to \texttt{get\_llm()}, a centralized utility in \texttt{utils.py} that routes inference requests to the NVIDIA Triton Inference Server when the \texttt{USE\_TRITON\_BACKEND} environment variable is set, and falls back to a local Ollama instance otherwise. The utility is configured with the \texttt{ProjectInfoExtraction} Pydantic schema for structured output:
 
 \begin{lstlisting}[language=Python, caption={Firmware project info extraction}]
 # User: "Create a project for STM32F401 with STM32CubeIDE, name MyApp"
 
-llm_extractor = ChatTriton(model="mistral").with_structured_output(ProjectInfoExtraction)
+llm = get_llm(config)
+llm_extractor = llm.with_structured_output(ProjectInfoExtraction)
 result = llm_extractor.invoke([
     SystemMessage(content=project_info_extraction_instructions),
-    HumanMessage(content=state.message)
+    HumanMessage(content=f"Messaggio: {state.message}")
 ])
 
-# Parsed: {ioc_file_path: null, board_name: "STM32F401", mcu_series: "F4", 
-#          project_name: "MyApp", toolchain: "STM32CubeIDE"}
+# Parsed: {ioc_file_path: null, board_name: "STM32F401", mcu_series: "F4",
+#          project_name: "MyApp", toolchain: "STM32CubeIDE",
+#          peripheral_config: []}
 \end{lstlisting}
 
-Alternatively, users can specify an existing \texttt{.ioc} configuration file path, bypassing project creation.
+The schema includes a \texttt{peripheral\_config} field containing CubeMX commands for pins and peripherals. When the user mentions specific hardware in their prompt, for example ``activate pin PA5 as output'' or ``use timer 1'', the LLM converts these into CubeMX script directives (\texttt{set\_pin PA5 GPIO\_Output}, \texttt{set\_peripheral TIM1}) that are injected directly into the generation script. Alternatively, users can specify an existing \texttt{.ioc} file path, bypassing project creation entirely.
+
+The node also handles two edge cases before issuing the interrupt. If \texttt{board\_name} is already set in the graph state from a previous session, the node skips the interrupt and reuses the existing value. If the user responds with a phrase such as ``use the one from yesterday'' or ``same as before'', the LLM maps the input to the token \texttt{USE\_PROFILE}, which triggers a lookup of the last used board and MCU series from the Redis persistent context.
 
 \subsection{Automated MCU Package Management}
 
-The \texttt{search\_and\_install\_stm32\_package()} function automates the download of required STM32Cube firmware packages from GitHub. This step is key for headless operations; unlike the STM32CubeIDE/MX GUI, which prompts the user to download missing packages, the CLI mode fails abruptly with a "Project loading error" if the MCU package is missing from the local repository.
+The \texttt{search\_and\_install\_stm32\_package()} function handles the download of STM32Cube firmware packages from GitHub. Without this step, the CubeMX CLI fails silently with a ``Project loading error'' when a required MCU package is absent from the local repository. This is a practical difference from the GUI, which offers an interactive download prompt.
 
-To address this, the system first identifies the repository URL based on the MCU series (e.g., \texttt{STM32CubeF4} for F4 devices). The agent then clones the repository directly into the \texttt{\textasciitilde/STM32Cube/Repository/} folder and verifies the installation of HAL files and device headers. This automated provisioning removes the dependency on the manual STM32CubeMX Updater and avoids blocking errors during the generation process.
+The node first checks whether a package folder for the detected MCU series already exists inside \texttt{\textasciitilde/STM32Cube/Repository/}. If present, the step is skipped. Otherwise, the function uses \texttt{git ls-remote --tags} to read available version tags without cloning the full repository, selects the latest semantic version, and performs a shallow recursive clone:
+
+\begin{verbatim}
+git clone --recursive --branch v1.28.1 --depth 1 \
+    https://github.com/STMicroelectronics/STM32CubeF4.git \
+    /tmp/STM32CubeF4_<timestamp>
+\end{verbatim}
+
+After cloning, it verifies that \texttt{Drivers/}, \texttt{Middlewares/}, and \texttt{Projects/} are present, reads the version from \texttt{Release\_Notes.html}, and moves the repository to the final path under \texttt{STM32Cube/Repository/}. If the clone fails or times out, the error is stored in \texttt{state.package\_error\_message} and the routing node short-circuits to \texttt{finalize\_project}, skipping script generation.
 
 \subsection{Headless Generation and CLI Scripting}
 
-STM32CubeMX supports headless operation via the \texttt{-s} (script mode) command-line flag. The \texttt{generate\_cubemx\_script()} node creates a \texttt{.script} file that manages the entire generation process. This script loads either a user-provided \texttt{.ioc} file or a default board template, then configures micro-controller peripherals such as GPIO, UART, or I2C based on the requirements defined in the collection phase.
+STM32CubeMX supports headless operation via the \texttt{-q} flag. The \texttt{generate\_cubemx\_script()} node builds a \texttt{.scr} file in three steps.
 
-The script also sets code generation parameters, including the toolchain and the destination directory, before triggering the \texttt{generate code} command. Once the script is ready, the \texttt{execute\_generation()} node invokes CubeMX using the command:
+First, it searches for a usable IOC file in priority order: a user-supplied path, a pre-validated template matching the exact board name, and finally a series-level template (e.g., \texttt{STM32H7A3ZITx.ioc} for any H7 device). A matched template is loaded with \texttt{config load}, which avoids the interactive recommendation dialogs. Only when no template is available does the script fall back to \texttt{load \textless MCU\textgreater}, risking GUI pop-ups.
+
+Second, the project name, toolchain, and output path are appended. Third, any \texttt{peripheral\_config} entries are added, after filtering out directives that do not start with a recognized prefix (\texttt{set\_pin}, \texttt{set\_peripheral}, \texttt{config}). The complete script is written to \texttt{/tmp/script\_\textless timestamp\textgreater.scr}.
+
+The \texttt{execute\_generation()} node then invokes CubeMX with a command adapted to the host OS. On macOS, CubeMX is called directly. On Linux, the node checks at runtime for \texttt{xvfb-run} and uses it if found to provide a virtual framebuffer, dropping back to a direct call otherwise:
 
 \begin{verbatim}
-<cubemx_path> -q <script_file.script>
+# macOS
+<cubemx_path> -q <script_file.scr>
+
+# Linux (with xvfb-run if available)
+xvfb-run -a <cubemx_path> -q <script_file.scr>
 \end{verbatim}
 
-\textbf{Note on Headless Licensing:} A deployment challenge identified during testing is that the STM32CubeMX CLI requires a one-time GUI acceptance of the license agreement. If this manual step is skipped, or if \texttt{xvfb-run} is used without prior initialization, the generation process hangs indefinitely. The current workflow assumes that this license has already been accepted on the server hosting the agent.
+\textbf{Note on headless licensing:} CubeMX CLI requires a one-time GUI acceptance of the license agreement before it can run headlessly. If this step is skipped, the process hangs indefinitely. The workflow assumes the license has already been accepted on the host.
+
+\subsection{Two-Stage Generation with Temporary Directory}
+\label{subsec:two_stage_gen}
+
+CubeMX writes its output to a local temporary directory at \texttt{/tmp/stm32\_\textless timestamp\textgreater/} rather than to the final project destination. The \texttt{project path} directive in the script is patched dynamically just before execution to point to this interim path. This avoids filesystem locking on NFS-mounted output directories.
+
+After the process exits with return code 0, the node polls the temporary directory up to 10 times at one-second intervals, waiting for \texttt{Src/} and \texttt{Inc/} to appear. Once confirmed, the project tree is moved to the final path with \texttt{shutil.move()}. If the process is interrupted mid-generation, the output folder on the target filesystem remains clean.
 
 \subsection{Overcoming GUI Dependencies: The Pre-seeded IOC Strategy}
 \label{subsec:preseeded_ioc}
 
-To resolve the interactive pop-up issues described in Section \ref{subsec:gui_locked_features}, the firmware workflow was refactored to move away from generic board-based loading (\texttt{load <MCU>}) towards a \textbf{Pre-seeded IOC Strategy} for particular chip families.
+For known chip families, the firmware workflow uses a \textbf{pre-seeded IOC strategy} to avoid the interactive pop-ups described above. A set of pre-validated \texttt{.ioc} templates, one per supported MCU family (e.g., \texttt{STM32H7A3ZITx.ioc}, \texttt{STM32U585AIIxQ.ioc}), is maintained in the \texttt{templates/ioc\_files/} directory. Each file is configured manually once in the GUI to answer all the recommendation wizards, including MPU regions and TrustZone context.
 
-The agent maintains a repository of pre-validated \texttt{.ioc} templates, one for each supported chip family (e.g., \texttt{STM32H7A3ZITx.ioc}, \texttt{STM32U585AIIxQ.ioc}). These files are configured manually once in the GUI to satisfy the "recommendation wizards" (e.g., MPU regions defined, TrustZone context set to Non-Secure).
+At runtime, \texttt{get\_template\_ioc\_path()} tries an exact board-name match first, then a series-level match via the \texttt{SERIES\_MAP} dictionary. The chosen template is loaded with \texttt{config load "template.ioc"}, and the \texttt{project name} and \texttt{project path} directives re-target it to the user's directory, producing a fresh project that inherits the silent configuration.
 
-The automation logic was subsequently refined to rely on template-based injection. Instead of initializing a raw, unconfigured project, the orchestration agent first identifies the pre-validated template corresponding to the user's specific development board. The generated CubeMX script utilizes a lean scripting approach by executing a direct \texttt{config load "<template.ioc>"} command; critically, by deliberately omitting the standard \texttt{load <MCU>} directive, the tool gracefully skips the architectural negotiation phase and bypasses the interactive, GUI-blocking dialogs. To ensure isolation, project decoupling connects the template to the user's workflow: the \texttt{project name} and \texttt{project path} commands are executed to dynamically re-target the loaded template to the user's specific directory. This guarantees that the final output is a clean, uniquely named project while smoothly inheriting the pre-validated "silent" configuration.
+\subsection{Automatic Fallback on Generation Failure}
 
-Generated output includes initialization code (\texttt{main.c}, \texttt{stm32f4xx\_hal\_msp.c}), linker scripts, and IDE project files.
+If the first CubeMX attempt returns a non-zero code or times out, \texttt{recover\_with\_ioc\_fallback()} runs automatically. It identifies the best matching template for the current board or series and rewrites the \texttt{.scr} script to use \texttt{config load} in place of the generic board directive. CubeMX is then relaunched with a 600-second timeout. The two-stage temporary directory strategy applies to this retry as well.
+
+Generated output includes \texttt{main.c}, \texttt{stm32xxxx\_hal\_msp.c}, linker scripts, and IDE project files.
 
 \subsection{Human-in-the-Loop Gate}
 
-After successful generation, the \texttt{decide\_continue\_to\_ai()} node presents an interrupt:
-
-\begin{quote}
-  \textit{"Firmware project created. Do you want to proceed with AI model selection?"}
-\end{quote}
-
-The user's response is classified via LLM, allowing transitions between workflows (firmware $\rightarrow$ AI analysis) or workflow termination.
+After successful generation, \texttt{finalize\_project()} stores the firmware project path in the graph state. The main orchestrator then asks the user whether to continue to AI model selection. A yes routes to Workflow 2; any other response ends the current session cleanly.

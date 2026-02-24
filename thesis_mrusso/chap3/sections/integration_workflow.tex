@@ -1,57 +1,130 @@
 \section{Firmware-AI Integration Workflow}
 \label{sec:integration}
 
-After neural network code generation (Workflow 2) and firmware scaffolding (Workflow 1), Workflow 3 merges the AI inference code into the STM32 project structure.
+Once the neural network code is ready (Workflow 2) and the firmware scaffolding is in place (Workflow 1), Workflow 3 merges the two outputs into a single deployable project. The workflow handles path collection, firmware layout detection, AI file transfer, \texttt{main.c} patching, and a final consistency check, all without manual intervention.
 
-\subsection{File Placement and Build System Modification}
+The implementation resides in \texttt{workflow3\_integration.py} and runs five LangGraph nodes in sequence: \texttt{collect\_integration\_info}, \texttt{scan\_ai\_files}, \texttt{copy\_ai\_files}, \texttt{modify\_main\_c}, and \texttt{verify\_integration}.
 
-The generated \texttt{network.c/h} files from STEdgeAI are copied into the firmware project:
+\subsection{Project Path Collection and Idempotency}
 
-\begin{verbatim}
-<firmware_project>/
-|-- Core/
-|   |-- Inc/
-|   |   |-- network.h  <- AI model header
-|   |-- Src/
-|   |   |-- main.c
-|   |   |-- network.c  <- AI inference implementation
-|-- Drivers/X-CUBE-AI/  <- X-CUBE-AI runtime library
-\-- CMakeLists.txt  <- Modified to include AI sources
-\end{verbatim}
+The \texttt{collect\_integration\_info()} node determines two key paths: the firmware project directory and the folder containing the AI-generated code. When the workflow is triggered directly by the user (not as part of a sequential WF1→WF2→WF3 chain), these paths are extracted from a natural language message using a Pydantic schema (\texttt{IntegrationInfoExtraction}) with structured LLM output.
 
-The \texttt{CMakeLists.txt} is automatically updated to integrate these new components by adding the \texttt{network.c} file to the \texttt{add\_executable()} directive, including the necessary X-CUBE-AI header paths, and explicitly linking the project against the \texttt{libai\_runtime.a} static library.
+If the paths are already present in the graph state from a prior step, the node skips collection entirely and goes directly to validation. This avoids unnecessary LLM calls when the workflow is invoked automatically.
 
-\subsection{Application Code Template}
+When the paths cannot be inferred from the message, the system reads the agent's persistent memory to suggest the last known project directory:
 
-A minimal \texttt{main.c} template is provided demonstrating:
-
-\begin{lstlisting}[language=C, caption={AI inference integration in main.c}]
-#include "network.h"
-
-int main(void) {
-    HAL_Init();
-    SystemClock_Config();
-    
-    // Initialize AI model
-    ai_network_create(&network);
-    ai_network_init(network, network_data);
-    
-    // Prepare input tensor
-    ai_float input_data[AI_NETWORK_IN_SIZE];
-    // ... populate input_data from sensor ...
-    
-    // Run inference
-    ai_network_run(network, input_data, output_data);
-    
-    // Process output
-    uint8_t predicted_class = argmax(output_data, AI_NETWORK_OUT_SIZE);
-    
-    while(1) { /* main loop */ }
+\begin{lstlisting}[language=Python, caption={Persistent context suggestion during path collection}, label={lst:integration_suggest}]
+last_fw = state.persistent_context.get("last_project_path", "Nessuno")
+dynamic_prompt = {
+    "instruction": "...",
+    "suggestion": f"Last project was: {last_fw}. Use the same or a new path?"
 }
+resume_value = interrupt(dynamic_prompt)
 \end{lstlisting}
 
-This allows users to immediately test the integrated AI model on hardware.
+If the user's reply contains a word like ``yes'', ``previous'', or ``profile'', the path from the persistent context is applied directly, with no further LLM extraction.
+
+\subsection{Filesystem Validation and Layout Detection}
+
+Before any file operation begins, the internal helper \texttt{\_validate\_and\_detect\_structure()} expands relative and home-directory references (e.g., \texttt{\textasciitilde/} or \texttt{./}) using \texttt{os.path.expanduser()} and checks that both paths exist on disk. Path expansion happens before any scan so that downstream functions always work with absolute paths.
+
+The node then detects which of the two common STM32 project layouts is in use. The standard layout places source files under \texttt{Src/} and headers under \texttt{Inc/}, while the STM32Cube layout uses \texttt{Core/Src/} and \texttt{Core/Inc/}. The correct pair of directories is selected automatically. If neither pattern matches, the workflow raises an error before touching any file.
+
+The node also handles the case where the project root contains a single subdirectory: in that case, the subdirectory is treated as the real project root, which is common when a CubeMX project is zipped and extracted into a wrapper folder.
+
+\subsection{AI File Scanning}
+
+The \texttt{scan\_ai\_files()} node lists the contents of the AI code directory and splits the files into two groups: \texttt{.c} sources (stored in \texttt{state.ai\_src\_files}) and \texttt{.h} headers (stored in \texttt{state.ai\_header\_files}). If both groups are empty, the workflow raises an error rather than producing a silent, broken integration.
+
+\subsection{File Placement and X-CUBE-AI Runtime Headers}
+\label{sec:copy_ai_files}
+
+The \texttt{copy\_ai\_files()} node copies the scanned files into the firmware directories identified earlier: \texttt{.c} files go to \texttt{firmware\_src\_dir} and \texttt{.h} files go to \texttt{firmware\_inc\_dir}.
+
+Beyond the network files, the node also handles a less obvious requirement: the X-CUBE-AI runtime headers. When STEdgeAI generates the network code, it also produces a subdirectory at \texttt{st\_ai\_ws/inspector\_network/workspace/include} containing the STMicroelectronics AI platform headers (such as \texttt{ai\_platform.h}). These files are needed at compile time, but are not included in a standard CubeMX project unless the X-CUBE-AI component has been explicitly added through the \texttt{.ioc} configuration.
+
+The node checks for this directory and, if it exists, copies all \texttt{.h} files into \texttt{Middlewares/ST/AI/Inc/}, creating the folder if necessary:
+
+\begin{lstlisting}[language=Python, caption={X-CUBE-AI runtime header copy}, label={lst:xcubeai_headers}]
+ws_include_dir = os.path.join(output_root, "..", "st_ai_ws",
+    "inspector_network", "workspace", "include")
+middlewares_ai_inc = os.path.join(proj_root, "Middlewares", "ST", "AI", "Inc")
+
+if os.path.exists(ws_include_dir):
+    os.makedirs(middlewares_ai_inc, exist_ok=True)
+    for header in os.listdir(ws_include_dir):
+        if header.endswith('.h'):
+            shutil.copy2(src, dst)
+else:
+    logger.warning("Runtime headers not found. Add X-CUBE-AI via CubeMX .ioc.")
+\end{lstlisting}
+
+If the directory is absent, a warning is logged and the user is advised to add the component through CubeMX. This check prevents the common compile-time error caused by a missing \texttt{ai\_platform.h}.
+
+\subsection{Automated \texttt{main.c} Modification}
+\label{sec:main_c_injection}
+
+The \texttt{modify\_main\_c()} node is the most involved step. It reads the existing \texttt{main.c} and injects AI initialization and inference code into the STM32CubeMX user-code comment blocks (\texttt{USER CODE BEGIN}). Since CubeMX regenerates only its own auto-generated regions, code placed inside these blocks is preserved across future regenerations.
+
+Before writing anything, the node creates a timestamped backup:
+
+\begin{lstlisting}[language=Python, caption={Backup before patching}, label={lst:main_backup}]
+backup_path = f"{state.main_c_path}.backup_{state.timestamp}"
+shutil.copy2(state.main_c_path, backup_path)
+\end{lstlisting}
+
+Four injections are then applied in sequence, each guarded by a regex check to skip the block if the corresponding code is already present:
+
+\begin{enumerate}[noitemsep, topsep=4pt]
+    \item \textbf{USER CODE BEGIN Includes}: adds \texttt{\#include "network.h"} and \texttt{"network\_data.h"}.
+    \item \textbf{USER CODE BEGIN PV}: declares the AI handle, the activations buffer, and the input/output float arrays (\texttt{in\_data}, \texttt{out\_data}).
+    \item \textbf{USER CODE BEGIN 2}: calls \texttt{ai\_network\_create()}, \texttt{ai\_network\_init()}, and binds the buffer pointers.
+    \item \textbf{USER CODE BEGIN WHILE}: calls \texttt{ai\_network\_run()} in the main loop, with commented examples for sensor data input and output classification.
+\end{enumerate}
+
+The injected loop code is shown below:
+
+\begin{lstlisting}[language=C, caption={Injected inference code in the main loop (USER CODE BEGIN WHILE)}, label={lst:main_while}]
+/* Fill in_data with sensor data (ADC, I2C, SPI, etc.)
+   HAL_ADC_Start(&hadc1);
+   HAL_ADC_PollForConversion(&hadc1, HAL_MAX_DELAY);
+   in_data[0] = (ai_float)HAL_ADC_GetValue(&hadc1) / 4095.0f;
+*/
+
+if (ai_network_run(network, &ai_input[0], &ai_output[0]) != 1) {
+    /* Inference failed - blink error LED */
+    HAL_GPIO_WritePin(LED_ERROR_GPIO_Port, LED_ERROR_Pin, GPIO_PIN_SET);
+    HAL_Delay(100);
+    HAL_GPIO_WritePin(LED_ERROR_GPIO_Port, LED_ERROR_Pin, GPIO_PIN_RESET);
+}
+
+/* Process results (classification example):
+   int predicted_class = 0;
+   ai_float max_prob = out_data[0];
+   for (int i = 1; i < AI_NETWORK_OUT_1_SIZE; i++) {
+       if (out_data[i] > max_prob) {
+           max_prob = out_data[i];
+           predicted_class = i;
+       }
+   }
+*/
+\end{lstlisting}
+
+The network name comes from \texttt{state.network\_name}, so the injection works across different model names. If \texttt{modify\_main} is set to \texttt{False} in the state, the step is skipped cleanly.
+
+\subsection{Verification and Persistent Context Update}
+
+The \texttt{verify\_integration()} node checks that every copied file is present at its destination and that the \texttt{main.c} patch was recorded as successful. If all checks pass, the workflow saves the used paths to Redis (see Section~\ref{sec:redis_architecture}):
+
+\begin{lstlisting}[language=Python, caption={Persistent context update on success}, label={lst:integration_persist}]
+state.persistent_context["last_project_path"] = state.firmware_project_dir
+state.persistent_context["last_ai_code_dir"] = state.ai_code_dir
+\end{lstlisting}
+
+These values are then available in future sessions, so the user will be prompted with the same paths as a default suggestion the next time the workflow runs.
+
+If verification fails, the response includes a step-by-step breakdown showing which operations succeeded and which did not, to help with manual recovery.
 
 \subsection{Build Verification}
 
-The workflow attempts to compile the integrated project using the configured toolchain (e.g., \texttt{arm-none-eabi-gcc}). If compilation fails, error logs are presented to the user for manual debugging.
+As a final check, the workflow compiles the project with the configured toolchain (typically \texttt{arm-none-eabi-gcc}). A clean build confirms that the AI files are in the right place, the runtime headers are visible to the compiler, and the injected code in \texttt{main.c} has no syntax errors. If the build fails, the compiler log is returned directly to the user for inspection.
