@@ -1,6 +1,6 @@
 \section{Web Search Agent: Quality Evaluation with DeepEval}
 
-This section presents an experimental validation of the Web Search Agent (Workflow 4), which integrates real-time information retrieval via Google Search, LLM-based summarization, and automated quality assessment using DeepEval metrics. The evaluation demonstrates the system's ability to provide reliable, fact-checked technical guidance for STM32 embedded AI development.
+This section presents an experimental validation of the Web Search Agent (Workflow 4), which integrates real-time information retrieval via DuckDuckGo, LLM-based summarization, and automated quality assessment using DeepEval metrics.
 
 \subsection{Methodology}
 
@@ -8,7 +8,7 @@ This section presents an experimental validation of the Web Search Agent (Workfl
 The quality assessment utilizes \textbf{DeepEval}\footnote{\url{https://github.com/confident-ai/deepeval}}, an open-source framework designed for RAG (Retrieval-Augmented Generation) evaluation. The framework was configured as follows:
 
 \begin{itemize}
-  \item \textbf{LLM Backend}: Mistral (7B parameters) via Ollama, running locally at \texttt{http://localhost:11434}
+  \item \textbf{LLM Backend}: DeepSeek-R1 (7B parameters) via a local Ollama instance (\texttt{http://localhost:11434}), used as the LLM-as-a-Judge evaluator
   \item \textbf{Metrics}: Four domain-specific metrics tailored for technical documentation:
         \begin{itemize}
           \item \textbf{Faithfulness}: Measures factual consistency between the LLM-generated summary and retrieved documents (range: 0.0--1.0, higher is better)
@@ -19,13 +19,7 @@ The quality assessment utilizes \textbf{DeepEval}\footnote{\url{https://github.c
 \end{itemize}
 
 \subsubsection{Test Protocol}
-The evaluation workflow is structured strictly across five sequential stages. 
-
-First, during Query Classification, the user submits a natural language query which the system automatically classifies into predefined categories (such as \texttt{ai\_model} or \texttt{board\_selection}). Next, in the Web Retrieval phase, the Google Search API actively retrieves the top-ranked web pages matching the reformulated technical query. 
-
-Third, to ensure high precision, the system performs Granular Chunking, splitting all retrieved text into paragraph-level chunks to precisely enable fine-grained relevance analysis. Fourth, during Summarization, a local Mistral LLM (running at a deterministic temperature of 0.2) synthesizes a concise technical answer directly from these chunks using a strict English-language prompt. 
-
-Finally, the DeepEval Assessment smoothly computes the four evaluation metrics asynchronously in a completely separate thread, ensuring the core agent workflow remains entirely unblocked.
+The evaluation runs in five sequential stages. First, the user's natural language query is classified into a predefined category (\texttt{ai\_model}, \texttt{board\_selection}, \texttt{optimization}, or \texttt{documentation}). Second, DuckDuckGo retrieves the top web pages for the reformulated query via the Agno agent. Third, the raw response is split into paragraph-level chunks (minimum 20 characters), giving the evaluator finer retrieval segments. Fourth, a local Mistral instance (temperature 0.2) synthesizes a concise technical answer in English from those chunks. Finally, DeepEval computes the four metrics synchronously in a separate thread via \texttt{asyncio.to\_thread}, keeping the main event loop unblocked.
 
 \subsection{Experimental Results}
 
@@ -84,9 +78,9 @@ The \textbf{lowest Faithfulness (0.44)} reveals an interesting trade-off: the su
 \subsection{Discussion}
 
 \subsubsection{Aggregate Performance}
-The system achieved consistent and revealing performance across all evaluated metrics. The consistently high scores for Contextual Relevancy (mean: 0.75, $\sigma$: 0.16; range: 0.56--0.90) firmly confirm the fundamental effectiveness of combining Google Search with targeted paragraph-level chunking. 
+Contextual Relevancy is the most stable metric (mean: 0.75, $\sigma$: 0.16; range: 0.56--0.90), confirming that DuckDuckGo retrieval combined with paragraph-level chunking consistently surfaces relevant content.
 
-However, the wide variance observed in Faithfulness (mean: 0.71, $\sigma$: 0.22) starkly reflects a Faithfulness-Utility trade-off: highly procedural queries achieve perfect scores by strictly adhering to retrieved sources, whereas exploratory consulting queries exhibit lower scores due to helpful but ungrounded LLM enrichment. Reassuringly, the low average for Hallucination (mean: 0.14, $\sigma$: 0.14) confirms minimal outright fabrication, with the few non-zero scores accurately detecting highly specific claims, such as hardware pricing or exact part numbers, that were genuinely absent from the raw retrieval context.
+Faithfulness shows the widest variance (mean: 0.71, $\sigma$: 0.22). Procedural queries, which demand step-by-step adherence to source documents, reach perfect scores; exploratory queries score lower because the model enriches its answers with pre-trained domain knowledge not present in the retrieved text. The Hallucination mean of 0.14 ($\sigma$: 0.14) confirms that outright fabrication is rare. The few non-zero cases correspond to specific hardware prices and exact part numbers that were absent from the retrieved context.
 
 \subsubsection{Faithfulness-Utility Trade-off}
 A key finding of this evaluation is the distinctly inverse relationship observed between absolute Faithfulness and practical user utility. High Faithfulness (between 0.80 and 1.00) is invariably achieved when the LLM strictly paraphrases the retrieved documents, making it ideal for rigid technical procedures and precise academic definitions. However, low Faithfulness (between 0.44 and 0.60) frequently occurs when the LLM intelligently supplements the basic retrieval with its own pre-trained domain knowledge, such as adding standard pricing estimates or typical hardware specifications. While technically unfaithful to the search results, this enrichment produces significantly more useful answers for exploratory queries, albeit requiring slightly more cautious interpretation from the user.
@@ -94,11 +88,7 @@ A key finding of this evaluation is the distinctly inverse relationship observed
 This trade-off suggests the need for \textbf{context-aware metric weighting}: procedural queries should prioritize Faithfulness, while exploratory queries may tolerate lower Faithfulness in exchange for detailed answers.
 
 \subsubsection{Threats to Validity}
-Several threats to validity clearly apply to this rigorous evaluation. Concerning internal validity, the selected LLM temperature of 0.2 deliberately trades creative fluency for deterministic consistency; utilizing even lower values might marginally improve mathematical Faithfulness at the heavy cost of readability. 
-
-Regarding external validity, the test cases were strictly limited to the STM32 and Edge AI domains, meaning successful generalization to wildly different embedded ecosystems like ESP32 or Arduino remains formally unverified. 
-
-Finally, regarding construct validity, it is clear that the strict DeepEval Faithfulness metric aggressively penalizes helpful LLM enrichment, meaning that human domain experts might actually prefer ``unfaithful'' enriched answers despite their lower automated scores.
+Three threats to validity apply here. For internal validity, the LLM temperature of 0.2 prioritizes deterministic consistency over creative fluency; lower values would likely improve Faithfulness scores at some cost to readability. For external validity, all test cases are limited to the STM32 and Edge AI domains, so generalization to other embedded ecosystems (ESP32, Arduino) remains untested. On construct validity, the DeepEval Faithfulness metric penalizes any claim not found verbatim in the retrieved text, meaning enriched answers that domain experts would consider accurate can receive lower automated scores than bare paraphrases.
 
 \subsection{Conclusion}
 The experimental validation demonstrates that the Web Search Agent, augmented with DeepEval metrics, provides a \textbf{transparent, quantifiable quality assessment} of AI-generated technical guidance. The system achieves:
@@ -108,4 +98,5 @@ The experimental validation demonstrates that the Web Search Agent, augmented wi
   \item Adaptive behavior across query types (perfect Faithfulness for procedures, enriched answers for exploration)
 \end{enumerate}
 
-Future work should explore adaptive metric weighting, hybrid retrieval strategies (vector DB + web search), and user feedback integration to calibrate acceptable Faithfulness-Utility trade-offs for different stakeholder profiles (novice developers vs. domain experts).
+Future work should explore adaptive metric weighting, hybrid retrieval strategies (vector database combined with live web search), and user feedback integration to calibrate acceptable Faithfulness-Utility trade-offs for different stakeholder profiles.
+

@@ -12,7 +12,7 @@ This experiment evaluates the effectiveness of the \textbf{multi-agent code gene
 
 \noindent \textbf{Orchestrator Decomposition:} The orchestrator identified heterogeneous knowledge requirements and routed to two specialized agents with semantic coupling:
 
-The orchestrator securely decomposed the task by routing it to the \textbf{snnTorch Agent}, which successfully generated both the \texttt{model.py} and \texttt{utils.py} files complete with noise injection and Leaky IF neurons, and the \textbf{NNI Agent}, which simultaneously generated the rigorous hyperparameter search space in \texttt{config.py} and the complete training loop in \texttt{train.py}.
+The orchestrator decomposed the task by routing it to the \textbf{snnTorch Agent}, which generated both \texttt{model.py} and \texttt{utils.py} (noise injection and Leaky IF neurons), and the \textbf{NNI Agent}, which generated the hyperparameter search space in \texttt{config.py} and the training loop in \texttt{train.py}.
 
 The orchestrator specified: ``train.py should load model from model.py,'' ensuring cross-agent integration without direct communication.
 
@@ -42,7 +42,7 @@ Critically, the NNI agent \textbf{expanded the search space to eight hyperparame
 
 \vspace{0.3cm}
 
-\noindent \textbf{Overall Performance:} Multi-agent orchestration with persistent vectorstores successfully decomposed heterogeneous code generation into specialized subtasks with ranked retrieval backing each agent. Key contributions: (1) orchestrator task decomposition identifying specialized knowledge requirements, (2) ranked query generation reflecting semantic prioritization, (3) weighted multi-pass retrieval concentrating most-relevant context, (4) semantic coupling through orchestrator contracts ensuring integrated code, (5) hyperparameter space expansion demonstrating architectural inference. Generated code achieves high domain semantic understanding, correct framework integration, and practical system coherence, validating the multi-agent approach with persistent knowledge infrastructure.
+\noindent \textbf{Overall Performance:} Multi-agent orchestration with persistent vectorstores decomposed heterogeneous code generation into specialized subtasks, each backed by ranked retrieval. Key contributions: (1) orchestrator task decomposition, (2) ranked query generation with semantic prioritization, (3) weighted multi-pass retrieval, (4) cross-agent coupling via orchestrator contracts, (5) hyperparameter space expansion by architectural inference. All four generated files integrate correctly with no parameter conflicts.
 
 The complete generated code is provided below for reproducibility and verification of the multi-agent code generation system's output.
 
@@ -471,9 +471,7 @@ This experiment evaluates the effectiveness of the \textbf{code generation branc
 
 \noindent \textbf{Code Normalization for Equivalent Input Handling:} Both generated and reference code were normalized to accept \textbf{identical input tensors} despite architectural differences. Generated code expects input shape \( (128, 784) \) and internally initializes membrane states, while reference code expects pre-initialized membrane potentials (\texttt{mem1, spk1, mem2}) as function parameters. Normalization involved:
 
-This complex normalization involved strict input standardization, ensuring both models received identical synthetic data tensors with the exact same shapes and device placements. It required state initialization reconciliation, where the reference code's explicit state parameters were forcefully initialized to zero tensors to perfectly match the generated code's internal, autonomous initialization strategy. 
-
-Also, the methodology enforced output format alignment, mandating that both models cleanly return spike recordings and membrane potentials formally stacked across the temporal dimension, and guaranteed device consistency by executing all operations on the identical hardware accelerator to ensure true computational equivalence.
+This complex normalization involved input standardization (both models received identical synthetic data tensors), state initialization reconciliation (the reference code's explicit state parameters were initialized to zero to match the generated code's internal initialization), output format alignment (both models return spike recordings and membrane potentials stacked across the temporal dimension), and device consistency (all operations ran on the same hardware accelerator).
 
 This normalization process transforms heterogeneous implementations into \textbf{functionally comparable artifacts} despite syntactic and architectural differences.
 
@@ -481,11 +479,7 @@ This normalization process transforms heterogeneous implementations into \textbf
 
 \noindent \textbf{Performance Metrics and Observed Behavior:} The system measured quantitative characteristics across three dimensions to explore whether performance patterns might provide insights into code correctness:
 
-Beginning with forward pass latency, the reference model executed in a mere \( 0.001485 \) seconds compared to the generated model's \( 0.504636 \) seconds; this significantly higher latency correctly aligns with the necessary temporal unrolling across 100 timesteps using complex Lapicque neuron dynamics, whereas the shallower reference executed a single, unrolled geometric pass. 
-
-Regarding model capacity, the generated code produced \( 795,010 \) parameters compared to the reference's \( 101,770 \), a delta that accurately reflects the generated architecture's deeper two-layer design and suggests flawless adherence to the complex architectural specification. 
-
-Finally, despite this massive parameter expansion, peak memory usage for the generated model remained impressively minimal at \( 0.06 \) MB, strongly indicating highly efficient tensor management within the autonomously generated loops.
+The reference model executed in 0.001485 seconds against the generated model's 0.504636 seconds; the higher latency correctly reflects temporal unrolling across 100 timesteps with Lapicque neuron dynamics. The generated code produced 795,010 parameters versus the reference's 101,770, consistent with the deeper two-layer architecture. Peak memory for the generated model was 0.06 MB, indicating efficient tensor management inside the temporal loop.
 
 \vspace{0.3cm}
 

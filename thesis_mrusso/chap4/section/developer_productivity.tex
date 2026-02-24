@@ -6,7 +6,7 @@ A key dimension for evaluating the framework's impact is quantifying the reducti
 
 \subsection{Methodology}
 
-Given the challenges of conducting a large-scale empirical developer study, the time estimates for the manual workflows were established using an analytical evaluation methodology inspired by the \textbf{Keystroke-Level Model (KLM)} and \textbf{GOMS} frameworks \cite{card1980keystroke, baek2014evaluating}. By decomposing the manual development lifecycle - such as navigating the STM32CubeMX GUI, configuring peripheral clock trees, and manually porting Keras artifacts into the X-CUBE-AI generator - into discrete operative steps (e.g., pointing, clicking, mental preparation, and system response times), we established a rigorous baseline for an expert user. These analytical estimates were then cross-referenced with three complementary sources to ensure validity:
+Given the challenges of conducting a large-scale empirical developer study, the time estimates for the manual workflows were established using an analytical evaluation methodology inspired by the \textbf{Keystroke-Level Model (KLM)} and \textbf{GOMS} frameworks \cite{card1980keystroke, baek2014evaluating}. By decomposing the manual development lifecycle (navigating the STM32CubeMX GUI, configuring peripheral clock trees, and manually porting Keras artifacts into the X-CUBE-AI generator) into discrete operative steps (pointing, clicking, mental preparation, and system response times), we established a baseline for a proficient user. These estimates were then cross-referenced with three complementary sources to verify their plausibility:
 
 \begin{enumerate}
   \item \textbf{Official STMicroelectronics Documentation}: Tutorial completion times from STM32Cube.AI user manuals and CubeMX getting-started guides\cite{st_cubemx_manual}.
@@ -52,10 +52,7 @@ Table~\ref{tab:productivity} presents a breakdown of the complete Edge AI deploy
 
 \subsubsection{Quantified Productivity Gains}
 
-The framework achieves an \textbf{average 9× speedup} for the complete deployment pipeline, reducing a typical 4-hour manual workflow to under 30 minutes of developer interaction time. This aligns with industry benchmarks for MLOps automation:
-This acceleration aligns strongly with established industry benchmarks for MLOps automation. 
-
-For instance, while recent studies on embedded ML CI/CD pipelines report a 70\% reduction in deployment time\cite{embedded_ml_cicd_2025}, our NNI experiment generation actually exceeds this benchmark, achieving 97\% time savings (reducing a 60-minute task to under 2 minutes). 
+For instance, recent studies on embedded ML CI/CD pipelines report a 70\% reduction in deployment time \cite{embedded_ml_cicd_2025}; the NNI experiment generation in this framework exceeds that benchmark, reducing a 60-minute task to under 2 minutes (97\% savings).
 
 Also, complex MLOps adoptions typically report a 30\% increase in operational efficiency\cite{mlops_productivity_2024}; the framework directly contributes to this metric through its autonomous resource optimization, such as automatic compression escalation and class mismatch rescue, which virtually eliminates iterative debugging cycles.
 
@@ -71,17 +68,15 @@ Also, complex MLOps adoptions typically report a 30\% increase in operational ef
 
 \subsubsection{Developer Experience Improvements}
 
-Beyond raw time savings, the framework provides qualitative benefits:
-
-Beyond raw time savings, the framework provides substantial qualitative benefits designed to improve the overall developer experience. Primarily, it significantly reduces cognitive load; developers can now specify high-level intent (e.g., ``Deploy MobileNetV2 on STM32H7 with high compression'') rather than manually orchestrating over 50 low-level commands. It also excels in error prevention, employing automated validation gates, such as resource constraint checking and build verification, to catch issues early and avoid the notoriously costly debug-flash-test cycle on physical hardware. Lastly, it dramatically improves knowledge accessibility, utilizing RAG-improved best practices retrieval (as detailed in Section~\ref{sec:customization}) to provide expert-level guidance that democratizes complex optimization techniques for novice users.
+Beyond raw time savings, the framework reduces cognitive load: developers specify high-level intent (e.g., ``Deploy MobileNetV2 on STM32H7 with high compression'') rather than manually orchestrating over 50 low-level commands. Automated validation gates (resource constraint checking, build verification) catch issues before the debug-flash-test cycle on physical hardware. RAG-based best-practices retrieval (Section~\ref{sec:customization}) provides expert-level guidance on compression and quantization that would otherwise require consulting several datasheets.
 
 \subsubsection{Limitations and Threats to Validity}
 
-Several threats to validity must be acknowledged. 
+Several threats to validity must be acknowledged.
 
-Regarding internal validity, the manual time estimates rely on official documentation and representative developer experiences, meaning actual times will naturally vary based on individual expertise, veterans will be faster, while novices will be slower. For external validity, these comparisons strictly assume standard workflows; organizations utilizing heavily customized toolchains or proprietary CI/CD pipelines will likely experience different speedup ratios. In terms of measurement precision, the automated timings represent median values recorded during test runs; real-world performance will invariably fluctuate due to network latency during model downloads, variable LLM inference speeds, and Redis I/O overhead. 
+Regarding internal validity, the manual time estimates rely on official documentation and representative developer experiences, meaning actual times will naturally vary based on individual expertise, veterans will be faster, while novices will be slower. For external validity, these comparisons strictly assume standard workflows; organizations utilizing heavily customized toolchains or proprietary CI/CD pipelines will likely experience different speedup ratios. In terms of measurement precision, the automated timings represent median values recorded during test runs; real-world performance will invariably fluctuate due to network latency during model downloads, variable LLM inference speeds, and Redis I/O overhead.
 
-Finally, there are hidden costs concerning the initial framework setup, such as configuring Docker containers and downloading massive STM32Cube packages, that are excluded from these timings, though this overhead becomes rapidly negligible when amortized across multiple projects.
+Finally, hidden costs for initial framework setup (configuring Docker containers and downloading STM32Cube packages) are excluded from these timings, though this overhead becomes negligible when amortized across multiple projects.
 
 \subsection{Architectural Scalability and Deployment Scenarios}
 \label{sec:scalability_scenarios}
@@ -99,7 +94,7 @@ An important outcome of the system design is its evolution from a local desktop 
         To resolve the resource locking issue, the final architecture decoupled the multi-agent orchestration logic from the model inference engine. User-specific LangGraph containers now run exclusively on CPU and RAM, delegating all LLM requests to a centralized \textbf{NVIDIA Triton Inference Server} via standardized APIs. Triton acts as an optimized proxy, dynamically loading and unloading models from GPU memory, handling concurrent request batching, and enabling fractional GPU allocation. This decoupling allows multiple agentic pipelines to share the same hardware accelerators simultaneously, laying the groundwork for a fully scalable Kubernetes deployment.
 \end{enumerate}
 
-Migrating from isolated container inference to a centralized Triton server improves concurrent throughput and prevents memory saturation failures under heavy load. The architecture no longer permanently binds expensive hardware accelerators to individual users, acting as a flexible multi-tenant backend.
+Decoupling workflow agents from model inference eliminates the 1:1 GPU-per-user binding, raising concurrent throughput and removing the memory saturation failures that appeared under the single-container architecture.
 
 \subsection{Comparison with Related Tools}
 
@@ -128,7 +123,7 @@ Table~\ref{tab:tool_comparison} contrasts the framework's automation coverage wi
   \end{tabular}
 \end{table}
 
-Several key differentiators emerge when comparing this framework to existing tools. While Edge Impulse provides excellent GUI-based model training, it still requires manual firmware project setup and completely lacks programmatic hyperparameter optimization. Bare-metal libraries like TFLite Micro offer only the core inference runtime, leaving all model selection, optimization, and integration steps strictly manual. STM32Cube.AI (Standalone) excels at C-code generation but offers zero workflow orchestration, forcing developers to manually invoke repetitive CLI commands and read raw reports. 
+Several key differentiators emerge when comparing this framework to existing tools. While Edge Impulse provides excellent GUI-based model training, it still requires manual firmware project setup and completely lacks programmatic hyperparameter optimization. Bare-metal libraries like TFLite Micro offer only the core inference runtime, leaving all model selection, optimization, and integration steps strictly manual. STM32Cube.AI (Standalone) excels at C-code generation but offers zero workflow orchestration, forcing developers to manually invoke repetitive CLI commands and read raw reports.
 
 Finally, although the NVIDIA TAO Toolkit delivers strong transfer learning automation, it exclusively targets powerful Jetson/GPU architectures rather than constrained MCUs, and it lacks any STM32-specific firmware generation capabilities.
 
@@ -136,4 +131,4 @@ This framework is the only solution providing \textbf{end-to-end automation} cov
 
 \subsection{Conclusion}
 
-The quantitative analysis indicates that the automated pipeline reduces the Edge AI deployment lifecycle from approximately 4 hours to under 30 minutes, representing a significant productivity multiplier. This aligns with published MLOps automation benchmarks while addressing the microcontroller-specific challenges of firmware generation and resource constraints.
+The quantitative analysis shows the automated pipeline cuts the Edge AI deployment lifecycle from roughly 4 hours to under 30 minutes, a 9× reduction that holds up against published MLOps benchmarks while covering the microcontroller-specific steps (firmware generation and resource validation) that general-purpose tools omit.

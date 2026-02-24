@@ -7,13 +7,13 @@ This experiment evaluates the effectiveness of the \textbf{web search branch} wi
 
 \textbf{Query Task:} The system was instructed to research the event ``Italian Tech Week 2025'' held in Turin, Italy (October 2025), with explicit requirements to provide:
 \begin{itemize}
-    \item Exact event dates and venue name
-    \item Event theme and slogan
-    \item At least five major speakers with descriptions
-    \item Key program elements and their relevance
-    \item Event scale metrics (attendees, startups, investors, sessions)
-    \item At least two reliable web citations from sources published after 2023
-    \item \textbf{Critical constraint:} Base answers only on up-to-date web information, not on pre-training data
+  \item Exact event dates and venue name
+  \item Event theme and slogan
+  \item At least five major speakers with descriptions
+  \item Key program elements and their relevance
+  \item Event scale metrics (attendees, startups, investors, sessions)
+  \item At least two reliable web citations from sources published after 2023
+  \item \textbf{Critical constraint:} Base answers only on up-to-date web information, not on pre-training data
 \end{itemize}
 
 This task design ensures that the web search capability is necessary for providing current, factual information that may not exist in the model's training data or may have changed since training.
@@ -21,18 +21,18 @@ This task design ensures that the web search capability is necessary for providi
 The system's performance was evaluated using the \textbf{DeepEval framework}, employing four complementary metrics designed to assess different dimensions of retrieval-augmented generation (RAG) quality.
 
 \begin{table}[h]
-    \centering
-    \caption{Experiment 1: DeepEval Metrics Summary}
-    \begin{tabular}{lcccl}
-        \toprule
-        \textbf{Metric}         & \textbf{Score} & \textbf{Status}       & \textbf{Interpretation}  \\
-        \midrule
-        Faithfulness            & \( 0.80 \)     & \( \checkmark \) Pass & Strong source alignment  \\
-        Answer Relevancy        & \( 0.923 \)    & \( \checkmark \) Pass & Highly targeted response \\
-        Contextual Relevancy    & \( 0.88 \)     & \( \checkmark \) Pass & Excellent retrieval      \\
-        Hallucination Detection & \( 0.94 \)     & \( \checkmark \) Pass & Minimal hallucinations   \\
-        \bottomrule
-    \end{tabular}
+  \centering
+  \caption{Experiment 1: DeepEval Metrics Summary}
+  \begin{tabular}{lcccl}
+    \toprule
+    \textbf{Metric}         & \textbf{Score} & \textbf{Status}       & \textbf{Interpretation}  \\
+    \midrule
+    Faithfulness            & \( 0.80 \)     & \( \checkmark \) Pass & Strong source alignment  \\
+    Answer Relevancy        & \( 0.923 \)    & \( \checkmark \) Pass & Highly targeted response \\
+    Contextual Relevancy    & \( 0.88 \)     & \( \checkmark \) Pass & Excellent retrieval      \\
+    Hallucination Detection & \( 0.94 \)     & \( \checkmark \) Pass & Minimal hallucinations   \\
+    \bottomrule
+  \end{tabular}
 \end{table}
 
 \textbf{Faithfulness (Score: \( 0.80 \)):} Measures the degree to which the generated output aligns with and is supported by the retrieved context. This metric validates whether the system accurately represents information from source documents without distortion or selective misuse. The generated response demonstrated strong alignment with retrieved context regarding core topics (sustainability, AI advancements, fintech). The score does not reach \( 0.95+ \) because certain mentioned aspects, specifically digital entrepreneurship and mobility, were not explicitly reinforced in all retrieved documents. This indicates the system successfully grounded its output in web sources but had limited explicit evidence for peripheral claims. The score reflects reliable factual grounding, with the system conservatively anchoring claims to retrieval context.
@@ -45,7 +45,7 @@ The system's performance was evaluated using the \textbf{DeepEval framework}, em
 
 \vspace{0.3cm}
 
-\noindent \textbf{Overall System Performance:} All metrics demonstrate that the web search branch successfully integrates external knowledge with pre-training to produce accurate, contextually grounded, and up-to-date responses. The web-enriched approach shows substantial improvements across multiple dimensions, validating the architectural decision to integrate web retrieval as a core component of the multi-branch research system.
+\noindent \textbf{Overall System Performance:} All four metrics passed their thresholds, confirming that the web search branch produced accurate, contextually grounded, and current responses. The approach of combining live web retrieval with pre-trained knowledge proved effective across event details, speaker information, and thematic content.
 
 
 
@@ -55,30 +55,30 @@ This experiment evaluates the effectiveness of the \textbf{academic search branc
 
 \textbf{Query Task:} The system was instructed to summarize recent advances in Spiking Neural Networks for 2025 with explicit requirements to provide:
 \begin{itemize}
-    \item Key models and architectures with specific names and descriptions
-    \item Quantitative performance benchmarks demonstrating improvements
-    \item Core technical innovations and methodological advances
-    \item Primary applications across distinct domains
-    \item Explicit enumeration of open research challenges and unresolved problems
+  \item Key models and architectures with specific names and descriptions
+  \item Quantitative performance benchmarks demonstrating improvements
+  \item Core technical innovations and methodological advances
+  \item Primary applications across distinct domains
+  \item Explicit enumeration of open research challenges and unresolved problems
 \end{itemize}
 
-This task design ensures that the academic search capability is necessary for providing cutting-edge, research-validated information organized precisely around the user's structured requirements.
+This task design ensures that the academic search capability is necessary for providing cutting-edge, research-validated information organized around the user's structured requirements.
 
 The system's performance was evaluated using the \textbf{DeepEval framework}, employing five complementary metrics designed to assess different dimensions of query-aligned academic synthesis quality.
 
 \begin{table}[h]
-    \centering
-    \caption{Experiment 2: DeepEval Metrics Summary}
-    \begin{tabular}{lccl}
-        \toprule
-        \textbf{Metric}          & \textbf{Score} & \textbf{Status}       & \textbf{Interpretation}       \\
-        \midrule
-        Faithfulness             & \( 0.89 \)     & \( \checkmark \) Pass & Excellent source fidelity     \\
-        Answer Relevancy         & \( 0.87 \)     & \( \checkmark \) Pass & High coverage of requirements \\
-        Hallucination Detection  & \( 0.96 \)     & \( \checkmark \) Pass & Minimal unsupported claims    \\
-        Requirement Completeness & \( 0.84 \)     & \( \checkmark \) Pass & All query elements addressed  \\
-        \bottomrule
-    \end{tabular}
+  \centering
+  \caption{Experiment 2: DeepEval Metrics Summary}
+  \begin{tabular}{lccl}
+    \toprule
+    \textbf{Metric}          & \textbf{Score} & \textbf{Status}       & \textbf{Interpretation}       \\
+    \midrule
+    Faithfulness             & \( 0.89 \)     & \( \checkmark \) Pass & Excellent source fidelity     \\
+    Answer Relevancy         & \( 0.87 \)     & \( \checkmark \) Pass & High coverage of requirements \\
+    Hallucination Detection  & \( 0.96 \)     & \( \checkmark \) Pass & Minimal unsupported claims    \\
+    Requirement Completeness & \( 0.84 \)     & \( \checkmark \) Pass & All query elements addressed  \\
+    \bottomrule
+  \end{tabular}
 \end{table}
 
 
@@ -87,7 +87,7 @@ The system's performance was evaluated using the \textbf{DeepEval framework}, em
 \textbf{Faithfulness (Score: 0.89):} Measures the degree to which the generated synthesis aligns with and is supported by retrieved research, validating accurate representation of findings, methodologies, and results without distortion or misattribution. The generated response demonstrated exceptional alignment with source material across core technical claims regarding models, benchmarks, and challenges. Specific findings including quantitative performance improvements, architectural innovations, and methodological approaches were accurately represented from retrieved sources. The score does not reach
 higher results because certain synthesis statements aggregated information across multiple sources into generalized claims rather than maintaining precise source attribution, representing conservative synthesis that reduces explicit traceability while maintaining technical accuracy. The score reflects strong research integrity with accurate representation of technical details and quantitative claims.
 
-\textbf{Answer Relevancy (Score: 0.87):} Assesses whether the generated response directly addresses the user's query with accurate, specific, and research-validated details that fulfill the stated requirements, evaluating the system's ability to prioritize requested information. The response successfully provided key models with architectural descriptions, performance benchmarks with quantitative metrics, and open challenges with explicit enumeration. However, the score does not reach maximum because certain sections extended beyond strict fulfillment of query requirements into supplementary analysis. 
+\textbf{Answer Relevancy (Score: 0.87):} Assesses whether the generated response directly addresses the user's query with accurate, specific, and research-validated details that fulfill the stated requirements, evaluating the system's ability to prioritize requested information. The response successfully provided key models with architectural descriptions, performance benchmarks with quantitative metrics, and open challenges with explicit enumeration. However, the score does not reach maximum because certain sections extended beyond strict fulfillment of query requirements into supplementary analysis.
 
 In addition, the response lacked explicit inline attribution linking specific benchmarks directly to their sources, reducing transparency about which findings are most strongly supported. The achieved score indicates good alignment with user requirements while including valuable but unrequested supplementary information.
 
@@ -97,7 +97,7 @@ In addition, the response lacked explicit inline attribution linking specific be
 
 \vspace{0.3cm}
 
-\noindent \textbf{Overall System Performance:} All metrics demonstrate that the academic search branch successfully retrieves and synthesizes research directly aligned with user query requirements, producing accurate and research-validated summaries of recent SNN advances. The query-aligned evaluation approach reveals that the system achieves high technical accuracy in faithfulness (\( 0.89 \)) and hallucination prevention (\( 0.96 \)), while demonstrating room for improvement in query alignment (\( 0.89 \)) and requirement depth (\( 0.84 \)). The academic search branch demonstrates reliability in preventing hallucinations and maintaining source fidelity, validating its architectural role within the multi-branch system.
+\noindent \textbf{Overall System Performance:} The academic search branch achieved high technical accuracy in faithfulness (0.89) and hallucination prevention (0.96), while showing room for improvement in requirement depth (0.84). The query-aligned evaluation confirms that the branch reliably synthesizes research-validated summaries with minimal fabrication.
 
 
 

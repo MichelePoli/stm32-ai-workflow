@@ -1,2 +1,39 @@
 \chapter{Conclusion}
 
+\section{Summary of Contributions}
+
+This thesis presented an agentic MLOps framework that automates the full Edge AI deployment cycle on STM32 microcontrollers, from peripheral configuration and model discovery to neural network optimization and firmware integration. The system was built on LangGraph's stateful graph model and connected seven specialized workflows through a shared state object and a Redis-backed checkpointing layer.
+
+The central design decision was to replace point-to-point tool invocations with a multi-agent architecture in which each workflow operates autonomously but hands its outputs to the next stage through a typed state schema. This eliminated the manual scripting that typically connects training environments, embedded toolchains, and hardware validation steps. The headless CubeMX strategy (pre-seeded IOC files and the \texttt{xvfb-run} virtual framebuffer on Linux) resolved what is ordinarily one of the hardest bottlenecks in automated STM32 workflows: a GUI tool that requires interactive input during non-interactive CI runs.
+
+Model discovery was implemented as a three-tier hierarchical search. A curated catalog of validated STM32 Model Zoo entries covers the common cases; iterative web search via DuckDuckGo handles unknown model families; and user-registered URLs allow teams to inject project-specific models without modifying the source code. The STEdgeAI CLI, called programmatically in sequence (analyze, validate, generate), provides the memory and cycle estimates that gate each candidate's eligibility before any training time is spent.
+
+Fine-tuning was automated through two paths: a standard fast path that applies heuristic anti-overfitting rules (layer freezing, dropout injection, epoch capping), and an NNI-backed hyperparameter optimization path where the LLM generates the trial code dynamically from the model's actual architecture, rather than relying on a static template. The validation run on MobileNetV1~0.25 with the Fruit-360 dataset confirmed that the class-mismatch rescue mechanism and the Dropout (0.4) injection produced a model with 98.1\% validation accuracy within the 10-epoch budget.
+
+The Human-in-the-Loop layer, implemented via LangGraph's \texttt{interrupt()} primitive and Redis state persistence, allows developers to approve gates, redirect searches, or override model choices at natural decision points without interrupting the overall workflow context. Structured LLM parsing converts free-text user responses into typed state updates, keeping the graph logic independent of the phrasing the user chooses.
+
+\section{Experimental Findings}
+
+The productivity measurement showed a median 9\,\texttimes{} speedup across the six deployment tasks compared to the equivalent manual procedures, reducing a typical 4-hour workflow to under 30 minutes of active developer interaction. The largest individual gains came from NNI experiment setup (30\,\texttimes{}) and CubeMX project configuration (40\,\texttimes{}), both of which involve repetitive, error-prone steps that the LLM handles in a single call.
+
+The web search evaluation, measured with DeepEval against five diverse queries, showed an average Contextual Relevancy of 0.75 and an average Hallucination rate of 0.14. The main finding was a Faithfulness-Utility trade-off: procedural queries (e.g., converting PyTorch to ONNX for STM32) scored perfect Faithfulness because the model closely paraphrased the retrieved guides, while exploratory queries (hardware comparisons, pricing estimates) scored lower because the model supplemented retrieved text with pre-trained knowledge. Both modes remain useful; the evaluation makes the trade-off explicit and measurable rather than opaque.
+
+The infrastructure evolved through three deployment scenarios. Local execution saturated the host CPU during Mistral inference. Per-user Docker containers with embedded Ollama freed the local machine but locked a dedicated GPU per active session. Centralizing inference on an \textbf{NVIDIA Triton} server with vLLM and PagedAttention decoupled the orchestration layer from the inference layer, enabling concurrent multi-user operation within the 16~GB VRAM constraint of the development server.
+
+\section{Limitations}
+
+Three limitations deserve explicit acknowledgement. First, the STM32CubeMX headless strategy requires a one-time manual GUI session to accept the STMicroelectronics license agreement; this step cannot be scripted and must be completed before any automated run. Second, the 10-epoch fine-tuning cap prevents severe overfitting on small datasets but also bounds the accuracy achievable on harder classification tasks. Third, NNI experiment generation relies on the LLM producing syntactically correct Python, and rare hallucinated API calls still require a human correction cycle, as illustrated in Experiment~4.
+
+The productivity estimates rest on analytical baselines derived from official documentation and KLM task decomposition, not a controlled user study. Actual speedup ratios will vary with developer experience, toolchain familiarity, and hardware target complexity.
+
+\section{Future Work}
+
+The most direct extension is the integration of multi-board parallel evaluation: generating firmware for several STM32 targets simultaneously and selecting the best candidate based on real inference cycle measurements rather than STEdgeAI static estimates. This would require asynchronous workflow branches and a shared result aggregation node, both of which LangGraph's graph model supports natively.
+
+On the inference side, replacing the current single-model Triton deployment with a dynamic multi-model router (loading Mistral for summarization, GPT-OSS for code generation, DeepSeek-R1 for evaluation only on demand) would reduce the average time-in-VRAM per request and allow more concurrent sessions without additional GPU provisioning.
+
+The web search component currently relies on a single DuckDuckGo retrieval call per query. Adding a ChromaDB-backed semantic cache of previously retrieved documentation, with live web fallback for stale or missing entries, would improve both retrieval consistency and response latency on repeated query types.
+
+The framework architecture is not STM32-specific at the graph level. Only two nodes (CubeMX and STEdgeAI) are hardware-coupled; replacing them with equivalent wrappers for Nordic, NXP, or Renesas targets would port the orchestration layer to other embedded ecosystems without structural changes to the agent graph.
+
+The current Triton deployment runs on a single research server. A Kubernetes-managed cluster is the natural production step: LangGraph agent pods, the Triton inference service, and the Redis state backend would each autoscale independently based on request load. Managed services (GKE, EKS, AKS) are all viable targets. Because Triton already exposes an OpenAI-compatible HTTP interface, the agent layer requires no code changes, only a new value for the \texttt{TRITON\_BASE\_URL} environment variable.

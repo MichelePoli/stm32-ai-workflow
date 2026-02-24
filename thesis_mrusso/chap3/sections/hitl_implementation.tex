@@ -1,11 +1,11 @@
 \section{Human-in-the-Loop Implementation}
 \label{sec:hitl_impl}
 
-The framework implements Human-in-the-Loop controls through LangGraph's \texttt{interrupt()} primitive, enabling workflow suspension at critical decision points.
+The framework places humans at critical decision points through LangGraph's \texttt{interrupt()} primitive, which pauses execution and returns control to the API server until the user responds.
 
 \subsection{Interrupt Mechanism}
 
-LangGraph checkpoints state after every node execution. When a node calls \texttt{interrupt()}, execution pauses and control returns to the API server:
+LangGraph checkpoints the full graph state after every node execution. When a node calls \texttt{interrupt()}, it suspends and the runtime surfaces the payload to the calling client. The code example below, from the firmware-to-AI transition gate, shows the pattern:
 
 \begin{lstlisting}[language=Python, caption={Interrupt-based approval gate}]
 # From workflow1_firmware.py
@@ -32,25 +32,25 @@ def decide_continue_to_ai(state, config):
     return state
 \end{lstlisting}
 
-Upon receiving user input, the workflow resumes from the exact checkpoint where it suspended, preserving all state variables.
+When the client sends the user's reply, the graph resumes from the exact checkpoint, with all state variables intact.
 
 \subsection{Approval Gates vs. Steering Inputs}
 
-The framework distinguishes two HITL patterns:
+The framework distinguishes two HITL patterns.
 
 \subsubsection{Human-as-Gate}
-Binary approval for risky operations (e.g., firmware flashing, model deployment):
 
-In this pattern, the workflow automatically suspends immediately before executing any high-risk action. The user is then granted the opportunity to thoroughly review the proposed operation and must provide an explicit ``approve'' or ``reject'' command to proceed. Typical examples of these critical gates include confirming the continuation to the AI workflow after firmware generation, accepting a specific neural network model or requesting a broader search during model selection, and granting final approval to deploy the optimized model after NNI completion.
+Before any high-risk operation, the workflow suspends and requests an explicit approve or reject command. In practice this covers three points: confirming the transition from firmware generation to AI model selection, accepting or rejecting a candidate model during search, and approving the fine-tuned model before deployment after NNI completion.
 
 \subsubsection{Human-as-Instructor}
-Natural language steering to modify workflow direction:
+
+Natural language steering lets the user redirect the workflow mid-execution without predefined menu options:
 
 \begin{quote}
-    User: \textit{"Actually, I want a smaller model"}
+    User: \textit{``Actually, I want a smaller model''}
 \end{quote}
 
-The system reclassifies this input using structured extraction and updates \texttt{MasterState}:
+The response is parsed with structured extraction and the state is updated accordingly:
 
 \begin{lstlisting}[language=Python]
 result = llm_classifier.invoke(user_input)
@@ -61,11 +61,9 @@ state.model_size_preference = "small"
 state.route = "search_model"  # Return to model discovery
 \end{lstlisting}
 
-This enables flexible, conversational control over the MLOps pipeline without predefined menu options.
-
 \subsection{State Persistence and Resume Logic}
 
-LangGraph stores checkpoints in a \textbf{Redis} database using a hierarchical key structure. Each checkpoint is serialized as a MessagePack or JSON payload:
+LangGraph stores checkpoints in \textbf{Redis} using a hierarchical key structure. Each entry is serialized as a MessagePack or JSON payload:
 
 \begin{verbatim}
 checkpoint:{thread_id}:{checkpoint_id} -> {
@@ -80,12 +78,8 @@ checkpoint:{thread_id}:{checkpoint_id} -> {
 }
 \end{verbatim}
 
-The resume process begins when the client sends the user's input via the API (\texttt{POST /threads/\{thread\_id\}/runs}). Upon receiving this request, LangGraph retrieves the latest stored checkpoint corresponding to the specific \texttt{thread\_id}. It then selectively deserializes the \texttt{MasterState}, injects the new user input directly into this state configuration, and smoothly resumes continuous execution from the next designated node in the computational graph.
-
-This architecture supports multi-hour workflows (e.g., overnight NNI experiments) with continuous resume capability.
+Resume begins when the client posts the user's reply to \texttt{POST /threads/\{thread\_id\}/runs}. LangGraph retrieves the latest checkpoint for the thread, deserializes \texttt{MasterState}, injects the new input, and resumes from the next node. This mechanism supports multi-hour workflows (overnight NNI experiments, for instance) without any explicit session management code.
 
 \subsection{Actionable Reporting and Synthetic Summaries}
 
-A key UX improvement implemented to improve high-level decision making is the transition from raw log introspection to \textbf{Synthetic Actionable Summaries}. Traditional toolchain outputs from CubeMX or STEdgeAI can be hundreds of lines long, containing technical noise that obscures critical failures.
-
-The orchestrator now implements heuristic-based log parsing after each tool execution. Instead of presenting the raw output, the agent extracts a 1-line summary (e.g., \textit{" Project generated successfully (STM32H7, 4 peripherals enabled)"} or \textit{"WARNING: Memory Overflow: Flash required 3.2MB/2MB"}). These summaries are stored in the \texttt{MasterState} and used to build context-aware prompts for the user during interrupt points, significantly reducing the cognitive load required to guide the autonomous agent.
+Raw toolchain outputs from CubeMX or STEdgeAI can run to hundreds of lines. Rather than exposing this verbatim to the user, the orchestrator applies heuristic log parsing after each tool execution and extracts a single-line summary: for example, \textit{``Project generated successfully (STM32H7, 4 peripherals enabled)''} or \textit{``WARNING: Memory Overflow: Flash required 3.2MB/2MB''}. These summaries are stored in \texttt{MasterState} and used to build context-aware prompts at interrupt points, reducing the information the user needs to review before making a decision.

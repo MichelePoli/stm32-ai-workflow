@@ -1,61 +1,51 @@
 \section{Tooling Infrastructure}
 \label{sec:tools}
 
-The framework integrates multiple specialized tools to enable end-to-end MLOps automation.
+The framework combines several specialized open-source tools to cover inference, web search, quality evaluation, vector storage, and neural network deployment.
 
 \subsection{Agno Framework for Agent Orchestration}
 
-Agno (\url{https://github.com/agno-agi/agno}) provides a lightweight agent framework with first-class tool support. The system smoothly integrates several of Agno's solid pre-built tool kits to reliably expand the agents' capabilities. For primary web connectivity, it utilizes TavilyTools, an advanced search engine explicitly optimized for LLM consumption, alongside GoogleSearchTools for broad Custom Search Engine integration and DuckDuckGoTools to provide a privacy-focused alternative.
-
-In addition, it strategically uses ArxivTools specifically to rapidly access and retrieve highly relevant academic machine learning papers directly from the arXiv repository.
-
-Agno agents execute tool-augmented reasoning loops transparently, logging all tool invocations for debugging.
+Agno (\url{https://github.com/agno-agi/agno}) is a lightweight Python framework for building tool-augmented LLM agents. In Workflow 4, the web research node wraps an Ollama-served Mistral instance in an Agno \texttt{Agent} and equips it with \texttt{DuckDuckGoTools} for web queries. Agno handles the tool-calling loop transparently, logging each invocation for debugging. All tool calls are synchronous and run within the LangGraph node execution context.
 
 \subsection{DeepEval for RAG Quality Assessment}
 
-DeepEval (\url{https://github.com/confident-ai/deepeval}) implements the "LLM-as-a-Judge" paradigm for automated evaluation. The framework employs four core metrics:
+DeepEval (\url{https://github.com/confident-ai/deepeval}) implements the LLM-as-a-Judge paradigm for automated output evaluation. After Workflow 4 generates a summary, four metrics are computed against the retrieved documents:
 
 \begin{enumerate}
-  \item \textbf{Faithfulness}: $\frac{\text{Grounded Claims}}{\text{Total Claims}}$
-  \item \textbf{Answer Relevancy}: $\frac{\text{Relevant Statements}}{\text{Total Statements}}$
-  \item \textbf{Contextual Relevancy}: $\frac{\text{Useful Retrieved Docs}}{\text{Total Retrieved Docs}}$
-  \item \textbf{Hallucination}: $1 - \frac{\text{Contradicted/Unsupported Claims}}{\text{Total Claims}}$
+    \item \textbf{Faithfulness}: $\frac{\text{Grounded Claims}}{\text{Total Claims}}$
+    \item \textbf{Answer Relevancy}: $\frac{\text{Relevant Statements}}{\text{Total Statements}}$
+    \item \textbf{Contextual Relevancy}: $\frac{\text{Useful Retrieved Docs}}{\text{Total Retrieved Docs}}$
+    \item \textbf{Hallucination}: $1 - \frac{\text{Contradicted/Unsupported Claims}}{\text{Total Claims}}$
 \end{enumerate}
 
-Evaluation is performed using DeepSeek-R1 (chain-of-thought reasoning model) to maximize interpretability.
+All four metrics are evaluated by a local \texttt{OllamaModel} backed by \texttt{deepseek-r1:latest}, keeping the evaluation pipeline fully offline. The threshold for all metrics is set to 0.55. Evaluation runs synchronously in a separate thread via \texttt{asyncio.to\_thread} to avoid blocking the main event loop.
 
 \subsection{ChromaDB for Vector Search}
 
-ChromaDB (\url{https://www.trychroma.com/}) stores embedded documentation for RAG retrieval. Two vectorstores are maintained:
+ChromaDB (\url{https://www.trychroma.com/}) stores embedded documentation for retrieval-augmented generation in Workflow 5. Two separate vectorstores are maintained:
 
 \begin{itemize}
-  \item \textbf{Architecture Best Practices}: Transfer learning guides, optimization techniques
-  \item \textbf{STM32 Documentation}: Hardware constraints, peripheral configurations
+    \item \textbf{Architecture Best Practices}: transfer learning guides and optimization techniques
+    \item \textbf{STM32 Documentation}: hardware constraints and peripheral configurations
 \end{itemize}
 
-Embeddings are generated using \texttt{all-MiniLM-L6-v2} (384-dimensional vectors).
+Embeddings are generated with \texttt{all-MiniLM-L6-v2} (384-dimensional vectors).
 
-\subsection{Ollama: Developmental Inference and Benchmarking}
+\subsection{Ollama: Local Development and Benchmarking}
 
-During the initial development and model-characterization phase, \textbf{Ollama} (\url{https://ollama.com}) was used to host and evaluate candidate language models locally. This setup provided several distinct advantages specifically tailored for rapid prototyping. Primarily, it guaranteed strict data privacy by completely eliminating the need for external API calls when processing sensitive embedded source code or proprietary datasets.
+During the initial development phase, \textbf{Ollama} (\url{https://ollama.com}) served as the primary inference backend for evaluating candidate models locally. Three practical advantages drove this choice: it kept all processing on-device (no sensitive source code or proprietary datasets left the machine), it eliminated network latency from the inference path, and it allowed unrestricted daily experimentation without per-token costs.
 
-Also, it offered high latency predictability by forcefully executing all model inference entirely on-device, entirely free from external web network bottlenecks.
-
-Finally, it inherently provided strict localized cost control, allowing for unbounded daily experimentation without accumulating any per-token charges.
-
-The insights gained from these local benchmarks (detailed in Section \ref{sec:llm_selection}) guided the final selection of models for the production environment.
+The benchmarking results from this phase, summarized in Section~\ref{sec:llm_selection}, informed the final model selection for the production Triton deployment.
 
 \subsection{NVIDIA Triton Inference Server}
 
-In the final architecture, \textbf{NVIDIA Triton Inference Server} serves as the primary inference backend. By centralizing model execution, Triton allows for dynamic resource allocation and concurrent request batching, overcoming the single-user GPU locking limitations encountered with local per-container engines. The server provides standardized API endpoints (OpenAI-compatible) and manages the dynamic loading of task-specific models.
+In the production architecture, \textbf{NVIDIA Triton Inference Server} is the primary inference backend. Centralizing model execution resolves a practical constraint encountered during development: local per-container inference engines lock the GPU for a single user, preventing concurrent requests from other workflows. Triton exposes OpenAI-compatible HTTP endpoints and manages dynamic model loading, allowing different LLMs to be swapped in and out of VRAM on demand.
 
-The efficiency of this centralized backend is further improved by the integration of \textbf{vLLM}, a high-throughput LLM serving engine that implements \textbf{PagedAttention}. This architecture addresses the management of \textbf{Video RAM (VRAM)}, the specialized high-bandwidth memory fundamental for Large Language Model (LLM) performance. 
-
-Traditional VRAM management for transformers often leads to memory fragmentation in the Key-Value (KV) cache, as large contiguous memory blocks are pre-allocated for possible maximum context lengths. By using PagedAttention, vLLM partitions the KV cache into small, non-contiguous physical pages, similar to virtual memory paging in operating systems. This strategy allows the framework to dynamically allocate memory as needed, substantially reducing fragmentation and allowing the processing of complex firmware code generation tasks with larger context windows on limited 16 GB VRAM hardware compared to standard inference backends.
+Memory efficiency is addressed by \textbf{vLLM}, integrated as the serving engine behind Triton. vLLM implements \textbf{PagedAttention}, which manages the transformer KV cache as small non-contiguous physical pages rather than large pre-allocated contiguous blocks. This reduces memory fragmentation substantially and allows the system to run models with larger effective context windows within the 16~GB VRAM constraint of the development server.
 
 \subsection{STEdgeAI CLI}
 
-STMicroelectronics' official toolchain for neural network deployment:
+STMicroelectronics' official toolchain for neural network deployment to X-CUBE-AI:
 
 \begin{verbatim}
 stedgeai analyze --model <model.h5> --target <stm32h743>
@@ -63,10 +53,10 @@ stedgeai validate --model <model.h5> --target <stm32h743>
 stedgeai generate --model <model.h5> --compression <high>
 \end{verbatim}
 
-Generates optimized C code compatible with X-CUBE-AI runtime library (v9.x).
+The toolchain converts Keras or TFLite models into optimized C code compatible with the X-CUBE-AI runtime library (v9.x). The three commands are called in sequence by Workflow 2: \texttt{analyze} profiles resource usage, \texttt{validate} confirms operator support on the target MCU, and \texttt{generate} produces the final inference artifacts.
 
-Microsoft's hyperparameter optimization framework (\url{https://nni.readthedocs.io}). The framework intelligently generates all NNI experiment code programmatically rather than relying on NNI's built-in static YAML configuration parsing. This dynamic execution strategy explicitly enables on-the-fly search space construction deeply tailored to the exact specifications of the Keras model architecture under automated optimization.
+\subsection{NNI: Neural Network Intelligence}
 
-Also, it directly allows for the smooth embedding of custom trial logic, such as aggressive memory footprint optimization techniques and adaptive layer replacement mechanisms, while simultaneously facilitating programmatic execution for optimal best-trial extraction and immediate autonomous retraining.
+Microsoft's NNI framework (\url{https://nni.readthedocs.io}) handles hyperparameter search in Workflow 5. Rather than using NNI's static YAML configuration files, the framework generates experiment code programmatically at runtime. This lets the search space be constructed dynamically from the actual Keras model architecture under optimization, with custom trial logic for memory footprint control and adaptive layer replacement embedded directly in the generated scripts. Best-trial extraction and retraining are also triggered programmatically at the end of each experiment.
 
-Supported tuners include: TPE (Tree-structured Parzen Estimator), Random Search, Grid Search, and SMAC.
+Supported tuners include TPE (Tree-structured Parzen Estimator), Random Search, Grid Search, and SMAC.

@@ -9,7 +9,7 @@ The shift from keyword-based to \textit{semantic} search is driven by the use of
 \end{itemize}
 
 \subsection{Retrieval-Augmented Generation (RAG)}
-Retrieval-Augmented Generation (RAG) is the architectural pattern that bridges the gap between a model's frozen weights and the need for up-to-date accuracy. It addresses the twin problems of "knowledge cutoff" and "hallucination" by effectively giving the LLM an "open-book" capability, where it can verify its answers against retrieved text \cite{gao2024retrieval}.
+Retrieval-Augmented Generation (RAG) addresses two practical limitations of static model weights: the knowledge cutoff, which prevents the model from reasoning about documentation released after training, and the tendency to hallucinate plausible but incorrect facts. Augmenting each inference call with retrieved text gives the LLM access to current, domain-specific evidence without requiring retraining \cite{gao2024retrieval}.
 
 A reliable RAG pipeline for engineering workflows typically involves:
 \begin{enumerate}

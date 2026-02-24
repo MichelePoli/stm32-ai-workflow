@@ -1,43 +1,46 @@
 \section{Web Research Workflow for Technical Guidance}
 \label{sec:web_research}
 
-Workflow 4 implements a RAG-improved web research system for gathering technical documentation, troubleshooting guides, and best practices from online sources. This workflow augments the embedded AI development process with real-time information retrieval.
+Workflow 4 provides on-demand technical research by querying the web and synthesizing the results into a structured summary. Rather than routing every information request through a static knowledge base, this workflow issues live DuckDuckGo searches via an Agno agent, covers four distinct search domains, and then evaluates the quality of the generated summary with the DeepEval framework.
 
-\subsection{Query Generation and Iterative Refinement}
+\subsection{Request Classification}
 
-The workflow uses LLM-driven query generation to produce diverse, specific search queries:
+Before any search is issued, the \texttt{classify\_search()} node determines what kind of information the user needs. A structured LLM call using \texttt{get\_llm()} classifies the request into one of four categories: \texttt{ai\_model} (finding neural network models compatible with STM32), \texttt{board\_selection} (comparing MCU families), \texttt{optimization} (quantization and compression techniques), and \texttt{documentation} (tutorials, guides, official references). Requests that fall outside these categories are labelled \texttt{none} and routed to a clarification step instead.
 
-\begin{lstlisting}[language=Python, caption={Multi-query generation for detailed coverage}]
-# Generate 6 diverse search queries covering different aspects
-queries = llm.generate_queries(user_question)
-# Example: "STM32 X-CUBE-AI deployment guide"
-#          "TensorFlow Lite quantization for embedded"
-#          "STM32H7 neural network performance optimization"
+From the user's natural language message the node extracts both the category and a refined English search query, which is constructed to be specific enough for a web search engine. A reasoning field explains the classification decision and is logged for debugging.
+
+\subsection{Dynamic Search Execution}
+
+The routing node \texttt{search\_type\_decision()} confirms the category is valid, then passes control to \texttt{execute\_web\_search()}, a single node that handles all four domains. The choice of a unified node rather than four separate ones keeps the graph compact: the appropriate prompt template is selected at runtime from the \texttt{SEARCH\_PROMPTS} dictionary by indexing on \texttt{state.search\_type}.
+
+Each prompt template instructs the agent on the specific fields to retrieve. For AI model searches, for instance, the template asks for model name, framework, size in KB, compatible STM32 targets, quantization level, and inference benchmarks. For board comparisons it requests flash, RAM, clock speed, peripheral sets, and price.
+
+The search itself is executed by an \textbf{Agno} agent backed by \textbf{DuckDuckGo} via \texttt{DuckDuckGoTools}. The underlying language model is an Ollama-served Mistral instance configured through the system's \texttt{ollama\_base\_url}:
+
+\begin{lstlisting}[language=Python, caption={Agno agent configuration for web search}]
+agent = Agent(
+    model=Ollama(id="mistral", base_url=cfg.ollama_base_url),
+    tools=[DuckDuckGoTools()],
+    markdown=True
+)
+response = agent.run(search_prompt)
 \end{lstlisting}
 
-Queries are then ranked by relevance using a second LLM call, prioritizing the most pertinent searches.
+The raw response text is stored in \texttt{state.search\_results} and also split into paragraph-level chunks (filtered to at least 20 characters) and saved to \texttt{state.search\_results\_list}, which feeds the evaluation stage.
 
-\subsection{Multi-Tool Web Search}
+\subsection{Summarization}
 
-The system employs Agno's tool ecosystem to access multiple search backends. It primarily utilizes TavilyTools, a search engine fully optimized for LLM consumption that retrieves full content for up to five documents per query. To ensure detailed coverage, it uses GoogleSearchTools as a fallback for broader web queries, alongside DuckDuckGoTools as a privacy-focused alternative for redundancy.
+After the search, \texttt{summarize\_search\_results()} condenses the raw content into a structured answer. A single LLM call (via \texttt{get\_llm()}, temperature 0.2) is given the original query and up to 10,000 characters of web results. The prompt instructs the model to produce a technically focused answer in English, use bullet points for readability, cite source URLs where present, and explicitly state when the retrieved content is not relevant to the query. The resulting summary is stored in \texttt{state.search\_summary} and displayed to the user by the final \texttt{finalize\_search()} node.
 
-Search results are parsed, deduplicated, and chunked into paragraph-level segments.
+\subsection{Quality Evaluation with DeepEval}
 
-\subsection{Summarization and Quality Evaluation}
-
-Retrieved content is synthesized into a coherent summary using an LLM through a structured, multi-stage process. 
-
-First, an initial summary is generated from the first batch of search results. The system then enters a reflection phase to independently identify any remaining knowledge gaps within this current summary. Based on these gaps, it executes a follow-up search by generating new, highly targeted queries. 
-
-Finally, it performs iterative extension, smoothly expanding the existing summary with the newly acquired information, a cycle that can repeat for up to three iterations to ensure maximum completeness.
-
-After the final iteration, DeepEval metrics assess summary quality:
+Once the summary is ready, the \texttt{finalize\_search()} node runs an automated quality assessment using the \textbf{DeepEval} framework. Evaluation runs synchronously in a separate thread (via \texttt{asyncio.to\_thread}) to avoid blocking the event loop. All four metrics run on a local \texttt{OllamaModel} backed by \texttt{deepseek-r1:latest}, keeping evaluation fully offline:
 
 \begin{itemize}
-  \item \textbf{Faithfulness}: Are claims grounded in retrieved documents? (Target: \textgreater 0.7)
-  \item \textbf{Answer Relevancy}: Does summary address user question? (Target: \textgreater 0.7)
-  \item \textbf{Contextual Relevancy}: Are retrieved documents relevant? (Target: \textgreater 0.7)
-  \item \textbf{Hallucination}: Does summary contain fabricated information? (Target: \textless 0.2)
+    \item \textbf{Faithfulness}: checks that claims in the summary are supported by the retrieved text (threshold: 0.55)
+    \item \textbf{Answer Relevancy}: measures how well the summary addresses the original query (threshold: 0.55)
+    \item \textbf{Contextual Relevancy}: assesses whether the retrieved documents were topically appropriate (threshold: 0.55)
+    \item \textbf{Hallucination}: detects content in the summary absent from the retrieval context (threshold: 0.55)
 \end{itemize}
 
-Results are presented to the user along with source citations, enabling verification of technical claims.
+Each metric is measured independently; failures in one do not abort the others. Scores are printed to the console alongside the summary. If the evaluation framework itself raises an exception (e.g., due to a missing dependency or model timeout), the error is logged as a warning and the workflow completes normally without blocking the user.
