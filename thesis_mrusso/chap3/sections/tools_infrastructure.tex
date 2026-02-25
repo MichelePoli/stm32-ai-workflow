@@ -39,9 +39,53 @@ The benchmarking results from this phase, summarized in Section~\ref{sec:llm_sel
 
 \subsection{NVIDIA Triton Inference Server}
 
-In the production architecture, \textbf{NVIDIA Triton Inference Server} is the primary inference backend. Centralizing model execution resolves a practical constraint encountered during development: local per-container inference engines lock the GPU for a single user, preventing concurrent requests from other workflows. Triton exposes OpenAI-compatible HTTP endpoints and manages dynamic model loading, allowing different LLMs to be swapped in and out of VRAM on demand.
+In the production architecture, \textbf{NVIDIA Triton Inference Server} is the primary inference backend. Centralizing model execution resolves a practical constraint encountered during development: per-user Docker containers with embedded Ollama bind a dedicated GPU for the entire duration of each session, preventing concurrent access. Triton replaces those isolated instances with a single shared server that handles all model requests through a unified queue.
 
-Memory efficiency is addressed by \textbf{vLLM}, integrated as the serving engine behind Triton. vLLM implements \textbf{PagedAttention}, which manages the transformer KV cache as small non-contiguous physical pages rather than large pre-allocated contiguous blocks. This reduces memory fragmentation substantially and allows the system to run models with larger effective context windows within the 16~GB VRAM constraint of the development server.
+\subsubsection{Model Repository Structure}
+
+Triton reads models from a structured directory tree where each subdirectory corresponds to one deployed model. Each model entry contains a Protocol Buffer configuration file (\texttt{config.pbtxt}) and a versioned implementation directory:
+
+\begin{verbatim}
+model_repository/
++-- mistral/
+|   +-- config.pbtxt
+|   \-- 1/
+|       \-- model.py
++-- deepseek-r1/
+|   +-- config.pbtxt
+|   \-- 1/
+|       \-- model.py
+\-- gpt-oss-20b/
+    +-- config.pbtxt
+    \-- 1/
+        \-- model.py
+\end{verbatim}
+
+The \texttt{config.pbtxt} file defines the model's I/O contract, the serving backend, and the GPU allocation policy. For the Mistral entry:
+
+\begin{verbatim}
+name: "mistral"
+backend: "python"
+max_batch_size: 1
+
+input  [{ name: "PROMPT",   data_type: TYPE_STRING, dims: [1] }]
+output [{ name: "RESPONSE", data_type: TYPE_STRING, dims: [1] }]
+
+instance_group [{ kind: KIND_GPU, count: 1 }]
+\end{verbatim}
+
+\subsubsection{EXPLICIT Model Control and LRU Eviction}
+
+Triton is configured with \texttt{model\_control\_mode: EXPLICIT}, which disables automatic startup of all models at boot time. Instead, each model is loaded into VRAM on demand when the first request for it arrives and can be unloaded when it is no longer needed. This is critical for running multiple 7B--20B models on a single 16~GB GPU: keeping all three models resident simultaneously would exceed VRAM capacity.
+
+When two users request different models concurrently and the combined weight would overflow available memory, Triton applies a \textbf{Least Recently Used (LRU)} eviction policy. The model that has not served a request for the longest time is unloaded from VRAM to system RAM, freeing space for the incoming model. The arriving request is held in the server's request queue for the few seconds the swap requires, then served normally. No request is dropped; the caller simply observes a slightly higher latency on first access after an eviction.
+
+This behavior differs fundamentally from Ollama's single-process model. Ollama loads one model at a time into the host GPU. If a second model is requested before the first is released, Ollama must unload the first entirely before loading the second, and it offers no queuing: concurrent requests to different models either fail with an out-of-memory error or serialize completely. Under multi-user workloads with more than one active model family, Ollama's approach is unsustainable, which is the primary reason production moved to Triton.
+
+\subsubsection{vLLM and PagedAttention}
+
+Memory efficiency within each model's active session is handled by \textbf{vLLM}, integrated as the Python backend behind Triton. vLLM implements \textbf{PagedAttention}, which manages the transformer KV cache as small non-contiguous physical pages rather than one large pre-allocated contiguous block. This reduces fragmentation and allows the system to accommodate longer effective context windows without reallocating VRAM between requests.
+
 
 \subsection{STEdgeAI CLI}
 

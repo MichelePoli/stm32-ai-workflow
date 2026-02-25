@@ -1,3 +1,4 @@
+\label{sec:llm_selection}
 The performance and reliability of an agentic workflow depend on the reasoning capabilities and specialized training of the underlying language models. Rather than using a single general-purpose model, the framework adopts a multi-model strategy where different LLMs are assigned to specific nodes based on their strengths.
 
 During the initial characterization phase, five local models served through the Ollama backend were evaluated across different task types, as summarized in Table~\ref{tab:llm_comparison}. This benchmarking was necessary to identify the optimal ensemble for the final production deployment on Triton.
