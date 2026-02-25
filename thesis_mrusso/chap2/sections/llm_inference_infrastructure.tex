@@ -11,7 +11,7 @@ Inference servers address this by acting as a centralized manager: client applic
 
 Triton exposes three network endpoints: HTTP (port 8000), gRPC (port 8001), and metrics (port 8002). The HTTP endpoint follows the KServe v2 inference protocol and, when a compatible backend is used, also accepts OpenAI-style chat completions, making Triton a drop-in replacement for cloud LLM APIs within existing LangChain or LangGraph pipelines.
 
-A key operational mode is \texttt{model\_control\_mode: EXPLICIT}, which disables automatic model loading at startup. The server boots with no models resident in VRAM; loading is triggered on demand by issuing \texttt{POST /v2/repository/models/\{name\}/load}, and the symmetric unload endpoint releases VRAM when the model is no longer needed. For a server hosting several large LLMs on a single GPU, this on-demand lifecycle is essential: it ensures that only the model currently needed occupies VRAM, while the others remain on disk or in system RAM.
+A key operational mode is \texttt{model\_control\_mode:~EXPLICIT}, which disables automatic model loading at startup. The server boots with no models resident in VRAM; loading is triggered on demand by issuing \texttt{POST /v2/repository/\allowbreak{}models/\{name\}/load}, and the symmetric unload endpoint releases VRAM when the model is no longer needed. For a server hosting several large LLMs on a single GPU, this on-demand lifecycle is essential: it ensures that only the model currently needed occupies VRAM, while the others remain on disk or in system RAM.
 
 \subsection{vLLM and PagedAttention}
 
