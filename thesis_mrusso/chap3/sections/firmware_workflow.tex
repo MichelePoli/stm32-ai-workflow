@@ -75,12 +75,8 @@ For known chip families, the firmware workflow uses a \textbf{pre-seeded IOC str
 
 At runtime, \texttt{get\_template\_ioc\_path()} tries an exact board-name match first, then a series-level match via the \texttt{SERIES\_MAP} dictionary. The chosen template is loaded with \texttt{config load "template.ioc"}, and the \texttt{project name} and \texttt{project path} directives re-target it to the user's directory, producing a fresh project that inherits the silent configuration.
 
-\subsection{Automatic Fallback on Generation Failure}
+\subsection{Error Recovery and Workflow Handoff}
 
-If the first CubeMX attempt returns a non-zero code or times out, \texttt{recover\_with\_ioc\_fallback()} runs automatically. It identifies the best matching template for the current board or series and rewrites the \texttt{.scr} script to use \texttt{config load} in place of the generic board directive. CubeMX is then relaunched with a 600-second timeout. The two-stage temporary directory strategy applies to this retry as well.
+When the first CubeMX attempt returns a non-zero exit code or times out, \texttt{recover\_with\_ioc\_fallback()} takes over. It selects the best matching IOC template for the detected board or series, rewrites the \texttt{.scr} script to use \texttt{config load} instead of the generic board directive, and relaunches CubeMX with a 600-second timeout. The two-stage temporary directory strategy described in Section~\ref{subsec:two_stage_gen} applies unchanged to this retry. On completion, the output tree contains \texttt{main.c}, \texttt{stm32xxxx\_hal\_msp.c}, the linker script, and the IDE project files.
 
-Generated output includes \texttt{main.c}, \texttt{stm32xxxx\_hal\_msp.c}, linker scripts, and IDE project files.
-
-\subsection{Human-in-the-Loop Gate}
-
-After successful generation, \texttt{finalize\_project()} stores the firmware project path in the graph state. The main orchestrator then asks the user whether to continue to AI model selection. A yes routes to Workflow 2; any other response ends the current session cleanly.
+Once generation succeeds, \texttt{finalize\_project()} stores the firmware project path in the graph state and yields control back to the orchestrator. The user is asked whether to proceed to AI model selection: confirming routes to Workflow 2, while declining closes the session.

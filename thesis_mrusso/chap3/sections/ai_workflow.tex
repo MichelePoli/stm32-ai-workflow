@@ -102,7 +102,7 @@ If the subprocess fails, a second pass opens the file with \texttt{h5py} and rea
 
 \subsection{STEdgeAI CLI Integration}
 
-With a model in hand, the workflow runs a three-phase profiling and code generation cycle using the STEdgeAI toolchain.
+With a model in hand, the workflow runs a three-phase profiling and code generation cycle using the STEdgeAI toolchain. An optional fine-tuning and customization step may precede this phase; it is described separately in Section~\ref{sec:customization}.
 
 \subsubsection{Phase 1: Model Analysis}
 
@@ -113,7 +113,7 @@ stedgeai analyze --model <model.h5> --target <stm32h743>
                  --output ./analisiAI/report_analyze
 \end{verbatim}
 
-The resulting report covers RAM usage (tensor buffers, activation memory, working memory), Flash usage after quantization, MACC count per inference, and estimated latency at typical clock speeds. If RAM or Flash limits are exceeded, the node automatically increments the quantization aggressiveness from \texttt{medium} to \texttt{high} and repeats the command, continuing until the model fits or the maximum compression level is reached.
+The resulting report covers RAM usage (tensor buffers, activation memory, working memory), Flash usage after quantization (Flash is the non-volatile program memory that stores the quantized model weights and the generated C inference code), MACC count per inference (number of multiply-accumulate operations, the standard metric for neural network computational cost), and estimated latency at typical clock speeds. If RAM or Flash limits are exceeded, the node automatically increments the quantization aggressiveness from \texttt{medium} to \texttt{high} and repeats the command, continuing until the model fits or the maximum compression level is reached.
 
 \subsubsection{Phase 2: On-Target Validation}
 
