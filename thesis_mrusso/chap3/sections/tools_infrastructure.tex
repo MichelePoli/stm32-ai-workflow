@@ -74,13 +74,16 @@ output [{ name: "RESPONSE", data_type: TYPE_STRING, dims: [1] }]
 instance_group [{ kind: KIND_GPU, count: 1 }]
 \end{verbatim}
 
-\subsubsection{EXPLICIT Model Control and LRU Eviction}
+\subsubsection{EXPLICIT Model Control and Model Swapping}
 
-Triton is configured with \texttt{model\_control\_mode: EXPLICIT}, which disables automatic startup of all models at boot time. Instead, each model is loaded into VRAM on demand when the first request for it arrives and can be unloaded when it is no longer needed. This is critical for running multiple 7B--20B models on a single 16~GB GPU: keeping all three models resident simultaneously would exceed VRAM capacity.
+Triton is configured with \texttt{model\_control\_mode: EXPLICIT}, which disables automatic model loading at boot time. Each model is loaded into VRAM on demand and can be unloaded via API when no longer needed. This is essential for hosting multiple 7B--20B models on a single 16~GB GPU: keeping all three resident simultaneously would exceed VRAM capacity.
 
-When two users request different models concurrently and the combined weight would overflow available memory, Triton applies a \textbf{Least Recently Used (LRU)} eviction policy. The model that has not served a request for the longest time is unloaded from VRAM to system RAM, freeing space for the incoming model. The arriving request is held in the server's request queue for the few seconds the swap requires, then served normally. No request is dropped; the caller simply observes a slightly higher latency on first access after an eviction.
+The \texttt{ChatTriton} client class implements a \textbf{mutual exclusion swapping} algorithm in its \texttt{\_ensure\_model\_loaded()} method. Before loading the requested model, the method calls Triton's \texttt{/v2/repository/models/\{name\}/unload} endpoint for every other active LLM, then polls \texttt{/v2/repository/index} until each reaches the \texttt{UNAVAILABLE} state. A two-second sleep after each unload gives the Python backend time to release its CUDA context before the next load begins. Only one heavyweight LLM resides in VRAM at any point. The embedding model (\texttt{nomic-embed}) is exempt from this cycle: at a fraction of the size of the language models, it stays resident throughout all inference requests.
 
-This behavior differs fundamentally from Ollama's single-process model. Ollama loads one model at a time into the host GPU. If a second model is requested before the first is released, Ollama must unload the first entirely before loading the second, and it offers no queuing: concurrent requests to different models either fail with an out-of-memory error or serialize completely. Under multi-user workloads with more than one active model family, Ollama's approach is unsustainable, which is the primary reason production moved to Triton.
+If the requested model is already in the \texttt{READY} state, the method returns immediately without any unloading, keeping unnecessary VRAM churn to a minimum. Once the target model reports \texttt{READY} in the repository index, a lightweight probe confirms that the native inference endpoint (\texttt{/v2/models/\{name\}/infer}) is actually live before the request is forwarded, since CUDA graph capturing can complete after the status flag flips.
+
+This behavior differs from Ollama's single-process model. Ollama has no equivalent model lifecycle API: it loads one model at a time and exposes no mechanism for a caller to explicitly unload a model or queue a request behind an in-progress swap. Under concurrent multi-model workloads, Ollama either runs out of memory or serializes requests without signalling the delay to the caller. The Triton design makes the swap explicit, observable, and controllable.
+
 
 \subsubsection{vLLM and PagedAttention}
 
