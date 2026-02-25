@@ -1,0 +1,25 @@
+# LaTeX build artifacts
+*.aux
+*.bbl
+*.bcf
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.lof
+*.lot
+*.out
+*.run.xml
+*.synctex.gz
+*.toc
+*.pdf
+*.xmpi
+
+# biber cache / par temp files
+par-*/
+
+# LaTeX output directories
+%OUTDIR%/
+
+# macOS metadata
+.DS_Store

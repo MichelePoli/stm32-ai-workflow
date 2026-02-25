@@ -1,0 +1,22 @@
+\section{LLM Inference Infrastructure}
+\label{sec:inference_infrastructure}
+
+Running a single large language model on a developer's workstation is straightforward, while serving multiple models to concurrent users from shared GPU hardware is not. As LLM-based workflows grow from single-user experiments to team-scale deployments, the naive approach of launching one inference process per model quickly hits the limits of available GPU memory: a 7B-parameter model in 16-bit precision occupies roughly 14~GB of VRAM, leaving no room for a second model on a typical research GPU.
+
+Inference servers address this by acting as a centralized manager: client applications send HTTP requests specifying the model they need, and the server handles loading, eviction, batching, and GPU allocation transparently. A single GPU can then serve a portfolio of models without each client managing hardware resources directly.
+
+\subsection{NVIDIA Triton Inference Server}
+
+\textbf{NVIDIA Triton Inference Server} is an open-source serving platform designed to host multiple AI models simultaneously across CPU and GPU backends~\cite{nvidia_triton_docs}. Unlike single-model deployment scripts, Triton defines a structured \textit{model repository}: a directory tree where each subdirectory represents one model, versioned and described by a Protocol Buffer configuration file (\texttt{config.pbtxt}). This file declares the model's I/O tensor contract, the backend used for execution, and the GPU instance allocation policy, decoupling all deployment configuration from the application code.
+
+Triton exposes three network endpoints: HTTP (port 8000), gRPC (port 8001), and metrics (port 8002). The HTTP endpoint follows the KServe v2 inference protocol and, when a compatible backend is used, also accepts OpenAI-style chat completions, making Triton a drop-in replacement for cloud LLM APIs within existing LangChain or LangGraph pipelines.
+
+A key operational mode is \texttt{model\_control\_mode: EXPLICIT}, which disables automatic model loading at startup. The server boots with no models resident in VRAM; loading is triggered on demand by issuing \texttt{POST /v2/repository/models/\{name\}/load}, and the symmetric unload endpoint releases VRAM when the model is no longer needed. For a server hosting several large LLMs on a single GPU, this on-demand lifecycle is essential: it ensures that only the model currently needed occupies VRAM, while the others remain on disk or in system RAM.
+
+\subsection{vLLM and PagedAttention}
+
+\textbf{vLLM}~\cite{kwon2023efficientmemorymanagementlarge} is a high-throughput inference engine that addresses a specific bottleneck in transformer serving: the KV cache. During autoregressive generation, each newly produced token requires access to the key and value projections of all previous tokens. Naive implementations pre-allocate a contiguous memory block for the maximum expected sequence length, which wastes a significant fraction of VRAM when actual sequences are shorter and prevents concurrent batches from sharing fragmented free memory.
+
+vLLM replaces contiguous KV allocation with \textbf{PagedAttention}, a mechanism borrowed from virtual memory management in operating systems. The cache is divided into fixed-size pages that are allocated dynamically as the sequence grows, and different requests can share physical pages when their prefix tokens are identical (a technique called \textit{prefix caching}). The practical outcome is higher GPU utilization and support for larger effective batch sizes within the same VRAM envelope.
+
+When integrated as a Triton Python backend, vLLM provides these memory efficiency gains while keeping the standard Triton request interface intact. Application code sends a prompt to the Triton HTTP endpoint; vLLM handles batching, page allocation, and generation internally before returning the response.
