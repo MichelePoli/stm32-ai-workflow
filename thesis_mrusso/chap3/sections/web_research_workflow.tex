@@ -11,11 +11,11 @@ From the user's natural language message the node extracts both the category and
 
 \subsection{Dynamic Search Execution}
 
-The routing node \texttt{search\_type\_decision()} confirms the category is valid, then passes control to \texttt{execute\_web\_search()}, a single node that handles all four domains. The choice of a unified node rather than four separate ones keeps the graph compact: the appropriate prompt template is selected at runtime from the \texttt{SEARCH\_PROMPTS} dictionary by indexing on \texttt{state.search\_type}.
+The routing node \texttt{search\_\allowbreak type\_\allowbreak decision()} confirms the category is valid, then passes control to \texttt{execute\_\allowbreak web\_\allowbreak search()}, a single node that handles all four domains. The choice of a unified node rather than four separate ones keeps the graph compact: the appropriate prompt template is selected at runtime from the \texttt{SEARCH\_PROMPTS} dictionary by indexing on \texttt{state.search\_type}.
 
 Each prompt template instructs the agent on the specific fields to retrieve. For AI model searches, for instance, the template asks for model name, framework, size in KB, compatible STM32 targets, quantization level, and inference benchmarks. For board comparisons it requests flash, RAM, clock speed, peripheral sets, and price.
 
-The search itself is executed by an \textbf{Agno} agent backed by \textbf{DuckDuckGo} via \texttt{DuckDuckGoTools}. The underlying language model is an Ollama-served Mistral instance configured through the system's \texttt{ollama\_base\_url}:
+The search itself is executed by an \textbf{Agno} agent backed by \textbf{DuckDuckGo} via \texttt{DuckDuckGoTools}. The underlying language model is an Ollama-served Mistral instance configured through the system's \texttt{ollama\_\allowbreak base\_\allowbreak url}:
 
 \begin{lstlisting}[language=Python, caption={Agno agent configuration for web search}]
 agent = Agent(
@@ -26,11 +26,11 @@ agent = Agent(
 response = agent.run(search_prompt)
 \end{lstlisting}
 
-The raw response text is stored in \texttt{state.search\_results} and also split into paragraph-level chunks (filtered to at least 20 characters) and saved to \texttt{state.search\_results\_list}, which feeds the evaluation stage.
+The raw response text is stored in \texttt{state.search\_results} and also split into paragraph-level chunks (filtered to at least 20 characters) and saved to \texttt{state.search\_\allowbreak results\_\allowbreak list}, which feeds the evaluation stage.
 
 \subsection{Summarization}
 
-After the search, \texttt{summarize\_search\_results()} condenses the raw content into a structured answer. A single LLM call (via \texttt{get\_llm()}, temperature 0.2) is given the original query and up to 10,000 characters of web results. The prompt instructs the model to produce a technically focused answer in English, use bullet points for readability, cite source URLs where present, and explicitly state when the retrieved content is not relevant to the query. The resulting summary is stored in \texttt{state.search\_summary} and displayed to the user by the final \texttt{finalize\_search()} node.
+After the search, \texttt{summarize\_\allowbreak search\_\allowbreak results()} condenses the raw content into a structured answer. A single LLM call (via \texttt{get\_llm()}, temperature 0.2) is given the original query and up to 10,000 characters of web results. The prompt instructs the model to produce a technically focused answer in English, use bullet points for readability, cite source URLs where present, and explicitly state when the retrieved content is not relevant to the query. The resulting summary is stored in \texttt{state.search\_summary} and displayed to the user by the final \texttt{finalize\_search()} node.
 
 \subsection{Quality Evaluation with DeepEval}
 

@@ -66,10 +66,10 @@ Example: MobileNet V2 0.35 requires 600 KB RAM / 1.1 MB Flash in FP32 format (in
 
 \section{Implementation Integration}
 
-This compatibility matrix informed the design of the automated \texttt{check\_resource\_constraints()} function in Workflow 2 (Section~\ref{sec:ai_workflow}), which:
+This compatibility matrix informed the design of the automated \texttt{check\_\allowbreak resource\_\allowbreak constraints()} function in Workflow 2 (Section~\ref{sec:ai_workflow}), which:
 \begin{enumerate}
     \item Parses STEdgeAI analysis reports to extract RAM/Flash usage
-    \item Compares against target MCU limits using \texttt{get\_mcu\_limits()} lookup table
+    \item Compares against target MCU limits using \texttt{get\_\allowbreak mcu\_\allowbreak limits()} lookup table
     \item Routes to high compression if overflow $<$ 4×, or rejects model if overflow $>$ 4×
 \end{enumerate}
 

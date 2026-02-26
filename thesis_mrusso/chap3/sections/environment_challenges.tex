@@ -48,7 +48,7 @@ These prompts represent a fundamental challenge for MLOps pipelines, as they req
 
 \subsection{The Keras 3 Compatibility Gap and the TFLite Bridge}
 
-With the transition to Keras 3.x, a significant regression was observed in the STMicroelectronics STEdgeAI 2.2 toolchain. Modern models serialized with the native Keras 3 format (\texttt{.keras}) often trigger internal errors in the ST parser (e.g., \texttt{INTERNAL ERROR: 'Concatenate' object has no attribute 'get\_input\_shape\_at'}). This issue is caused by the shift in the internal Keras API that the ST tool expects for graph traversal.
+With the transition to Keras 3.x, a significant regression was observed in the STMicroelectronics STEdgeAI 2.2 toolchain. Modern models serialized with the native Keras 3 format (\texttt{.keras}) often trigger internal errors in the ST parser (e.g., \texttt{INTERNAL ERROR: 'Concatenate' object has no attribute 'get\_\allowbreak input\_\allowbreak shape\_\allowbreak at'}). This issue is caused by the shift in the internal Keras API that the ST tool expects for graph traversal.
 
 To smoothly overcome this limitation without demanding manual model conversion from the end-user, I successfully engineered an Autonomous TFLite Bridge. When the orchestrator explicitly detects a modern Keras 3 model, it automatically spawns a dedicated subprocess within the primary \texttt{stm32\_agent} environment. This subprocess utilizes the native \texttt{TFLiteConverter} API to flawlessly transform the unsupported Keras model into a standard TensorFlow Lite flatbuffer. Following this successful conversion, the system transparently redirects the STEdgeAI analysis engine to target the newly generated TFLite artifact instead of the original Keras file.
 
@@ -74,7 +74,7 @@ Developing an orchestration framework for STMicroelectronics toolchains (primari
 
 \subsubsection{Path Abstraction and Configuration Management}
 
-A primary barrier to portability was the use of system-specific absolute paths (e.g., \texttt{/mnt/shared-storage/...} on Linux server deployments). To effectively resolve this, I implemented a solid Dynamic Configuration Layer within \texttt{configuration.py}. This new architecture inherently relies on environment-agnostic defaults, utilizing strictly relative paths (anchored to either the project root or the user's home directory) for all critical external resources, such as model caches (e.g., \texttt{\textasciitilde/.stm32\_ai\_models}) and model discovery catalogs. 
+A primary barrier to portability was the use of system-specific absolute paths (e.g., \texttt{/mnt/shared-storage/...} on Linux server deployments). To effectively resolve this, I implemented a solid Dynamic Configuration Layer within \texttt{configuration.py}. This new architecture inherently relies on environment-agnostic defaults, utilizing strictly relative paths (anchored to either the project root or the user's home directory) for all critical external resources, such as model caches (e.g., \texttt{\textasciitilde/.stm32\_\allowbreak ai\_\allowbreak models}) and model discovery catalogs. 
 
 Also, it employs a late-binding path resolution strategy for required external binaries like the STM32CubeMX CLI. By actively evaluating the \texttt{sys.platform} flag at runtime, the system automatically and accurately toggles between unique macOS and Linux executable naming conventions, effortlessly handling nuances like \texttt{.exe} parity or Homebrew-specific installation directories.
 

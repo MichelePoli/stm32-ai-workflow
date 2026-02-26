@@ -94,7 +94,7 @@ Runtime parameters are managed through a dedicated \texttt{Configuration} class 
 
 In addition, the \textbf{LangGraph Runtime Config} enables the injection of per-request settings directly into each workflow node via the \texttt{config} parameter.
 
-The framework relies on several important parameters to govern its behavior: \texttt{local\_llm} defines the language model identifier (defaulting to \texttt{mistral:latest}), while \texttt{llm\_temperature} balances deterministic routing ($0.0$) with creative code generation ($0.2$). The \texttt{llm\_context\_window} manages token limits, typically $4096$--$8192$, and \texttt{cubemx\_path} points to the absolute location of the STM32CubeMX CLI. 
+The framework relies on several important parameters to govern its behavior: \texttt{local\_llm} defines the language model identifier (defaulting to \texttt{mistral:latest}), while \texttt{llm\_temperature} balances deterministic routing ($0.0$) with creative code generation ($0.2$). The \texttt{llm\_\allowbreak context\_\allowbreak window} manages token limits, typically $4096$--$8192$, and \texttt{cubemx\_path} points to the absolute location of the STM32CubeMX CLI. 
 
 For AI-specific workflows, the \texttt{ai\_target} specifies the target MCU (e.g., \texttt{stm32h743}), and \texttt{ai\_compression} sets the desired quantization level ranging from \texttt{low} to \texttt{very\_high}. All parameters are validated at runtime using \textbf{Pydantic validators}, to ensure that required paths exist and credentials are correctly formatted before the orchestrator starts any workflow execution.
 
@@ -117,10 +117,10 @@ This multi-stage pipeline mirrors the typical embedded AI development lifecycle:
 The graph construction logic resides in four primary "injection" functions:
 
 \begin{itemize}
-    \item \texttt{inject\_firmware\_nodes()}: Firmware workflow (Workflow 1)
-    \item \texttt{inject\_ai\_analysis\_nodes()}: AI discovery, customization, and data management (Workflows 2, 5, 6, 7)
-    \item \texttt{inject\_integration\_nodes()}: Firmware-AI integration and verification (Workflow 3)
-    \item \texttt{inject\_web\_search\_nodes()}: Web research and RAG support (Workflow 4)
+    \item \texttt{inject\_\allowbreak firmware\_\allowbreak nodes()}: Firmware workflow (Workflow 1)
+    \item \texttt{inject\_\allowbreak ai\_\allowbreak analysis\_\allowbreak nodes()}: AI discovery, customization, and data management (Workflows 2, 5, 6, 7)
+    \item \texttt{inject\_\allowbreak integration\_\allowbreak nodes()}: Firmware-AI integration and verification (Workflow 3)
+    \item \texttt{inject\_\allowbreak web\_\allowbreak search\_\allowbreak nodes()}: Web research and RAG support (Workflow 4)
 \end{itemize}
 
 Each function encapsulates the node definitions and internal routing logic for its respective domain, adding them to the master \texttt{StateGraph} builder.

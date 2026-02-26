@@ -5,7 +5,7 @@ Once a base model has been discovered and profiled, the user may need to adapt i
 
 \subsection{Model Architecture Inspection}
 
-The workflow begins with the \texttt{inspect\_model\_architecture()} node, which analyses the downloaded model file and populates the graph state with the architectural metadata needed by all subsequent steps. The extracted data includes layer types (Conv2D, Dense, Dropout), output shapes, the total parameter count, and whether the model contains BatchNormalization or Dropout layers. This profile feeds directly into the best practice retrieval and modification planning steps.
+The workflow begins with the \texttt{inspect\_\allowbreak model\_\allowbreak architecture()} node, which analyses the downloaded model file and populates the graph state with the architectural metadata needed by all subsequent steps. The extracted data includes layer types (Conv2D, Dense, Dropout), output shapes, the total parameter count, and whether the model contains BatchNormalization or Dropout layers. This profile feeds directly into the best practice retrieval and modification planning steps.
 
 Model loading is not a trivial operation: the same file can fail with a standard \texttt{load\_model()} call if it was saved with a different Keras version or if it contains custom objects. For this reason, the node implements a three-level fallback chain. In the first attempt, it calls \texttt{tf.keras.models.load\_model()} with \texttt{compile=False} and reads the architecture directly from the live model object. If that fails on a \texttt{.h5} or \texttt{.keras} file, the node switches to a raw HDF5 inspection: it opens the file with \texttt{h5py} and parses the \texttt{model\_config} attribute to recover the layer list and names without loading any weights. If both attempts fail, the node fills the state with a minimal default dictionary (all counts set to zero, format set to \texttt{unknown}) so that the pipeline can still continue and present the user with a fallback interface.
 
@@ -16,9 +16,9 @@ After inspection, the results are also checked against the idempotency flag: if 
 \subsection{Best Practice Retrieval}
 \label{sec:best_practices}
 
-Before asking the user to specify modifications, the system retrieves a tailored set of fine-tuning recommendations for the detected architecture. The \texttt{retrieve\_best\_practices\_for\_architecture()} function follows a three-step strategy, moving to the next step only if the previous one fails.
+Before asking the user to specify modifications, the system retrieves a tailored set of fine-tuning recommendations for the detected architecture. The \texttt{retrieve\_\allowbreak best\_\allowbreak practices\_\allowbreak for\_\allowbreak architecture()} function follows a three-step strategy, moving to the next step only if the previous one fails.
 
-First, it checks whether a ChromaDB vectorstore already exists for the identified architecture type (e.g., \texttt{mobilenet}, \texttt{resnet}, \texttt{yolo}). Each architecture has its own persistent collection stored under \texttt{st\_ai\_output/chroma\_docs/}. If the collection exists and returns results with a similarity score above the threshold, those documents are used immediately, avoiding any LLM call.
+First, it checks whether a ChromaDB vectorstore already exists for the identified architecture type (e.g., \texttt{mobilenet}, \texttt{resnet}, \texttt{yolo}). Each architecture has its own persistent collection stored under \texttt{st\_\allowbreak ai\_\allowbreak output/chroma\_\allowbreak docs/}. If the collection exists and returns results with a similarity score above the threshold, those documents are used immediately, avoiding any LLM call.
 
 If no cached data is found, the system invokes the local Ollama LLM (Mistral) to generate a concise best practice guide. The prompt is deliberately structured and constrained, requesting a bullet-point output with four specific sections (strategy, hyperparameters, quantization, and memory constraints), and keeps the response under 200 tokens. The generated document is then split into chunks and saved to the architecture-specific ChromaDB collection for reuse:
 
@@ -42,7 +42,7 @@ If even the LLM call fails (for example, due to an Ollama timeout), the function
 
 \subsection{Modification Intent Classification}
 
-The \texttt{ask\_modification\_intent()} node determines, without mandatory user input, whether the current request requires any architectural changes. It first analyses the initial message sent to start the workflow. If the text contains explicit modification keywords (e.g., ``freeze'', ``dropout'', ``change input'') with a confidence above 90\%, the node sets \texttt{wants\_model\_modifications = True} and skips the interrupt. Generic triggers like ``analyze'' or ``start ai'' are treated as negative signals regardless of confidence, since those phrases imply the user wants to proceed without changes.
+The \texttt{ask\_\allowbreak modification\_\allowbreak intent()} node determines, without mandatory user input, whether the current request requires any architectural changes. It first analyses the initial message sent to start the workflow. If the text contains explicit modification keywords (e.g., ``freeze'', ``dropout'', ``change input'') with a confidence above 90\%, the node sets \texttt{wants\_\allowbreak model\_\allowbreak modifications = True} and skips the interrupt. Generic triggers like ``analyze'' or ``start ai'' are treated as negative signals regardless of confidence, since those phrases imply the user wants to proceed without changes.
 
 When the intent is ambiguous or entirely absent, the node pauses with an LangGraph interrupt and presents a structured prompt:
 
@@ -64,7 +64,7 @@ If the user replies negatively, the graph routes to the STEdgeAI analysis step d
 \subsection{Modification Parsing and Validation}
 \label{sec:mod_parsing}
 
-When modifications are requested, the \texttt{ask\_and\_parse\_user\_modifications()} node collects the user's natural language description and converts it into a structured plan using the \texttt{ParsedModificationsPlan} Pydantic schema. The schema captures a list of individual modifications, an overall confidence score, training recommendations (learning rate, batch size, epochs, optimizer), and a validation sub-object listing any detected issues.
+When modifications are requested, the \texttt{ask\_\allowbreak and\_\allowbreak parse\_\allowbreak user\_\allowbreak modifications()} node collects the user's natural language description and converts it into a structured plan using the \texttt{ParsedModificationsPlan} Pydantic schema. The schema captures a list of individual modifications, an overall confidence score, training recommendations (learning rate, batch size, epochs, optimizer), and a validation sub-object listing any detected issues.
 
 The node supports seven distinct modification types:
 
@@ -78,7 +78,7 @@ The node supports seven distinct modification types:
   \item \textbf{add\_resizing\_layer}: Wraps the existing model in a new input layer that accepts images of any resolution and resizes them automatically to the model's original input shape. This is the only valid option for detection models (YOLO, SSD) where changing the input shape directly would break the output grid structure.
 \end{itemize}
 
-The LLM extractor is called with strict instructions to parse only what the user explicitly asked for. A second validation pass then checks each modification for parameter completeness and value ranges (for example, dropout rates must be between 0.0 and 1.0, and the layer count must not exceed the total layers in the model). The \texttt{change\_input\_shape} type is also cross-checked against a blocklist of model families for which it is unsupported:
+The LLM extractor is called with strict instructions to parse only what the user explicitly asked for. A second validation pass then checks each modification for parameter completeness and value ranges (for example, dropout rates must be between 0.0 and 1.0, and the layer count must not exceed the total layers in the model). The \texttt{change\_\allowbreak input\_\allowbreak shape} type is also cross-checked against a blocklist of model families for which it is unsupported:
 
 \begin{lstlisting}[language=Python, caption={Input shape compatibility guard}, label={lst:input_guard}]
 INCOMPATIBLE_INPUT_SHAPE_MODELS = {
@@ -88,34 +88,34 @@ INCOMPATIBLE_INPUT_SHAPE_MODELS = {
 }
 \end{lstlisting}
 
-If a blocked modification is detected, it is removed from the plan, a warning is added to the validation issues list, and the user is advised to use \texttt{add\_resizing\_layer} instead.
+If a blocked modification is detected, it is removed from the plan, a warning is added to the validation issues list, and the user is advised to use \texttt{add\_\allowbreak resizing\_\allowbreak layer} instead.
 
 \subsection{Preview and Confirmation}
 
-Before any file is modified, the \texttt{collect\_modification\_confirmation()} node displays a structured preview to the user: a summary of all planned modifications, the overall confidence of the parsing, the training recommendations, and any validation warnings. The user can respond in one of three ways: confirm the plan, reject it entirely, or request changes. The response is interpreted by an LLM agent, with a keyword-based fallback parser in case the LLM call fails.
+Before any file is modified, the \texttt{collect\_\allowbreak modification\_\allowbreak confirmation()} node displays a structured preview to the user: a summary of all planned modifications, the overall confidence of the parsing, the training recommendations, and any validation warnings. The user can respond in one of three ways: confirm the plan, reject it entirely, or request changes. The response is interpreted by an LLM agent, with a keyword-based fallback parser in case the LLM call fails.
 
-If the user asks to revise the plan, the graph sets \texttt{user\_wants\_to\_edit = True} and routes back to the modification parsing node, allowing a full re-specification without restarting the workflow.
+If the user asks to revise the plan, the graph sets \texttt{user\_\allowbreak wants\_\allowbreak to\_\allowbreak edit = True} and routes back to the modification parsing node, allowing a full re-specification without restarting the workflow.
 
 \subsection{Architecture Patching}
 \label{sec:arch_patching}
 
-Once the plan is confirmed, the \texttt{apply\_user\_customization()} node patches the model architecture in a subprocess. Before starting, the node resolves the correct conda environment based on the model format: \texttt{.keras} files are processed in the \texttt{stm32} environment (Keras 3.x), while \texttt{.h5} files use \texttt{stm32legacy} (Keras 2.x). This routing is necessary because most models downloaded from common repositories are saved in the legacy HDF5 format, which is incompatible with Keras 3's default importer.
+Once the plan is confirmed, the \texttt{apply\_\allowbreak user\_\allowbreak customization()} node patches the model architecture in a subprocess. Before starting, the node resolves the correct conda environment based on the model format: \texttt{.keras} files are processed in the \texttt{stm32} environment (Keras 3.x), while \texttt{.h5} files use \texttt{stm32legacy} (Keras 2.x). This routing is necessary because most models downloaded from common repositories are saved in the legacy HDF5 format, which is incompatible with Keras 3's default importer.
 
 The patching itself is divided into two phases. Non-reconstructive modifications, that is layer freezing and learning rate changes, are applied directly to the model object in memory since they do not alter the graph topology. Reconstructive modifications, those that change the layer graph (output size, dropout injection, input shape, resizing wrapper), are queued and then applied in a specific order to preserve skip connections:
 
 \begin{enumerate}[noitemsep, topsep=4pt]
   \item \textbf{Output layer change}: The model config dict is patched to update the units count of the last Dense layer, and the model is rebuilt with \texttt{Model.from\_config()}. Weights from all layers except the last Dense are copied to the new model.
   \item \textbf{Dropout insertion}: A Dropout layer is inserted between the penultimate layer and the output layer using the functional API.
-  \item \textbf{Input shape change}: The \texttt{batch\_input\_shape} field of the first layer's config is patched, and the entire model is rebuilt. Weights are copied where shapes allow; layers with a shape mismatch are re-initialized.
+  \item \textbf{Input shape change}: The \texttt{batch\_\allowbreak input\_\allowbreak shape} field of the first layer's config is patched, and the entire model is rebuilt. Weights are copied where shapes allow; layers with a shape mismatch are re-initialized.
   \item \textbf{Resizing wrapper}: A new \texttt{Input} layer accepting \texttt{(None, None, C)} is created, a \texttt{Resizing} layer is appended to scale images to the model's original resolution, and the existing model is called on the resized output.
 \end{enumerate}
 
-The entire patching script runs in a subprocess via \texttt{execute\_in\_environment()}, which writes the script to a temporary file, runs it with the selected Python binary, and streams output line by line. A \texttt{SUCCESS:} marker in stdout signals that the modified model was saved to \texttt{/tmp/customized\_model.h5} along with a JSON-encoded info block.
+The entire patching script runs in a subprocess via \texttt{execute\_\allowbreak in\_\allowbreak environment()}, which writes the script to a temporary file, runs it with the selected Python binary, and streams output line by line. A \texttt{SUCCESS:} marker in stdout signals that the modified model was saved to \texttt{/tmp/customized\_model.h5} along with a JSON-encoded info block.
 
 \subsection{Standard Fine-Tuning Path}
 \label{sec:standard_fine_tuning}
 
-The \texttt{fine\_tune\_customized\_model()} node fine-tunes the patched model on the user's dataset inside another subprocess (using the \texttt{stm32} conda environment). The training configuration is taken from the \texttt{training\_recommendation} field of the parsed modification plan, with two safety caps applied: the learning rate is clipped at \texttt{1e-3} to avoid destabilizing pre-trained weights, and the epoch count is capped at 10 for standard runs.
+The \texttt{fine\_\allowbreak tune\_\allowbreak customized\_\allowbreak model()} node fine-tunes the patched model on the user's dataset inside another subprocess (using the \texttt{stm32} conda environment). The training configuration is taken from the \texttt{training\_recommendation} field of the parsed modification plan, with two safety caps applied: the learning rate is clipped at \texttt{1e-3} to avoid destabilizing pre-trained weights, and the epoch count is capped at 10 for standard runs.
 
 The node supports two dataset sources. When \texttt{dataset\_source = "real"}, it loads \texttt{x\_train.npy} and \texttt{y\_train.npy} from the configured dataset path, normalises pixel values to $[0, 1]$, applies one-hot encoding if the labels are in scalar format, and limits the sample count to 5,000 to avoid RAM exhaustion. If a separate \texttt{x\_test.npy} exists, it is used as the validation split. When \texttt{dataset\_source = "synthetic"}, the node generates random noise data instead. If neither option is available, it falls back to pure dummy data so that the training step always completes and the user gets a functional model file, even without a dataset.
 
@@ -141,9 +141,9 @@ The generated code also manages memory limits on consumer hardware through datas
 
 \subsubsection{Prompt Engineering Strategy}
 
-The \texttt{generate\_nni\_experiment()} function in \texttt{nni\_optimization/generator.py} uses a detailed 480-line prompt to produce accurate generation. This prompt relies on context injection by providing the LLM with exact model metadata, such as layer counts and tensor shapes, together with specific dataset requirements. To prevent common errors, the instructions forbid the use of placeholder paths or the reference of non-existent API methods. It also includes functional code templates for both \texttt{manager.py} and \texttt{trial.py}, with inline comments explaining the most significant logic blocks.
+The \texttt{generate\_\allowbreak nni\_\allowbreak experiment()} function in \texttt{nni\_optimization/generator.py} uses a detailed 480-line prompt to produce accurate generation. This prompt relies on context injection by providing the LLM with exact model metadata, such as layer counts and tensor shapes, together with specific dataset requirements. To prevent common errors, the instructions forbid the use of placeholder paths or the reference of non-existent API methods. It also includes functional code templates for both \texttt{manager.py} and \texttt{trial.py}, with inline comments explaining the most significant logic blocks.
 
-Specific rules are included to address known inconsistencies in the NNI API. For example, the prompt explicitly warns that \texttt{experiment.get\_best\_trial()} is unavailable in certain versions. To ensure the output remains easy to parse, the system also mandates a strict format using \texttt{\# FILE:} markers for multi-file generation.
+Specific rules are included to address known inconsistencies in the NNI API. For example, the prompt explicitly warns that \texttt{experiment.get\_\allowbreak best\_\allowbreak trial()} is unavailable in certain versions. To ensure the output remains easy to parse, the system also mandates a strict format using \texttt{\# FILE:} markers for multi-file generation.
 
 A representative extract from the prompt:
 
@@ -183,11 +183,11 @@ def force_unload_triton(model_name: str = "mistral"):
         logger.error(f"Failed to unload Triton model: {e}")
 \end{lstlisting}
 
-This call runs in the \texttt{finally} block of \texttt{generate\_nni\_experiment()} so that VRAM is released regardless of whether generation succeeds or fails.
+This call runs in the \texttt{finally} block of \texttt{generate\_\allowbreak nni\_\allowbreak experiment()} so that VRAM is released regardless of whether generation succeeds or fails.
 
 \subsubsection{Multi-File Parser}
 
-The LLM output is a single string containing both files, separated by \texttt{\# FILE: filename.py} markers. The \texttt{extract\_files\_from\_code()} function parses it with a permissive regex:
+The LLM output is a single string containing both files, separated by \texttt{\# FILE: filename.py} markers. The \texttt{extract\_\allowbreak files\_\allowbreak from\_\allowbreak code()} function parses it with a permissive regex:
 
 \begin{lstlisting}[language=Python, caption={Multi-file code extraction}, label={lst:file_extraction}]
 file_pattern = re.compile(
@@ -203,7 +203,7 @@ If no markers are found, the output is saved as \texttt{main.py} as a fallback f
 \subsubsection{Generated File Structure}
 
 \paragraph{\texttt{manager.py}}
-This file manages the hyperparameter search. It sets up CUDA library paths for Conda environments, defines the NNI search space (learning rate, batch size, optimizer, freeze backbone flag), configures the TPE tuner, scans for a free port in the 8080--8100 range to avoid conflicts, and launches the experiment with \texttt{experiment.run(wait\_completion=True)}. After all trials complete, it manually iterates \texttt{experiment.list\_trial\_jobs()} to find the highest-accuracy trial, then re-runs \texttt{trial.py} with \texttt{RETRAIN\_MODE=true} to produce the final saved model.
+This file manages the hyperparameter search. It sets up CUDA library paths for Conda environments, defines the NNI search space (learning rate, batch size, optimizer, freeze backbone flag), configures the TPE tuner, scans for a free port in the 8080--8100 range to avoid conflicts, and launches the experiment with \texttt{experiment.run(wait\_completion=True)}. After all trials complete, it manually iterates \texttt{experiment.list\_\allowbreak trial\_\allowbreak jobs()} to find the highest-accuracy trial, then re-runs \texttt{trial.py} with \texttt{RETRAIN\_MODE=true} to produce the final saved model.
 
 \paragraph{\texttt{trial.py}}
 This file executes a single training trial. It checks the \texttt{RETRAIN\_MODE} environment variable to determine whether to report metrics back to NNI or save the final model. Data is loaded with \texttt{mmap\_mode='r'} to avoid mapping the full array into RAM, and only 50\% of the data is used per trial. If the label array has shape \texttt{(N, 1)}, it is converted to one-hot automatically. If the model's output class count does not match the dataset, the final Dense layer is replaced in-place. Images are resized dynamically if the input shape mismatches, and data augmentation (random flips, rotations, zoom) is applied during training.
@@ -214,7 +214,7 @@ To prevent GPU memory errors when transitioning from LLM inference to NNI traini
 
 \subsection{Hyperparameter Optimization Execution}
 
-Once the NNI scripts are successfully generated and saved to \texttt{./nni\_experiment/}, the training is started by \texttt{optimize\_hyperparameters\_with\_nni()}:
+Once the NNI scripts are successfully generated and saved to \texttt{./nni\_experiment/}, the training is started by \texttt{optimize\_\allowbreak hyperparameters\_\allowbreak with\_\allowbreak nni()}:
 
 \begin{enumerate}[noitemsep, topsep=2pt]
   \item \textbf{Validation}: Checks that both \texttt{manager.py} and \texttt{trial.py} exist and are syntactically valid Python.
@@ -254,7 +254,7 @@ Algorithm~\ref{alg:nni_retrain} outlines the NNI workflow, including the extract
 
 \subsection{Validation and Model Persistence}
 
-After NNI completes, the \texttt{validate\_customized\_model()} node loads \texttt{best\_model.h5} and evaluates it on a held-out test set. If validation accuracy meets the user's threshold (configurable, default 0.7), the model is saved alongside a JSON metadata file:
+After NNI completes, the \texttt{validate\_\allowbreak customized\_\allowbreak model()} node loads \texttt{best\_model.h5} and evaluates it on a held-out test set. If validation accuracy meets the user's threshold (configurable, default 0.7), the model is saved alongside a JSON metadata file:
 
 \begin{lstlisting}[language=Python, caption={Model persistence with metadata tracking}, label={lst:model_save}]
 metadata = {

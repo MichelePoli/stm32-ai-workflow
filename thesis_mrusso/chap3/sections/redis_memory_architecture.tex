@@ -76,8 +76,8 @@ The profile value is a JSON-serialized dictionary containing persistent user pre
   \item \texttt{last\_board}: The most recently used STM32 board (e.g., ``STM32H743ZI''), used to pre-fill firmware generation requests
   \item \texttt{preferred\_compression}: Default quantization level (``low'', ``medium'', ``high'', ``very\_high'')
   \item \texttt{code\_style}: Preferred code verbosity (``minimal'', ``standard'', ``verbose'') for generated C code
-  \item \texttt{last\_project\_paths}: History of firmware project directories for quick re-selection
-  \item \texttt{model\_registry\_contributions}: User-submitted models awaiting validation (transactional registration flow)
+  \item \texttt{last\_\allowbreak project\_\allowbreak paths}: History of firmware project directories for quick re-selection
+  \item \texttt{model\_\allowbreak registry\_\allowbreak contributions}: User-submitted models awaiting validation (transactional registration flow)
   \item \texttt{session\_count}: Total number of sessions (for analytics)
   \item \texttt{last\_active}: Timestamp of last interaction (for inactive user cleanup)
 \end{itemize}
@@ -203,9 +203,9 @@ The dual-memory architecture enables powerful cross-session workflows:
 
 \textbf{Day 2 - Session 2 (CLI):}
 \begin{enumerate}
-  \item User reconnects via CLI with same \texttt{user\_id + session\_id}
+  \item User reconnects via CLI with same \texttt{user\_\allowbreak id + session\_\allowbreak id}
   \item \texttt{graph.aget\_state(config)} retrieves the checkpoint from Day 1
-  \item \textbf{Automatic Resume}: The graph detects \texttt{current\_state.next = ["check\_nni\_status"]} and resumes execution
+  \item \textbf{Automatic Resume}: The graph detects \texttt{current\_\allowbreak state.next = ["check\_\allowbreak nni\_\allowbreak status"]} and resumes execution
   \item NNI results are retrieved from disk, best model is saved, and integration proceeds
 \end{enumerate}
 
@@ -221,7 +221,7 @@ The dual-memory architecture enables powerful cross-session workflows:
 \textbf{Session B (AI Model Selection, 1 week later):}
 \begin{enumerate}
   \item User: ``Analyze MobileNetV2''
-  \item \textbf{Context Chaining}: The \texttt{collect\_analysis\_info()} node checks \texttt{state.last\_board} and auto-populates \texttt{target\_mcu = "stm32h743"}
+  \item \textbf{Context Chaining}: The \texttt{collect\_\allowbreak analysis\_\allowbreak info()} node checks \texttt{state.last\_board} and auto-populates \texttt{target\_mcu = "stm32h743"}
   \item No need for user to re-specify hardware → \textbf{Eliminated 1 clarification roundtrip}
 \end{enumerate}
 
@@ -233,7 +233,7 @@ The short-term memory checkpoint enables continuous Human-in-the-Loop workflows:
 
 \begin{enumerate}
   \item Node calls \texttt{interrupt(\{type: "decision\_request", message: "Proceed to AI?"\})}
-  \item LangGraph suspends execution and saves checkpoint with \texttt{next = ["decide\_continue\_to\_ai"]}
+  \item LangGraph suspends execution and saves checkpoint with \texttt{next = ["decide\_\allowbreak continue\_\allowbreak to\_\allowbreak ai"]}
   \item Control returns to API server, which sends a JSON event to VS Code
   \item User sees: ``Firmware generated. Continue with AI model selection? [Yes/No]''
 \end{enumerate}
@@ -243,9 +243,9 @@ The short-term memory checkpoint enables continuous Human-in-the-Loop workflows:
 \begin{enumerate}
   \item User types: ``Yes, use high compression''
   \item VS Code sends \texttt{POST /stream} with \texttt{messages: [\{role: "user", content: "Yes, use high compression"\}]}
-  \item Server calls \texttt{graph.aget\_state(config)} and detects \texttt{current\_state.next = ["decide\_continue\_to\_ai"]}
-  \item Server injects user response: \texttt{await graph.aupdate\_state(config, \{"user\_response": "Yes, use high compression"\})}
-  \item Graph resumes from \texttt{decide\_continue\_to\_ai} node, which parses the response via LLM and routes accordingly
+  \item Server calls \texttt{graph.aget\_state(config)} and detects \texttt{current\_\allowbreak state.next = ["decide\_\allowbreak continue\_\allowbreak to\_\allowbreak ai"]}
+  \item Server injects user response: \texttt{await graph.aupdate\_\allowbreak state(config, \{"user\_\allowbreak response": "Yes, use high compression"\})}
+  \item Graph resumes from \texttt{decide\_\allowbreak continue\_\allowbreak to\_\allowbreak ai} node, which parses the response via LLM and routes accordingly
 \end{enumerate}
 
 \subsection{Performance Considerations}

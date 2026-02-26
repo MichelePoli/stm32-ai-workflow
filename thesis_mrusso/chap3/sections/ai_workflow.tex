@@ -5,7 +5,7 @@ Workflow 2 handles the selection, profiling, and C code generation of pre-traine
 
 \subsection{Analysis Parameters Collection}
 
-\texttt{collect\_analysis\_info()} extracts the target MCU and the desired compression level from the user's message. The node scans the initial prompt for known MCU series tokens (e.g., \texttt{h7}, \texttt{u5}, \texttt{f4}). If nothing is found, it issues an interrupt and surfaces the last used series from the persistent context as a suggestion. When Workflow 1 has already set \texttt{state.target} from the selected board, the interrupt is skipped entirely. Inference is delegated to \texttt{get\_llm()}, which routes requests to the NVIDIA Triton Inference Server when \texttt{USE\_TRITON\_BACKEND} is set, falling back to a local Ollama instance otherwise:
+\texttt{collect\_\allowbreak analysis\_\allowbreak info()} extracts the target MCU and the desired compression level from the user's message. The node scans the initial prompt for known MCU series tokens (e.g., \texttt{h7}, \texttt{u5}, \texttt{f4}). If nothing is found, it issues an interrupt and surfaces the last used series from the persistent context as a suggestion. When Workflow 1 has already set \texttt{state.target} from the selected board, the interrupt is skipped entirely. Inference is delegated to \texttt{get\_llm()}, which routes requests to the NVIDIA Triton Inference Server when \texttt{USE\_\allowbreak TRITON\_\allowbreak BACKEND} is set, falling back to a local Ollama instance otherwise:
 
 \begin{lstlisting}[language=python, caption={Parameter extraction from user input}, label={lst:param_extraction}]
 # User: "I need a model for image classification on STM32H7 with high compression"
@@ -32,9 +32,9 @@ Model discovery follows a three-tier hierarchy. The first tier covers locally cu
 
 \subsubsection{Tier 1: Curated Task-Based Models (Two-Node Pipeline)}
 
-The first tier runs across two separate nodes. \texttt{choose\_ai\_task()} presents a menu of all task categories in \texttt{predefined\_models.json}, a JSON registry decoupled from the discovery logic so it can be updated without touching any source code. The menu covers standard embedded tasks (image classification, object detection, human activity recognition) and also exposes two shortcut options: ``Register your own model'' and ``Online search''. An LLM classifier maps the user's free-text response to the appropriate category key.
+The first tier runs across two separate nodes. \texttt{choose\_\allowbreak ai\_\allowbreak task()} presents a menu of all task categories in \texttt{predefined\_models.json}, a JSON registry decoupled from the discovery logic so it can be updated without touching any source code. The menu covers standard embedded tasks (image classification, object detection, human activity recognition) and also exposes two shortcut options: ``Register your own model'' and ``Online search''. An LLM classifier maps the user's free-text response to the appropriate category key.
 
-\texttt{choose\_ai\_model()} then handles selection within the chosen category. Before showing the list, it computes a compatibility estimate for each model by comparing its stated file size against the flash limit returned by \texttt{get\_mcu\_limits(state.target)}:
+\texttt{choose\_\allowbreak ai\_\allowbreak model()} then handles selection within the chosen category. Before showing the list, it computes a compatibility estimate for each model by comparing its stated file size against the flash limit returned by \texttt{get\_\allowbreak mcu\_\allowbreak limits(state.target)}:
 
 \begin{itemize}[noitemsep, topsep=4pt]
     \item Models fitting within flash limits natively are marked \textbf{Fits} ($\checkmark$)
@@ -46,7 +46,7 @@ The user sees this information upfront, before any download or conversion is att
 
 \subsubsection{Tier 2: Iterative Web Search with Hybrid Retrieval}
 
-When no curated model satisfies the request, the system enters \texttt{search\_recommendation\_model()}, a loop capped at three iterations. Each iteration tries two backends in sequence.
+When no curated model satisfies the request, the system enters \texttt{search\_\allowbreak recommendation\_\allowbreak model()}, a loop capped at three iterations. Each iteration tries two backends in sequence.
 
 The primary backend scans the \texttt{STMicroelectronics/stm32ai-modelzoo} GitHub repository via the PyGitHub API. It recursively traverses the task-specific subfolder (depth limit: 5, early exit at 20 files) and collects files with extensions \texttt{.h5}, \texttt{.keras}, \texttt{.onnx}, or \texttt{.tflite}. An LLM then scores each candidate on task relevance, architecture recognition, and file size, and the top result is validated with a lightweight HTTP HEAD check before being shown to the user.
 
@@ -65,17 +65,17 @@ Accept this model? (yes/no)
 })
 \end{lstlisting}
 
-A rejection resets \texttt{state.model\_discovery\_method} to \texttt{"search"} and the routing node re-enters the loop. After three failed iterations, the system selects a task-based fallback from the local registry and presents it with one final confirmation interrupt before starting the download.
+A rejection resets \texttt{state.model\_\allowbreak discovery\_\allowbreak method} to \texttt{"search"} and the routing node re-enters the loop. After three failed iterations, the system selects a task-based fallback from the local registry and presents it with one final confirmation interrupt before starting the download.
 
 \subsubsection{Tier 3: User Model Registration}
 
-Users can also register their own local or remote models through \texttt{add\_custom\_model\_procedure()}, providing a category, a name, and a direct download URL. The entry is written to \texttt{predefined\_models.json} only after \texttt{stedgeai analyze} confirms the model is structurally valid for the target runtime.
+Users can also register their own local or remote models through \texttt{add\_\allowbreak custom\_\allowbreak model\_\allowbreak procedure()}, providing a category, a name, and a direct download URL. The entry is written to \texttt{predefined\_models.json} only after \texttt{stedgeai analyze} confirms the model is structurally valid for the target runtime.
 
 \subsection{Model Download and Inspection}
 
-\texttt{download\_model\_to\_cache()} saves the selected model to \texttt{\textasciitilde/.stm32\_ai\_models/}. A cached copy, if present, is reused without re-downloading. For fresh downloads, data streams in 8~KB chunks with progress logged every 20\%. The file size is checked after saving, and if the model entry carries an optional \texttt{sha256} field, the hash is verified before proceeding.
+\texttt{download\_\allowbreak model\_\allowbreak to\_\allowbreak cache()} saves the selected model to \texttt{\textasciitilde/.stm32\_\allowbreak ai\_\allowbreak models/}. A cached copy, if present, is reused without re-downloading. For fresh downloads, data streams in 8~KB chunks with progress logged every 20\%. The file size is checked after saving, and if the model entry carries an optional \texttt{sha256} field, the hash is verified before proceeding.
 
-Architecture inspection follows a two-level subprocess strategy. The model is loaded inside an isolated subprocess in the correct conda environment (\texttt{stm32} for \texttt{.keras}, \texttt{stm32legacy} for \texttt{.h5}). The inspection script is generated inline as a Python string and executed via \texttt{execute\_in\_environment()}; results are returned through a \texttt{JSON\_START\ldots JSON\_END} marker in stdout:
+Architecture inspection follows a two-level subprocess strategy. The model is loaded inside an isolated subprocess in the correct conda environment (\texttt{stm32} for \texttt{.keras}, \texttt{stm32legacy} for \texttt{.h5}). The inspection script is generated inline as a Python string and executed via \texttt{execute\_\allowbreak in\_\allowbreak environment()}; results are returned through a \texttt{JSON\_\allowbreak START\ldots JSON\_\allowbreak END} marker in stdout:
 
 \begin{lstlisting}[language=python, caption={Inline subprocess script for model inspection}, label={lst:legacy_env}]
 script = f"""
@@ -146,4 +146,4 @@ Modern Keras 3.x, required by LangGraph and NNI, is incompatible with the Keras 
     \item \textbf{Legacy environment} (\texttt{stm32legacy}): pinned to TensorFlow 2.15 and Keras 2.15 for inspection and fine-tuning of older model files
 \end{itemize}
 
-At download time, \texttt{download\_model\_to\_cache()} reads the file extension and routes accordingly: \texttt{.keras} files go to \texttt{stm32}, while \texttt{.h5} files are directed to \texttt{stm32legacy} via the \texttt{ARCH\_ENVIRONMENT\_MAP} dictionary, which also maps specific architectures (e.g., YOLO variants) to their required environment. The chosen interpreter path is resolved from the system configuration and passed to \texttt{execute\_in\_environment()}, keeping the main runtime isolated from TensorFlow dependency conflicts.
+At download time, \texttt{download\_\allowbreak model\_\allowbreak to\_\allowbreak cache()} reads the file extension and routes accordingly: \texttt{.keras} files go to \texttt{stm32}, while \texttt{.h5} files are directed to \texttt{stm32legacy} via the \texttt{ARCH\_\allowbreak ENVIRONMENT\_\allowbreak MAP} dictionary, which also maps specific architectures (e.g., YOLO variants) to their required environment. The chosen interpreter path is resolved from the system configuration and passed to \texttt{execute\_\allowbreak in\_\allowbreak environment()}, keeping the main runtime isolated from TensorFlow dependency conflicts.

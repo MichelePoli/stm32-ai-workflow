@@ -6,7 +6,7 @@ Workflow 1 automates the initialization of STM32CubeMX projects through CLI-driv
 
 \subsection{Project Information Collection}
 
-The \texttt{collect\_project\_info()} node extracts hardware specifications from the user's natural language input. Parsing is delegated to \texttt{get\_llm()}, a centralized utility in \texttt{utils.py} that routes inference requests to the NVIDIA Triton Inference Server when the \texttt{USE\_TRITON\_BACKEND} environment variable is set, and falls back to a local Ollama instance otherwise. The utility is configured with the \texttt{ProjectInfoExtraction} Pydantic schema for structured output:
+The \texttt{collect\_\allowbreak project\_\allowbreak info()} node extracts hardware specifications from the user's natural language input. Parsing is delegated to \texttt{get\_llm()}, a centralized utility in \texttt{utils.py} that routes inference requests to the NVIDIA Triton Inference Server when the \texttt{USE\_\allowbreak TRITON\_\allowbreak BACKEND} environment variable is set, and falls back to a local Ollama instance otherwise. The utility is configured with the \texttt{ProjectInfoExtraction} Pydantic schema for structured output:
 
 \begin{lstlisting}[language=Python, caption={Firmware project info extraction}]
 # User: "Create a project for STM32F401 with STM32CubeIDE, name MyApp"
@@ -23,13 +23,13 @@ result = llm_extractor.invoke([
 #          peripheral_config: []}
 \end{lstlisting}
 
-The schema includes a \texttt{peripheral\_config} field containing CubeMX commands for pins and peripherals. When the user mentions specific hardware in their prompt, for example ``activate pin PA5 as output'' or ``use timer 1'', the LLM converts these into CubeMX script directives (\texttt{set\_pin PA5 GPIO\_Output}, \texttt{set\_peripheral TIM1}) that are injected directly into the generation script. Alternatively, users can specify an existing \texttt{.ioc} file path, bypassing project creation entirely.
+The schema includes a \texttt{peripheral\_config} field containing CubeMX commands for pins and peripherals. When the user mentions specific hardware in their prompt, for example ``activate pin PA5 as output'' or ``use timer 1'', the LLM converts these into CubeMX script directives (\texttt{set\_\allowbreak pin PA5 GPIO\_\allowbreak Output}, \texttt{set\_peripheral TIM1}) that are injected directly into the generation script. Alternatively, users can specify an existing \texttt{.ioc} file path, bypassing project creation entirely.
 
 The node also handles two edge cases before issuing the interrupt. If \texttt{board\_name} is already set in the graph state from a previous session, the node skips the interrupt and reuses the existing value. If the user responds with a phrase such as ``use the one from yesterday'' or ``same as before'', the LLM maps the input to the token \texttt{USE\_PROFILE}, which triggers a lookup of the last used board and MCU series from the Redis persistent context.
 
 \subsection{Automated MCU Package Management}
 
-The \texttt{search\_and\_install\_stm32\_package()} function handles the download of STM32Cube firmware packages from GitHub. Without this step, the CubeMX CLI fails silently with a ``Project loading error'' when a required MCU package is absent from the local repository. This is a practical difference from the GUI, which offers an interactive download prompt.
+The \texttt{search\_\allowbreak and\_\allowbreak install\_\allowbreak stm32\_\allowbreak package()} function handles the download of STM32Cube firmware packages from GitHub. Without this step, the CubeMX CLI fails silently with a ``Project loading error'' when a required MCU package is absent from the local repository. This is a practical difference from the GUI, which offers an interactive download prompt.
 
 The node first checks whether a package folder for the detected MCU series already exists inside \texttt{\textasciitilde/STM32Cube/Repository/}. If present, the step is skipped. Otherwise, the function uses \texttt{git ls-remote --tags} to read available version tags without cloning the full repository, selects the latest semantic version, and performs a shallow recursive clone:
 
@@ -39,11 +39,11 @@ git clone --recursive --branch v1.28.1 --depth 1 \
     /tmp/STM32CubeF4_<timestamp>
 \end{verbatim}
 
-After cloning, it verifies that \texttt{Drivers/}, \texttt{Middlewares/}, and \texttt{Projects/} are present, reads the version from \texttt{Release\_Notes.html}, and moves the repository to the final path under \texttt{STM32Cube/Repository/}. If the clone fails or times out, the error is stored in \texttt{state.package\_error\_message} and the routing node short-circuits to \texttt{finalize\_project}, skipping script generation.
+After cloning, it verifies that \texttt{Drivers/}, \texttt{Middlewares/}, and \texttt{Projects/} are present, reads the version from \texttt{Release\_Notes.html}, and moves the repository to the final path under \texttt{STM32Cube/Repository/}. If the clone fails or times out, the error is stored in \texttt{state.package\_\allowbreak error\_\allowbreak message} and the routing node short-circuits to \texttt{finalize\_project}, skipping script generation.
 
 \subsection{Headless Generation and CLI Scripting}
 
-STM32CubeMX supports headless operation via the \texttt{-q} flag. The \texttt{generate\_cubemx\_script()} node builds a \texttt{.scr} file in three steps.
+STM32CubeMX supports headless operation via the \texttt{-q} flag. The \texttt{generate\_\allowbreak cubemx\_\allowbreak script()} node builds a \texttt{.scr} file in three steps.
 
 First, it searches for a usable IOC file in priority order: a user-supplied path, a pre-validated template matching the exact board name, and finally a series-level template (e.g., \texttt{STM32H7A3ZITx.ioc} for any H7 device). A matched template is loaded with \texttt{config load}, which avoids the interactive recommendation dialogs. Only when no template is available does the script fall back to \texttt{load \textless MCU\textgreater}, risking GUI pop-ups.
 
@@ -73,10 +73,10 @@ After the process exits with return code 0, the node polls the temporary directo
 
 For known chip families, the firmware workflow uses a \textbf{pre-seeded IOC strategy} to avoid the interactive pop-ups described above. A set of pre-validated \texttt{.ioc} templates, one per supported MCU family (e.g., \texttt{STM32H7A3ZITx.ioc}, \texttt{STM32U585AIIxQ.ioc}), is maintained in the \texttt{templates/ioc\_files/} directory. Each file is configured manually once in the GUI to answer all the recommendation wizards, including MPU regions and TrustZone context.
 
-At runtime, \texttt{get\_template\_ioc\_path()} tries an exact board-name match first, then a series-level match via the \texttt{SERIES\_MAP} dictionary. The chosen template is loaded with \texttt{config load "template.ioc"}, and the \texttt{project name} and \texttt{project path} directives re-target it to the user's directory, producing a fresh project that inherits the silent configuration.
+At runtime, \texttt{get\_\allowbreak template\_\allowbreak ioc\_\allowbreak path()} tries an exact board-name match first, then a series-level match via the \texttt{SERIES\_MAP} dictionary. The chosen template is loaded with \texttt{config load "template.ioc"}, and the \texttt{project name} and \texttt{project path} directives re-target it to the user's directory, producing a fresh project that inherits the silent configuration.
 
 \subsection{Error Recovery and Workflow Handoff}
 
-When the first CubeMX attempt returns a non-zero exit code or times out, \texttt{recover\_with\_ioc\_fallback()} takes over. It selects the best matching IOC template for the detected board or series, rewrites the \texttt{.scr} script to use \texttt{config load} instead of the generic board directive, and relaunches CubeMX with a 600-second timeout. The two-stage temporary directory strategy described in Section~\ref{subsec:two_stage_gen} applies unchanged to this retry. On completion, the output tree contains \texttt{main.c}, \texttt{stm32xxxx\_hal\_msp.c}, the linker script, and the IDE project files.
+When the first CubeMX attempt returns a non-zero exit code or times out, \texttt{recover\_\allowbreak with\_\allowbreak ioc\_\allowbreak fallback()} takes over. It selects the best matching IOC template for the detected board or series, rewrites the \texttt{.scr} script to use \texttt{config load} instead of the generic board directive, and relaunches CubeMX with a 600-second timeout. The two-stage temporary directory strategy described in Section~\ref{subsec:two_stage_gen} applies unchanged to this retry. On completion, the output tree contains \texttt{main.c}, \texttt{stm32xxxx\_\allowbreak hal\_\allowbreak msp.c}, the linker script, and the IDE project files.
 
 Once generation succeeds, \texttt{finalize\_project()} stores the firmware project path in the graph state and yields control back to the orchestrator. The user is asked whether to proceed to AI model selection: confirming routes to Workflow 2, while declining closes the session.
