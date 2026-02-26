@@ -51,35 +51,23 @@ The profile value is a JSON-serialized dictionary containing persistent user pre
 
 \begin{lstlisting}[language=json, caption={User profile schema stored in Redis}, label={lst:profile_schema}]
 {
-  "last_board": "STM32H743ZI",
-  "last_mcu_series": "H7",
-  "preferred_compression": "high",
-  "code_style": "verbose",
-  "last_project_paths": [
-    "/home/user/projects/firmware_2024_01",
-    "/home/user/projects/firmware_2024_02"
-  ],
-  "model_registry_contributions": [
-    {
-      "model_name": "custom_mobilenet_v3",
-      "url": "https://github.com/user/models/mobilenet_v3.h5",
-      "added_date": "2024-01-15T10:30:00Z"
-    }
-  ],
-  "session_count": 42,
-  "last_active": "2024-02-10T14:35:22Z"
+  "board_name": "NUCLEO-H743ZI",
+  "mcu_series": "STM32H7",
+  "last_model": "mobilenet_v1_0.25_128",
+  "last_project_path": "/home/user/workspace/h7_project",
+  "last_workflow": "firmware",
+  "timestamp": "2024-02-10T14:35:22Z"
 }
 \end{lstlisting}
 
 \textbf{Profile Fields:}
 \begin{itemize}
-  \item \texttt{last\_board}: The most recently used STM32 board (e.g., ``STM32H743ZI''), used to pre-fill firmware generation requests
-  \item \texttt{preferred\_compression}: Default quantization level (``low'', ``medium'', ``high'', ``very\_high'')
-  \item \texttt{code\_style}: Preferred code verbosity (``minimal'', ``standard'', ``verbose'') for generated C code
-  \item \texttt{last\_\allowbreak project\_\allowbreak paths}: History of firmware project directories for quick re-selection
-  \item \texttt{model\_\allowbreak registry\_\allowbreak contributions}: User-submitted models awaiting validation (transactional registration flow)
-  \item \texttt{session\_count}: Total number of sessions (for analytics)
-  \item \texttt{last\_active}: Timestamp of last interaction (for inactive user cleanup)
+  \item \texttt{board\_name}: The most recently used STM32 board (e.g., ``NUCLEO-H743ZI''), used to pre-fill firmware generation requests
+  \item \texttt{mcu\_series}: The series of the target MCU (e.g., ``STM32H7'')
+  \item \texttt{last\_model}: The last AI model selected for optimization or integration
+  \item \texttt{last\_project\_path}: Path of the most recently generated or targeted firmware project directory
+  \item \texttt{last\_workflow}: The last executed workflow route (e.g., ``firmware'', ``ai\_analysis'')
+  \item \texttt{timestamp}: Timestamp of the last successful workflow completion
 \end{itemize}
 
 \subsection{LangGraph Integration: \texttt{AsyncRedisSaver}}
@@ -159,8 +147,7 @@ user_profile = json.loads(raw_profile) if raw_profile else {}
 initial_state = {
     "message": last_user_message,
     "persistent_context": user_profile,
-    "last_board": user_profile.get("last_board"),
-    "preferred_compression": user_profile.get("preferred_compression")
+    "reset_profile": False
 }
 \end{lstlisting}
 
@@ -171,17 +158,22 @@ The \texttt{persistent\_context} field is accessible to all graph nodes, enablin
 After workflow completion (or critical state mutations), the profile is updated:
 
 \begin{lstlisting}[language=Python, caption={User profile saving in server.py}, label={lst:profile_save}]
-# 1. Update profile dictionary
-user_profile["last_board"] = final_state.get("board_name")
-user_profile["last_active"] = datetime.now().isoformat()
-user_profile["session_count"] = user_profile.get("session_count", 0) + 1
+# 1. Extract current values from state
+new_profile = {
+    "board_name": state.get("board_name"),
+    "mcu_series": state.get("mcu_series"),
+    "last_model": state.get("selected_model"),
+    "last_project_path": state.get("firmware_project_path") or state.get("firmware_project_dir"),
+    "last_workflow": state.get("route"),
+    "timestamp": state.get("timestamp")
+}
 
-# 2. Serialize and save to Redis
-await redis_client.set(
-    user_profile_key,
-    json.dumps(user_profile),
-    ex=60*60*24*365  # Expire after 1 year of inactivity
-)
+# 2. Update profile dictionary
+new_profile = {k: v for k, v in new_profile.items() if v is not None and v != ""}
+updated_profile = {**user_profile, **new_profile}
+
+# 3. Serialize and save to Redis
+await redis_client.set(user_profile_key, json.dumps(updated_profile))
 \end{lstlisting}
 
 The \texttt{ex} (expiration) parameter prevents indefinite accumulation of inactive user profiles.
