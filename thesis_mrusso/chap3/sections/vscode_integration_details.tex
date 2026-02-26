@@ -16,7 +16,7 @@ Finally, this decoupled approach inherently supports multi-client architecture, 
 
 The extension manifest registers a Chat Participant using VS Code's native chat interface API (introduced in VS Code 1.85+).
 
-\begin{lstlisting}[language=json, caption={Chat Participant registration in package.json}, label={lst:package_json}]
+\begin{lstlisting}[caption={Chat Participant registration in package.json}, label={lst:package_json}]
 {
   "name": "stm32-ai-assistant",
   "displayName": "STM32 Edge AI Chat",
@@ -50,7 +50,7 @@ The extension manifest registers a Chat Participant using VS Code's native chat 
 
 The core logic resides in \texttt{extension.ts}, which implements a \texttt{ChatRequestHandler} callback.
 
-\begin{lstlisting}[language=typescript, caption={Chat request handler in extension.ts}, label={lst:extension_handler}, mathescape=false]
+\begin{lstlisting}[caption={Chat request handler in extension.ts}, label={lst:extension_handler}, mathescape=false]
 const handler: vscode.ChatRequestHandler = async (
   request: vscode.ChatRequest,
   context: vscode.ChatContext,
@@ -120,7 +120,7 @@ Finally, the handler processes typed responses dynamically; the server emits dis
 
 The backend implements the \texttt{/stream} endpoint using FastAPI's \texttt{StreamingResponse}.
 
-\begin{lstlisting}[language=python, caption={FastAPI streaming endpoint in server.py}, label={lst:server_streaming}]
+\begin{lstlisting}[caption={FastAPI streaming endpoint in server.py}, label={lst:server_streaming}]
 @app.post("/stream")
 async def stream_chat(request: ChatRequest):
     user_id = request.user_id

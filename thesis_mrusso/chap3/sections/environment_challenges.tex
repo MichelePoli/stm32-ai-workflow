@@ -4,22 +4,22 @@
 Implementing a fully autonomous MLOps pipeline for embedded systems involves addressing a variety of software dependencies, legacy constraints, and proprietary toolchain limitations. This section details the specific architectural solutions adopted to manage these interoperability challenges.
 
 \subsection{Dual-Environment Strategy for Legacy Model Support}
-A critical challenge encountered during the development of the framework was the fundamental incompatibility between the modern deep learning libraries required for agentic orchestration and the legacy formats predominantly found in established embedded AI repositories. 
+A critical challenge encountered during the development of the framework was the fundamental incompatibility between the modern deep learning libraries required for agentic orchestration and the legacy formats predominantly found in established embedded AI repositories.
 
 Specifically, while the NNI optimization engine and the LangGraph orchestrator strictly rely on modern Python environments (such as Keras 3.x and PyTorch 2.x) to use recent asynchronous execution features, many pre-trained models, including those from older STModelZoo releases, are serialized in older Keras 2.x H5 formats. These older formats are incompatible with Keras 3.x runtimes due to breaking changes in the serialization API.
 
-To elegantly resolve this conflict, the framework employs a Dual-Environment Architecture. The system simultaneously maintains two distinct virtual environments: a primary environment (\texttt{stm32\_agent}) that hosts the LLM agents and the LangGraph orchestrator using the latest libraries for maximum performance, and a tightly pinned legacy environment (\texttt{stm32\_legacy}) running TensorFlow 2.15 designed exclusively for introspecting older models. 
+To elegantly resolve this conflict, the framework employs a Dual-Environment Architecture. The system simultaneously maintains two distinct virtual environments: a primary environment (\texttt{stm32\_agent}) that hosts the LLM agents and the LangGraph orchestrator using the latest libraries for maximum performance, and a tightly pinned legacy environment (\texttt{stm32\_legacy}) running TensorFlow 2.15 designed exclusively for introspecting older models.
 
 Mechanistically, when the Model Discovery Agent identifies a potential candidate model, it delegates the inspection task to a secure subprocess running within the legacy environment. This dedicated subprocess loads the model, extracts its architectural metadata and I/O signatures, and returns the information as a JSON object to the main orchestrator, thereby securely bridging the semantic gap between software generations without compromising application stability.
 
 \subsection{Model Format Standardization: H5 vs. TFLite}
 While the TensorFlow Lite (\texttt{.tflite}) format is the de facto standard for mobile deployment, the specific requirements of the STEdgeAI Core CLI introduced constraints that necessitated a standardized approach to model persistence.
 
-Experimental validation revealed that the STEdgeAI CLI exhibits higher reliability and broader quantization support when processing Keras H5 files compared to TFLite flatbuffers, particularly for complex custom architectures. 
+Experimental validation revealed that the STEdgeAI CLI exhibits higher reliability and broader quantization support when processing Keras H5 files compared to TFLite flatbuffers, particularly for complex custom architectures.
 
 Specifically, the CLI's internal graph optimization passes were found to occasionally drop quantization parameters when ingesting pre-quantized TFLite models, leading to performance degradation on the target MCU.
 
-Consequently, the pipeline was explicitly engineered to enforce the H5 format as the universal intermediate representation standard. During NNI optimization, the dynamically generated \texttt{trial.py} templates are strictly constrained to save the best-performing models as \texttt{.h5} files, regardless of whether the specific hyperparameter search space includes quantization-aware training. The subsequent conversion to deployable C-code is then performed directly from these high-precision \texttt{.h5} artifacts utilizing the STEdgeAI CLI. 
+Consequently, the pipeline was explicitly engineered to enforce the H5 format as the universal intermediate representation standard. During NNI optimization, the dynamically generated \texttt{trial.py} templates are strictly constrained to save the best-performing models as \texttt{.h5} files, regardless of whether the specific hyperparameter search space includes quantization-aware training. The subsequent conversion to deployable C-code is then performed directly from these high-precision \texttt{.h5} artifacts utilizing the STEdgeAI CLI.
 
 Crucially, actual quantization is applied exclusively during this final generation phase via the dynamically injected \texttt{--compression} flag. This architectural decision smartly delegates all low-level quantization layout decisions directly to the specialized ST toolchain rather than the high-level training framework, guaranteeing that the resulting \texttt{network.c} and \texttt{network.h} files remain flawlessly compatible with the embedded X-CUBE-AI runtime engine.
 
@@ -30,14 +30,14 @@ A significant "Toolchain Maturity Gap" was identified during the automation of t
 
 For instance, when targeting Cortex-M7 series devices like the H7, the tool interactively prompts the user to overtly enable the Memory Protection Unit (MPU) to mitigate speculative read access risks (as illustrated in Figure~\ref{fig:mpu_popup}); importantly, even if the Cache and MPU are technically enabled in the raw project configuration, the mere absence of an explicit MPU region definition predictably triggers this blocking dialog. Similarly, for projects utilizing Cortex-M33 and newer secure cores (such as the U5 and N6 series), the tool abruptly triggers a mandatory graphical dialog forcing the developer to explicitly choose between "Secure" and "Non-Secure" TrustZone contexts (see Figure~\ref{fig:trustzone_popup}). Because this prompt appears during the critical initial project loading phase, it effectively permanently stalls the CLI execution process in any automated headless environment lacking a graphical display buffer.
 
-\begin{figure}[htbp]
+\begin{figure}[H]
   \centering
   \includegraphics[width=0.8\textwidth]{chap3/figures/mpu_popup.png}
   \caption{Interactive MPU recommendation dialog in STM32CubeMX CLI execution.}
   \label{fig:mpu_popup}
 \end{figure}
 
-\begin{figure}[htbp]
+\begin{figure}[H]
   \centering
   \includegraphics[width=0.8\textwidth]{chap3/figures/trustzone_popup.png}
   \caption{TrustZone context selection prompt blocking headless automation.}
@@ -57,12 +57,12 @@ This bridge "flattens" the model architecture into standard TFLite operators, wh
 \subsection{Architectural Constraints on Model Customization}
 While the discovery and profiling workflow (Workflow 2) achieves format-agnostic interoperability, successfully processing \texttt{.h5}, \texttt{.keras}, \texttt{.onnx}, and \texttt{.tflite} artifacts for resource estimation and firmware generation, the structural customization workflow (Workflow 5) introduces a strict dependency on native Keras formats.
 
-This critical distinction arises directly from the technical requirements of surgical neural network operations. Advanced features such as dynamic layer freezing, appending Dense or Dropout regularization layers, and modifying custom activation functions inherently require the orchestrator to load the architecture as a live, fully instantiable Keras \texttt{Model} object. 
+This critical distinction arises directly from the technical requirements of surgical neural network operations. Advanced features such as dynamic layer freezing, appending Dense or Dropout regularization layers, and modifying custom activation functions inherently require the orchestrator to load the architecture as a live, fully instantiable Keras \texttt{Model} object.
 
 However, deployment formats like \texttt{.tflite} and \texttt{.onnx} are aggressively optimized for pure inference execution. Because they represent the entire model as a flattened sequence of raw mathematical operators, typically serialized as flatbuffers, they completely lack the high-level symbolic Python class metadata strictly necessary for Keras to successfully reconstruct and re-initialize a structurally editable training graph.
 
 \paragraph{The Irreversibility Trap}
-A common question in edge AI orchestration is whether these deployment formats can be back-converted into editable Keras artifacts. While bridge libraries like \texttt{onnx2keras} exist, they are often unreliable for complex architectures due to operator name mangling. For \texttt{.tflite} models, the conversion is fundamentally "destructive": the process of \textit{Operator Fusion} (merging convolution and activation layers) and \textit{Quantization} (converting FP32 to INT8) removes the structural and numerical resolution required for stable fine-tuning. 
+A common question in edge AI orchestration is whether these deployment formats can be back-converted into editable Keras artifacts. While bridge libraries like \texttt{onnx2keras} exist, they are often unreliable for complex architectures due to operator name mangling. For \texttt{.tflite} models, the conversion is fundamentally "destructive": the process of \textit{Operator Fusion} (merging convolution and activation layers) and \textit{Quantization} (converting FP32 to INT8) removes the structural and numerical resolution required for stable fine-tuning.
 
 Consequently, the framework adopts the best practice of requiring the original "source" formats for customization, treating deployment artifacts as a terminal stage in the MLOps pipeline.
 
@@ -74,15 +74,15 @@ Developing an orchestration framework for STMicroelectronics toolchains (primari
 
 \subsubsection{Path Abstraction and Configuration Management}
 
-A primary barrier to portability was the use of system-specific absolute paths (e.g., \texttt{/mnt/shared-storage/...} on Linux server deployments). To effectively resolve this, I implemented a solid Dynamic Configuration Layer within \texttt{configuration.py}. This new architecture inherently relies on environment-agnostic defaults, utilizing strictly relative paths (anchored to either the project root or the user's home directory) for all critical external resources, such as model caches (e.g., \texttt{\textasciitilde/.stm32\_\allowbreak ai\_\allowbreak models}) and model discovery catalogs. 
+A primary barrier to portability was the use of system-specific absolute paths (e.g., \texttt{/mnt/shared-storage/...} on Linux server deployments). To effectively resolve this, I implemented a solid Dynamic Configuration Layer within \texttt{configuration.py}. This new architecture inherently relies on environment-agnostic defaults, utilizing strictly relative paths (anchored to either the project root or the user's home directory) for all critical external resources, such as model caches (e.g., \texttt{\textasciitilde/.stm32\_\allowbreak ai\_\allowbreak models}) and model discovery catalogs.
 
 Also, it employs a late-binding path resolution strategy for required external binaries like the STM32CubeMX CLI. By actively evaluating the \texttt{sys.platform} flag at runtime, the system automatically and accurately toggles between unique macOS and Linux executable naming conventions, effortlessly handling nuances like \texttt{.exe} parity or Homebrew-specific installation directories.
 
 \subsubsection{Conda Architecture and Dependency Management}
 
-The shift to Apple Silicon required a specialized dependency management strategy due to the lack of native ARM64 support for older versions of TensorFlow and specific ST binaries. 
+The shift to Apple Silicon required a specialized dependency management strategy due to the lack of native ARM64 support for older versions of TensorFlow and specific ST binaries.
 
-To address this, I developed a clean environment strategy via a dedicated \texttt{environment\_clean.yaml} specification. This configuration aggressively utilizes the \texttt{conda-forge} channel to securely provide consistent, native ARM64 builds for modern Python libraries like LangGraph and FastAPI, while strictly isolating all required legacy x86\_64 toolchains within completely separate sub-environments. 
+To address this, I developed a clean environment strategy via a dedicated \texttt{environment\_clean.yaml} specification. This configuration aggressively utilizes the \texttt{conda-forge} channel to securely provide consistent, native ARM64 builds for modern Python libraries like LangGraph and FastAPI, while strictly isolating all required legacy x86\_64 toolchains within completely separate sub-environments.
 
 Also, for local development on macOS, the system was explicitly configured to detect and integrate specialized acceleration adapters (\texttt{tensorflow-macos} and \texttt{tensorflow-metal}). This strategic integration smoothly enables hardware acceleration directly on the Mac's integrated GPU via Metal Performance Shaders during the intensive model customization phase (Workflow 5), successfully providing a high-performance local alternative to expensive GPU-equipped Linux servers for rapid initial prototyping.
 
