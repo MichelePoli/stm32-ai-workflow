@@ -8,7 +8,7 @@ Right now, a sharp divide exists in the tech industry. AI engineers write Python
 My thesis asks: what if an AI assistant could handle this tedious toolchain instead? To answer this, I built an end-to-end, multi-agent framework. Instead of clicking through interfaces, the developer just talks to their IDE. They can say: "Generate an STM32H7 project, find a small MobileNet model, optimize it, and put it in my C code."
 
 [Slide 4: Architecture & Orchestration]
-The system relies on Multi-Agent Orchestration using LangGraph. I use specialized LLM agents for different jobs. One agent handles Firmware Generation by controlling the STM32CubeMX CLI without a GUI. Another Customization Agent writes Python scripts to fine-tune networks or run hyperparameter searches. A Web Search Agent reads current documentation straight from the internet.
+The system relies on Multi-Agent Orchestration using LangGraph. I designed it as a directed graph divided into specialized branches. One branch handles Firmware Generation by controlling the STM32CubeMX CLI without a GUI. Another Customization branch writes Python scripts to fine-tune networks or run hyperparameter searches. A Web Search branch reads current documentation straight from the internet.
 To keep things fast and scalable, I split the agent logic from the heavy LLM inference. All LLM requests go to a centralized NVIDIA Triton Inference Server. Triton handles dynamic model swapping and shares GPU memory across users. This decoupling lays the groundwork for a fully scalable Kubernetes deployment, allowing multiple developers to share the same hardware without bottlenecking.
 
 [Slide 5: IDE Integration & Human-in-the-Loop]
