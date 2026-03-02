@@ -1,0 +1,41 @@
+[Slide 1: Title & Introduction]
+Good morning everyone. I'm Michele Russo and today I present my thesis: "Conversational Multi-Agent Workflows for Edge AI Deployment on Microcontrollers."
+
+[Slide 2: The Core Problem]
+Right now, a sharp divide exists in the tech industry. AI engineers write Python, spin up cloud servers, and train large neural networks. Meanwhile, embedded systems engineers write C, fight strict memory limits, and program bare-metal STM32 hardware. Bringing an AI model from the cloud down to a microcontroller is called Edge AI deployment. And right now, it hurts. Developers must master a scattered toolset: STM32CubeMX for hardware, STEdgeAI for model conversion, custom Python scripts for hyperparameter tuning, and manual C-code integration. My tests show this manual pipeline takes an expert over 4 hours. Most of that time is wasted navigating dense GUIs, hunting through datasheets, writing repetitive code, and debugging tiny misconfigurations.
+
+[Slide 3: The Multi-Agent Solution]
+My thesis asks: what if an AI assistant could handle this tedious toolchain instead? To answer this, I built an end-to-end, multi-agent framework. Instead of clicking through interfaces, the developer just talks to their IDE. They can say: "Generate an STM32H7 project, find a small MobileNet model, optimize it, and put it in my C code."
+
+[Slide 4: Architecture & Orchestration]
+The system relies on Multi-Agent Orchestration using LangGraph. I use specialized LLM agents for different jobs. One agent handles Firmware Generation by controlling the STM32CubeMX CLI without a GUI. Another Customization Agent writes Python scripts to fine-tune networks or run hyperparameter searches. A Web Search Agent reads current documentation straight from the internet.
+To keep things fast and scalable, I split the agent logic from the heavy LLM inference. All LLM requests go to a centralized NVIDIA Triton Inference Server. Triton handles dynamic model swapping and shares GPU memory across users. This decoupling lays the groundwork for a fully scalable Kubernetes deployment, allowing multiple developers to share the same hardware without bottlenecking.
+
+[Slide 5: IDE Integration & Human-in-the-Loop]
+We also didn't force developers into a web app. I built a custom Visual Studio Code Extension. The assistant sits right inside the editor. It uses asynchronous streaming so the IDE never freezes during heavy tasks. At critical moments—like right before flashing a physical board or starting a long training job—the system stops and asks the user for permission in the chat. The developer stays in control.
+
+[Slide 6: Automated Workflows in Action]
+Let's look at how the framework actually performs.
+First, Firmware Generation. A developer usually navigates around 15 manual configuration steps in CubeMX to set up clock trees and peripherals. My framework uses pre-seeded templates to skip the GUI entirely. It translates the user's plain English into the correct headless command, building the C project in the background.
+Second, Information Retrieval. LLMs hallucinate technical specifications. To fix this, I built an agentic RAG system with DuckDuckGo. When the user asks a technical question, the agent searches the internet, reads the actual pages, and gives a sourced answer.
+
+[Slide 7: Neural Network Customization & NNI]
+Third is Neural Network Customization. Say a user wants to deploy a model, but their dataset has 132 classes while the pre-trained model outputs 1000. Under normal conditions, this "class mismatch" breaks the training script. Here, the agent reads the neural network architecture, spots the error, and automatically rewrites the Keras code to fix the final output layer.
+Furthermore, if the user asks for hyperparameter optimization, the system fully integrates with Microsoft's Neural Network Intelligence, or NNI. Setting up NNI manually is notoriously complex. You have to write a custom trial script, define a search space in JSON, and configure a manager. Instead of forcing the developer to do this, our Customization Agent dynamically writes the entire NNI experiment from scratch. It generates the `trial.py` file, defines the search boundary for learning rates and batch sizes, and launches the tuning job automatically. The developer simply asks for "optimization" and waits for the best model to emerge.
+
+[Slide 8: Benchmarks & Productivity Gains]
+A developer tool only matters if it actually saves time, so I benchmarked the automated workflow against experienced developers. The results matter.
+The end-to-end AI deployment dropped from about 4 hours to just 20 to 30 minutes. That is a 9x speed increase.
+If we break it down:
+CubeMX Project Setup went from 20 minutes to 30 seconds. That’s a 40x speedup just by cutting out the GUI.
+Model Discovery showed a 24x speedup, replacing hours of GitHub searching with a few minutes of automated scanning.
+And that NNI Experiment Setup we just talked about? It usually takes nearly an hour of writing configs and scripts. The agents did it in 1 to 2 minutes—a 30x speedup.
+
+[Slide 9: Validation & Reliability]
+We also tested the generated code itself. In a test run fine-tuning MobileNetV1 for a custom 132-class dataset, the agent accurately translated the user's high-level request for anti-overfitting measures into functional Keras code, correctly injecting dynamic dropout and freezing layers. The resulting model hit 98.1% validation accuracy on a set of 5,000 images. The code works.
+Finally, I evaluated the web search agents using the DeepEval framework to measure reliability. Across multiple queries, the system scored an average Contextual Relevancy of 75% and kept hallucination rates remarkably low, between 4% and 14% depending on the task. When given strict procedural tasks, the agent scored a perfect 1.0 on Faithfulness, meaning it stuck entirely to the retrieved technical manuals.
+
+[Slide 10: Conclusion]
+This thesis proves we can drastically lower the barrier to entry for Edge AI. By using a multi-agent orchestrator inside the IDE and running it on scalable inference servers, we change how embedded engineers work. They don't have to be experts in hardware, C programming, and machine learning infrastructure all at once. They state their intent, and the AI handles the messy orchestration. A 9x reduction in deployment time means intelligent edge devices can go from an idea to working hardware much faster.
+
+Thank you. I welcome any questions or comments from the committee.
