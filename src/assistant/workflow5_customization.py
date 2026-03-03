@@ -167,33 +167,23 @@ RISPOSTE NEGATIVE (procede senza modifiche):
 - "no", "nope", "niente", "skip", "avanti", "procedi", "andiamo avanti", "mantieni", "ok così", "va bene così"
 - "no, procedi direttamente", "nessuna modifica", "default"
 
-Rispondi SEMPRE in JSON:
-- "wants_modifications": true/false
-- "reasoning": breve spiegazione (max 50 caratteri)
-- "confidence": 0.0-1.0
+Rispondi SEMPRE con un oggetto JSON valido con questa struttura esatta:
+{
+  "wants_modifications": true,
+  "reasoning": "spiegazione (max 50 caratteri)",
+  "confidence": 0.95
+}
 
 Esempi:
 
 Input: "Riduci il numero di layer, è troppo complesso"
-Output: {
-  "wants_modifications": true,
-  "reasoning": "Richiesta esplicita di riduzione layer",
-  "confidence": 0.95
-}
+Output: {"wants_modifications": true, "reasoning": "Richiesta esplicita di riduzione layer", "confidence": 0.95}
 
 Input: "No, procedi direttamente con l'analisi"
-Output: {
-  "wants_modifications": false,
-  "reasoning": "Rifiuto esplicito, skip modifiche",
-  "confidence": 0.95
-}
+Output: {"wants_modifications": false, "reasoning": "Rifiuto esplicito, skip modifiche", "confidence": 0.95}
 
 Input: "Hmm, non so... che cosa consigli?"
-Output: {
-  "wants_modifications": false,
-  "reasoning": "Indecisione, mantiene default",
-  "confidence": 0.6
-}
+Output: {"wants_modifications": false, "reasoning": "Indecisione, mantiene default", "confidence": 0.6}
 """
 
 
@@ -511,15 +501,19 @@ Cosa preferisci? (si/no)""",
             user_text = extract_user_response(state.user_response).lower()
         state.user_response = ""
         
-        decision = llm_classifier.invoke([
-            SystemMessage(content=modification_decision_instructions),
-            HumanMessage(content=f"Risposta utente: {user_text}")
-        ])
+        try:
+            decision = llm_classifier.invoke([
+                SystemMessage(content=modification_decision_instructions),
+                HumanMessage(content=f"Risposta utente: {user_text}")
+            ])
 
-        # Guard: In case LLM returns non-dict or validation fails (via triton_client _to_pydantic)
-        if not hasattr(decision, "wants_modifications"):
-            logger.warning(f"⚠️ Classification failed/invalid (type: {type(decision)}). Defaulting to NO modifications.")
-            decision = ModificationDecision(wants_modifications=False, reasoning="Classification error fallback", confidence=0.0)
+            # Guard: In case LLM returns non-dict or validation fails (via triton_client _to_pydantic)
+            if not hasattr(decision, "wants_modifications"):
+                logger.warning(f"⚠️ Classification failed/invalid (type: {type(decision)}). Defaulting to NO modifications.")
+                decision = ModificationDecision(wants_modifications=False, reasoning="Classification error fallback", confidence=0.0)
+        except Exception as e:
+            logger.warning(f"❌ Errore critico nel parsing dell'intento LLM: {str(e)}. Defaulting to NO modifications.")
+            decision = ModificationDecision(wants_modifications=False, reasoning="Parser exception fallback", confidence=0.0)
 
     # === SALVA NELLO STATE ===
     state.wants_model_modifications = decision.wants_modifications
