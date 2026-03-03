@@ -198,7 +198,8 @@ PythonWebHDFS==0.2.3
 pytz==2025.2
 PyYAML==6.0.3
 redis[asyncio]==7.1.1
-redis[asyncio]vl==0.14.0
+redisvl==0.14.0
+async_timeout>=4.0.0
 referencing==0.37.0
 regex==2026.1.15
 requests==2.32.5

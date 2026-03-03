@@ -378,7 +378,7 @@ def execute_web_search(state: MasterState, config: RunnableConfig = None) -> Mas
         # Inizializza Agno Agent con Google Search
         cfg = Configuration.from_runnable_config(config)
         agent = Agent(
-            model=Ollama(id="mistral", base_url=cfg.ollama_base_url),
+            model=Ollama(id="mistral", host=cfg.ollama_base_url),
             tools=[DuckDuckGoTools()],
             markdown=True
         )

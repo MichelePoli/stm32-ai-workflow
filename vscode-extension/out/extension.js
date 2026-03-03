@@ -16,6 +16,14 @@ const SERVER_URL = 'http://127.0.0.1:8000/stream';
 function activate(context) {
     console.log('Attivazione estensione STM32 AI Assistant');
     // -----------------------------------------------------------------------
+    // SESSION ID: generato UNA SOLA VOLTA all'attivazione dell'estensione.
+    // Fisso per tutta la durata di questa finestra VS Code → stesso thread Redis
+    // (= memoria conversazionale persistente tra i messaggi).
+    // Aprire una nuova finestra VS Code genera un nuovo SESSION_ID → utente separato.
+    // -----------------------------------------------------------------------
+    const SESSION_ID = `vscode-session-${Date.now()}`;
+    console.log(`STM32 AI: session attiva → ${SESSION_ID}`);
+    // -----------------------------------------------------------------------
     // 1. REGISTRA IL CHAT PARTICIPANT
     // -----------------------------------------------------------------------
     // Questo handler viene chiamato da VS Code quando l'utente scrive "@stm32ai ..."
@@ -41,17 +49,15 @@ function activate(context) {
             // 3. CHIAMATA AL SERVER PYTHON (FastAPI)
             // -----------------------------------------------------------------------
             // Usiamo 'fetch' per una richiesta POST allo stream endpoint.
-            // Questo endpoint restituisce una risposta "Transfer-Encoding: chunked" (NDJSON)
-            // Passiamo ID utente e sessione (hardcoded per ora, ma espandibile)
-            // Generiamo un session_id univoco per non avere conflitti in Redis se apriamo più VS Code
-            const uniqueSessionId = `vscode-session-${Date.now()}`;
+            // session_id è fisso per questa finestra (SESSION_ID), garantendo
+            // continuità di memoria tra i messaggi dello stesso utente.
             const bodyPayload = JSON.stringify({
                 messages: messages,
                 context: {
                 // "activeFile": activeEditor?.document.fileName  // Esempio futuro
                 },
                 user_id: "michele",
-                session_id: uniqueSessionId
+                session_id: SESSION_ID
             });
             const response = yield fetch(SERVER_URL, {
                 method: 'POST',

@@ -25,7 +25,17 @@ class TritonPythonModel:
         responses = []
         for request in requests:
             input_tensor = pb_utils.get_input_tensor_by_name(request, "TEXT")
-            text = input_tensor.as_numpy()[0].decode("utf-8")
+            raw = input_tensor.as_numpy()
+            # raw shape can be [1] or [1,1] depending on max_batch_size config.
+            # The leaf element is bytes (dtype=object) when KIND_CPU backend is used.
+            elem = raw.flat[0]
+            if isinstance(elem, (bytes, bytearray)):
+                text = elem.decode("utf-8")
+            elif hasattr(elem, 'item'):
+                # numpy scalar wrapping bytes
+                text = elem.item().decode("utf-8") if isinstance(elem.item(), bytes) else str(elem.item())
+            else:
+                text = str(elem)
             
             if SENTENCE_TRANSFORMERS_AVAILABLE:
                 embedding = self.model.encode(text)

@@ -103,8 +103,9 @@ services:
       - TRITON_BASE_URL=http://triton-server:8000/v1  # Docker internal network
       - LOCAL_LLM=${MODEL_NAME:-mistral}
       - REDIS_URL=redis://redis:6379
+      - GITHUB_ACCESS_TOKEN=${GITHUB_ACCESS_TOKEN}
       # System path first for uvicorn/python, then Miniconda so subprocesses find it
-      - PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/home/mrusso/miniconda3/bin:/home/mrusso/miniconda3/envs/stm32/bin
+      - PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/home/mrusso/miniconda3/bin:/home/mrusso/miniconda3/envs/stm32/bin:/home/mrusso/stm32-ai_utilities/linux
       - HOME=/home/mrusso
     ports:
       - "8000:8000"
@@ -132,6 +133,10 @@ services:
       # stedgeai workspace and output
       - /home/mrusso/stm32-ai-workflow/st_ai_ws:/home/mrusso/stm32-ai-workflow/st_ai_ws
       - /home/mrusso/stm32-ai-workflow/st_ai_output:/home/mrusso/stm32-ai-workflow/st_ai_output
+      # STM32CubeMX installation (executable + JRE + plugins)
+      - /home/mrusso/STM32CubeMX:/home/mrusso/STM32CubeMX:ro
+      # STM32Cube firmware packages (downloaded by workflow1)
+      - /home/mrusso/STM32Cube:/home/mrusso/STM32Cube:ro
     # GPU access so Keras/TF training subprocesses can use the GPU
     deploy:
       resources:
