@@ -44,20 +44,24 @@ export function activate(context: vscode.ExtensionContext) {
             // -----------------------------------------------------------------------
             // Usiamo 'fetch' per una richiesta POST allo stream endpoint.
             // Questo endpoint restituisce una risposta "Transfer-Encoding: chunked" (NDJSON)
+            // Passiamo ID utente e sessione (hardcoded per ora, ma espandibile)
+            // Generiamo un session_id univoco per non avere conflitti in Redis se apriamo più VS Code
+            const uniqueSessionId = `vscode-session-${Date.now()}`;
+            const bodyPayload = JSON.stringify({
+                messages: messages,
+                context: {
+                    // "activeFile": activeEditor?.document.fileName  // Esempio futuro
+                },
+                user_id: "michele",
+                session_id: uniqueSessionId
+            });
+
             const response = await fetch(SERVER_URL, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({
-                    messages: messages,
-                    context: {
-                        // "activeFile": activeEditor?.document.fileName  // Esempio futuro
-                    },
-                    // Passiamo ID utente e sessione (hardcoded per ora, ma espandibile)
-                    user_id: "michele",
-                    session_id: "vscode-session"
-                })
+                body: bodyPayload
             });
 
             if (!response.ok) {
