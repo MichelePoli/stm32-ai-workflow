@@ -26,6 +26,14 @@ RUN apt-get update && apt-get install -y \
     git \
     libhdf5-dev \
     libgomp1 \
+    xvfb \
+    libxrender1 \
+    libxtst6 \
+    libxi6 \
+    libxext6 \
+    libx11-6 \
+    libfreetype6 \
+    libfontconfig1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Make python3 and pip point to 3.11

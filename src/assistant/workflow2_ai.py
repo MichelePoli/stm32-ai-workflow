@@ -458,16 +458,16 @@ def choose_ai_task(state: MasterState, config: RunnableConfig = None) -> MasterS
 
     resume_value = None
     if not state.user_response or state.user_response.strip() == "":
-        # logger.info("⏸️ Interrupting for AI task selection.")
-        # resume_value = interrupt({"instruction": prompt_text})
-        logger.info("⏭️  BYPASS: Selezione automatica task -> '1' (Classificazione)")
-        user_text = "1"
+        logger.info("⏸️ Interrupting for AI task selection.")
+        resume_value = interrupt({"instruction": prompt_text})
+        # logger.info("⏭️  BYPASS: Selezione automatica task -> '1' (Classificazione)")
+        # user_text = "1"
+    
+    # Usa interrupt return value come priorità
+    if resume_value and str(resume_value).strip():
+        user_text = str(resume_value).strip()
     else:
-        # Usa interrupt return value come priorità
-        if resume_value and str(resume_value).strip():
-            user_text = str(resume_value).strip()
-        else:
-            user_text = extract_user_response(state.user_response).strip()
+        user_text = extract_user_response(state.user_response).strip()
     state.user_response = "" # Clear after use
     if not user_text: user_text = "1"
     
@@ -560,16 +560,16 @@ def choose_ai_model(state: MasterState, config: RunnableConfig = None) -> Master
     
     resume_value = None
     if not state.user_response or state.user_response.strip() == "":
-        # logger.info("⏸️ Interrupting for AI model selection.")
-        # resume_value = interrupt({"instruction": prompt_text})
-        logger.info("⏭️  BYPASS: Selezione automatica modello -> '2' (MobileNetV1)")
-        model_text = "2"
+        logger.info("⏸️ Interrupting for AI model selection.")
+        resume_value = interrupt({"instruction": prompt_text})
+        # logger.info("⏭️  BYPASS: Selezione automatica modello -> '2' (MobileNetV1)")
+        # model_text = "2"
+    
+    # Usa interrupt return value come priorità
+    if resume_value and str(resume_value).strip():
+        model_text = str(resume_value).strip()
     else:
-        # Usa interrupt return value come priorità
-        if resume_value and str(resume_value).strip():
-            model_text = str(resume_value).strip()
-        else:
-            model_text = extract_user_response(state.user_response).strip()
+        model_text = extract_user_response(state.user_response).strip()
     state.user_response = "" # Clear after use
     
     # === ESTRAZIONE SCELTA ===
@@ -806,53 +806,19 @@ def search_recommendation_model(state: MasterState, config: RunnableConfig = Non
             state.selected_model = fallback_model
             state.model_discovery_method = "taskbased_fallback"
             
-            # ✅ INTERRUPT FINALE: Chiedi conferma anche per fallback
-            logger.info(f"\n✓ MODELLO FALLBACK - Richiesta conferma utente...")
-            
-            # Estrai formato
+            # ✅ AUTO-ACCETTA il fallback (niente interrupt — LangGraph re-esegue il nodo
+            # dall'inizio ad ogni resume, impedendo all'interrupt di ricevere il valore 'si')
             import os
             filename = fallback_model.get('local_filename', fallback_model.get('url', ''))
             _, ext = os.path.splitext(filename)
             ext = ext.upper() if ext else "N/D"
             
-            prompt = {
-                "instruction": f"""Modello di fallback per {state.last_task}
-
-Dopo 3 tentativi di ricerca, ecco il modello di fallback:
-
-📦 Dettagli:
-- Nome: {fallback_model['name']}
-- Formato: {ext}
-- Size: {fallback_model.get('size', 'N/A')}
-- Source: Task-based fallback
-
-🔗 URL: {fallback_model.get('url', 'N/A')}
-
-❓ Accetti questo modello? (rispondi: si/no)
-- 'si': Procedi con il download
-- 'no': Usa il modello generico dal config""",
-            }
-            
-            user_confirmation = interrupt(prompt)
-            
-            if isinstance(user_confirmation, dict):
-                confirmation_text = str(user_confirmation.get("response", user_confirmation.get("input", ""))).lower().strip()
-            else:
-                confirmation_text = str(user_confirmation).lower().strip()
-            
-            logger.info(f"📝 Risposta utente: '{confirmation_text}'")
-            
-            accepted_keywords = ["si", "yes", "ok", "accetto", "conferma", "y", "sì"]
-            
-            if any(keyword in confirmation_text for keyword in accepted_keywords):
-                logger.info(f"✓ Modello ACCETTATO dall'utente")
-                logger.info("=" * 70)
-                return state  # ← Procedi al download
-            else:
-                logger.warning(f"❌ Modello RIFIUTATO - Uso config default")
-                cfg = Configuration.from_runnable_config(config)
-                state.model_path = cfg.ai_model_path
-                state.model_discovery_method = "default"
+            logger.info(f"\n✓ MODELLO FALLBACK AUTO-SELEZIONATO")
+            logger.info(f"  Nome: {fallback_model['name']}")
+            logger.info(f"  Formato: {ext} | Size: {fallback_model.get('size', 'N/A')}")
+            logger.info(f"  URL: {fallback_model.get('url', 'N/A')}")
+            logger.info("=" * 70)
+            return state  # ← Procedi al download automaticamente
         else:
             logger.warning(f"❌ Nessun fallback disponibile")
             

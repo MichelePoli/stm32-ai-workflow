@@ -61,10 +61,18 @@ class ChatTriton(BaseChatModel):
         parser = JsonOutputParser(pydantic_object=schema)
 
         def _inject_schema(messages: List[BaseMessage]) -> List[BaseMessage]:
-            """Inject JSON schema instructions into the system message."""
+            """Inject JSON schema instructions into the system message.
+            Keep it short — ottimizzazione valida (prompt più corto = meno rischio di timeout vuoti), ma non era la causa root.
+            """
+            # Minimal instruction: just list field names from the schema
+            if hasattr(schema, 'model_fields'):
+                field_names = list(schema.model_fields.keys())
+                schema_hint = f"Required JSON fields: {field_names}"
+            else:
+                schema_hint = parser.get_format_instructions()[:400]  # truncate
+
             schema_instructions = (
-                f"\n\nYou MUST respond with ONLY a valid JSON object (no markdown, no explanation) "
-                f"matching this schema:\n{parser.get_format_instructions()}"
+                f"\n\nRespond ONLY with a valid JSON object. No markdown. No explanation. {schema_hint}"
             )
             messages = list(messages)  # don't mutate caller's list
             if messages and isinstance(messages[0], SystemMessage):
@@ -76,11 +84,15 @@ class ChatTriton(BaseChatModel):
         def _extract_json(ai_message) -> str:
             """Find and extract the first JSON object from the LLM response.
             
-            This is more robust than just stripping fences, as it handles Mistral
-            putting text before or after the JSON block.
+            Returns '{}' (empty object) instead of empty string when Mistral
+            returns nothing — this prevents JsonOutputParser from crashing.
             """
             text = ai_message.content if hasattr(ai_message, 'content') else str(ai_message)
             
+            if not text or not text.strip():
+                logger.warning("⚠️ Mistral returned empty response for structured output, using fallback {}")
+                return '{}'
+
             # Find first { and last }
             start = text.find('{')
             end = text.rfind('}')
@@ -91,9 +103,10 @@ class ChatTriton(BaseChatModel):
             # Fallback to fence stripping logic for non-dict JSON (if ever used)
             text = re.sub(r'^```(?:json)?\s*', '', text.strip(), flags=re.IGNORECASE)
             text = re.sub(r'\s*```$', '', text.strip())
-            # stampa sul terminale text per vedere se funziona:
-            print("text: ", text)
             
+            # If still no braces, return empty object so parser doesn't crash
+            if not text.strip():
+                return '{}'
             return text
 
 
@@ -123,6 +136,7 @@ class ChatTriton(BaseChatModel):
             | RunnableLambda(_to_pydantic)
         )
         return chain
+
 
 
     def _generate(
@@ -378,7 +392,7 @@ class TritonEmbeddings:
             "inputs": [
                 {
                     "name": "TEXT",
-                    "shape": [1],
+                    "shape": [1, 1],
                     "datatype": "BYTES",
                     "data": [text]
                 }
