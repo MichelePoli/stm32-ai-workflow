@@ -11,7 +11,7 @@ LangChain has established itself as a foundational framework for simplifying the
     \item \textbf{Tools}: Interfaces that allow the agent to interact with the outside world, from web searching to code execution.
 \end{enumerate}
 This modularity allows developers to move beyond simple "prompt-response" paradigms, facilitating the creation of systems that can retrieve external data (RAG) and interact with APIs.
-However, typical LangChain implementations act as Directed Acyclic Graphs (DAGs), which can limit the development of highly iterative workflows where an agent needs to loop back, retry, or refine its approach based on dynamic feedback.
+However, typical LangChain implementations act as Directed Acyclic Graphs (DAGs), which can limit the development of highly iterative workflows where an agent needs to loop back, retry, or refine its approach based on dynamic feedback \cite{hong2024workflowllm}.
 
 \subsection{LangGraph: Cyclic and Stateful Orchestration}
 To address the limitations of linear execution, LangGraph extends the ecosystem by introducing a graph-theoretic approach to orchestration. Unlike the rigid sequences of its predecessor, LangGraph models agentic processes as stateful graphs, where \textbf{nodes} represent computational units (functions or model calls) and \textbf{edges} define the control flow logic \cite{wang2024agentailanggraphmodular, hong2024workflowllm}.
@@ -32,7 +32,7 @@ A defining characteristic of reliable agentic systems is the ability to maintain
 In the context of this work, state persistence is achieved through a "checkpointing" system that saves a detailed snapshot of the graph's state, including variable values, conversation history, and execution progress, at every step.
 This architectural choice unlocks critical capabilities for MLOps:
 \begin{enumerate}
-\item \textbf{Fault Tolerance and Recovery}: If a long-running process (like a firmware compilation) fails due to transient errors, the system can resume execution from the last valid checkpoint rather than restarting from scratch.
-\item \textbf{Human-in-the-loop (HITL)}: The execution can be paused to allow human experts to inspect the state, approve sensitive actions, or manually correct the agent's trajectory before resuming.
-\item \textbf{Time-Travel Debugging}: Developers can "rewind" the agent's actions to virtually any previous state to diagnose logic errors or test alternative execution paths \cite{wang2025stateful}.
+    \item \textbf{Fault Tolerance and Recovery}: If a long-running process (like a firmware compilation) fails due to transient errors, the system can resume execution from the last valid checkpoint rather than restarting from scratch.
+    \item \textbf{Human-in-the-loop (HITL)}: The execution can be paused to allow human experts to inspect the state, approve sensitive actions, or manually correct the agent's trajectory before resuming.
+    \item \textbf{Time-Travel Debugging}: Developers can "rewind" the agent's actions to virtually any previous state to diagnose logic errors or test alternative execution paths \cite{wang2025stateful}.
 \end{enumerate}

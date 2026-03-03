@@ -5,7 +5,7 @@ The democratization of large language models has been accelerated by the rise of
 Models such as Meta’s \textbf{Llama 3} and \textbf{Mistral} have demonstrated that smaller, well-trained models can approach the performance of massive proprietary APIs on many reasoning and coding tasks \cite{mistral_7b, touvron2023llama}. These models are often distributed in quantized formats (e.g., GGUF), which compress the model weights from 16-bit floating point to 4-bit or 8-bit integers. This reduction in memory footprint allows state-of-the-art models (even those with 8B to 70B parameters) to run on consumer-grade hardware or local workstations without specialized GPU clusters.
 
 \subsection{Ollama: Streamlining Local Inference}
-\textbf{Ollama} is a lightweight, open-source framework designed to simplify the local deployment and management of LLMs. It packages model weights, configurations, and inference engines into a single, easy-to-use interface. By utilizing the \texttt{llama.cpp} backend, Ollama provides high-performance inference through hardware acceleration (Metal on macOS, CUDA on NVIDIA, and ROCm on AMD). 
+\textbf{Ollama} is a lightweight, open-source framework designed to simplify the local deployment and management of LLMs \cite{ollama_github_repo}. It packages model weights, configurations, and inference engines into a single, easy-to-use interface. By utilizing the \texttt{llama.cpp} backend, Ollama provides high-performance inference through hardware acceleration (Metal on macOS, CUDA on NVIDIA, and ROCm on AMD).
 
 Key features of Ollama integrated into this work include:
 \begin{enumerate}

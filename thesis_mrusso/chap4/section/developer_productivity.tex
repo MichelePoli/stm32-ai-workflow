@@ -9,9 +9,9 @@ A key dimension for evaluating the framework's impact is quantifying the reducti
 Given the challenges of conducting a large-scale empirical developer study, the time estimates for the manual workflows were established using an analytical evaluation methodology inspired by the \textbf{Keystroke-Level Model (KLM)} and \textbf{GOMS} frameworks \cite{card1980keystroke, baek2014evaluating}. By decomposing the manual development lifecycle (navigating the STM32CubeMX GUI, configuring peripheral clock trees, and manually porting Keras artifacts into the X-CUBE-AI generator) into discrete operative steps (pointing, clicking, mental preparation, and system response times), we established a baseline for a proficient user. These estimates were then cross-referenced with three complementary sources to verify their plausibility:
 
 \begin{enumerate}
-  \item \textbf{Official STMicroelectronics Documentation}: Tutorial completion times from STM32Cube.AI user manuals and CubeMX getting-started guides\cite{st_cubemx_manual}.
-  \item \textbf{Industry Benchmarks}: Published research on MLOps automation impact, specifically studies reporting 30\% operational efficiency gains and 70\% deployment time reduction through CI/CD automation\cite{mlops_productivity_2024, embedded_ml_cicd_2025}.
-  \item \textbf{Development Log Analysis}: Timestamped conversations from the integration debugging process documented in project notes, reflecting real-world challenges such as Keras version conflicts and NNI API troubleshooting.
+    \item \textbf{Official STMicroelectronics Documentation}: Tutorial completion times from STM32Cube.AI user manuals and CubeMX getting-started guides\cite{st_cubemx_manual}.
+    \item \textbf{Industry Benchmarks}: Published research on MLOps automation impact, specifically studies reporting 30\% operational efficiency gains and 70\% deployment time reduction through CI/CD automation\cite{mlops_productivity_2024, embedded_ml_cicd_2025}.
+    \item \textbf{Development Log Analysis}: Timestamped conversations from the integration debugging process documented in project notes, reflecting real-world challenges such as Keras version conflicts and NNI API troubleshooting.
 \end{enumerate}
 
 In contrast, the automated workflow timings are reported as empirical median execution times observed during test runs on a development workstation (Intel i7-12700K, 32GB RAM, NVIDIA RTX 3070), providing a direct comparison against the theoretical manual baseline.
@@ -21,31 +21,31 @@ In contrast, the automated workflow timings are reported as empirical median exe
 Table~\ref{tab:productivity} presents a breakdown of the complete Edge AI deployment lifecycle across six necessary tasks.
 
 \begin{table}[htbp]
-  \centering
-  \caption{Developer Time Comparison: Manual vs. Automated Workflows}
-  \label{tab:productivity}
-  \small
-  \begin{tabular}{|l|c|c|c|p{4cm}|}
-    \hline
-    \textbf{Task}                 & \textbf{Manual}        & \textbf{Automated} & \textbf{Speedup}   & \textbf{Source/Notes}                                                                                                                                                \\
-    \hline
-    \hline
-    \textbf{CubeMX Project Setup} & 20-30 min              & 30-45 sec          & 40×                & STM32CubeMX official tutorial (15 steps)\cite{st_cubemx_manual}. Automated workflow eliminates GUI navigation.                                                       \\
-    \hline
-    \textbf{Model Discovery}      & 1-2 hours              & 3-5 min            & 24×                & GitHub/Kaggle manual search + documentation review. Automated hybrid search (task-based + iterative web) with LLM ranking.                                           \\
-    \hline
-    \textbf{STEdgeAI Analysis}    & 15-20 min              & 2-3 min            & 7×                 & Manual CLI invocation + report parsing. Includes resource constraint checking and autonomous compression escalation.                                                 \\
-    \hline
-    \textbf{NNI Experiment Setup} & 45-60 min              & 1-2 min            & 30×                & Writing \texttt{manager.py} + \texttt{trial.py} from scratch per NNI documentation\cite{nni_documentation}. LLM generates production-ready code with error handling. \\
-    \hline
-    \textbf{Model Fine-Tuning}    & 30-45 min              & 10-15 min          & 3×                 & Dataset loading, class mismatch resolution, hyperparameter tuning. Automated anti-overfitting heuristics (dropout injection, epoch capping).                         \\
-    \hline
-    \textbf{Firmware Integration} & 25-35 min              & 3-5 min            & 8×                 & Manual file copying, \texttt{CMakeLists.txt} editing, \texttt{main.c} modification. Automated build verification.                                                    \\
-    \hline
-    \hline
-    \textbf{Total (End-to-End)}   & \textbf{3.5-4.5 hours} & \textbf{20-30 min} & \textbf{9× faster} & Complete pipeline from firmware initialization to validated AI integration.                                                                                          \\
-    \hline
-  \end{tabular}
+    \centering
+    \caption{Developer Time Comparison: Manual vs. Automated Workflows}
+    \label{tab:productivity}
+    \small
+    \begin{tabular}{|l|c|c|c|p{4cm}|}
+        \hline
+        \textbf{Task}                 & \textbf{Manual}        & \textbf{Automated} & \textbf{Speedup}   & \textbf{Source/Notes}                                                                                                                                                \\
+        \hline
+        \hline
+        \textbf{CubeMX Project Setup} & 20-30 min              & 30-45 sec          & 40×                & STM32CubeMX official tutorial (15 steps)\cite{st_cubemx_manual}. Automated workflow eliminates GUI navigation.                                                       \\
+        \hline
+        \textbf{Model Discovery}      & 1-2 hours              & 3-5 min            & 24×                & GitHub/Kaggle manual search + documentation review. Automated hybrid search (task-based + iterative web) with LLM ranking.                                           \\
+        \hline
+        \textbf{STEdgeAI Analysis}    & 15-20 min              & 2-3 min            & 7×                 & Manual CLI invocation + report parsing. Includes resource constraint checking and autonomous compression escalation.                                                 \\
+        \hline
+        \textbf{NNI Experiment Setup} & 45-60 min              & 1-2 min            & 30×                & Writing \texttt{manager.py} + \texttt{trial.py} from scratch per NNI documentation\cite{nni_documentation}. LLM generates production-ready code with error handling. \\
+        \hline
+        \textbf{Model Fine-Tuning}    & 30-45 min              & 10-15 min          & 3×                 & Dataset loading, class mismatch resolution, hyperparameter tuning. Automated anti-overfitting heuristics (dropout injection, epoch capping).                         \\
+        \hline
+        \textbf{Firmware Integration} & 25-35 min              & 3-5 min            & 8×                 & Manual file copying, \texttt{CMakeLists.txt} editing, \texttt{main.c} modification. Automated build verification.                                                    \\
+        \hline
+        \hline
+        \textbf{Total (End-to-End)}   & \textbf{3.5-4.5 hours} & \textbf{20-30 min} & \textbf{9× faster} & Complete pipeline from firmware initialization to validated AI integration.                                                                                          \\
+        \hline
+    \end{tabular}
 \end{table}
 
 \subsection{Discussion}
@@ -84,14 +84,14 @@ Finally, hidden costs for initial framework setup (configuring Docker containers
 An important outcome of the system design is its evolution from a local desktop tool to a scalable server architecture. The migration strategy was evaluated across three distinct deployment scenarios to benchmark efficiency and resource utilization:
 
 \begin{enumerate}
-  \item \textbf{Scenario 1: Local Deployment (Personal Computer)}\\
-        In the initial phase, the entire framework (LangGraph agents, Ollama inference, and STEdgeAI tooling) was executed directly on the developer's local workstation. While this provided zero network latency, the performance was severely constrained by the physical hardware. Local executions of Mistral 7B monopolized the host CPU and RAM, frequently preventing multitasking and significantly degrading the speed of concurrent firmware compilations.
+    \item \textbf{Scenario 1: Local Deployment (Personal Computer)}\\
+          In the initial phase, the entire framework (LangGraph agents, Ollama inference, and STEdgeAI tooling) was executed directly on the developer's local workstation. While this provided zero network latency, the performance was severely constrained by the physical hardware. Local executions of Mistral 7B monopolized the host CPU and RAM, frequently preventing multitasking and significantly degrading the speed of concurrent firmware compilations.
 
-  \item \textbf{Scenario 2: Single-User Containerized Server (Ollama Bottleneck)}\\
-        The architecture was subsequently migrated to a high-performance research server using individual Docker containers per user. Each user container embedded its own instance of Ollama to handle LLM requests. While this offloaded processing from the local computer, it introduced a significant infrastructure bottleneck: a single active user would monopolize a dedicated GPU (e.g., an NVIDIA A4000) for the entire duration of their development session. This 1:1 mapping between user containers and GPU resources prevented multi-user concurrency and resulted in poor overall hardware utilization.
+    \item \textbf{Scenario 2: Single-User Containerized Server (Ollama Bottleneck)}\\
+          The architecture was subsequently migrated to a high-performance research server using individual Docker containers per user. Each user container embedded its own instance of Ollama to handle LLM requests. While this offloaded processing from the local computer, it introduced a significant infrastructure bottleneck: a single active user would monopolize a dedicated GPU (e.g., an NVIDIA A4000) for the entire duration of their development session. This 1:1 mapping between user containers and GPU resources prevented multi-user concurrency and resulted in poor overall hardware utilization.
 
-  \item \textbf{Scenario 3: Scalable Cluster with Triton Inference Server}\\
-        To resolve the resource locking issue, the final architecture decoupled the multi-agent orchestration logic from the model inference engine. User-specific LangGraph containers now run exclusively on CPU and RAM, delegating all LLM requests to a centralized \textbf{NVIDIA Triton Inference Server} via standardized APIs. Triton acts as an optimized proxy, dynamically loading and unloading models from GPU memory, handling concurrent request batching, and enabling fractional GPU allocation. This decoupling allows multiple agentic pipelines to share the same hardware accelerators simultaneously, laying the groundwork for a fully scalable Kubernetes deployment.
+    \item \textbf{Scenario 3: Scalable Cluster with Triton Inference Server}\\
+          To resolve the resource locking issue, the final architecture decoupled the multi-agent orchestration logic from the model inference engine. User-specific LangGraph containers now run exclusively on CPU and RAM, delegating all LLM requests to a centralized \textbf{NVIDIA Triton Inference Server} via standardized APIs \cite{nvidia_triton_docs}. Triton acts as an optimized proxy, dynamically loading and unloading models from GPU memory, handling concurrent request batching \cite{kwon2023efficientmemorymanagementlarge}, and enabling fractional GPU allocation. This decoupling allows multiple agentic pipelines to share the same hardware accelerators simultaneously, laying the groundwork for a fully scalable Kubernetes deployment.
 \end{enumerate}
 
 Decoupling workflow agents from model inference eliminates the 1:1 GPU-per-user binding, raising concurrent throughput and removing the memory saturation failures that appeared under the single-container architecture.
@@ -101,26 +101,26 @@ Decoupling workflow agents from model inference eliminates the 1:1 GPU-per-user 
 Table~\ref{tab:tool_comparison} contrasts the framework's automation coverage with commercial and open-source alternatives.
 
 \begin{table}[htbp]
-  \centering
-  \caption{Automation Coverage Comparison}
-  \label{tab:tool_comparison}
-  \small
-  \begin{tabular}{|l|c|c|c|c|c|}
-    \hline
-    \textbf{Tool}                   & \textbf{Firmware} & \textbf{Model Search} & \textbf{HPO}      & \textbf{HITL}    & \textbf{Integration} \\
-                                    & \textbf{Gen}      & \textbf{Automation}   & \textbf{Code Gen} & \textbf{Support} & \textbf{Automation}  \\
-    \hline
-    \textbf{This Framework}         & $\checkmark$      & $\checkmark$          & $\checkmark$      & $\checkmark$     & $\checkmark$         \\
-    \hline
-    Edge Impulse\cite{edge_impulse} & $\times$          & $\checkmark$          & $\times$          & $\times$         & $\checkmark$         \\
-    \hline
-    TFLite Micro\cite{tflite_micro} & $\times$          & $\times$              & $\times$          & $\times$         & $\checkmark$         \\
-    \hline
-    STM32Cube.AI (Standalone)       & $\times$          & $\times$              & $\times$          & $\times$         & $\checkmark$         \\
-    \hline
-    NVIDIA TAO\cite{nvidia_tao}     & $\times$          & $\checkmark$          & $\checkmark$      & $\times$         & $\times$             \\
-    \hline
-  \end{tabular}
+    \centering
+    \caption{Automation Coverage Comparison}
+    \label{tab:tool_comparison}
+    \small
+    \begin{tabular}{|l|c|c|c|c|c|}
+        \hline
+        \textbf{Tool}                   & \textbf{Firmware} & \textbf{Model Search} & \textbf{HPO}      & \textbf{HITL}    & \textbf{Integration} \\
+                                        & \textbf{Gen}      & \textbf{Automation}   & \textbf{Code Gen} & \textbf{Support} & \textbf{Automation}  \\
+        \hline
+        \textbf{This Framework}         & $\checkmark$      & $\checkmark$          & $\checkmark$      & $\checkmark$     & $\checkmark$         \\
+        \hline
+        Edge Impulse\cite{edge_impulse} & $\times$          & $\checkmark$          & $\times$          & $\times$         & $\checkmark$         \\
+        \hline
+        TFLite Micro\cite{tflite_micro} & $\times$          & $\times$              & $\times$          & $\times$         & $\checkmark$         \\
+        \hline
+        STM32Cube.AI (Standalone)       & $\times$          & $\times$              & $\times$          & $\times$         & $\checkmark$         \\
+        \hline
+        NVIDIA TAO\cite{nvidia_tao}     & $\times$          & $\checkmark$          & $\checkmark$      & $\times$         & $\times$             \\
+        \hline
+    \end{tabular}
 \end{table}
 
 Several key differentiators emerge when comparing this framework to existing tools. While Edge Impulse provides excellent GUI-based model training, it still requires manual firmware project setup and completely lacks programmatic hyperparameter optimization. Bare-metal libraries like TFLite Micro offer only the core inference runtime, leaving all model selection, optimization, and integration steps strictly manual. STM32Cube.AI (Standalone) excels at C-code generation but offers zero workflow orchestration, forcing developers to manually invoke repetitive CLI commands and read raw reports.

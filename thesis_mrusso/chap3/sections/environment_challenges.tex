@@ -20,6 +20,28 @@ Quantization is never applied inside the training loop. Instead, the \texttt{--c
 
 The format story changes for models serialized with \textbf{Keras 3.x}. STEdgeAI 2.2 cannot parse the new native \texttt{.keras} format directly, and in practice it also fails on \texttt{.h5} files produced by Keras 3 due to internal API changes in the graph traversal layer (e.g., the error \texttt{INTERNAL ERROR: 'Concatenate' object has no attribute 'get\_input\_shape\_at'}). To handle this transparently, the pipeline auto-detects Keras 3 models and converts them to TFLite before calling STEdgeAI, as described in the next subsection. The \texttt{.h5} format therefore remains the internal standard for the training and optimization phases, while STEdgeAI always receives either a Keras 2 \texttt{.h5} or a converted \texttt{.tflite} artifact, depending on which Keras generation produced the model.
 
+\subsection{The Keras 3 Compatibility Gap and the TFLite Bridge}
+
+With the transition to Keras 3.x, a significant regression was observed in the STMicroelectronics STEdgeAI 2.2 toolchain. Modern models serialized with the native Keras 3 format (\texttt{.keras}) often trigger internal errors in the ST parser (e.g., \texttt{INTERNAL ERROR: 'Concatenate' object has no attribute 'get\_\allowbreak input\_\allowbreak shape\_\allowbreak at'}). This issue is caused by the shift in the internal Keras API that the ST tool expects for graph traversal.
+
+To smoothly overcome this limitation without demanding manual model conversion from the end-user, I successfully engineered an Autonomous TFLite Bridge. When the orchestrator explicitly detects a modern Keras 3 model, it automatically spawns a dedicated subprocess within the primary \texttt{stm32} environment. This subprocess utilizes the native \texttt{TFLiteConverter} API to flawlessly transform the unsupported Keras model into a standard TensorFlow Lite flatbuffer. Following this successful conversion, the system transparently redirects the STEdgeAI analysis engine to target the newly generated TFLite artifact instead of the original Keras file.
+
+This bridge "flattens" the model architecture into standard TFLite operators, which the ST toolchain interprets correctly, thus restoring the autonomous flow for the latest state-of-the-art models.
+
+\subsection{Architectural Constraints on Model Customization}
+While the discovery and profiling workflow (Workflow 2) achieves format-agnostic interoperability, successfully processing \texttt{.h5}, \texttt{.keras}, \texttt{.onnx}, and \texttt{.tflite} artifacts for resource estimation and firmware generation, the structural customization workflow (Workflow 5) introduces a strict dependency on native Keras formats.
+
+This critical distinction arises directly from the technical requirements of surgical neural network operations. Advanced features such as dynamic layer freezing, appending Dense or Dropout regularization layers, and modifying custom activation functions inherently require the orchestrator to load the architecture as a live, fully instantiable Keras \texttt{Model} object.
+
+However, deployment formats like \texttt{.tflite} and \texttt{.onnx} are aggressively optimized for pure inference execution. Because they represent the entire model as a flattened sequence of raw mathematical operators, typically serialized as flatbuffers, they completely lack the high-level symbolic Python class metadata strictly necessary for Keras to successfully reconstruct and re-initialize a structurally editable training graph.
+
+\paragraph{The Irreversibility Trap}
+A common question in edge AI orchestration is whether these deployment formats can be back-converted into editable Keras artifacts. While bridge libraries like \texttt{onnx2keras} exist, they are often unreliable for complex architectures due to operator name mangling. For \texttt{.tflite} models, the conversion is fundamentally "destructive": the process of \textit{Operator Fusion} (merging convolution and activation layers) and \textit{Quantization} (converting FP32 to INT8) removes the structural and numerical resolution required for stable fine-tuning.
+
+Consequently, the framework adopts the best practice of requiring the original "source" formats for customization, treating deployment artifacts as a terminal stage in the MLOps pipeline.
+
+To maintain system stability, a format-based validation gate was implemented in the customization node, ensuring that only native Keras artifacts enter the optimization pipeline, while guiding users towards Workflow 2 for non-editable binary formats.
+
 \subsection{GUI-Locked Architectural Features: The Automation Barrier}
 \label{subsec:gui_locked_features}
 
@@ -43,31 +65,9 @@ For instance, when targeting Cortex-M7 series devices like the H7, the tool inte
 
 These prompts represent a fundamental challenge for MLOps pipelines, as they require a "human-in-the-loop" interaction for features that could otherwise be programmatically derived. To achieve full autonomy, a "Pre-seeded IOC" strategy was developed, which is further detailed in Section \ref{subsec:preseeded_ioc}.
 
-\subsection{The Keras 3 Compatibility Gap and the TFLite Bridge}
-
-With the transition to Keras 3.x, a significant regression was observed in the STMicroelectronics STEdgeAI 2.2 toolchain. Modern models serialized with the native Keras 3 format (\texttt{.keras}) often trigger internal errors in the ST parser (e.g., \texttt{INTERNAL ERROR: 'Concatenate' object has no attribute 'get\_\allowbreak input\_\allowbreak shape\_\allowbreak at'}). This issue is caused by the shift in the internal Keras API that the ST tool expects for graph traversal.
-
-To smoothly overcome this limitation without demanding manual model conversion from the end-user, I successfully engineered an Autonomous TFLite Bridge. When the orchestrator explicitly detects a modern Keras 3 model, it automatically spawns a dedicated subprocess within the primary \texttt{stm32} environment. This subprocess utilizes the native \texttt{TFLiteConverter} API to flawlessly transform the unsupported Keras model into a standard TensorFlow Lite flatbuffer. Following this successful conversion, the system transparently redirects the STEdgeAI analysis engine to target the newly generated TFLite artifact instead of the original Keras file.
-
-This bridge "flattens" the model architecture into standard TFLite operators, which the ST toolchain interprets correctly, thus restoring the autonomous flow for the latest state-of-the-art models.
-
-\subsection{Architectural Constraints on Model Customization}
-While the discovery and profiling workflow (Workflow 2) achieves format-agnostic interoperability, successfully processing \texttt{.h5}, \texttt{.keras}, \texttt{.onnx}, and \texttt{.tflite} artifacts for resource estimation and firmware generation, the structural customization workflow (Workflow 5) introduces a strict dependency on native Keras formats.
-
-This critical distinction arises directly from the technical requirements of surgical neural network operations. Advanced features such as dynamic layer freezing, appending Dense or Dropout regularization layers, and modifying custom activation functions inherently require the orchestrator to load the architecture as a live, fully instantiable Keras \texttt{Model} object.
-
-However, deployment formats like \texttt{.tflite} and \texttt{.onnx} are aggressively optimized for pure inference execution. Because they represent the entire model as a flattened sequence of raw mathematical operators, typically serialized as flatbuffers, they completely lack the high-level symbolic Python class metadata strictly necessary for Keras to successfully reconstruct and re-initialize a structurally editable training graph.
-
-\paragraph{The Irreversibility Trap}
-A common question in edge AI orchestration is whether these deployment formats can be back-converted into editable Keras artifacts. While bridge libraries like \texttt{onnx2keras} exist, they are often unreliable for complex architectures due to operator name mangling. For \texttt{.tflite} models, the conversion is fundamentally "destructive": the process of \textit{Operator Fusion} (merging convolution and activation layers) and \textit{Quantization} (converting FP32 to INT8) removes the structural and numerical resolution required for stable fine-tuning.
-
-Consequently, the framework adopts the best practice of requiring the original "source" formats for customization, treating deployment artifacts as a terminal stage in the MLOps pipeline.
-
-To maintain system stability, a format-based validation gate was implemented in the customization node, ensuring that only native Keras artifacts enter the optimization pipeline, while guiding users towards Workflow 2 for non-editable binary formats.
-
 \subsection{Cross-Platform Portability and macOS ARM64 Support}
 
-Developing an orchestration framework for STMicroelectronics toolchains (primarily Linux and Windows-centric) on a macOS ARM64 (Apple Silicon) environment introduced specific portability challenges. To ensure a consistent developer experience across heterogeneous host systems, several architectural adaptations were implemented.
+During the experimental phase of this research, I developed and operated the orchestration framework natively on a MacBook Air (Apple Silicon). This introduced specific portability challenges, not strictly due to the core STMicroelectronics toolchains, but because many of the employed Python libraries and orchestration dependencies were primarily optimized for Linux and Windows-centric environments. To ensure a consistent developer experience across heterogeneous host systems, several architectural adaptations were implemented.
 
 \subsubsection{Path Abstraction and Configuration Management}
 

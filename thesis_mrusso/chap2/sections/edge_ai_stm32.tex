@@ -4,10 +4,10 @@
 Edge Artificial Intelligence (Edge AI) refers to the deployment of machine learning models directly on embedded devices, such as microcontrollers (MCUs) and digital signal processors (DSPs), rather than on centralized cloud servers. This paradigm shift is driven by the need for low latency, reduced bandwidth consumption, data privacy, and improved energy efficiency \cite{warden2019tinyml}. However, deploying sophisticated AI on resource-constrained hardware like the STM32 family presents significant technical challenges.
 
 \subsection{Challenges of TinyML}
-The field of Tiny Machine Learning (TinyML) focuses on enabling inference on devices with power consumption typically in the milliwatt range. The primary constraints include:
+The field of Tiny Machine Learning (TinyML) focuses on enabling inference on devices with power consumption typically in the milliwatt range \cite{warden2019tinyml}. The primary constraints include:
 
 \begin{itemize}
-    \item \textbf{Memory Limitations}: MCUs often have limited RAM (typically hundreds of KB) and Flash memory (a few MB). This necessitates aggressive model compression techniques such as quantization and pruning.
+    \item \textbf{Memory Limitations}: MCUs often have limited RAM (typically hundreds of KB) and Flash memory (a few MB). This necessitates aggressive model compression techniques such as quantization and pruning \cite{st_cubeai_docs}.
     \item \textbf{Computational Power}: Without the benefit of high-end GPUs, models must be optimized for execution on ARM Cortex-M cores, sometimes using hardware accelerators like the STM32 NPU where available.
     \item \textbf{Energy Efficiency}: Many Edge AI applications are battery-powered, requiring architectures that minimize active clock cycles and maximize sleep states.
 \end{itemize}
@@ -42,7 +42,7 @@ To provide concrete guidance on model selection for resource-constrained devices
 
 Key observations from this analysis:
 \begin{itemize}
-    \item \textbf{INT8 Quantization Impact}: Compression reduces model footprint by approximately 4× compared to FP32, enabling deployment of models like MobileNet V2 0.35 on mid-tier MCUs (L476) that would otherwise be infeasible.
+    \item \textbf{INT8 Quantization Impact}: Compression reduces model footprint by approximately 4× compared to FP32, enabling deployment of models like MobileNet V2 0.35 on mid-tier MCUs (L476) that would otherwise be infeasible \cite{st_cubeai_docs}.
     \item \textbf{Vision Models on F401}: Standard image classification architectures remain incompatible with the STM32F401 (64KB RAM) even with aggressive quantization, limiting this platform to audio-based TinyML or custom ultra-lightweight CNNs.
     \item \textbf{H7 Family as Sweet Spot}: The STM32H743/H747 (1MB RAM) emerge as optimal targets for production-grade vision AI, supporting MobileNet variants at 224×224 resolution with acceptable inference latency.
 \end{itemize}

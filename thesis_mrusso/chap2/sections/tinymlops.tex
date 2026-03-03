@@ -1,6 +1,6 @@
 \subsection{TinyMLOps: MLOps for Resource-Constrained Devices}
 
-The rapid proliferation of Artificial Intelligence on embedded systems has necessitated the adaptation of traditional Machine Learning Operations (MLOps) principles to the specific constraints of micro-controllers. This emerging field, known as \textbf{TinyMLOps}, addresses the lifecycle management of AI models in environments where memory, compute, and power are severely limited.
+The rapid proliferation of Artificial Intelligence on embedded systems has necessitated the adaptation of traditional Machine Learning Operations (MLOps) principles to the specific constraints of micro-controllers. This emerging field, known as \textbf{TinyMLOps}, addresses the lifecycle management of AI models in environments where memory, compute, and power are severely limited \cite{warden2019tinyml}.
 
 \subsubsection{Distinction from Cloud-Scale MLOps}
 
@@ -8,7 +8,7 @@ While traditional MLOps focuses on scaling model deployment across cloud cluster
 
 \begin{table}[h]
     \centering
-    \caption{Comparison between traditional Cloud MLOps and TinyMLOps.}
+    \caption{Comparison between traditional Cloud MLOps and TinyMLOps \cite{mlops_productivity_2024}.}
     \label{tab:mlops_vs_tinymlops}
     \begin{tabular}{|l|l|l|}
         \hline
@@ -32,7 +32,7 @@ A systematic TinyMLOps framework typically implements three fundamental pillars:
 
     \item \textbf{Integrated Automation ("Plumbing")}: TinyMLOps requires the direct integration of traditionally disjoint tools, Python-based training environments, C-based firmware toolchains (like STM32Cube), and binary flashing utilities.
 
-    \item \textbf{Reproducibility}: Defining the end-to-end workflow as a declarative graph (e.g., via LangGraph) ensures that an optimized model can be reconstructed and re-verified consistently across different hardware revisions.
+    \item \textbf{Reproducibility}: Defining the end-to-end workflow as a declarative graph (e.g., via LangGraph) ensures that an optimized model can be reconstructed and re-verified consistently across different hardware revisions \cite{wang2024agentailanggraphmodular}.
 \end{itemize}
 
 Adopting a TinyMLOps approach transitions the development of embedded AI from a manual, expert-intensive process to a systematic, automated engineering discipline.
