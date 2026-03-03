@@ -491,8 +491,8 @@ Cosa preferisci? (si/no)""",
                 prompt["suggestion"] = "💡 L'ultima volta hai personalizzato il modello. Vuoi farlo di nuovo?"
             
             logger.info("⏸️ Interrupting for modification intent.")
-            # resume_value = interrupt(prompt)
-            user_text = "si"
+            resume_value = interrupt(prompt)
+            # user_text = "si"
 
         # Dopo la ripresa
         if resume_value and str(resume_value).strip():
@@ -1297,21 +1297,24 @@ class ValidationInfo(BaseModel):
 
 class ParsedModificationsPlan(BaseModel):
     """Plan completo di modifiche - OUTPUT FINALE"""
-    modifications: List[Modification] = Field(
-        description="List of modifications to apply"
+    modifications: List[Any] = Field(
+        description="List of modifications to apply. Each item should be a dictionary with 'type', 'description', 'params'.",
+        default_factory=list
     )
     summary: str = Field(
         description="Brief summary of all modifications"
     )
     confidence: float = Field(
-        ge=0.0, le=1.0,
-        description="Overall confidence of the parsing (0.0-1.0)"
+        description="Overall confidence of the parsing (0.0-1.0)",
+        default=0.9
     )
-    validation: ValidationInfo = Field(
-        description="Validation status and issues"
+    validation: Any = Field(
+        description="Validation status and issues",
+        default=None
     )
-    training_recommendation: TrainingRecommendation = Field(
-        description="Training recommendations based on modifications"
+    training_recommendation: Any = Field(
+        description="Training recommendations based on modifications",
+        default=None
     )
 
 # Lista modelli che NON supportano change_input_shape

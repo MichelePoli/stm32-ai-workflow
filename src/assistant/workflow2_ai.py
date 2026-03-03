@@ -174,10 +174,12 @@ REGOLE CRITICAL:
 3. Se l'utente rifiuta tutti o scrive "no" / "nessuno", imposta wants_another_search: true e model_accepted: false.
 4. Se l'utente vuole usare un default o non sa, imposta model_accepted: false e wants_another_search: false.
 
-Output JSON:
-- "model_index": int (1-based) o null
-- "model_accepted": boolean
-- "wants_another_search": boolean
+Rispondi SEMPRE con un oggetto JSON valido con questa struttura esatta:
+{
+  "model_index": 1,
+  "model_accepted": true,
+  "wants_another_search": false
+}
 """
 
 model_feedback_extraction_instructions = """Analizza il feedback dell'utente sul modello proposto.
@@ -193,13 +195,15 @@ Classifica la risposta in una di queste categorie:
 3. **wants_default**: L'utente vuole il MODELLO DI DEFAULT o TERMINA
    Esempi: "default", "basta ricerche", "stop", "predefinito", "termina"
 
-Rispondi SEMPRE in formato JSON con:
-- "model_accepted": true/false
-- "wants_another_search": true/false
-- "wants_default": true/false
-- "confidence": 0.0-1.0
+Rispondi SEMPRE con un oggetto JSON valido con questa struttura esatta:
+{
+  "model_accepted": true,
+  "wants_another_search": false,
+  "wants_default": false,
+  "confidence": 0.95
+}
 
-IMPORTANTE: Solo UNO dei tre può essere true!
+IMPORTANTE: Solo UNO dei tre (model_accepted, wants_another_search, wants_default) può essere true!
 """
 
 search_result_extraction_instructions = """Estrai SOLO questi 5 campi dal risultato della ricerca:
@@ -213,14 +217,14 @@ search_result_extraction_instructions = """Estrai SOLO questi 5 campi dal risult
 IMPORTANTE: Cerca link che finiscono con .h5, .keras, .onnx o .tflite.
 Se vedi [testo](https://...) estrai l'URL dalle parentesi tonde (il secondo)
 
-Rispondi SEMPRE in formato JSON con esattamente questi campi:
+Rispondi SEMPRE con un oggetto JSON valido con esattamente questi campi:
 {
-  "model_name": "string",
-  "download_url": "string o null",
-  "model_size": "string o null",
-  "accuracy": "string o null",
-  "inference_time": "string o null",
-  "is_valid": true/false
+  "model_name": "MobileNetV2 128",
+  "download_url": "https://url.com/model.h5",
+  "model_size": "5.7MB",
+  "accuracy": "64%",
+  "inference_time": "40ms (STM32H7)",
+  "is_valid": true
 }
 """
 
