@@ -34,7 +34,7 @@ After the search, \texttt{summarize\_\allowbreak search\_\allowbreak results()} 
 
 \subsection{Quality Evaluation with DeepEval}
 
-Once the summary is ready, the \texttt{finalize\_search()} node runs an automated quality assessment using the \textbf{DeepEval} framework. Evaluation runs synchronously in a separate thread (via \texttt{asyncio.to\_thread}) to avoid blocking the event loop. All four metrics run on a local \texttt{OllamaModel} backed by \texttt{deepseek-r1:latest}, keeping evaluation fully offline:
+Once the summary is ready, the \texttt{finalize\_search()} node runs an automated quality assessment using the \textbf{DeepEval} framework. Evaluation runs synchronously in a separate thread (via \texttt{asyncio.to\_thread}) to avoid blocking the event loop. All four metrics run on a local \texttt{OllamaModel} backed by \texttt{deepseek-r1:latest}, keeping evaluation fully offline. The 0.55 threshold serves exclusively as an observability and logging baseline calibrated for local model capabilities. It does not act as a blocking filter; instead, if a metric falls below this threshold, the framework simply records a "Fail" status for offline analysis without discarding any sources or interrupting the runtime:
 
 \begin{itemize}
     \item \textbf{Faithfulness}: checks that claims in the summary are supported by the retrieved text (threshold: 0.55)

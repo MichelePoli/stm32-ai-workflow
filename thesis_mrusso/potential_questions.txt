@@ -1,0 +1,203 @@
+POTENTIAL THESIS DEFENSE QUESTIONS
+Conversational Multi-Agent Workflows for Edge AI Deployment on Microcontrollers
+================================================================================
+
+
+════════════════════════════════════════════════
+SECTION 1 – MOTIVATION & PROBLEM STATEMENT
+════════════════════════════════════════════════
+
+Q1. Why did you choose STM32 microcontrollers as the target platform and not more powerful embedded platforms like Raspberry Pi or NVIDIA Jetson?
+Hint: STM32 represents the "hardest case" for Edge AI — severe memory constraints, no OS, no GPU. It is the most widely deployed MCU family in industrial/IoT. Tools like Jetson already have good ML support; the gap on bare-metal MCUs was the real unsolved problem.
+
+Q2. Who is the target user of this framework? A researcher, a student, or a professional embedded engineer?
+Hint: Primary target is an embedded engineer who is an expert in hardware/firmware but not in ML/LLM toolchains. The framework acts as an ML co-pilot in their IDE.
+
+Q3. What specific pain point motivated the 4-hour baseline estimate? Were there real-world measurements or surveys?
+Hint: The estimate combines official ST tutorials (15 steps in CubeMX), Keystroke-Level Model (KLM) analysis, and published MLOps industry benchmarks (e.g., 70% deployment time reduction via CI/CD). The methodology is documented in Chapter 4 (developer_productivity.tex).
+
+Q4. Edge AI is a broad term. What specific sub-problem does your thesis focus on?
+Hint: The thesis focuses on the model deployment pipeline — from model selection to firmware-level integration. It does not address sensor acquisition, real-time OS scheduling, or hardware design.
+
+Q5. What would a developer have to do manually today if this framework did not exist?
+Hint: They would need to: (1) run CubeMX GUI manually, (2) search GitHub/Kaggle for models manually, (3) write NNI experiment scripts manually, (4) debug class mismatches manually, (5) copy and edit CMakeLists.txt and main.c manually. Each step in isolation is error-prone.
+
+
+════════════════════════════════════════════════
+SECTION 2 – ARCHITECTURE & DESIGN DECISIONS
+════════════════════════════════════════════════
+
+Q6. Why did you choose LangGraph over other agentic frameworks like LangChain, AutoGen, or CrewAI?
+Hint: LangGraph provides explicit control over state transitions via a directed graph. Unlike LangChain's sequential chains, LangGraph makes it possible to implement conditional branching (e.g., NNI vs. standard optimization path), interrupt() checkpoints for HITL, and persistent state across nodes — features critical for a complex, multi-step engineering pipeline.
+
+Q7. What exactly is a "branch" in your LangGraph architecture? How does the system decide which branch to activate?
+Hint: A branch is a subgraph of specialized nodes. The router node (a conditional edge) reads the parsed intent from the LLM and routes the state to the appropriate branch: Firmware, Customization, Web Search, Dataset, etc.
+
+Q8. Why did you use Ollama locally for inference instead of calling a commercial API like OpenAI or Anthropic?
+Hint: Privacy (no user data sent externally), offline operation, cost (no API fees for many experimental runs), and the ability to swap models at runtime. In the server scenario, Triton replaces Ollama for GPU sharing.
+
+Q9. Why NVIDIA Triton Inference Server specifically? Could you have used a simpler HTTP proxy?
+Hint: Triton provides: dynamic model loading/unloading from GPU VRAM, request batching, the standardized V2 API for model repository management, and fractional GPU allocation. A simple HTTP proxy would require custom memory management, concurrent queuing, and model lifecycle handling from scratch.
+
+Q10. How does Triton handle concurrent requests from multiple users? What prevents one user from monopolizing the GPU?
+Hint: Triton implements request queuing and batching per model. The /v2/repository/models/{model}/load and /unload endpoints allow dynamic VRAM management. This was the key architectural fix compared to the single-container-per-user model (Scenario 2 in Chapter 4).
+
+Q11. The VS Code extension communicates with the backend over HTTP. Is this not a security risk on a shared research server?
+Hint: In the current implementation, communication is local or trusted-network only (no authentication layer). This is a known limitation. A production deployment would require token-based authentication or mTLS. The thesis acknowledges this in the limitations section.
+
+Q12. Why did you implement the Human-in-the-Loop mechanism using LangGraph's interrupt() rather than a simpler event or callback?
+Hint: interrupt() integrates natively with LangGraph's graph state. It suspends the graph deterministically at a node, persists the full state in Redis, and allows the graph to be resumed from the exact same checkpoint after user approval — something a generic callback cannot easily guarantee.
+
+Q13. Why Redis specifically for state persistence? Could you have used a simple SQLite database?
+Hint: Redis provides in-memory key-value storage optimized for fast read/write of structured state (Python dicts/JSON), native TTL expiration for session cleanup, and it is required by LangGraph's built-in checkpointer. SQLite would require custom serialization and is not as well-supported by LangGraph's persistence layer.
+
+Q14. What happens to the user's state (chat history, current workflow) if the FastAPI server crashes?
+Hint: State is persisted in Redis. On restart, the server restores the session state from Redis using the user's session ID. This is a key feature of the Redis-backed checkpointing design.
+
+
+════════════════════════════════════════════════
+SECTION 3 – INDIVIDUAL WORKFLOWS & TECHNICAL IMPLEMENTATION
+════════════════════════════════════════════════
+
+Q15. How does the framework generate a valid CubeMX project without a graphical interface?
+Hint: It uses STM32CubeMX in headless CLI mode, passing a pre-seeded .ioc file as input. The .ioc file is a template pre-configured for each supported board (e.g., STM32H7A3ZITx.ioc). CubeMX reads it and generates the C project without launching the GUI. The framework runs this via subprocess from Python.
+
+Q16. What is in the pre-seeded .ioc template files? Who created them?
+Hint: They were manually created once per supported board by the developer, capturing the correct clock configuration, peripheral enablement, and the X-CUBE-AI configuration. They live in the model_repository and are reused for every new project generation request.
+
+Q17. What happens if the user requests a board that does not have a pre-seeded .ioc template?
+Hint: The framework falls back to informing the user that the board is not supported, or could theoretically generate a generic template. Currently, unsupported boards are a known limitation documented in the thesis.
+
+Q18. When the framework searches for a model on GitHub/Kaggle, how does it avoid downloading dangerous or malicious repositories?
+Hint: This is a valid security concern and a known limitation of the framework. The search is restricted to repositories with specific format keywords (e.g., ".h5", ".tflite", "keras") and high star counts, but no sandboxed execution or content scanning is performed.
+
+Q19. How does the STEdgeAI analysis step work? What does the output look like and how does the framework interpret it?
+Hint: The framework calls the stedgeai CLI via subprocess, piping the output. STEdgeAI returns a JSON/text report with Flash usage, RAM usage, MACs count, and latency estimates. The framework parses these values against the target board's constraints (e.g., flash <= 1MB for H7) and autonomously escalates to compression if constraints are violated.
+
+Q20. What compression techniques are available to STEdgeAI, and how does the framework choose between them?
+Hint: The framework escalates through a defined hierarchy: (1) no compression, (2) INT8 quantization, (3) Pruning + Quantization. If each level fails the resource constraint check, it moves to the next. This is documented in the "Autonomous Compression Escalation" section of Chapter 3.
+
+Q21. What happens if even the highest compression level cannot fit the model into the microcontroller's Flash/RAM?
+Hint: The framework reports back to the user via the VS Code chat that the model is fundamentally too large for the target hardware, and suggests selecting a smaller architecture (e.g., MobileNetV1 0.25 instead of MobileNetV2 1.0).
+
+Q22. In the NNI workflow, the generated trial.py runs for only 3 epochs per trial. Is that enough to find a meaningful best hyperparameter configuration?
+Hint: 3 epochs is intentional for fast HPO iteration, not for final accuracy. The NNI experiment finds the best hyperparameter set (learning rate, batch size, optimizer), and then a full-length retrain with RETRAIN_MODE=true produces the final model. The short trials are a common best practice in HPO (similar to Successive Halving / Hyperband strategies).
+
+Q23. You use a TPE (Tree-structured Parzen Estimator) tuner in NNI. What is it and why did you choose it over a random search or grid search?
+Hint: TPE is a Bayesian optimization method that builds a probabilistic model of the search space, prioritizing configurations likely to perform well based on previous trial results. It converges faster than random search (fewer trials needed) and is much less expensive than grid search in high-dimensional spaces. It is the standard NNI tuner for moderate-scale HPO.
+
+Q24. You mention that the framework detects class mismatches and replaces the final Dense layer. Does the re-trained model's backbone retain its original ImageNet weights?
+Hint: Yes, by default it does. The transfer learning strategy (defined by the freeze_backbone NNI search space parameter) can either freeze the backbone (preserving pre-trained features) or allow full fine-tuning. This is a hyperparameter explored by NNI itself.
+
+Q25. The web search agent uses DuckDuckGo. What happens when DuckDuckGo returns pages with incorrect or outdated information?
+Hint: This is addressed by the DeepEval evaluation pipeline. Faithfulness and Hallucination metrics are computed using the LLM-as-judge approach, comparing the agent's output against the retrieved content. If the retrieved content itself is wrong, it is a limitation of the web search source, not the agent. The 6% hallucination rate measured in Chapter 4 accounts for this.
+
+Q26. How does the academic search branch differ from the web search branch?
+Hint: The academic branch uses a specialized search endpoint oriented to scientific papers (e.g., Semantic Scholar or ArXiv-style sources), generates structured research queries optimized for academic language, and evaluates the output with an additional Requirement Completeness metric (ensuring all structured query dimensions like "models, benchmarks, challenges" are addressed).
+
+Q27. The framework generates the CMakeLists.txt and main.c modifications for firmware integration. How does it avoid introducing C syntax errors?
+Hint: The LLM prompt for integration includes the current content of the existing files and strict instructions to preserve all existing code, performing additive modifications only. Post-generation validation is performed by checking that the inserted code blocks are syntactically complete (matching braces, includes) before writing to disk.
+
+
+════════════════════════════════════════════════
+SECTION 4 – EVALUATION & RESULTS
+════════════════════════════════════════════════
+
+Q28. The 9x speedup compares your automated system against a manual pipeline. Is this a fair comparison? Could an experienced engineer be much faster?
+Hint: The methodology uses the Keystroke-Level Model (KLM) for the manual baseline and cross-references it against official ST tutorial times and developer community benchmarks. The thesis explicitly acknowledges that veteran engineers may be faster. The speedup is presented as a ratio against a "proficient user" baseline, not a novice.
+
+Q29. The automated timing (20-30 minutes) includes LLM inference time? That seems long. What dominates the time?
+Hint: Yes, it does. The dominant factors are: LLM code generation for NNI scripts (~1-2 min), the STEdgeAI analysis and optional compression (~2-3 min), and model discovery and downloading (~3-5 min). The LLM inference itself on local Ollama is typically 20-60 seconds per call.
+
+Q30. The fine-tuning validation achieved 98.1% accuracy on 5,000 images with only 3 epochs of training. Does this not suggest the dataset was too easy?
+Hint: The 132-class CIFAR-style dataset was deliberately chosen as an accessible benchmark to demonstrate the framework's functional correctness (class mismatch rescue, anti-overfitting code generation), not to set a state-of-the-art accuracy record. The goal was to validate that the agent's generated code trains correctly, not to produce a production model.
+
+Q31. You report a Hallucination Rate of 4–14% on the DeepEval evaluation. What exactly counts as a hallucination in your metric?
+Hint: A hallucination is a factual claim in the agent's output that has no support in any of the retrieved context documents. It does NOT include statements that are correct but not explicitly present in the retrieved documents (those still get penalized by Faithfulness, but are not counted as hallucinations if they don't contradict sources).
+
+Q32. The DeepEval framework uses an LLM-as-judge to compute metrics. Doesn't that introduce a circularity problem (using an LLM to evaluate an LLM)?
+Hint: This is a well-known and valid critique of LLM-based evaluation. The thesis uses deepseek-r1:latest as the judge model, which is a different model from the agent (Mistral/Llama). Orthogonality between judge and agent reduces but does not eliminate this circularity. It is a limitation explicitly acknowledged in the thesis.
+
+Q33. Your Contextual Relevancy averages 75%. That means 25% of retrieved documents were not directly useful. Is this acceptable?
+Hint: In RAG literature, a Contextual Relevancy of 0.75 is considered strong, especially for open-web search where not all retrieved documents will be perfectly on-topic. The more critical metric for quality is Faithfulness (how well the generator uses what was retrieved), which scored 0.80–0.89 in both experiments.
+
+Q34. Did you test the framework end-to-end on a real physical STM32 board?
+Hint: The thesis describes the complete pipeline including firmware generation, C-code compilation, and binary integration. Physical flashing and validation on actual hardware was performed during development to verify the generated CMakeLists and main.c patches. The evaluation chapter focuses on the software pipeline metrics.
+
+
+════════════════════════════════════════════════
+SECTION 5 – LIMITATIONS, THREATS, & FUTURE WORK
+════════════════════════════════════════════════
+
+Q35. What is the biggest unresolved limitation of your framework?
+Hint: The most significant architectural gap is the absence of real-time validation on physical hardware after firmware generation. The pipeline ends at binary generation; it does not currently automate the flash-and-test cycle on the physical board. This would require integrating OpenOCD or ST-Link CLI tooling.
+
+Q36. The framework relies on LLM-generated code for NNI and firmware. What happens when the LLM produces incorrect code?
+Hint: The framework includes validation gates: after NNI code generation, it attempts to import and parse the generated Python files. After firmware integration, it checks for syntactic consistency in the C modifications. However, subtle logical bugs in generated code would not be caught at this level — this is a real limitation.
+
+Q37. How does the system perform when the model was originally trained on a completely different domain (e.g., a speech model asked to do image classification)?
+Hint: The class mismatch rescue handles architectural incompatibilities (output layer shape), but domain incompatibilities (different modalities) would require more fundamental re-architecture. Currently the system informs the user about fundamental incompatibilities but cannot automatically resolve them.
+
+Q38. The framework stores user profile data in Redis. What happens when the Redis server goes down?
+Hint: If Redis is unavailable, the server falls back to stateless behavior — the session history is lost. A more robust architecture would include a Redis Sentinel or persistent Redis AOF backup. This is a known production limitation.
+
+Q39. Could this framework be used for FPGA deployment instead of MCU deployment?
+Hint: Not directly — the core tool (STEdgeAI) is specific to ST's Cortex-M ecosystem. However, the orchestration layer (LangGraph, LLM agents, VS Code extension) is hardware-agnostic and could be adapted to FPGA toolchains like Vivado HLS or Vitis AI with a different workflow implementation.
+
+Q40. You mentioned 3 deployment scenarios in Chapter 4 (local, single-user containerized, Kubernetes). Why is the Kubernetes deployment described as "future work" and not implemented?
+Hint: The Kubernetes configuration was designed and the architecture validated at the Docker container level. Full Kubernetes deployment (including Helm charts, auto-scaling policies, and persistent volume claims for model storage) was out of scope for the thesis timeline but is the natural next step, documented in the conclusion.
+
+Q41. How would the framework handle a model that is already quantized (e.g., a pre-quantized INT8 TFLite model)?
+Hint: If the model is already INT8, STEdgeAI would run its analysis without additional quantization, potentially skipping the compression escalation step. The framework reads the model's data type from its metadata and conditionally applies the escalation ladder.
+
+Q42. The framework generates Python fine-tuning code. Does it support PyTorch models or only Keras/TensorFlow?
+Hint: The current implementation exclusively targets Keras/TensorFlow, which is what STEdgeAI supports for conversion. PyTorch models would need to be exported to ONNX first (via torch.onnx.export), which STEdgeAI can then ingest. Full native PyTorch support is identified as a future extension.
+
+
+════════════════════════════════════════════════
+SECTION 6 – BROADER CONTEXT & ACADEMIC FRAMING
+════════════════════════════════════════════════
+
+Q43. How does this work relate to the field of MLOps? Is it a contribution to MLOps?
+Hint: Yes — the framework is a specialized MLOps contribution for the embedded/Edge AI domain. Classical MLOps focuses on cloud model serving; this thesis extends the MLOps lifecycle to bare-metal hardware, covering the last mile of deployment from trained model to running firmware.
+
+Q44. What is the relationship between your multi-agent system and the concept of "Agentic AI" described in recent literature?
+Hint: The framework instantiates the agentic AI paradigm: agents that perceive state, decide on actions, use tools, and interact with the environment autonomously. Each LangGraph node is an agent with a specific role, tool set, and decision boundary. The HITL mechanism ensures human oversight, aligning with responsible AI deployment principles.
+
+Q45. Your framework uses LLMs to generate code. How do you ensure the generated code is deterministic and reproducible?
+Hint: LLM inference is inherently stochastic. The framework mitigates this via: (1) low temperature settings for code generation prompts, (2) highly constrained structured prompts that leave little room for variation, and (3) post-generation validation that rejects and retries outputs that fail parsing checks.
+
+Q46. How does this project compare to GitHub Copilot or STMicroelectronics' own AI tools?
+Hint: GitHub Copilot is a single-step code suggestion tool — it does not orchestrate multi-step workflows, run external CLI tools, or manage hardware-level constraints. ST has begun integrating AI suggestions into STM32Cube.AI but does not offer an end-to-end conversational pipeline that covers model search, HPO, and firmware generation in one flow.
+
+Q47. Could the same architecture be applied to other MCU vendors, such as NXP or Nordic Semiconductor?
+Hint: The LangGraph/LLM orchestration layer is vendor-agnostic. The vendor-specific parts are: the .ioc template files (CubeMX-specific) and the STEdgeAI CLI calls. Replacing these with NXP's MCUXpresso or Nordic's nRF AI tools would theoretically generalize the system. This is left as future work.
+
+Q48. Do you think LLMs are ready to fully automate embedded AI development, or is human oversight still essential?
+Hint: Based on this thesis, partial automation is mature today (code generation, model search, analysis), but human oversight remains essential for safety-critical decisions (flashing real hardware, validating model correctness on production data). The HITL design is precisely the answer to this question — full autonomy is not the goal.
+
+
+════════════════════════════════════════════════
+SECTION 7 – VERY SPECIFIC "GOTCHA" TECHNICAL QUESTIONS
+════════════════════════════════════════════════
+
+Q49. Why does your manager.py use experiment.list_trial_jobs() to find the best trial instead of experiment.get_best_trial()?
+Hint: experiment.get_best_trial() and experiment.export_top_trial() do not exist in the version of the NNI Python API used. The correct approach is to iterate list_trial_jobs(), filter for SUCCEEDED trials, and manually find the maximum finalMetricData value.
+
+Q50. What is the 'CRC' peripheral in STM32 and why must it be enabled for X-CUBE-AI?
+Hint: CRC is the Cyclic Redundancy Check hardware block. STM32Cube.AI uses it internally to verify the integrity of the neural network weights stored in Flash. Without CRC enabled in CubeMX, the generated code fails to compile or link.
+
+Q51. What is the role of the LD_LIBRARY_PATH fix in the generated NNI scripts?
+Hint: In Conda environments, TensorFlow expects CUDA libraries at paths registered in LD_LIBRARY_PATH. Without this, TF cannot find libcublas.so or libcudnn.so even if CUDA is installed. The generated scripts prepend the Conda lib directory at runtime to fix GPU initialization errors that would otherwise silently fail and fall back to CPU.
+
+Q52. Why does trial.py include a self-restart mechanism (os.execv)?
+Hint: LD_LIBRARY_PATH is read by the dynamic linker at process start. Modifying it from inside a running Python process does not affect already-loaded shared libraries. The os.execv call replaces the current process with a fresh one that inherits the updated environment, effectively applying the CUDA path fix before TensorFlow is imported.
+
+Q53. You use mmap_mode='r' to load NumPy arrays. Does this work correctly with tf.data.Dataset?
+Hint: Yes, because the Dataset.from_tensor_slices() call receives the memory-mapped NumPy array, which tf.data internally treats as a normal array. The slicing behavior of mmap is compatible with tf.data's sequential access pattern, and the prefetch() call handles asynchronous block loading efficiently.
+
+Q54. What is the Pre-seeded IOC Strategy and why is it necessary?
+Hint: Running CubeMX fully headlessly (without a pre-existing .ioc file) triggers interactive GUI pop-ups that block CLI mode on headless servers. The pre-seeded .ioc templates bypass this by providing a complete, pre-configured project description. CubeMX reads it deterministically and generates the code without any interactive steps.
+
+Q55. How does the NDJSON protocol work between the VS Code extension and the FastAPI backend?
+Hint: NDJSON (Newline-Delimited JSON) streams individual JSON objects separated by newlines over a persistent HTTP connection. The backend writes each agent step, tool call result, or message as a separate JSON line. The VS Code extension reads the response as a ReadableStream, parsing each line as it arrives to provide live updates in the chat panel without waiting for the full response.
