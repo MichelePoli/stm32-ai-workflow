@@ -32,6 +32,13 @@ import asyncio
 # ============================================================================
 # DEEPEVAL INTEGRATION
 # ============================================================================
+# ===== CRITICAL: SET ENVIRONMENT VARIABLES BEFORE IMPORTING DEEPEVAL =====
+os.environ["DEEPEVAL_RESULTS_FOLDER"] = "/tmp/deepeval"  # Scrivibile anche in Docker
+os.environ["DEEPEVAL_DISABLE_TELEMETRY"] = "1"
+os.environ["DEEPEVAL_TELEMETRY_OPT_OUT"] = "YES"
+os.environ["DEEPEVAL_SKIP_PROMPTS_CACHE"] = "1"
+os.environ["DEEPEVAL_CACHE_DIR"] = "/tmp/.deepeval"
+
 def _evaluate_summary_sync(
     research_topic: str,
     running_summary: str,
@@ -41,17 +48,11 @@ def _evaluate_summary_sync(
     Evaluation Synchrone in thread separato.
     Usa metriche compatibili con web search (Faithfulness, AnswerRelevancy).
     """
-    print("\n🔍 Running DeepEval evaluation with Ollama (deepseek-r1:latest)...\n")
+    triton_enabled = os.environ.get("USE_TRITON_BACKEND", "false").lower() == "true"
+    backend_label = "Triton (deepseek-r1)" if triton_enabled else "Ollama (deepseek-r1:latest)"
+    print(f"\n🔍 Running DeepEval evaluation with {backend_label}...\n")
     
     try:
-        # ===== CRITICAL: SET ENVIRONMENT VARIABLES FIRST =====
-        import os
-        os.environ["DEEPEVAL_RESULTS_FOLDER"] = ""
-        os.environ["DEEPEVAL_DISABLE_TELEMETRY"] = "1"
-        os.environ["DEEPEVAL_SKIP_PROMPTS_CACHE"] = "1"
-        
-        from deepeval import evaluate
-        from deepeval.models import OllamaModel
         from deepeval.metrics import (
             FaithfulnessMetric,
             AnswerRelevancyMetric,
@@ -60,19 +61,79 @@ def _evaluate_summary_sync(
         )
         from deepeval.test_case import LLMTestCase
         
-        base_url = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
-        # Initialize Ollama model
-        ollama_model = OllamaModel(
-            model="deepseek-r1:latest", 
-            base_url=base_url
-        )
+        # -----------------------------------------------------------------------
+        # MODELLO DI VALUTAZIONE: Custom DeepEval wrapper su get_llm
+        # Sfruttiamo il routing centralizzato (Triton/Ollama) bypassando il 
+        # vincolo stretto 'OPENAI_API_KEY' imposto dalla classe GPTModel nativa.
+        # -----------------------------------------------------------------------
+        from src.assistant.utils import get_llm
+        from deepeval.models import DeepEvalBaseLLM
+        
+        class DeepEvalLangChainWrapper(DeepEvalBaseLLM):
+            def __init__(self, model_name: str, config: RunnableConfig = None):
+                self.model_name = model_name
+                # Temperature=0 for deterministic evaluation
+                self.llm = get_llm(config=config, model=model_name, temperature=0, num_predict=1024)
+
+            def get_model_name(self):
+                return self.model_name
+
+            def load_model(self):
+                return self.llm
+
+            def _clean_json(self, text: str) -> str:
+                import re
+                
+                # 1. Remove <think>...</think> completely (if any)
+                cleaned = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL).strip()
+                
+                # 2. Try to find JSON using regex instead of greedy rfind
+                pattern = r'(\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}|\[[^\[\]]*(?:\[[^\[\]]*\][^\[\]]*)*\])'
+                matches = re.finditer(pattern, cleaned, re.DOTALL)
+                
+                import json
+                for match in matches:
+                    candidate = match.group(1)
+                    try:
+                        json.loads(candidate)
+                        return candidate
+                    except json.JSONDecodeError:
+                        continue
+                        
+                # 3. Fallback: string heuristic
+                start_idx = min((cleaned.find(c) for c in '{[' if c in cleaned), default=-1)
+                if start_idx != -1:
+                    end_char = ']' if cleaned[start_idx] == '[' else '}'
+                    end_idx = cleaned.rfind(end_char)
+                    while end_idx > start_idx:
+                        candidate = cleaned[start_idx:end_idx+1]
+                        try:
+                            json.loads(candidate)
+                            return candidate
+                        except json.JSONDecodeError:
+                            end_idx = cleaned.rfind(end_char, 0, end_idx)
+                            
+                return cleaned
+
+            def generate(self, prompt: str) -> str:
+                res = self.llm.invoke(prompt)
+                return self._clean_json(res.content)
+
+            async def a_generate(self, prompt: str) -> str:
+                res = await self.llm.ainvoke(prompt)
+                return self._clean_json(res.content)
+
+        # Usiamo gpt-oss-20b per l'evaluation (più preciso sui JSON e role-play eval)
+        eval_model_name = "gpt-oss-20b" if triton_enabled else "gpt-oss-20b"
+        eval_model = DeepEvalLangChainWrapper(model_name=eval_model_name, config=None)
+
         
         # Define metrics 
-        faithfulness = FaithfulnessMetric(threshold=0.55, model=ollama_model, async_mode=False) 
-        relevancy = AnswerRelevancyMetric(threshold=0.55, model=ollama_model, async_mode=False)
+        faithfulness = FaithfulnessMetric(threshold=0.55, model=eval_model, async_mode=False) 
+        relevancy = AnswerRelevancyMetric(threshold=0.55, model=eval_model, async_mode=False)
         # ContextualRelevancy e Hallucination ORA ATTIVI
-        contextual_relevancy = ContextualRelevancyMetric(threshold=0.55, model=ollama_model, async_mode=False)
-        hallucination = HallucinationMetric(threshold=0.55, model=ollama_model, async_mode=False)
+        contextual_relevancy = ContextualRelevancyMetric(threshold=0.55, model=eval_model, async_mode=False)
+        hallucination = HallucinationMetric(threshold=0.55, model=eval_model, async_mode=False)
         
         # Create test case
         # retrieval_context must be a LIST of strings. 
@@ -363,73 +424,78 @@ def search_type_decision(state: MasterState) -> Literal["execute_web_search", "c
 def execute_web_search(state: MasterState, config: RunnableConfig = None) -> MasterState:
     """
     Nodo unico di ricerca che adatta il prompt dinamicamente.
-    Molto più elegante che avere 4 nodi separati.
+    Usa duckduckgo_search direttamente (no agno Agent) e poi get_llm() per sintetizzare.
+    Questo approccio è compatibile sia con Triton che con Ollama senza richiedere
+    il tool-calling/function-calling del modello.
     """
     
     logger.info(f"🔍 Ricerca web: tipo={state.search_type}, query={state.search_query}")
     
     try:
-        # Ottieni il prompt dinamico basato sul tipo di ricerca
+        from duckduckgo_search import DDGS
+        from langchain_core.messages import SystemMessage, HumanMessage
+        from src.assistant.utils import get_llm
+        
         base_prompt = SEARCH_PROMPTS.get(state.search_type, SEARCH_PROMPTS["documentation"])
         search_prompt = base_prompt.format(search_query=state.search_query)
         
         logger.info(f"📋 Prompt utilizzato per {state.search_type} (lunghezza: {len(search_prompt)} char)")
         
-        # Inizializza Agno Agent con Google Search
-        cfg = Configuration.from_runnable_config(config)
-        agent = Agent(
-            model=Ollama(id="mistral", host=cfg.ollama_base_url),
-            tools=[DuckDuckGoTools()],
-            markdown=True
-        )
-
-        # Esegui la ricerca
-        logger.info(f"🌐 Esecuzione ricerca con Agno Agent...")
-        response = agent.run(search_prompt)
-
-        #vedi se usa i tools
-        # ✅ DEBUG: STAMPA INFORMAZIONI SUI TOOL
-        # print("\n" + "="*70)
-        # print("🔍 DEBUG: Tool Calls")
-        # print("="*70)
+        # -----------------------------------------------------------------
+        # STEP 1: Ricerca DuckDuckGo diretta (no LLM, no tool calling)
+        # Usiamo la libreria duckduckgo_search direttamente. In questo modo
+        # evitiamo la dipendenza da agno Agent + function calling del modello,
+        # incompatibile con il backend Triton.
+        # -----------------------------------------------------------------
+        logger.info(f"🌐 Esecuzione ricerca DuckDuckGo diretta per: {state.search_query}")
+        raw_results = []
+        try:
+            with DDGS() as ddgs:
+                results = list(ddgs.text(state.search_query, max_results=6))
+                for r in results:
+                    snippet = f"**{r.get('title', '')}**\n{r.get('body', '')}\nSource: {r.get('href', '')}"
+                    raw_results.append(snippet)
+            logger.info(f"   ✓ DuckDuckGo: {len(raw_results)} risultati trovati")
+        except Exception as search_err:
+            logger.warning(f"⚠️ DuckDuckGo search error: {search_err}")
+            raw_results = [f"Nessun risultato per: {state.search_query}"]
         
-        # # Controlla gli attributi della response
-        # if hasattr(response, 'formatted_tool_calls'):
-        #     print(f"✅ Tool Calls: {response.formatted_tool_calls}")
-        # else:
-        #     print(f"❌ NO formatted_tool_calls")
+        raw_text = "\n\n---\n\n".join(raw_results)
         
-        # if hasattr(response, 'tools'):
-        #     print(f"Tools usati: {response.tools}")
-        # else:
-        #     print(f"❌ NO tools attribute")
+        # -----------------------------------------------------------------
+        # STEP 2: Sintesi con LLM (routato via get_llm → Triton o Ollama)
+        # -----------------------------------------------------------------
+        logger.info(f"🧠 Sintesi risultati con LLM...")
+        llm = get_llm(config=config)
         
-        # if hasattr(response, 'messages'):
-        #     print(f"Messages count: {len(response.messages)}")
-        #     for i, msg in enumerate(response.messages):
-        #         if hasattr(msg, 'tool_calls') and msg.tool_calls:
-        #             print(f"  Message {i}: ✅ Ha tool_calls: {msg.tool_calls}")
-        #         else:
-        #             print(f"  Message {i}: ❌ NO tool_calls")
-        # else:
-        #     print(f"❌ NO messages")
-        #fine debug tools
-
+        synthesis_messages = [
+            SystemMessage(content=(
+                "Sei un assistente tecnico esperto in sistemi STM32 e AI embedded. "
+                "Ti vengono forniti estratti di ricerche web. Sintetizzali in una "
+                "risposta chiara e strutturata in italiano, mantenendo i link alle fonti. "
+                "Rispondi in modo conciso e tecnico."
+            )),
+            HumanMessage(content=(
+                f"Query di ricerca: {state.search_query}\n\n"
+                f"Tipo di ricerca: {state.search_type}\n\n"
+                f"Estratti web:\n{raw_text}\n\n"
+                f"Prompt originale: {search_prompt}"
+            ))
+        ]
         
-        state.search_results = response.content if response else "Nessun risultato trovato"
+        synthesis_response = llm.invoke(synthesis_messages)
+        synthesized = synthesis_response.content if hasattr(synthesis_response, 'content') else str(synthesis_response)
         
-        # Populate search_results_list for DeepEval
-        if state.search_results:
-            # Simple heuristic: Split by paragraphs/double newlines to create "chunks"
-            # In a real RAG with vector DB, these would be the retrieved docs.
-            state.search_results_list = [
-                chunk.strip() 
-                for chunk in state.search_results.split("\n\n") 
-                if len(chunk.strip()) > 20 # Filter out tiny noise
-            ]
+        state.search_results = synthesized
+        
+        # Populate search_results_list for DeepEval (usa i raw chunk, più fedeli)
+        state.search_results_list = [
+            chunk.strip()
+            for chunk in raw_results
+            if len(chunk.strip()) > 20
+        ]
         
         state.web_research_success = True
-        
         logger.info(f"✓ Ricerca completata ({len(state.search_results)} caratteri, {len(state.search_results_list)} chunks)")
         
     except Exception as e:

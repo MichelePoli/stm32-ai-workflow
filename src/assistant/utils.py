@@ -145,6 +145,66 @@ def force_unload_ollama(model_name: str = "gpt-oss:20b"):
         logger.warning(f"⚠️ Failed to unload Ollama model: {e}")
 
 
+def force_unload_triton(models: list = None):
+    """
+    Unload one or more models from Triton to free VRAM before a GPU-intensive task (e.g. fine-tuning).
+    Requires Triton to run with --model-control-mode=explicit (already configured).
+    
+    Args:
+        models: Lista di nomi modelli da scaricare. Default: ["mistral"] (il più pesante, ~7.8GB)
+    """
+    if models is None:
+        models = ["mistral"]   # Mistral occupa ~7.8GB, il principale candidato per lo scaricamento
+    
+    triton_url = os.environ.get("TRITON_BASE_URL", "http://triton-server:8000").rstrip("/")
+    # Rimuovi /v1 se presente (l'API di model control usa /v2, non /v1)
+    triton_url = triton_url.replace("/v1", "")
+    
+    for model_name in models:
+        url = f"{triton_url}/v2/repository/models/{model_name}/unload"
+        try:
+            req = urllib.request.Request(
+                url,
+                data=b"{}",
+                headers={'Content-Type': 'application/json'},
+                method='POST'
+            )
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                logger.info(f"🔫 Triton: modello '{model_name}' scaricato dalla VRAM (HTTP {resp.status})")
+        except Exception as e:
+            logger.warning(f"⚠️ Triton unload '{model_name}' fallito: {e}")
+
+
+def reload_triton_models(models: list = None):
+    """
+    Ricarica i modelli su Triton dopo il fine-tuning.
+    Usa la stessa API /v2/repository/models/{model}/load.
+    
+    Args:
+        models: Lista di nomi modelli da ricaricare. Default: ["mistral"]
+    """
+    if models is None:
+        models = ["mistral"]
+    
+    triton_url = os.environ.get("TRITON_BASE_URL", "http://triton-server:8000").rstrip("/")
+    triton_url = triton_url.replace("/v1", "")
+    
+    for model_name in models:
+        url = f"{triton_url}/v2/repository/models/{model_name}/load"
+        try:
+            req = urllib.request.Request(
+                url,
+                data=b"{}",
+                headers={'Content-Type': 'application/json'},
+                method='POST'
+            )
+            with urllib.request.urlopen(req, timeout=200) as resp:
+                logger.info(f"🚀 Triton: modello '{model_name}' ricaricato in VRAM (HTTP {resp.status})")
+        except Exception as e:
+            logger.warning(f"⚠️ Triton reload '{model_name}' fallito: {e}")
+
+
+
 # ============================================================================
 # FILE SECURITY UTILITIES
 # ============================================================================
@@ -449,6 +509,7 @@ def run_subprocess_streaming(
             # Manual timeout check
             if time.time() - start_time > timeout:
                 process.terminate()
+                process.stdout.close()
                 return {
                     'success': False,
                     'stdout': "".join(stdout_lines),
@@ -456,6 +517,7 @@ def run_subprocess_streaming(
                 }
 
         process.wait()
+        process.stdout.close()
         return {
             'success': process.returncode == 0,
             'stdout': "".join(stdout_lines),

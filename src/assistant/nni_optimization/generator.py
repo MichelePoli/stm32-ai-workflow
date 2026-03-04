@@ -8,7 +8,8 @@ from src.assistant.utils import force_unload_ollama
 
 from typing import Dict, Any, Optional
 from agno.agent import Agent
-from agno.models.ollama import Ollama
+# agno model backends are imported conditionally inside generate_nni_experiment()
+# based on USE_TRITON_BACKEND: agno.models.openai.OpenAIChat (Triton) or agno.models.ollama.Ollama
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -462,17 +463,41 @@ DO NOT SKIP EITHER FILE.
 USE THE EXACT PATHS PROVIDED ABOVE - DO NOT USE PLACEHOLDERS!
 """
     
-    # Initialize Agent with GPT-OSS 20B for code generation
-    agent = Agent(
-        model=Ollama(
+    # -----------------------------------------------------------------------
+    # BACKEND SELECTION: Triton (OpenAI-compat) oppure Ollama
+    # Quando USE_TRITON_BACKEND=true, gpt-oss-20b gira su Triton con la stessa
+    # logica di model-swapping usata per Mistral (mutex + carica/scarica L'LLM).
+    # In modalità Ollama (fallback), force_unload_ollama viene chiamato al termine
+    # per liberare la VRAM prima del training NNI.
+    # -----------------------------------------------------------------------
+    import os
+    triton_enabled = os.environ.get("USE_TRITON_BACKEND", "false").lower() == "true"
+    
+    if triton_enabled:
+        from agno.models.openai import OpenAIChat
+        triton_url = os.environ.get("TRITON_BASE_URL", "http://triton-server:8000/v1")
+        logger.info(f"🚀 [generator.py] Routing gpt-oss-20b → Triton ({triton_url})")
+        llm_model = OpenAIChat(
+            id="gpt-oss-20b",    # Deve corrispondere al nome del modello nel repo Triton
+            base_url=triton_url,
+            api_key="triton"     # Triton non richiede autenticazione reale
+        )
+    else:
+        from agno.models.ollama import Ollama
+        logger.info("🦙 [generator.py] Routing gpt-oss-20b → Ollama (fallback)")
+        llm_model = Ollama(
             id="gpt-oss:20b",
             options={"num_ctx": num_ctx}
-        ),
+        )
+    
+    # Initialize Agent with GPT-OSS 20B for code generation
+    agent = Agent(
+        model=llm_model,
         description="You are an AI specialized in writing NNI optimization code.",
         instructions="""Return ONLY valid Python code with # FILE markers. Generate BOTH manager.py and trial.py. Don't add explanations or your personal comments.""",
         tools=[],
         markdown=False
-    )
+    ) # agno.Agent è model-agnostic — è solo un orchestratore che prende qualsiasi modello tu gli passi! La parte che determina dove vanno le chiamate è llm_model . Agno supporta nativamente sia Ollama che modelli OpenAI-compatible (come Triton).
     
     # Generate Code
     logger.info("   ⏳ Waiting for LLM generation...")
@@ -507,8 +532,10 @@ USE THE EXACT PATHS PROVIDED ABOVE - DO NOT USE PLACEHOLDERS!
         logger.error(f"❌ Generation failed: {e}")
         return {}
     finally:
-        # ALWAYS unload model to free GPU for NNI
-        force_unload_ollama("gpt-oss:20b")
+        # Ollama only: forza lo scaricamento del modello dalla VRAM prima del training NNI.
+        # Triton gestisce il proprio model-swapping internamente tramite mutex.
+        if not triton_enabled:
+            force_unload_ollama("gpt-oss:20b")
 
 if __name__ == "__main__":
     # Test stub

@@ -338,9 +338,32 @@ def route_request(state: MasterState, config: RunnableConfig = None) -> MasterSt
             state.route = "unknown"
         
     except Exception as e:
-        logger.error(f"❌ Errore routing: {str(e)}")
-        logger.exception(e)
-        state.route = "unknown"
+        # -----------------------------------------------------------------------
+        # FALLBACK: Mistral a volte restituisce un dict Python con virgolette singole
+        # invece di JSON valido con virgolette doppie, es: {'route': 'chat', ...}
+        # LangChain's JsonOutputParser fallisce su questo formato.
+        # Proviamo ast.literal_eval come recover prima di arrenderci.
+        # -----------------------------------------------------------------------
+        err_msg = str(e)
+        if "Invalid json output:" in err_msg:
+            try:
+                import ast
+                raw_dict_str = err_msg.split("Invalid json output:")[-1].strip()
+                # ast.literal_eval gestisce correttamente le virgolette singole Python
+                recovered = ast.literal_eval(raw_dict_str)
+                result = RouteDecision(**recovered)
+                state.route = result.route
+                logger.warning(f"⚠️ Router: JSON malformato recuperato via ast.literal_eval → route={result.route}")
+            except Exception as recover_e:
+                logger.error(f"❌ Errore routing: {err_msg}")
+                logger.error(f"   Recover via ast fallito: {recover_e}")
+                logger.exception(e)
+                state.route = "unknown"
+        else:
+            logger.error(f"❌ Errore routing: {err_msg}")
+            logger.exception(e)
+            state.route = "unknown"
+
     
     return state
 

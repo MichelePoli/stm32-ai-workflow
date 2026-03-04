@@ -133,20 +133,31 @@ def decide_data_source(state: MasterState, config: RunnableConfig = None) -> Mas
 Rispondi SOLO con una parola: REAL, REGISTER, o SYNTHETIC. Se incerto: null.
 """
 
-    # --- Passo 1: Prova a usare il messaggio iniziale ---
+    # --- Passo 1: Prova a rilevare dal messaggio iniziale con keyword check ---
+    # NON usiamo l'LLM qui: era troppo aggressivo e "indovinava" SYNTHETIC
+    # anche quando l'utente non lo aveva detto espressamente.
+    # Solo keyword esplicite nel messaggio triggherano l'auto-selezione.
     initial_source = None
-    if not state.user_response:
-        res = llm.invoke([
-            SystemMessage(content=source_classification_prompt),
-            HumanMessage(content=f"Messaggio: {state.message}")
-        ])
-        source_text = res.content.strip().upper()
-        if "REAL" in source_text: initial_source = "real"
-        elif "REGISTER" in source_text: initial_source = "register"
-        elif "SYNTHETIC" in source_text: initial_source = "synthetic"
+    if not state.user_response and state.message:
+        msg_low = state.message.lower()
+        # Keyword esplicite per ciascuna sorgente
+        real_keywords    = ["real", "reale", "cifar", "mnist", "dataset", "predefinit", "esistente"]
+        synth_keywords   = ["synthetic", "sintetico", "artificiale", "genera", "generat"]
+        register_keywords = ["register", "url", "http", "link", "registra", "aggiungi"]
+        
+        if any(k in msg_low for k in synth_keywords):
+            initial_source = "synthetic"
+        elif any(k in msg_low for k in register_keywords):
+            initial_source = "register"
+        elif any(k in msg_low for k in real_keywords):
+            initial_source = "real"
+        # Se nessuna keyword trovata → initial_source resta None → chiede all'utente
         
         if initial_source:
             logger.info(f"🤖 Sorgente rilevata nel messaggio iniziale: {initial_source}")
+        else:
+            logger.info("ℹ️ Nessuna sorgente rilevata nel messaggio — chiedo all'utente")
+
 
     # --- Passo 2: Verifica e Interrupt ---
     if not initial_source:

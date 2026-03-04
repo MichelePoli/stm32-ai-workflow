@@ -2877,16 +2877,15 @@ def fine_tune_customized_model(state: MasterState, config: RunnableConfig = None
         python_code = f"""
 import sys
 import os
+import glob
 
 # --- AUTO-CONFIGURE CUDA PATH (Robust) ---
 # NOTE: Manual LD_LIBRARY_PATH manipulation removed to avoid symbol lookup errors.
 # We rely on the correct environment being selected by the parent process.
-import os
-import sys
-
 import tensorflow as tf
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
 import numpy as np
+
 
 # GPU Memory Growth (Prevent OOM)
 gpus = tf.config.list_physical_devices('GPU')
@@ -3358,9 +3357,26 @@ except Exception as e:
         
         logger.info(f"  [Subprocess] Executing fine-tuning...")
         
-        # Free GPU memory from Ollama model before training
-        cfg = Configuration.from_runnable_config(config)
-        force_unload_ollama(cfg.local_llm or "gpt-oss:20b")
+        # -----------------------------------------------------------------------
+        # VRAM MANAGEMENT: Scarica Mistral da Triton prima del fine-tuning
+        # Con USE_TRITON_BACKEND, Mistral occupa ~7.8GB della A4000 (16GB).
+        # TF training vede solo ~1.1GB → SIGABRT (OOM) dopo Epoch 1.
+        # Triton è avviato con --model-control-mode=explicit, quindi possiamo
+        # usare l'API /v2/repository/models/{model}/unload per liberare la VRAM.
+        # Dopo il training, reload_triton_models() ricarica i modelli.
+        # -----------------------------------------------------------------------
+        from src.assistant.utils import force_unload_triton, reload_triton_models
+        import os as _os
+        use_triton = _os.environ.get("USE_TRITON_BACKEND", "false").lower() == "true"
+        
+        if use_triton:
+            logger.info("🔫 [fine-tuning] Scaricando Mistral da Triton per liberare VRAM...")
+            force_unload_triton(["mistral"])
+            logger.info("✅ [fine-tuning] VRAM liberata. Avvio training...")
+        else:
+            cfg = Configuration.from_runnable_config(config)
+            force_unload_ollama(cfg.local_llm or "gpt-oss:20b")
+
         
         # Define ignore list for real-time suppression
         ignore_list = [
@@ -3453,6 +3469,11 @@ except Exception as e:
             "success": False,
             "error": str(e)
         }
+    finally:
+        # Ricarica Mistral su Triton dopo il training (sia in caso di successo che errore)
+        if use_triton:
+            logger.info("🚀 [fine-tuning] Ricaricando Mistral su Triton post-training...")
+            reload_triton_models(["mistral"])
     
     return state
 

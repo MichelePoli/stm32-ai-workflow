@@ -270,7 +270,7 @@ class ChatTriton(BaseChatModel):
         url = f"{base_url}/v2/repository/models/{self.model_name}/load"
         req = urllib.request.Request(url, method="POST")
         try:
-            with urllib.request.urlopen(req, timeout=10) as response:
+            with urllib.request.urlopen(req, timeout=180) as response:
                 pass
             # Attendiamo che diventi READY nel registry
             self._wait_for_status(base_url, self.model_name, "READY", timeout=180)
