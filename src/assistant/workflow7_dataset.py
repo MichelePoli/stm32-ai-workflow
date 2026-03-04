@@ -167,10 +167,9 @@ Cosa preferisci? (1, 2 o 3)""",
             prompt["suggestion"] = f"💡 L'ultima volta hai usato: **{last_source}**."
             
         if not state.user_response:
-            # logger.info("⏸️ Interrupting for data source decision.")
-            # resume_value = interrupt(prompt)
-            logger.info("⏭️  BYPASS: Selezione automatica sorgente -> '1' (Real Dataset)")
-            user_text = "1"
+            logger.info("⏸️ Interrupting for data source decision.")
+            resume_value = interrupt(prompt)
+            user_text = str(resume_value).strip().lower() if resume_value else ""
         else:
             # Dopo la ripresa: usa interrupt return value come priorità
             if resume_value and str(resume_value).strip():
@@ -440,10 +439,9 @@ def select_predefined_dataset(state: MasterState, config: RunnableConfig = None)
                 prompt["suggestion"] = f"💡 L'ultima volta hai usato: **{last_ds}**. Vuoi usare lo stesso?"
             
         if not state.user_response:
-            # logger.info("⏸️ Interrupting for dataset selection.")
-            # resume_value = interrupt(prompt)
-            logger.info("⏭️  BYPASS: Selezione automatica dataset -> 'fruit_360'")
-            selection = "fruit_360"
+            logger.info("⏸️ Interrupting for dataset selection.")
+            resume_value = interrupt(prompt)
+            selection = str(resume_value).strip().lower() if resume_value else ""
         else:
             # Usa interrupt return value come priorità
             if resume_value and str(resume_value).strip():

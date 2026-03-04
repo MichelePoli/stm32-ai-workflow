@@ -82,8 +82,10 @@ Esempi:
             SystemMessage(content="Extract signal generation parameters. Return None if not specified."),
             HumanMessage(content=f"Messaggio: {state.message}")
         ])
-        if res.signal_type:
-            state.synthetic_request = res.dict()
+        # Handle both Pydantic models and raw dicts (Triton fallback)
+        signal_val = res.get("signal_type") if isinstance(res, dict) else getattr(res, "signal_type", None)
+        if signal_val:
+            state.synthetic_request = res if isinstance(res, dict) else res.model_dump()
             initial_req_detected = True
             logger.info(f"🤖 Parametri rilevati nel messaggio iniziale: {state.synthetic_request}")
 
@@ -131,7 +133,7 @@ Per "mixed" o richieste complesse, cerca di mappare al tipo più simile o usa "s
                 HumanMessage(content=f"Richiesta: {user_text}")
             ])
             
-            state.synthetic_request = request.dict()
+            state.synthetic_request = request if isinstance(request, dict) else request.model_dump()
             logger.info(f"✓ Parametri estratti: {state.synthetic_request}")
         
         except Exception as e:

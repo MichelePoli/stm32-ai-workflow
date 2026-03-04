@@ -1901,10 +1901,19 @@ def run_analyze(state: MasterState, config: RunnableConfig = None) -> MasterStat
             
             if not os.path.exists(tflite_path): # Se il file è già presente, il sistema salta tutto il blocco di conversione. Significa che la conversione è già stata eseguita in precedenza.
                 conversion_script = f"""
-import tensorflow as tf
 import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+os.environ.pop('TF_USE_LEGACY_KERAS', None)  # Allow keras3 to load cleanly
+
+import tensorflow as tf
+
 try:
-    model = tf.keras.models.load_model(r'{model_path}', compile=False)
+    # Try keras3 first (env 'stm32'), fall back to tf.keras (env 'stm32legacy')
+    try:
+        import keras
+        model = keras.models.load_model(r'{model_path}', compile=False)
+    except Exception:
+        model = tf.keras.models.load_model(r'{model_path}', compile=False)
     converter = tf.lite.TFLiteConverter.from_keras_model(model)
     tflite_model = converter.convert()
     with open(r'{tflite_path}', 'wb') as f:
@@ -1914,10 +1923,23 @@ except Exception as e:
     print(f"CONVERSION_ERROR:{{e}}")
 """
                 python_path = cfg.get_python_path('stm32') # Usa env Keras 3
-                res = execute_in_environment(conversion_script, python_path)
+                # Use subprocess.run directly to avoid any state/type confusion
+                import tempfile
+                with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as tmpf:
+                    tmpf.write(conversion_script)
+                    tmp_script = tmpf.name
+                try:
+                    conv_result = subprocess.run(
+                        [python_path, tmp_script],
+                        capture_output=True, text=True, timeout=120
+                    )
+                    conv_stdout = conv_result.stdout + conv_result.stderr
+                finally:
+                    if os.path.exists(tmp_script):
+                        os.remove(tmp_script)
                 
-                if not res['success'] or "CONVERSION_OK" not in res['stdout']:
-                    logger.error(f"❌ Conversione TFLite fallita: {res['stdout']} {res['stderr']}")
+                if "CONVERSION_OK" not in conv_stdout:
+                    logger.error(f"❌ Conversione TFLite fallita: {conv_stdout[:500]}")
                     state.analyze_success = False
                     state.ai_error_message = f"TFLite conversion failed for Keras 3 model."
                     return state

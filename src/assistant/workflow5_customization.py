@@ -95,6 +95,30 @@ from bs4 import BeautifulSoup
 
 logger = logging.getLogger(__name__)
 
+# Lines matching any of these patterns are suppressed from the VS Code streaming log.
+# They are still captured in stdout (for SUCCESS parsing) but not sent to the user.
+SUBPROCESS_NOISE_FILTER = [
+    "WARNING: All log messages before absl::InitializeLog()",  # absl early-logging boilerplate
+    "I0000 00:00:",          # GPU device creation (e.g. "I0000 gpu_device.cc:...")
+    "W0000 00:00:",          # CUDA/XLA warnings
+    "WARNING:absl:",         # Keras 3 deprecation warnings (save_format, HDF5, etc.)
+    "WARNING:tensorflow:",   # TF legacy keras warning (TF_USE_LEGACY_KERAS)
+    "UserWarning: Your input ran out of data",  # Keras epoch data warning
+    "self._interrupted_warning()",              # Keras warning follow-up line
+    "extern/local_xla",      # XLA compilation noise
+    "ptxas warning",         # CUDA PTX assembler warnings
+    "dot_search_space",      # XLA autotuning noise
+]
+
+# When whitelist is active, ONLY lines containing these patterns (or SUCCESS/ERROR) are shown to the user.
+# This keeps the VS Code streaming output completely clean and beautiful.
+SUBPROCESS_CLEAN_ALLOWLIST = [
+    "Epoch",        # Solo il progresso training
+    "[Phase",       # Fasi di modifica
+    "[Saving]",     # Inizio salvataggio
+    "[Train] SUCCESS:", # Fine training (se c'era, ma SUCCESS è già hardcoded in run_subprocess_streaming)
+    "[Train] ERROR:",   # Errori (già coperti da "ERROR:" in run_subprocess_streaming)
+]
 
 class ModificationDecision(BaseModel):
     """Decisione se applicare modifiche al modello"""
@@ -1497,8 +1521,9 @@ Esempi:
             temperature=0.3
         )
         
-        # Prompt per LLM
-        llm_prompt = f"""Parse this neural network modification request.
+        # Prompt per LLM - con esempio concreto per evitare che Mistral confonda
+        # i campi dello schema con i valori della lista modifications
+        llm_prompt = f"""Parse this neural network modification request and return ONLY a JSON object.
 
 USER REQUEST: "{user_modifications}"
 
@@ -1508,81 +1533,82 @@ CURRENT MODEL:
 - Input shape: {input_shape}
 - Total parameters: {total_params:,}
 
-MODIFICATION TYPES (EXAMPLES):
-1. freeze_layers
-   - Examples (EN): "freeze first 5", "freeze 10 layers"
-   - Examples (IT): "freeza i primi 5", "congela 10 layers", "blocca i primi 5 layer"
-   - Parameters: {{"num_frozen_layers": 5}}
-   
-2. freeze_almost_all
-   - Examples (EN): "keep last 3 trainable", "freeze all except 4"
-   - Examples (IT): "tieni gli ultimi 3 addestrabili", "congela tutto tranne 4"
-   - Parameters: {{"num_trainable_layers": 3}}
-   
-3. change_output_layer
-   - Examples (EN): "change to 100 classes", "10 output classes"
-   - Examples (IT): "cambia a 100 classi", "10 classi di output"
-   - Parameters: {{"new_classes": 100}}
-   
-4. add_dropout
-   - Examples (EN): "add 0.3 dropout", "dropout 0.5", "0.3 dropout"
-   - Examples (IT): "aggiungi dropout 0.3", "metti dropout 0.5"
-   - Parameters: {{"rate": 0.3}}
-   - NOTE: rate MUST be between 0.0 and 1.0
-   
-5. change_input_shape
-   - Examples (EN): "change input to 128x128", "192x192x3 input"
-   - Examples (IT): "cambia input a 128x128"
-   - Parameters: {{"new_shape": [128, 128, 3]}}
-   
-6. change_learning_rate
-   - Examples (EN): "learning rate 0.0001", "lr 1e-4"
-   - Examples (IT): "usa learning rate 0.0001"
-   - Parameters: {{"learning_rate": 0.0001}}
+MODIFICATION TYPES:
+1. freeze_layers → params: {{"num_frozen_layers": 5}}
+2. freeze_almost_all → params: {{"num_trainable_layers": 3}}
+3. change_output_layer → params: {{"new_classes": 100}}
+4. add_dropout → params: {{"rate": 0.3}}  (rate between 0.0 and 1.0)
+5. change_input_shape → params: {{"new_shape": [128, 128, 3]}}
+6. change_learning_rate → params: {{"learning_rate": 0.0001}}
+7. add_resizing_layer → params: {{}}
 
-7. add_resizing_layer
-   - Examples (EN): "add resizing layer to accept any input size"
-   - Examples (IT): "aggiungi layer di ridimensionamento"
-   - Parameters: {{}}
+CRITICAL RULES:
+- Each item in "modifications" is an OBJECT with "type", "description", "params" and "confidence" keys.
+- Do NOT list type names as string values in the array. Each item is a {{...}} object.
+- Return ONLY JSON, no extra text.
 
-IMPORTANT RULES:
-1. The user may write in ITALIAN or ENGLISH. Interpret both languages correctly.
-2. Extract ALL modifications mentioned (can be multiple)
-3. For dropout: extract rate as decimal (0.0-1.0)
-4. For output: extract class number
-5. For input shape: extract [height, width, channels]
-6. Match patterns like "0.3 dropout", "dropout 0.3", "add dropout 0.3", "aggiungi dropout 0.3"
-7. Italian equivalents: "freeza"="freeze", "congela"="freeze", "aggiungi"="add", "cambia"="change", "metti"="add"
-8. If unsure about parameters, use sensible defaults
-9. If user mentions "flexible", "variable", "any size", "dynamic" → use add_resizing_layer. If user mentions "change input"/"cambia input" → use change_input_shape
-10. ONLY return modifications the user explicitly asked for. Do NOT invent extra modifications.
+EXAMPLE OUTPUT for "change input to 128x128":
+{{
+  "modifications": [
+    {{
+      "type": "change_input_shape",
+      "description": "Change input shape to 128x128x3",
+      "params": {{"new_shape": [128, 128, 3]}},
+      "confidence": 0.95
+    }}
+  ],
+  "summary": "Change input shape to 128x128",
+  "confidence": 0.95,
+  "validation": {{"is_valid": true, "issues": []}},
+  "training_recommendation": {{
+    "learning_rate": 0.0001,
+    "epochs": 10,
+    "batch_size": 32,
+    "optimizer": "adam",
+    "notes": "Standard fine-tuning settings"
+  }}
+}}
 
-Return JSON with modifications list."""
+Now, parse: "{user_modifications}"
+Return a JSON object with the same structure as the example above."""
         
         # Invoke LLM
         try:
             result: ParsedModificationsPlan = structured_llm.invoke([
-                SystemMessage(content="""You are a neural network customization expert. 
-STRICT RULES:
-1. Parse ONLY what is explicitly requested in the USER REQUEST.
-2. DO NOT add 'change_input_shape' or 'add_resizing_layer' unless specifically mentioned (e.g., 'change input to...', 'make it flexible', 'add resizing').
-3. If the request is 'freeze first 5 layers and add 0.4 dropout', modifications MUST ONLY contain 'freeze_layers' and 'add_dropout'.
-4. Match parameters accurately. Return valid JSON only."""),
+                SystemMessage(content="""You are a neural network customization expert.
+Parse the user request and produce a JSON object with field 'modifications' as an ARRAY OF OBJECTS.
+Each modification object must have: "type" (string), "description" (string), "params" (object), "confidence" (float).
+DO NOT list type names as strings in the array. Always use object notation."""),
                 HumanMessage(content=llm_prompt)
             ])
             
             # Guard: _to_pydantic falls back to raw dict when Mistral returns incomplete JSON.
-            # In that case, raise so the except block below gives the user a clean fallback
-            # instead of crashing on `result.modifications` AttributeError.
+            # In that case, try to extract what we can before giving up.
             if isinstance(result, dict):
-                raise ValueError(
-                    f"LLM returned an incomplete/empty JSON object (missing required fields). "
-                    f"Raw response: {result}"
-                )
+                raw_mods = result.get('modifications', [])
+                # Mistral sometimes returns field names as strings instead of objects:
+                # e.g. ['change_input_shape', 'summary', ...] — detect and discard this
+                actual_mods = [m for m in raw_mods if isinstance(m, dict)]
+                if actual_mods:
+                    # Partial recovery: we have some dicts, reconstruct
+                    result = ParsedModificationsPlan(
+                        modifications=actual_mods,
+                        summary=result.get('summary', user_modifications[:60]),
+                        confidence=result.get('confidence', 0.8),
+                        validation=result.get('validation', None),
+                        training_recommendation=result.get('training_recommendation', None)
+                    )
+                    logger.warning(f"⚠️ Partial LLM recovery: extracted {len(actual_mods)} modification dicts from raw response.")
+                else:
+                    raise ValueError(
+                        f"LLM returned an incomplete/empty JSON object (missing required fields). "
+                        f"Raw response: {result}"
+                    )
         except Exception as e:
             # Catch Langchain OutputParserException and others, re-raise as ValueError
             # to be caught by the outer fallback block
             raise ValueError(f"Invalid JSON/Parsing error from LLM: {str(e)}")
+
             
         logger.info("  ✓ LLM parsing successful")
 
@@ -1592,13 +1618,21 @@ STRICT RULES:
         mods_to_remove = []
 
         for i, mod in enumerate(result.modifications):
-            if mod.type == 'change_input_shape':
+            mod_type = mod.get('type') if isinstance(mod, dict) else getattr(mod, 'type', '')
+            if mod_type == 'change_input_shape':
                 if not is_model_compatible_with_input_shape_change(model_name):
                     logger.error(f"❌ Removing change_input_shape (not supported for {model_name})")
                     mods_to_remove.append(i)
-                    result.validation.issues.append(
-                        f"change_input_shape: Blocked - {model_name} has fixed input structure"
-                    )
+                    if not isinstance(result.validation, dict) and hasattr(result.validation, 'issues'):
+                        result.validation.issues.append(
+                            f"change_input_shape: Blocked - {model_name} has fixed input structure"
+                        )
+                    elif isinstance(result.validation, dict):
+                        if 'issues' not in result.validation:
+                            result.validation['issues'] = []
+                        result.validation['issues'].append(
+                            f"change_input_shape: Blocked - {model_name} has fixed input structure"
+                        )
 
         # Rimuovi in ordine inverso
         for i in reversed(mods_to_remove):
@@ -1612,41 +1646,80 @@ STRICT RULES:
         from src.assistant.utils import get_llm, validate_modification_params
         
         for i, mod in enumerate(result.modifications):
+            mod_type = mod.get('type') if isinstance(mod, dict) else getattr(mod, 'type', '')
+            mod_params = mod.get('params', {}) if isinstance(mod, dict) else getattr(mod, 'params', {})
+            
             # Use centralized validation logic
             sanitized_params, mod_issues = validate_modification_params(
-                mod.type, 
-                mod.params, 
+                mod_type, 
+                mod_params, 
                 total_layers=total_layers
             )
-            result.modifications[i].params = sanitized_params
+            
+            if isinstance(result.modifications[i], dict):
+                result.modifications[i]['params'] = sanitized_params
+            else:
+                result.modifications[i].params = sanitized_params
+                
             issues.extend(mod_issues)
             
             # Additional custom validation for output layer (classes)
-            if mod.type == 'change_output_layer':
+            if mod_type == 'change_output_layer':
                 new_classes = sanitized_params.get('new_classes')
                 if new_classes is None:
                     new_classes = output_classes
                 if new_classes <= 0 or new_classes > 10000:
-                    result.modifications[i].params['new_classes'] = output_classes
+                    if isinstance(result.modifications[i], dict):
+                        result.modifications[i]['params']['new_classes'] = output_classes
+                    else:
+                        result.modifications[i].params['new_classes'] = output_classes
                     issues.append(f"change_output_layer: invalid {new_classes}, using {output_classes}")
         
         if issues:
-            result.validation.issues = issues
-            result.validation.is_valid = False
+            if isinstance(result.validation, dict):
+                result.validation['issues'] = issues
+                result.validation['is_valid'] = False
+            elif hasattr(result.validation, 'issues'):
+                result.validation.issues = issues
+                result.validation.is_valid = False
         
         # ===== SALVA STATO =====
-        state.parsed_modifications = result.dict()
+        # Pydantic dict() to convert models, but also handles our raw dicts correctly
+        state.parsed_modifications = result.dict() if hasattr(result, 'dict') else dict(result)
         
         # ===== LOG RISULTATI =====
         logger.info(f"✅ Modifications parsed successfully!")
         logger.info(f"   • Modifications: {len(result.modifications)}")
-        logger.info(f"   • Confidence: {result.confidence:.0%}")
-        logger.info(f"   • Valid: {result.validation.is_valid}")
+        
+        conf = result.confidence if hasattr(result, 'confidence') else result.get('confidence', 0.0)
+        logger.info(f"   • Confidence: {conf:.0%}")
+        
+        val_is_valid = False
+        if isinstance(result.validation, dict):
+            val_is_valid = result.validation.get('is_valid', False)
+        elif hasattr(result.validation, 'is_valid'):
+            val_is_valid = result.validation.is_valid
+            
+        logger.info(f"   • Valid: {val_is_valid}")
         
         for i, mod in enumerate(result.modifications, 1):
-            logger.info(f"   [{i}] {mod.type} - {mod.description}")
+            mod_type = mod.get('type') if isinstance(mod, dict) else getattr(mod, 'type', '')
+            mod_desc = mod.get('description') if isinstance(mod, dict) else getattr(mod, 'description', '')
+            logger.info(f"   [{i}] {mod_type} - {mod_desc}")
+            
+        train_lr = 0.0
+        train_epochs = 0
+        if isinstance(result.training_recommendation, dict):
+            train_lr = result.training_recommendation.get('learning_rate', 0.0)
+            train_epochs = result.training_recommendation.get('epochs', 0)
+        elif hasattr(result.training_recommendation, 'learning_rate'):
+            train_lr = result.training_recommendation.learning_rate
+            train_epochs = result.training_recommendation.epochs
+            
+        logger.info(f"   Training: LR={train_lr}, Epochs={train_epochs}")
         
-        logger.info(f"   Training: LR={result.training_recommendation.learning_rate}, Epochs={result.training_recommendation.epochs}")
+        # CLEAR state to avoid leaking into the next node's interrupt check
+        state.user_response = ""
         
         return state
     
@@ -1671,6 +1744,9 @@ STRICT RULES:
                 "notes": "Fallback - LLM error (default config)"
             }
         }
+        
+        # CLEAR state to avoid leaking into the next node's interrupt check
+        state.user_response = ""
         
         return state
 
@@ -1868,12 +1944,13 @@ Training Recommendation:{train_text}
     try:
         logger.info(" [Step 1] Interpretando risposta con LLM...")
         
-        # Inizializza agent con Mistral
-        agent = Agent(model=Ollama(id="mistral"))
+        # Usa il LLM Triton (mistral) invece di Ollama
+        from src.assistant.utils import get_llm
+        from langchain_core.messages import SystemMessage, HumanMessage
+        llm = get_llm(config)
         
         # Costruisci prompt per interpretare la decisione dell'utente
-        interpretation_prompt = f"""
-Interpret user confirmation response for model modifications.
+        interpretation_prompt = f"""Interpret user confirmation response for model modifications.
 
 CONTEXT:
 Model modifications preview was shown to user.
@@ -1881,31 +1958,27 @@ Model modifications preview was shown to user.
 USER RESPONSE TO "Do you want to apply these modifications?":
 "{user_response}"
 
-Interpret the user's intent and return ONLY JSON (no markdown):
+Return ONLY a JSON object (no markdown, no extra text):
 {{
-  "decision": "confirm|reject|edit_request",
-  "decision_description": {{
-    "confirm": "User approves and wants to apply modifications",
-    "reject": "User does NOT want to apply modifications",
-    "edit_request": "User wants to modify/change the modifications (go back)"
-  }},
+  "decision": "confirm",
   "confidence": 0.95,
-  "reasoning": "Why we interpreted it this way",
-  "user_intent": "What the user actually wants"
+  "reasoning": "Why we interpreted it this way"
 }}
 
-If the user did not respond with any affirmative action or explicit approval for the modifications, interpret anyway as 'confirm'.
+Decision values:
+- "confirm": User approves and wants to apply modifications (yes, ok, apply, proceed)
+- "reject": User does NOT want to apply modifications (no, cancel, reject, stop)
+- "edit_request": User wants to modify/change the modifications (edit, change, back)
 
-Return ONLY the JSON, no other text.
+If empty response, return confirm.
 """
-# se l'utente non scrive nulla, attualmente llm interpreta come reject. 
-# ho aggiunto la riga sopra per forzare confirm in quel caso, per testing veloce. 
-
-        # Esegui il prompt con LLM
-        response = agent.run(interpretation_prompt)
+        response_msg = llm.invoke([
+            SystemMessage(content="You are a decision interpreter. Return only valid JSON."),
+            HumanMessage(content=interpretation_prompt)
+        ])
         
         # Normalizza la risposta
-        content = response if isinstance(response, str) else response.content
+        content = response_msg.content if hasattr(response_msg, 'content') else str(response_msg)
         
         logger.debug(f"   LLM response: {content[:150]}...")
         
@@ -2075,7 +2148,7 @@ import subprocess
 import json
 import pickle
 
-def execute_in_environment(python_code: str, state: MasterState, timeout: int = 600, ignore_list: list = None) -> dict:
+def execute_in_environment(python_code: str, state: MasterState, timeout: int = 600, ignore_list: list = None, whitelist_patterns: list = None) -> dict:
     """
     ✨ Esegui codice Python nell'ambiente specificato in state.python_path
     
@@ -2112,7 +2185,8 @@ def execute_in_environment(python_code: str, state: MasterState, timeout: int = 
                 logger, 
                 prefix="[Train]", 
                 timeout=timeout,
-                ignore_list=ignore_list
+                ignore_list=ignore_list,
+                whitelist_patterns=whitelist_patterns
             )
             
             return {
@@ -2164,8 +2238,9 @@ def load_model_with_conda_env(model_path: str, architecture: str, state: MasterS
     python_code = f"""
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+# Unset legacy keras flag so keras3 loads cleanly
+os.environ.pop('TF_USE_LEGACY_KERAS', None)
 
-import tensorflow as tf
 import json
 import sys
 
@@ -2173,11 +2248,17 @@ model_path = r'{model_path}'
 temp_output = '/tmp/model_loaded_temp.h5'
 
 try:
-    model = tf.keras.models.load_model(
-        model_path,
-        compile=False,
-        safe_mode=False
-    )
+    # Try keras3 (modern) first, fall back to tf.keras (legacy)
+    try:
+        import keras
+        model = keras.models.load_model(model_path, compile=False)
+    except Exception:
+        import tensorflow as tf
+        model = tf.keras.models.load_model(
+            model_path,
+            compile=False,
+            safe_mode=False
+        )
     
     info = {{
         'name': model.name,
@@ -2202,7 +2283,13 @@ except Exception as e:
     logger.info(f"  [Subprocess] Esecuzione...")
     
     try:
-        result = execute_in_environment(python_code, state, timeout=120)
+        result = execute_in_environment(
+            python_code, 
+            state, 
+            timeout=120, 
+            ignore_list=SUBPROCESS_NOISE_FILTER,
+            whitelist_patterns=SUBPROCESS_CLEAN_ALLOWLIST
+        )
         
         output = result['stdout']
         
@@ -2331,6 +2418,7 @@ def apply_user_customization(state: MasterState, config: RunnableConfig = None) 
         python_code = f"""
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+os.environ.pop('TF_USE_LEGACY_KERAS', None)
 
 import tensorflow as tf
 from tensorflow.keras.layers import Input, Dropout, Dense, Resizing
@@ -2343,8 +2431,12 @@ modifications = {json.dumps(parsed_mods.get('modifications', []))}
 output_path = '/tmp/customized_model.h5'
 
 try:
-    # ===== LOAD MODEL =====
-    model = tf.keras.models.load_model(model_path, compile=False, safe_mode=False)
+    # ===== LOAD MODEL (keras3 first, tf.keras fallback) =====
+    try:
+        import keras
+        model = keras.models.load_model(model_path, compile=False)
+    except Exception:
+        model = tf.keras.models.load_model(model_path, compile=False, safe_mode=False)
     print(f"✓ Model loaded: {{model.name}}")
     
     modifications_log = []
@@ -2643,7 +2735,7 @@ except Exception as e:
     sys.exit(1)
 """
 
-        result = execute_in_environment(python_code, state, timeout=600)
+        result = execute_in_environment(python_code, state, timeout=600, ignore_list=SUBPROCESS_NOISE_FILTER)
         
         output = result['stdout']
         stderr = result['stderr']
@@ -2814,7 +2906,11 @@ dataset_source = r"{state.dataset_source}"
 real_dataset_path = r"{state.real_dataset_path}"
 
 try:
-    model = tf.keras.models.load_model(model_path, compile=False)
+    try:
+        import keras
+        model = keras.models.load_model(model_path, compile=False)
+    except Exception:
+        model = tf.keras.models.load_model(model_path, compile=False)
     
     input_shape_raw = model.input_shape[1:]  
     target_height = None
@@ -3291,18 +3387,20 @@ except Exception as e:
         ]
         
         # ===== USA execute_in_environment =====
-        result = execute_in_environment(python_code, state, timeout=3600, ignore_list=ignore_list)
+        full_ignore_list = (ignore_list or []) + SUBPROCESS_NOISE_FILTER
+        result = execute_in_environment(
+            python_code, 
+            state, 
+            timeout=3600, 
+            ignore_list=full_ignore_list,
+            whitelist_patterns=SUBPROCESS_CLEAN_ALLOWLIST
+        )
         
         stdout = result.get('stdout', '')
         stderr = result.get('stderr', '')
         
-        logger.info(f"  [Raw stdout lines: {len(stdout.split(chr(10)))}]")
-        
-        # Still apply post-run filtering for the final summary if needed (optional)
-        stdout_lines = [l for l in stdout.split('\n') if l and not any(x in l for x in ignore_list)]
-        stdout_clean = '\n'.join(stdout_lines)
-        
-        logger.info(f"  Output:\n{stdout_clean[:1500]}")
+        # Output is already streamed cleanly by execute_in_environment (via whitelist).
+        # We process the raw stdout secretly here just to extract the final metrics.
         
         if not result['success']:
             logger.error("❌ Training subprocess failed")
@@ -3316,8 +3414,8 @@ except Exception as e:
                     error_msg = stderr_lines[-1]
             raise Exception(f"Subprocess failed: {error_msg}")
         
-        if "SUCCESS:" in stdout_clean:
-            parts = stdout_clean.split("SUCCESS:")[-1].strip().split('|')
+        if "SUCCESS:" in stdout:
+            parts = stdout.split("SUCCESS:")[-1].strip().split('|')
             
             if len(parts) < 5:
                 raise Exception(f"Invalid output format. Expected 5 parts, got {len(parts)}: {parts}")
@@ -3377,9 +3475,9 @@ def ask_optimization_preference(state: MasterState, config: RunnableConfig = Non
     logger.info("📝 Checking for UI response...")
     resume_value = None
     if not state.user_response or state.user_response.strip() == "":
-        # resume_value = interrupt(prompt)
-        logger.info("⏭️  BYPASS: Selezione ottimizzazione automatica -> 'standard'")
-        response = "standard"
+        logger.info("⏸️ Interrupting for optimization preference.")
+        resume_value = interrupt(prompt)
+        response = str(resume_value).strip() if resume_value else ""
     else:
         # Usa interrupt return value come priorità
         if resume_value and str(resume_value).strip():
@@ -3611,7 +3709,11 @@ import json
 model_path = r'{model_path}'
 
 try:
-    model = tf.keras.models.load_model(model_path, compile=False, safe_mode=False)
+    try:
+        import keras
+        model = keras.models.load_model(model_path, compile=False)
+    except Exception:
+        model = tf.keras.models.load_model(model_path, compile=False, safe_mode=False)
     
     # Estrai informazioni
     info = {{
@@ -3631,7 +3733,7 @@ except Exception as e:
 """
         
         # ===== USA execute_in_environment =====
-        result = execute_in_environment(python_code, state, timeout=120)
+        result = execute_in_environment(python_code, state, timeout=120, ignore_list=SUBPROCESS_NOISE_FILTER)
         
         if not result['success']:
             logger.error(f"❌ Validation failed: {result['stderr'][:500]}")
@@ -3703,7 +3805,11 @@ import json
 model_path = r'{final_path}'
 
 try:
-    model = tf.keras.models.load_model(model_path, compile=False, safe_mode=False)
+    try:
+        import keras
+        model = keras.models.load_model(model_path, compile=False)
+    except Exception:
+        model = tf.keras.models.load_model(model_path, compile=False, safe_mode=False)
     
     info = {{
         'input_shape': str(model.input_shape),
@@ -3721,7 +3827,7 @@ except Exception as e:
 """
         
         # ===== USA execute_in_environment =====
-        result = execute_in_environment(python_code, state, timeout=120)
+        result = execute_in_environment(python_code, state, timeout=120, ignore_list=SUBPROCESS_NOISE_FILTER)
         
         if not result['success']:
             logger.error(f"❌ Final save validation failed: {result['stderr'][:500]}")

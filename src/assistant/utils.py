@@ -359,7 +359,8 @@ def run_subprocess_streaming(
     logger_instance, 
     prefix: str = "[Subprocess]",
     timeout: int = 600,
-    ignore_list: list = None
+    ignore_list: list = None,
+    whitelist_patterns: list = None
 ) -> dict:
     """
     Run a subprocess and stream its output to a logger in real-time.
@@ -370,6 +371,7 @@ def run_subprocess_streaming(
         prefix: Prefix for each logged line
         timeout: Execution timeout in seconds
         ignore_list: Optional list of strings to suppress from logs if found in a line
+        whitelist_patterns: If provided, ONLY lines containing these patterns are logged (others hidden but captured)
         
     Returns:
         Dictionary with success, stdout, and returncode
@@ -416,13 +418,30 @@ def run_subprocess_streaming(
             if line:
                 clean_line = line.strip()
                 if clean_line:
-                    # Optional filtering
+                    stdout_lines.append(line)
+                    
+                    # Optional filtering - blocklist
                     if ignore_list and any(x in clean_line for x in ignore_list):
-                        stdout_lines.append(line)
                         continue
                         
-                    logger_instance.info(f"  {prefix} {clean_line}")
-                    stdout_lines.append(line)
+                    # Optional filtering - allowlist
+                    if whitelist_patterns:
+                        # Always show errors and success parsing
+                        if "ERROR:" in clean_line or "SUCCESS:" in clean_line:
+                            pass
+                        elif not any(x in clean_line for x in whitelist_patterns):
+                            continue
+                            
+                    # VS Code UI Aesthetic: Se inizia con [Phase o Epoch, formattalo come un grande nodo principale "* *Emoji Testo*"
+                    if clean_line.startswith("[Phase") or clean_line.startswith("Epoch"):
+                        # Scegli l'emoji adatta
+                        icon = "🔄" if "Epoch" in clean_line else "📌"
+                        # Logga senza il prefisso standard [Train] in modo che il server HTTP lo spedisca nudo
+                        logger_instance.info(f"* *{icon} {clean_line}*")
+                    elif clean_line.startswith("[Saving]"):
+                        logger_instance.info(f"* *💾 Salvataggio in corso...*")
+                    else:
+                        logger_instance.info(f"  {prefix} {clean_line}")
             
             # Manual timeout check
             if time.time() - start_time > timeout:
