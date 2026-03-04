@@ -426,7 +426,7 @@ def run_subprocess_streaming(
                         
                     # Optional filtering - allowlist
                     if whitelist_patterns:
-                        # Always show errors and success parsing
+                        # Always capture errors and success for parsing (already in stdout_lines)
                         if "ERROR:" in clean_line or "SUCCESS:" in clean_line:
                             pass
                         elif not any(x in clean_line for x in whitelist_patterns):
@@ -440,6 +440,9 @@ def run_subprocess_streaming(
                         logger_instance.info(f"* *{icon} {clean_line}*")
                     elif clean_line.startswith("[Saving]"):
                         logger_instance.info(f"* *💾 Salvataggio in corso...*")
+                    elif "SUCCESS:" in clean_line:
+                        # Non loggare l'output JSON bruto di SUCCESS, è solo per il parsing interno
+                        pass
                     else:
                         logger_instance.info(f"  {prefix} {clean_line}")
             

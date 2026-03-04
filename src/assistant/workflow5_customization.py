@@ -2735,7 +2735,7 @@ except Exception as e:
     sys.exit(1)
 """
 
-        result = execute_in_environment(python_code, state, timeout=600, ignore_list=SUBPROCESS_NOISE_FILTER)
+        result = execute_in_environment(python_code, state, timeout=600, ignore_list=SUBPROCESS_NOISE_FILTER, whitelist_patterns=SUBPROCESS_CLEAN_ALLOWLIST)
         
         output = result['stdout']
         stderr = result['stderr']
@@ -3733,7 +3733,7 @@ except Exception as e:
 """
         
         # ===== USA execute_in_environment =====
-        result = execute_in_environment(python_code, state, timeout=120, ignore_list=SUBPROCESS_NOISE_FILTER)
+        result = execute_in_environment(python_code, state, timeout=120, ignore_list=SUBPROCESS_NOISE_FILTER, whitelist_patterns=SUBPROCESS_CLEAN_ALLOWLIST)
         
         if not result['success']:
             logger.error(f"❌ Validation failed: {result['stderr'][:500]}")
@@ -3827,7 +3827,7 @@ except Exception as e:
 """
         
         # ===== USA execute_in_environment =====
-        result = execute_in_environment(python_code, state, timeout=120, ignore_list=SUBPROCESS_NOISE_FILTER)
+        result = execute_in_environment(python_code, state, timeout=120, ignore_list=SUBPROCESS_NOISE_FILTER, whitelist_patterns=SUBPROCESS_CLEAN_ALLOWLIST)
         
         if not result['success']:
             logger.error(f"❌ Final save validation failed: {result['stderr'][:500]}")

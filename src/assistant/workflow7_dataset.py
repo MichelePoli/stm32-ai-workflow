@@ -406,7 +406,7 @@ def select_predefined_dataset(state: MasterState, config: RunnableConfig = None)
     # ===== STEP 6: Mostra informazioni modello selezionato =====
     if state.selected_model:
         model_name = state.selected_model.get('name', 'N/A')
-        menu_text += f"\n🤖 Modello selezionato: {model_name}\n"
+        menu_text += f"\n🤖 Modello: {model_name}\n"
     
     prompt = {
         "instruction": menu_text,
