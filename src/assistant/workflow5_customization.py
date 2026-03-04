@@ -3936,6 +3936,16 @@ Quantized: {state.should_quantize}
         user_lower = str(user_response).lower()
         state.continue_after_customization = any(kw in user_lower for kw in ["continue", "si", "yes", "ok", "analyze"])
     
+    # Se l'utente decide di continuare verso l'analisi AI, dobbiamo resettare i flag di
+    # idempotenza (model_selected, task_selected) altrimenti workflow2 salterà la selezione
+    # e terrà in memoria il primissimo modello scelto invece di questo nuovo customizzato!
+    if state.continue_after_customization:
+        state.model_selected = False
+        state.task_selected = False
+        state.selected_model = None
+        state.ai_task = None
+        logger.info("🗑️  Reset dei flag di idempotenza per forzare la nuova selezione del modello in Workflow 2")
+        
     return state
 
 

@@ -357,6 +357,12 @@ def general_chat(state: MasterState, config: RunnableConfig = None) -> MasterSta
             temperature=0.7 # Leggermente più alta per chat
         )
         
+        # Bypass LLM per il messaggio di reset
+        if state.message and state.message.startswith("[SYSTEM_MESSAGE] Il sistema è stato resettato"):
+            state.message = "🧠 Bzz... bip... memoria cancellata con successo!\n\nHo dimenticato tutte le tue preferenze, le board, e i modelli precedenti. D'ora in poi ripartiamo da un foglio bianco.\n\nCome posso aiutarti oggi?"
+            logger.info("✓ Risposta di reset hardcoded generata (LLM bypassato)")
+            return state
+            
         # Costruisci un sommario della situazione attuale (memoria a breve + lungo termine)
         session_info = {
             "board_attuale": state.board_name or "Non ancora selezionata",
