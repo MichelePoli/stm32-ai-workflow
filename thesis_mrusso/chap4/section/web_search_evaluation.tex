@@ -1,102 +1,156 @@
 \section{Web Search Agent: Quality Evaluation with DeepEval}
 
-This section presents an experimental validation of the Web Search Agent (Workflow 4), which integrates real-time information retrieval via DuckDuckGo, LLM-based summarization, and automated quality assessment using DeepEval metrics.
+This section documents the experimental validation of the Web Search Agent (Workflow~4), which combines real-time web retrieval via DuckDuckGo, LLM-based summarisation, and automated quality assessment through the DeepEval framework. The evaluation is presented in two phases: a first campaign conducted with a local Ollama back-end, and a second one after migrating inference to NVIDIA Triton Inference Server.
 
 \subsection{Methodology}
 
 \subsubsection{Evaluation Framework}
-The quality assessment utilizes \textbf{DeepEval}\footnote{\url{https://github.com/confident-ai/deepeval}}, an open-source framework designed for RAG (Retrieval-Augmented Generation) evaluation. The framework was configured as follows:
+Quality assessment relies on \textbf{DeepEval}\footnote{\url{https://github.com/confident-ai/deepeval}}, an open-source library for RAG (Retrieval-Augmented Generation) evaluation. Four metrics were selected for their relevance to technical documentation tasks.
 
-\begin{itemize}
-  \item \textbf{LLM Backend}: DeepSeek-R1 (7B parameters) via a local Ollama instance (\texttt{http://localhost:11434}), used as the LLM-as-a-Judge evaluator
-  \item \textbf{Metrics}: Four domain-specific metrics tailored for technical documentation:
-        \begin{itemize}
-          \item \textbf{Faithfulness}: Measures factual consistency between the LLM-generated summary and retrieved documents (range: 0.0--1.0, higher is better)
-          \item \textbf{Answer Relevancy}: Assesses semantic alignment between user query and generated response using embedding-based similarity (range: 0.0--1.0)
-          \item \textbf{Contextual Relevancy}: Evaluates retrieval quality by measuring signal-to-noise ratio in retrieved documents (range: 0.0--1.0)
-          \item \textbf{Hallucination}: Detects fabricated or unsupported claims by cross-referencing the summary against retrieval context (range: 0.0--1.0, \textbf{lower} is better, 0.0 indicates no hallucinations)
-        \end{itemize}
-\end{itemize}
+\textbf{Faithfulness} measures factual consistency between the generated summary and the retrieved source documents (range 0.0--1.0, higher is better). \textbf{Answer Relevancy} captures the semantic alignment between the user query and the generated response (range 0.0--1.0, higher is better). \textbf{Contextual Relevancy} evaluates retrieval quality by estimating the proportion of retrieved content genuinely useful for answering the query (range 0.0--1.0, higher is better). \textbf{Hallucination} detects claims in the output that are not supported by retrieved documents (range 0.0--1.0, \textbf{lower} is better; 0.0 means no fabrication detected).
+
+Each metric is computed by an auxiliary \emph{LLM-as-a-Judge}: the same inference infrastructure used for main tasks also drives the evaluation step. This avoids external API dependencies and keeps the entire pipeline self-contained.
 
 \subsubsection{Test Protocol}
-The evaluation runs in five sequential stages. First, the user's natural language query is classified into a predefined category (\texttt{ai\_model}, \texttt{board\_selection}, \texttt{optimization}, or \texttt{documentation}). Second, DuckDuckGo retrieves the top web pages for the reformulated query via the Agno agent. Third, the raw response is split into paragraph-level chunks (minimum 20 characters), giving the evaluator finer retrieval segments. Fourth, a local Mistral instance (temperature 0.2) synthesizes a concise technical answer in English from those chunks. Finally, DeepEval computes the four metrics synchronously in a separate thread via \texttt{asyncio.to\_thread}, keeping the main event loop unblocked.
+Evaluation proceeds through five stages. The user query is classified into one of four categories (\texttt{ai\_model}, \texttt{board\_selection}, \texttt{optimization}, \texttt{documentation}). DuckDuckGo then retrieves the top results for the reformulated query. Raw text is split into paragraph-level chunks of at least 20 characters, which serve as the retrieval context. A local Mistral instance (temperature 0.2) synthesises a concise English summary from those chunks. Finally, DeepEval computes the four metrics synchronously inside a dedicated thread via \texttt{asyncio.to\_thread}, keeping the main event loop unblocked.
 
-\subsection{Experimental Results}
+\subsection{Phase 1 --- Ollama Back-End (Baseline)}
 
-\subsubsection{Test Cases}
-Five test queries were selected to cover diverse information needs typical of STM32 embedded AI developers:
+\subsubsection{Configuration}
+The first campaign used \textbf{DeepSeek-R1} (7B parameters, GPTQ-quantised) served by a local Ollama instance at \texttt{http://localhost:11434}. Five representative queries were designed to cover the breadth of requests typical of an STM32 developer: model search, board selection, optimisation guidance, conceptual comparison, and hardware benchmarking.
+
+\subsubsection{Results}
+Table~\ref{tab:deepeval-ollama} reports the metric scores for each test case.
 
 \begin{table}[ht]
   \centering
-  \caption{DeepEval Metric Scores Across Test Queries}
-  \label{tab:deepeval-results}
+  \caption{DeepEval scores --- Ollama back-end (DeepSeek-R1 7B)}
+  \label{tab:deepeval-ollama}
   \begin{tabular}{|l|c|c|c|c|}
     \hline
-    \textbf{Query Type}     & \textbf{Faith.} & \textbf{Ans. Rel.} & \textbf{Ctx. Rel.} & \textbf{Hall.} \\
+    \textbf{Query Type}     & \textbf{Faith.} & \textbf{Ans.\ Rel.} & \textbf{Ctx.\ Rel.} & \textbf{Hall.} \\
     \hline
-    AI Model Search         & 0.60            & 0.50               & \textbf{0.90}      & 0.00           \\
-    Board Selection (Audio) & 0.73            & 0.18               & 0.56               & 0.25           \\
-    Optimization Guide      & \textbf{1.00}   & 0.40               & 0.56               & 0.14           \\
-    Theoretical Comparison  & 0.80            & \textbf{0.88}      & \textbf{0.86}      & 0.00           \\
-    Hardware Comparison     & 0.44            & 0.87               & \textbf{0.88}      & 0.33           \\
+    AI Model Search         & 0.60            & 0.50                & \textbf{0.90}       & 0.00           \\
+    Board Selection (Audio) & 0.73            & 0.18                & 0.56                & 0.25           \\
+    Optimization Guide      & \textbf{1.00}   & 0.40                & 0.56                & 0.14           \\
+    Theoretical Comparison  & 0.80            & \textbf{0.88}       & \textbf{0.86}       & 0.00           \\
+    Hardware Comparison     & 0.44            & 0.87                & \textbf{0.88}       & 0.33           \\
     \hline
-    \textbf{Mean}           & \textbf{0.71}   & \textbf{0.57}      & \textbf{0.75}      & \textbf{0.14}  \\
-    \textbf{Std. Dev.}      & 0.22            & 0.28               & 0.16               & 0.14           \\
+    \textbf{Mean}           & \textbf{0.71}   & \textbf{0.57}       & \textbf{0.75}       & \textbf{0.14}  \\
+    \textbf{Std.\ Dev.}     & 0.22            & 0.28                & 0.16                & 0.14           \\
     \hline
   \end{tabular}
 \end{table}
 
-\textbf{Test 1 -- AI Model Search}: \textit{``Lightweight AI models for image classification on STM32H7''}
-The system successfully retrieved authoritative sources (TensorFlow documentation, arXiv papers), achieving excellent Contextual Relevancy (0.90). The moderate Faithfulness score (0.60) reflects the LLM's tendency to enrich raw data with general knowledge (e.g., typical use cases for MobileNet), which is valuable for end-users but technically ``unfaithful'' to strict retrieval context. Zero hallucination (0.00) confirms no fabricated facts.
+\textbf{Test 1 -- AI Model Search}: \textit{``Lightweight AI models for image classification on STM32H7''}. Contextual Relevancy reached 0.90, the highest single score in this campaign, confirming that the retriever consistently surfaced authoritative sources, including TensorFlow documentation and arXiv pre-prints. The Faithfulness score of 0.60 reflects the model's tendency to enrich retrieved content with general domain knowledge, for instance citing typical MobileNet use cases not found verbatim in the retrieved pages. Zero hallucination confirms no fabricated facts were introduced.
 
-\textbf{Test 2 -- Board Selection}: \textit{``Qual è la migliore board STM32 per un progetto di audio recognition?''}
-Low Answer Relevancy (0.18) stems from semantic distance between the singular query (``migliore board'') and the plural response (list of 3 boards). Hallucination was triggered (0.25) by specific pricing information (\$10--\$40) likely inferred from the LLM's training data rather than retrieved documents. This demonstrates DeepEval's sensitivity to ``consulting-style'' responses that go beyond strict retrieval.
+\textbf{Test 2 -- Board Selection}: \textit{``Qual è la migliore board STM32 per un progetto di audio recognition?''}. Answer Relevancy fell to 0.18 because the query asked for a single best board while the response listed three options. The model also introduced pricing estimates absent from the retrieved snippets, triggering a hallucination score of 0.25. This episode illustrates a recurring pattern: a richer answer is more useful to the developer but scores lower against strict faithfulness criteria.
 
-\textbf{Test 3 -- Optimization Guide}: \textit{``Come converto un modello PyTorch in ONNX per STM32?''}
-\textbf{Perfect Faithfulness (1.00)} indicates the summary contained zero unsupported facts, ideal for technical documentation. The system successfully retrieved step-by-step guides, quantization tutorials, and tool comparisons (STEdgeAI, TensorFlow Lite, TVM). Visual output shown in Figure~\ref{fig:pytorch-onnx}.
+\textbf{Test 3 -- Optimization Guide}: \textit{``Come converto un modello PyTorch in ONNX per STM32?''}. \textbf{Faithfulness reached 1.00}, meaning every claim in the summary was traceable to a retrieved document. Step-by-step guides and tool comparisons (STEdgeAI, TensorFlow Lite, TVM) were reproduced accurately. Figure~\ref{fig:pytorch-onnx} shows the visual output.
 
 \begin{figure}[ht]
   \centering
   \includegraphics[width=0.9\textwidth]{chap4/figures/Screenshot 2026-01-08 at 16.46.34.png}
-  \caption{Web Search Agent output for PyTorch-to-ONNX conversion query, demonstrating perfect Faithfulness (1.00) by strictly adhering to retrieved technical guides.}
+  \caption{Web Search Agent output for the PyTorch-to-ONNX query. Faithfulness of 1.00 confirms strict adherence to retrieved technical guides.}
   \label{fig:pytorch-onnx}
 \end{figure}
 
-\textbf{Test 4 -- Theoretical Comparison}: \textit{``TinyML vs Edge AI: differenze principali''}
-\textbf{Best overall scores} (Answer Relevancy: 0.88, Contextual Relevancy: 0.86). The query's conceptual nature (definitions, comparisons) aligned well with academic sources (datasheets, whitepapers). High Contextual Relevancy confirms Google retrieved authoritative STMicroelectronics documentation. Output shown in Figure~\ref{fig:tinyml-edgeai}.
+\textbf{Test 4 -- Theoretical Comparison}: \textit{``TinyML vs Edge AI: differenze principali''}. This query produced the best combined scores (Answer Relevancy 0.88, Contextual Relevancy 0.86). Conceptual queries align naturally with well-structured academic sources; DuckDuckGo returned STMicroelectronics white papers and datasheets, giving the summariser solid factual material. Figure~\ref{fig:tinyml-edgeai} shows the output.
 
 \begin{figure}[ht]
   \centering
   \includegraphics[width=0.9\textwidth]{chap4/figures/Screenshot 2026-01-08 at 16.50.55.png}
-  \caption{Comparative analysis of TinyML vs. Edge AI paradigms, achieving highest Answer Relevancy (0.88) through precise conceptual distinction.}
+  \caption{Comparative analysis of TinyML vs.\ Edge AI. The highest Answer Relevancy score (0.88) reflects the precision of the conceptual distinction.}
   \label{fig:tinyml-edgeai}
 \end{figure}
 
-\textbf{Test 5 -- Hardware Comparison}: \textit{``Confronta STM32H7 e STM32N6 per performance AI''}
-The \textbf{lowest Faithfulness (0.44)} reveals an interesting trade-off: the summary included precise part numbers (STM32H745VGT6, STM32N6T6) and bulk pricing (\$6.05, \$3.56) that were \textbf{not} present in the retrieved snippets. DeepEval correctly flagged this as potential hallucination (0.33). While useful for users, it demonstrates the LLM's reliance on pre-trained knowledge when retrieval is incomplete.
+\textbf{Test 5 -- Hardware Comparison}: \textit{``Confronta STM32H7 e STM32N6 per performance AI''}. Faithfulness fell to 0.44: the summary included exact part numbers and bulk pricing absent from the retrieved snippets, drawn from the model's pre-training data. DeepEval correctly flagged this (Hallucination 0.33). The answer was practically useful, yet technically unsupported by retrieval.
 
-\subsection{Discussion}
+\subsubsection{Aggregate Analysis}
+Contextual Relevancy is the most stable indicator across Phase~1 (mean 0.75, $\sigma$ 0.16), confirming that DuckDuckGo combined with paragraph-level chunking reliably surfaces relevant content. Faithfulness varies more ($\sigma$ 0.22): procedural queries score near 1.00 while exploratory queries drop when the model supplements retrieval with prior knowledge. The Hallucination mean of 0.14 confirms that outright fabrication is infrequent; non-zero cases correspond to hardware prices and part numbers absent from the retrieved context.
 
-\subsubsection{Aggregate Performance}
-Contextual Relevancy is the most stable metric (mean: 0.75, $\sigma$: 0.16; range: 0.56--0.90), confirming that DuckDuckGo retrieval combined with paragraph-level chunking consistently surfaces relevant content.
+A recurring inverse relationship between strict Faithfulness and practical utility was observed. Answers scoring below 0.60 on Faithfulness often contain the most useful material for the developer, while perfectly faithful summaries can read as bare paraphrases of the source. For exploratory queries, Faithfulness alone is a poor proxy for answer quality.
 
-Faithfulness shows the widest variance (mean: 0.71, $\sigma$: 0.22). Procedural queries, which demand step-by-step adherence to source documents, reach perfect scores; exploratory queries score lower because the model enriches its answers with pre-trained domain knowledge not present in the retrieved text. The Hallucination mean of 0.14 ($\sigma$: 0.14) confirms that outright fabrication is rare. The few non-zero cases correspond to specific hardware prices and exact part numbers that were absent from the retrieved context.
+\subsection{Phase 2 --- Triton Inference Server Back-End}
 
-\subsubsection{Faithfulness-Utility Trade-off}
-A key finding of this evaluation is the distinctly inverse relationship observed between absolute Faithfulness and practical user utility. High Faithfulness (between 0.80 and 1.00) is invariably achieved when the LLM strictly paraphrases the retrieved documents, making it ideal for rigid technical procedures and precise academic definitions. However, low Faithfulness (between 0.44 and 0.60) frequently occurs when the LLM intelligently supplements the basic retrieval with its own pre-trained domain knowledge, such as adding standard pricing estimates or typical hardware specifications. While technically unfaithful to the search results, this enrichment produces significantly more useful answers for exploratory queries, albeit requiring slightly more cautious interpretation from the user.
+\subsubsection{Motivation for Migration}
+The Ollama-based setup worked well as a prototype but presented two structural limits. Ollama loads a single model per process, which is ill-suited for an architecture where three models (Mistral, DeepSeek-R1, gpt-oss-20b) must be selectable at runtime within a fixed VRAM budget. Ollama also offers no built-in mechanism for dynamic model loading and unloading, necessary to prevent out-of-memory errors during concurrent LangGraph workflows on the available 16~GB NVIDIA A4000.
 
-This trade-off suggests the need for \textbf{context-aware metric weighting}: procedural queries should prioritize Faithfulness, while exploratory queries may tolerate lower Faithfulness in exchange for detailed answers.
+The migration to \textbf{NVIDIA Triton Inference Server} (v2, explicit model control mode) addresses both issues. Triton supports dynamic loading and unloading of model instances via its v2 HTTP API, enabling on-demand model swapping. Each model runs as a \textbf{Python backend} module backed by vLLM with GPTQ quantisation to reduce the memory footprint. The long-term goal is to deploy this configuration on HPP (High Performance Platform) infrastructure, where larger GPU allocations would eliminate the model-swap constraint entirely and allow multiple models to remain resident simultaneously.
+
+\subsubsection{Configuration}
+For the Triton-based evaluation, the judge model was switched to \textbf{gpt-oss-20b} (TechxGenus/starcoder2-15b-instruct-GPTQ, 15B parameters), chosen initially for its larger parameter count. The evaluation covered one test query (\textit{``STM32 boards comparison''}) with retrieval context capped at five chunks of 300 characters each, and output capped at 800 characters, to limit prompt-length issues identified during debugging.
+
+\subsubsection{Results}
+Table~\ref{tab:deepeval-triton} summarises the scores for this phase.
+
+\begin{table}[ht]
+  \centering
+  \caption{DeepEval scores --- Triton back-end (gpt-oss-20b / StarCoder2-15B-GPTQ)}
+  \label{tab:deepeval-triton}
+  \begin{tabular}{|l|c|c|c|c|}
+    \hline
+    \textbf{Query Type} & \textbf{Faith.} & \textbf{Ans.\ Rel.} & \textbf{Ctx.\ Rel.} & \textbf{Hall.} \\
+    \hline
+    Board Selection (STM32) & 0.25 & 0.00$^{\dagger}$ & \textbf{1.00} & 0.50 \\
+    \hline
+  \end{tabular}
+  \vspace{3pt}
+
+  {\small $^{\dagger}$\,Metric evaluation failed: the judge model returned a non-JSON response for the verdict extraction step.}
+\end{table}
+
+Contextual Relevancy reached 1.00, an improvement over Phase~1. The other three metrics regressed substantially.
+
+\subsubsection{Engineering Challenges}
+The migration exposed several technical problems that required iterative debugging.
+
+\paragraph{VRAM exhaustion during model loading.} An \texttt{HTTP 400 Bad Request} error from Triton appeared when loading gpt-oss-20b. The error traced back to vLLM's KV-cache allocation: with \texttt{gpu\_memory\_utilization} set to 0.60, the remaining GPU memory after loading model weights was insufficient for any cache blocks. Raising the value to 0.85 resolved the issue, giving the engine approximately 13.6~GB of usable GPU memory.
+
+\paragraph{Endpoint URL mismatch under proxy prefix.} When Triton is accessed with a URL prefix such as \texttt{/triton/v1} (required for the HPP deployment environment), the internal v2 repository API calls for model loading and unloading resolved to incorrect paths. A \texttt{base\_v2\_url} property was added to \texttt{triton\_client.py} to strip the \texttt{/v1} suffix and reconstruct the correct v2 base path dynamically.
+
+\paragraph{Malformed JSON output from the judge model.} DeepEval expects each LLM-as-a-Judge call to return a valid JSON object. Both models tested produced non-conforming output in distinct ways. DeepSeek-R1 appended Python test code after the JSON block, sequences such as \texttt{def test\_extract()} or full \texttt{import} chains drawn from its training corpus. gpt-oss-20b (StarCoder2) occasionally emitted Chinese text, references to unrelated training examples (Einstein Nobel Prize, Keil5 Chinese tutorials), or Python f-string double braces (\texttt{\{\{...\}\}}) instead of literal JSON. A multi-layer extraction pipeline was built inside the \texttt{\_clean\_json} method: double-brace normalisation, \texttt{<think>} tag removal, nested-JSON regex search, backwards bracket scan, and a final fallback that wraps plain-text responses inside a \texttt{\{"reason":~...\}} envelope to prevent hard crashes downstream.
+
+\paragraph{Stop sequence configuration.} Stop sequences were added to vLLM's \texttt{SamplingParams} inside each model's Python backend. For DeepSeek-R1, sequences including \texttt{```}, \texttt{"""}, \texttt{\textbackslash ndef~}, and \texttt{\textbackslash nA:~} were configured with \texttt{max\_tokens} reduced from 1024 to 512. This reduced but did not fully eliminate appended code, since some generation patterns were not covered by the explicit stop list.
+
+\paragraph{Instruction-following limitations of code-specialised models.} The most significant finding of Phase~2 is that \textbf{StarCoder2-15B is not a suitable LLM-as-a-Judge}. StarCoder2 is designed for code completion, not natural-language instruction following. When presented with DeepEval's structured evaluation prompts, it exhibited context confusion: for the Answer Relevancy verdict step it returned ``I don't understand. Please provide more information'', causing a score of 0.00 due to a missing \texttt{verdicts} key. DeepSeek-R1 was more capable at structured output but required the stop-sequence workaround described above. Neither model matched the reliability of a dedicated instruction-tuned LLM.
+
+\subsection{Comparative Analysis}
+
+Table~\ref{tab:deepeval-comparison} puts the two configurations side by side on the Board Selection query type.
+
+\begin{table}[ht]
+  \centering
+  \caption{Phase~1 vs.\ Phase~2 on ``Board Selection'' query}
+  \label{tab:deepeval-comparison}
+  \begin{tabular}{|l|c|c|c|c|}
+    \hline
+    \textbf{Configuration}              & \textbf{Faith.} & \textbf{Ans.\ Rel.} & \textbf{Ctx.\ Rel.} & \textbf{Hall.} \\
+    \hline
+    Ollama (DeepSeek-R1 7B)             & 0.73            & 0.18                & 0.56                & 0.25           \\
+    Triton (StarCoder2-15B-GPTQ)        & 0.25            & 0.00$^{\dagger}$    & \textbf{1.00}       & 0.50           \\
+    \hline
+  \end{tabular}
+  \vspace{3pt}
+
+  {\small $^{\dagger}$\,Metric evaluation failed; judge model refused the structured output step.}
+\end{table}
+
+Contextual Relevancy improved from 0.56 to 1.00, confirming the retrieval pipeline was not degraded by the migration. The regression on Faithfulness, Answer Relevancy, and Hallucination is attributable to the judge model quality alone: Mistral's summaries were qualitatively unchanged across both phases.
+
+\subsection{Discussion and Threats to Validity}
+
+\subsubsection{Interpreting the Score Regression}
+The Phase~2 scores do not imply that the Triton system produces worse summaries. They indicate that the selected judge model is unsuitable for the evaluation task. A coding model acting as an evaluator introduces measurement noise that makes results unreliable for Faithfulness, Answer Relevancy, and Hallucination. Contextual Relevancy, which depends on a simpler binary verdict structure, proved more resilient to instruction-following failures.
+
+\subsubsection{Why Triton Despite the Regression}
+The migration was not motivated by improving evaluation scores. Its goal is a \textbf{production-ready inference infrastructure} that supports multiple models and, eventually, multiple concurrent users. With Triton's explicit model control mode, the system can swap models within the 16~GB VRAM budget on demand, a capability that Ollama could not provide. On HPP hardware with larger allocations, it becomes possible to keep multiple models resident simultaneously, eliminating model-swap latency and enabling a genuinely instruction-tuned model to serve as the judge without the workarounds described above.
 
 \subsubsection{Threats to Validity}
-Three threats to validity apply here. For internal validity, the LLM temperature of 0.2 prioritizes deterministic consistency over creative fluency; lower values would likely improve Faithfulness scores at some cost to readability. For external validity, all test cases are limited to the STM32 and Edge AI domains, so generalization to other embedded ecosystems (ESP32, Arduino) remains untested. On construct validity, the DeepEval Faithfulness metric penalizes any claim not found verbatim in the retrieved text, meaning enriched answers that domain experts would consider accurate can receive lower automated scores than bare paraphrases.
+The same three threats from Phase~1 apply here, with additional considerations. On internal validity, the model-swap mechanism introduces latency (35--40 seconds per load event) acceptable in single-user experimentation but not in production. On external validity, Phase~2 covers only one test query rather than five, so broader conclusions about Triton's effect on answer quality would require a full five-query replication. On construct validity, a code-specialised model acting as an evaluator produces scores that do not correspond to the same underlying construct as those from an instruction-tuned model, making the two phases not fully comparable on Faithfulness and Answer Relevancy.
 
-\subsection{Conclusion}
-The experimental validation demonstrates that the Web Search Agent, augmented with DeepEval metrics, provides a \textbf{transparent, quantifiable quality assessment} of AI-generated technical guidance. The system achieves:
-\begin{enumerate}
-  \item High retrieval quality (avg. Contextual Relevancy: 0.75)
-  \item Minimal hallucination (avg. Hallucination: 0.14)
-  \item Adaptive behavior across query types (perfect Faithfulness for procedures, enriched answers for exploration)
-\end{enumerate}
+\subsection{Conclusions}
 
-Future work should explore adaptive metric weighting, hybrid retrieval strategies (vector database combined with live web search), and user feedback integration to calibrate acceptable Faithfulness-Utility trade-offs for different stakeholder profiles.
+Phase~1 established that the Web Search Agent, backed by a suitable instruction-following model via Ollama, delivers measurable and interpretable quality metrics. Average Contextual Relevancy of 0.75, Answer Relevancy of 0.57, and a Hallucination rate of 0.14 across five query types confirm that the retrieval and summarisation pipeline is sound. Score variation by query type is predictable: procedural queries score highest on Faithfulness, exploratory queries score higher on Answer Relevancy at the cost of lower Faithfulness.
 
+Phase~2 showed that migrating to Triton introduces significant engineering complexity. The problems encountered, from VRAM allocation errors to JSON parsing anomalies and instruction-following failures, are not intrinsic to Triton but to the judge models available within the current hardware constraints. Contextual Relevancy improved to 1.00, confirming the retrieval pipeline was unaffected. Future iterations should pair Triton with a genuinely instruction-tuned model as the evaluation back-end, reserving code-specialised models for their intended use cases.

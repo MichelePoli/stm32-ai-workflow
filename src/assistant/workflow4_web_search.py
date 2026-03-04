@@ -72,8 +72,11 @@ def _evaluate_summary_sync(
         class DeepEvalLangChainWrapper(DeepEvalBaseLLM):
             def __init__(self, model_name: str, config: RunnableConfig = None):
                 self.model_name = model_name
-                # Temperature=0 for deterministic evaluation
-                self.llm = get_llm(config=config, model=model_name, temperature=0, num_predict=1024)
+                # Temperature=0 for deterministic evaluation.
+                # stop sequences prevent deepseek-r1 from appending Python test code 
+                # after its JSON output (it writes "def test_extract...()" otherwise)
+                self.llm = get_llm(config=config, model=model_name, temperature=0, num_predict=512,
+                                   stop=["```", "\n```", "# tests", "def test_", "\n\nimport ", "\n\n#"])
 
             def get_model_name(self):
                 return self.model_name
@@ -83,24 +86,32 @@ def _evaluate_summary_sync(
 
             def _clean_json(self, text: str) -> str:
                 import re
+                import json
+                
+                print(f"\n[DEEPEVAL RAW model]\n{text}\n[/DEEPEVAL RAW model]\n", flush=True) # per test
+                
+                # 0. Normalize Python f-string double-braces {{ }} -> { }
+                # DeepSeek-R1 was trained on StackOverflow f-string examples and sometimes
+                # echoes back template double-braces instead of literal JSON braces.
+                cleaned = text.replace("{{", "{").replace("}}", "}")
                 
                 # 1. Remove <think>...</think> completely (if any)
-                cleaned = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL).strip()
+                cleaned = re.sub(r'<think>.*?</think>', '', cleaned, flags=re.DOTALL).strip()
                 
-                # 2. Try to find JSON using regex instead of greedy rfind
+                # 2. Try to find JSON using regex (supports nested objects/arrays)
                 pattern = r'(\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}|\[[^\[\]]*(?:\[[^\[\]]*\][^\[\]]*)*\])'
                 matches = re.finditer(pattern, cleaned, re.DOTALL)
                 
-                import json
                 for match in matches:
                     candidate = match.group(1)
                     try:
                         json.loads(candidate)
+                        print(f"\n[DEEPEVAL EXTRACTED (Regex)]\n{candidate}\n[/DEEPEVAL EXTRACTED (Regex)]\n", flush=True) # per test
                         return candidate
                     except json.JSONDecodeError:
                         continue
                         
-                # 3. Fallback: string heuristic
+                # 3. Fallback: scan backwards from last } bracket until we find valid JSON
                 start_idx = min((cleaned.find(c) for c in '{[' if c in cleaned), default=-1)
                 if start_idx != -1:
                     end_char = ']' if cleaned[start_idx] == '[' else '}'
@@ -109,11 +120,15 @@ def _evaluate_summary_sync(
                         candidate = cleaned[start_idx:end_idx+1]
                         try:
                             json.loads(candidate)
+                            print(f"\n[DEEPEVAL EXTRACTED (Fallback)]\n{candidate}\n[/DEEPEVAL EXTRACTED (Fallback)]\n", flush=True) # per test
                             return candidate
                         except json.JSONDecodeError:
                             end_idx = cleaned.rfind(end_char, 0, end_idx)
-                            
-                return cleaned
+
+                print(f"\n[DEEPEVAL FAILED TO FIND JSON]\n{cleaned}\n", flush=True)  # per test
+                # 4. Last resort: LLM returned plain prose (e.g. "The score is X because...")
+                # Wrap it in {"reason": "..."} so DeepEval can parse it without crashing.
+                return json.dumps({"reason": cleaned})
 
             def generate(self, prompt: str) -> str:
                 res = self.llm.invoke(prompt)
@@ -123,7 +138,8 @@ def _evaluate_summary_sync(
                 res = await self.llm.ainvoke(prompt)
                 return self._clean_json(res.content)
 
-        # Usiamo gpt-oss-20b per l'evaluation (più preciso sui JSON e role-play eval)
+        # Usiamo gpt-oss-20b: è il cod model più preciso sulle istruzioni strutturate
+        # brevi. Lo teniamo su prompt corti (retrieval_ctx troncato qui sotto).
         eval_model_name = "gpt-oss-20b" if triton_enabled else "gpt-oss-20b"
         eval_model = DeepEvalLangChainWrapper(model_name=eval_model_name, config=None)
 
@@ -135,20 +151,27 @@ def _evaluate_summary_sync(
         contextual_relevancy = ContextualRelevancyMetric(threshold=0.55, model=eval_model, async_mode=False)
         hallucination = HallucinationMetric(threshold=0.55, model=eval_model, async_mode=False)
         
-        # Create test case
-        # retrieval_context must be a LIST of strings. 
-        # If input is a string, split it or wrap it. Ideally it comes as a list from the state.
-        if isinstance(web_research_results, str):
-             # Fallback if string: split by double newlines to simulate chunks
-             retrieval_ctx = [chunk for chunk in web_research_results.split("\n\n") if len(chunk.strip()) > 50]
-             if not retrieval_ctx: retrieval_ctx = [web_research_results[:2000]]
-        else:
-             retrieval_ctx = web_research_results # It's already a list
+        # --- Context Truncation ---
+        # Cap retrieval context to keep prompts SHORT for gpt-oss-20b.
+        # Long contexts cause the model to hallucinate off-topic responses.
+        MAX_CTX_ITEMS = 5       # max number of retrieved chunks to pass
+        MAX_CTX_CHARS = 300     # max chars per chunk
+        MAX_OUTPUT_CHARS = 800  # max chars of actual_output to evaluate
 
+        if isinstance(web_research_results, str):
+             retrieval_ctx = [chunk for chunk in web_research_results.split("\n\n") if len(chunk.strip()) > 50]
+             if not retrieval_ctx: retrieval_ctx = [web_research_results[:MAX_CTX_CHARS]]
+        else:
+             retrieval_ctx = web_research_results
+
+        # Apply length caps
+        retrieval_ctx = [c[:MAX_CTX_CHARS] for c in retrieval_ctx[:MAX_CTX_ITEMS]]
+        truncated_output = running_summary[:MAX_OUTPUT_CHARS]
+        
         test_case = LLMTestCase(
             input=research_topic,
-            actual_output=running_summary,
-            retrieval_context=retrieval_ctx, 
+            actual_output=truncated_output,
+            retrieval_context=retrieval_ctx,
             context=retrieval_ctx # Used by HallucinationMetric as "ground truth"
         )
         

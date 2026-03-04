@@ -21,9 +21,9 @@ class TritonPythonModel:
             self.llm = LLM(
                 model=model_name,
                 trust_remote_code=True,
-                # Usa 0.6 per stare in ~9.6GB. 
-                # Attenzione: richiede lo sload di Mistral/DeepSeek (35%+35%+60% > 100%)
-                gpu_memory_utilization=0.6,
+                # Usa 0.85 per avere abbastanza spazio per pesi + KV Cache (~13.6GB su 16GB)
+                # Mistral e DeepSeek vengono prima scaricati dal triton_client, quindi la VRAM è libera.
+                gpu_memory_utilization=0.85,
                 max_model_len=2048,
                 quantization="gptq", # Fondamentale per farlo stare in 16GB
                 dtype="float16", # Obbligatorio per GPTQ

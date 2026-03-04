@@ -61,7 +61,19 @@ class TritonPythonModel:
                 dtype="float16",
                 enforce_eager=True,  # Skip CUDA graph capture to avoid race with Triton HTTP routes
             )
-            self.sampling_params = SamplingParams(temperature=0.3, max_tokens=1024)
+            self.sampling_params = SamplingParams(
+                temperature=0.3,
+                max_tokens=512,
+                stop=[
+                    "```",          # Markdown code fence
+                    '"""',          # Python triple-quote docstring
+                    "\n\nfrom ",    # any import after a blank line
+                    "\ndef ",       # any function definition
+                    "\nA: ",        # StackOverflow "Answer:" prefix
+                    "\n\n# ",       # any block comment after blank line
+                    "# tests",      # test file header
+                ]
+            )
         else:
             print("[WARN] vLLM non trovato.")
             self.llm = None

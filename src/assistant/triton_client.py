@@ -28,17 +28,28 @@ class ChatTriton(BaseChatModel):
     triton_url: str = "http://localhost:8000/v1"
     temperature: float = 0.7
     max_tokens: int = 2048
+    stop_sequences: List[str] = []
 
-    def __init__(self, triton_url: str, model: str, temperature: float = 0.7, **kwargs):
+    def __init__(self, triton_url: str, model: str, temperature: float = 0.7, stop: Optional[List[str]] = None, **kwargs):
         super().__init__(**kwargs)
         self.triton_url = triton_url
         self.model_name = model
         self.temperature = temperature
+        self.stop_sequences = stop or []
+
         # Initialize OpenAI client pointing to Triton
         self.client = OpenAI(
             base_url=self.triton_url,
             api_key="empty" # Triton/vLLM usually doesn't need a key locally
         )
+
+    @property
+    def base_v2_url(self) -> str:
+        """
+        Returns the base URL for Triton V2 APIs (repository, inference).
+        Strips the /v1 suffix if present to handle proxies and prefixes (e.g. /triton/v1).
+        """
+        return self.triton_url.rstrip("/").removesuffix("/v1")
 
     @property
     def _llm_type(self) -> str:
@@ -157,8 +168,8 @@ class ChatTriton(BaseChatModel):
         prompt = self._format_prompt(messages)
         
         # Native Triton v2 inference with retry for server-side transient errors
-        base_url = self.triton_url.rstrip("/").removesuffix("/v1")
-        infer_url = f"{base_url}/v2/models/{self.model_name}/infer"
+        # Native Triton v2 inference with retry for server-side transient errors
+        infer_url = f"{self.base_v2_url}/v2/models/{self.model_name}/infer"
         payload = {
             "inputs": [
                 {
@@ -242,7 +253,7 @@ class ChatTriton(BaseChatModel):
         results in Out-of-Memory (OOM). This method implements a "Model Swapping" 
         algorithm with mutual exclusion: only ONE heavy LLM resides in VRAM at a time.
         """
-        base_url = self.triton_url.rstrip("/").removesuffix("/v1")
+        base_url = self.base_v2_url
         
         # Lista di tutti i modelli LLM (escludendo nomic-embed che è piccolo)
         all_llms = ["mistral", "deepseek-r1", "gpt-oss-20b"]
@@ -267,7 +278,7 @@ class ChatTriton(BaseChatModel):
 
         # 3. Richiesta di caricamento per il modello target
         logger.info(f"⏳ Caricamento modello target: {self.model_name}...")
-        url = f"{base_url}/v2/repository/models/{self.model_name}/load"
+        url = f"{self.base_v2_url}/v2/repository/models/{self.model_name}/load"
         req = urllib.request.Request(url, method="POST")
         try:
             with urllib.request.urlopen(req, timeout=180) as response:
