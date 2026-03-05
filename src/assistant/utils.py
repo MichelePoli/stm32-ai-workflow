@@ -109,11 +109,11 @@ def get_embeddings(config: Optional[dict] = None, **kwargs):
         logger.info(f"🧬 Routing embedding request -> Triton model '{model}'")
         return TritonEmbeddings(triton_url=triton_url, model_name=model)
     else:
-        from langchain_ollama import OllamaEmbeddings
-        base_url = kwargs.get("base_url", cfg.ollama_base_url)
+        from langchain_ollama import OllamaEmbeddings # ← Libreria Python # c'è bisogno dell'immagine ollama/ollama:latest? Si, vedi sotto. (però adesso la cancello l'immagine ollama/ollama:latest per fare spazio, tanto Triton testato e funziona)
+        base_url = kwargs.get("base_url", cfg.ollama_base_url) # ← Punta a http://ollama:11434
         model = kwargs.get("model", "nomic-embed-text")  # Standard Ollama model name
         logger.info(f"🧬 Routing embedding request -> Ollama model '{model}'")
-        return OllamaEmbeddings(model=model, base_url=base_url)
+        return OllamaEmbeddings(model=model, base_url=base_url) # ← Manda la HTTP request al container Ollama
 
 
 

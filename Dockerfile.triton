@@ -1,3 +1,9 @@
+# Questo è il file di build specifico per il mio NVIDIA Triton Inference Server custom. Se usassi semplicemente l'immagine standard di NVIDIA (nvcr.io/nvidia/tritonserver), il server non avrebbe le librerie aggiuntive Python necessarie per far girare modelli complessi come vllm.
+# Cosa fa questo file:
+# * Prende l'immagine base NVIDIA vuota.
+# * Installa il backend Python di Triton (tritonserver-python).
+# * Installa vllm, transformers, e torch, che sono indispensabili perché io sto usando vllm dentro i file model.py per caricare mistral e gpt-oss-20b in modo ottimizzato.
+
 # Dockerfile.triton
 # Custom Triton image with vLLM + sentence-transformers support
 

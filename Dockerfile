@@ -1,3 +1,5 @@
+# Questo è il file di build dell'applicazione principale LangGraph (l'assistente AI in Python). Contiene tutta la configurazione per installare TensorFlow, compilare pacchetti e montare i volumi con il tuo utente Linux (mrusso UID 1002).
+
 # ============================================================
 # Dockerfile — STM32 AI LangGraph Application Server
 # 
@@ -6,6 +8,9 @@
 # User 'mrusso' is created with the same UID (1002) as the host
 # user to avoid permission issues on mounted volumes.
 # ============================================================
+
+
+
 
 FROM ubuntu:22.04
 

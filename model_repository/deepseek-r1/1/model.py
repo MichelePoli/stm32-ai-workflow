@@ -1,3 +1,8 @@
+# Questo è il codice che gira dentro Triton Server. È il ponte tra il framework inferenziale ad altissime prestazioni (vLLM) e le API standard di Triton.
+
+# A cosa serve: Inizializza il modello nella VRAM usando vLLM, definisce come i prompt in ingresso devono essere processati e restituisce pezzettini di testo (streaming) generati dalla GPU.
+# Perché esiste: Senza questo file, Triton non saprebbe come far girare i modelli open-source complessi che ho scaricato.
+
 import triton_python_backend_utils as pb_utils
 import json
 import numpy as np
@@ -43,6 +48,8 @@ def _patch_deepseek_config(model_name):
 
 class TritonPythonModel:
     def initialize(self, args):
+        # Triton chiama questo metodo quando riceve la richiesta API di caricare il modello. DENTRO questo metodo, ho dovuto istanziare vLLM (self.llm = LLM(...)), che fisicamente va a leggere i pesi dal disco e occupare la memoria GPU.
+
         self.model_config = json.loads(args['model_config'])
         print(f"[INIT] Inizializzazione DeepSeek-R1 (Ready: {VLLM_AVAILABLE})")
 
@@ -79,6 +86,8 @@ class TritonPythonModel:
             self.llm = None
 
     def execute(self, requests):
+        # Qui scrivo la logica di generazione testi quando l'utente fa una richiesta chat.
+        # Quando riceve una richiesta, estrae il prompt, lo passa a vLLM, e restituisce la risposta.
         responses = []
         for request in requests:
             input_tensor = pb_utils.get_input_tensor_by_name(request, "PROMPT")
@@ -95,7 +104,11 @@ class TritonPythonModel:
         return responses
 
     def finalize(self):
+        # Triton chiama questo metodo quando riceve la richiesta API di scaricare (unload) il modello! Se non scrivo la logica qui, la RAM/VRAM non si libera mai. 
+
         print("[CLEANUP] Pulizia DeepSeek-R1 backend in corso...")
+
+        # 1. Distruggi l'oggetto LLM
         if VLLM_AVAILABLE and hasattr(self, 'llm'):
             try:
                 import torch
@@ -107,9 +120,9 @@ class TritonPythonModel:
                 except ImportError:
                     pass  # Not needed on single-GPU setups
                 del self.llm
-                gc.collect()
-                torch.cuda.empty_cache()
-                torch.cuda.synchronize()
+                gc.collect() # 2. Forza il garbage collector Python
+                torch.cuda.empty_cache() # 3. Chiedo a PyTorch di svuotare la VRAM occupata e ora senza reference
+                torch.cuda.synchronize() # 4. Sincronizza la GPU
                 print("[CLEANUP] VRAM liberata con successo per DeepSeek-R1.")
             except Exception as e:
                 print(f"[CLEANUP] Errore durante pulizia: {e}")

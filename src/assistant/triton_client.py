@@ -1,3 +1,9 @@
+# Questo è il codice che gira dentro l'App Python (LangGraph container). È il "traduttore" che permette all'assistente AI di parlare con Triton.
+
+# * A cosa serve: Espone interfacce compatibili con LangChain (es. ChatTritonVLLM), permettendo al tuo workflow di fare richieste ai modelli usando una sintassi AI standard. Gestisce internamente le chiamate di rete (HTTP/gRPC) verso la porta 8000 di Triton, si occupa di caricare/scaricare i modelli dalla VRAM automagicamente tramite API, ed estrae il testo generato.
+
+# * Perché esiste: LangGraph si aspetta di parlare con "OpenAI" o "Anthropic". Questo file inganna LangGraph facendogli credere che Triton sia una normale API AI.
+
 import logging
 import json
 import urllib.request

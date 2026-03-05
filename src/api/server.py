@@ -6,7 +6,9 @@ import redis
 import json
 import asyncio
 from fastapi import FastAPI, Request
+# from fastapi import HTTPException, Security, Depends # solo nel caso in cui implementi API KEY
 from fastapi.responses import StreamingResponse
+# from fastapi.security import APIKeyHeader # solo nel caso in cui implementi API KEY
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 
@@ -18,6 +20,18 @@ from langgraph.checkpoint.redis.aio import AsyncRedisSaver
 # Configura Logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("api_server")
+
+# --- API Key Authentication --- (solo nel caso in cui implementi API KEY. Al momento non serve.)
+# Setta API_KEY nel .env per abilitare l'autenticazione.
+# Se non impostata, l'autenticazione è disabilitata (utile in sviluppo locale).
+# _API_KEY_HEADER = APIKeyHeader(name="X-API-Key", auto_error=False)
+
+# async def verify_api_key(api_key: str = Security(_API_KEY_HEADER)):
+#     expected = os.getenv("API_KEY", "")     
+#     if not expected:
+#         return  # Auth disabilitata: nessuna API_KEY nel .env
+#     if api_key != expected:
+#         raise HTTPException(status_code=403, detail="API key non valida o assente.")
 
 
 class ChatMessage(BaseModel):
@@ -72,6 +86,8 @@ def health_check():
     return {"status": "ok", "service": "STM32 AI Assistant"}
 
 @app.post("/stream")
+
+# @app.post("/stream", dependencies=[Depends(verify_api_key)]) # nel caso in cui vuoi implementare API KEY (al momento no). 
 async def stream_chat(request: ChatRequest):
     """
     Endpoint principale per la chat.
