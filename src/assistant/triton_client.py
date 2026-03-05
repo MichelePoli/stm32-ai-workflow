@@ -254,46 +254,30 @@ class ChatTriton(BaseChatModel):
     def _ensure_model_loaded(self) -> None:
         """
         Guarantees that the requested model is READY in Triton (EXPLICIT mode).
-        
-        On an NVIDIA A4000 (16GB VRAM), serving multiple 7B+ LLMs simultaneously 
-        results in Out-of-Memory (OOM). This method implements a "Model Swapping" 
-        algorithm with mutual exclusion: only ONE heavy LLM resides in VRAM at a time.
+
+        On the HPP server there is sufficient VRAM to keep all LLMs loaded
+        simultaneously, so no model-swapping / mutual-exclusion is required.
+        The method simply checks whether the target model is already READY; if
+        not, it issues a load request and waits for the endpoint to become live.
         """
         base_url = self.base_v2_url
-        
-        # Lista di tutti i modelli LLM (escludendo nomic-embed che è piccolo)
-        all_llms = ["mistral", "deepseek-r1", "gpt-oss-20b"]
-        
-        # Stage 1: Check if the model is already in READY state to avoid re-loading overhead.
+
+        # Fast-path: model already READY, nothing to do.
         if self._is_model_ready(base_url, self.model_name):
             return
 
-        # Stage 2: MUTUAL EXCLUSION SWAPPING. 
-        # Unload all other active LLMs. We wait for each to be COMPLETED unloaded 
-        # before continuing, as GPU memory release is asynchronous.
-        for model in all_llms:
-            if model != self.model_name:
-                # Controlliamo se è caricato o in fase di caricamento
-                if self._check_model_status(base_url, model) != "UNAVAILABLE":
-                    logger.info(f"⏳ Scaricamento modello {model} per liberare VRAM...")
-                    self._unload_model(base_url, model)
-                    self._wait_for_status(base_url, model, "UNAVAILABLE")
-                    # Sleep di sicurezza per permettere al backend Python di chiudere il processo
-                    import time
-                    time.sleep(2)
-
-        # 3. Richiesta di caricamento per il modello target
+        # Load the target model and wait until it is fully ready.
         logger.info(f"⏳ Caricamento modello target: {self.model_name}...")
         url = f"{self.base_v2_url}/v2/repository/models/{self.model_name}/load"
         req = urllib.request.Request(url, method="POST")
         try:
             with urllib.request.urlopen(req, timeout=180) as response:
                 pass
-            # Attendiamo che diventi READY nel registry
+            # Wait until the model appears as READY in the repository index.
             self._wait_for_status(base_url, self.model_name, "READY", timeout=180)
-            # Probe: wait until the OpenAI /v1/chat/completions route is actually live.
-            # A READY registry state does NOT guarantee the HTTP endpoint is registered yet !
-            # (CUDA graph capturing can finish *after* the status flip).
+            # Probe the native v2 infer endpoint: a READY repo state does NOT
+            # guarantee the HTTP endpoint is registered yet (CUDA graph capturing
+            # can finish *after* the status flip).
             self._wait_for_endpoint_live(timeout=120)
             logger.info(f"✅ Modello {self.model_name} caricato e endpoint live.")
         except Exception as e:
