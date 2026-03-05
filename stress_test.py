@@ -4,7 +4,7 @@ import time
 import json
 import argparse
 
-SERVER_URL = "http://127.0.0.1:8000/stream"
+SERVER_URL = "http://130.192.40.61/stream"
 
 async def simulate_user(session_client: aiohttp.ClientSession, user_num: int, message: str):
     """Simula una singola richiesta chat utente al server."""

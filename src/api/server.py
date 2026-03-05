@@ -65,23 +65,32 @@ async def lifespan(app: FastAPI):
     """Inizializza il grafo e il checkpointer Redis all'avvio (dentro l'event loop)."""
     global graph, memory
     logger.info("🚀 Inizializzazione Graph & Redis Checkpointer...")
-    try:
-        # 1. Crea il checkpointer asincrono (ora che il loop è attivo)
-        memory = AsyncRedisSaver(redis_client=checkpointer_redis)
-        
-        # 2. Configura indici RedisVL (creazione fisica se non esistono)
-        await memory.setup()
-        
-        # 3. Compila il grafo con il checkpointer
-        graph = builder.compile(checkpointer=memory)
-        
-        logger.info("✅ Grafo compilato e Redis pronto.")
-    except Exception as e:
-        logger.error(f"❌ Errore durante startup: {e}")
-        logger.exception(e)
+    
+    # Retry con backoff: Redis può essere in BusyLoadingError (caricamento RDB ~18s)
+    import asyncio
+    from redis.exceptions import BusyLoadingError
+    max_retries = 20
+    retry_delay = 3  # secondi
+    
+    for attempt in range(1, max_retries + 1):
+        try:
+            memory = AsyncRedisSaver(redis_client=checkpointer_redis)
+            await memory.setup()
+            graph = builder.compile(checkpointer=memory)
+            logger.info("✅ Grafo compilato e Redis pronto.")
+            break  # successo → esci dal loop
+        except BusyLoadingError as e:
+            if attempt < max_retries:
+                logger.warning(f"⏳ Redis ancora in caricamento, riprovo in {retry_delay}s (tentativo {attempt}/{max_retries})...")
+                await asyncio.sleep(retry_delay)
+            else:
+                logger.error(f"❌ Redis non pronto dopo {max_retries} tentativi: {e}")
+        except Exception as e:
+            logger.error(f"❌ Errore durante startup: {e}")
+            logger.exception(e)
+            break  # errore non recuperabile
     
     yield
-    # Shutdown logic (opzionale)
     logger.info("👋 Shutdown server...")
 
 app = FastAPI(title="STM32 AI Assistant API", lifespan=lifespan)

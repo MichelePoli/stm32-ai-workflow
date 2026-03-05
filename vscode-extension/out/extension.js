@@ -13,6 +13,7 @@ exports.activate = activate;
 exports.deactivate = deactivate;
 const vscode = require("vscode");
 const SERVER_URL = 'http://127.0.0.1:8000/stream';
+// è corretto così, LangGraph è locale.
 function activate(context) {
     console.log('Attivazione estensione STM32 AI Assistant');
     // -----------------------------------------------------------------------

@@ -16,6 +16,12 @@ services:
     volumes:
       - redis_data:/data
     restart: always
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "6379", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 30          # attende fino a 150s (Redis carica ~18s di RDB con 1.09M keys)
+      start_period: 10s    # non controlla i primi 10s (warm-up iniziale)
 
 #  minio:
 #    image: minio/minio:latest
@@ -66,38 +72,38 @@ services:
 #      ollama:
 #        condition: service_healthy
 
-  # Triton Inference Server
-  triton-server:
-    build:
-      context: .
-      dockerfile: Dockerfile.triton
-    container_name: stm32-ai-triton
-    ports:
-      - "8001:8000" # HTTP
-      - "8002:8001" # GRPC
-      - "8003:8002" # Metrics
-    volumes:
-      - ./model_repository:/models
-    environment:
-      - TRITON_MODEL_NAME=thesven/Mistral-7B-Instruct-v0.3-GPTQ
-      - DEEPSEEK_MODEL_NAME=TheBloke/deepseek-coder-6.7B-instruct-GPTQ
-      - GPTOSS_MODEL_NAME=TechxGenus/starcoder2-15b-instruct-GPTQ
-      - EMBED_MODEL_NAME=nomic-ai/nomic-embed-text-v1.5
-    command: ["tritonserver", "--model-repository=/models", "--model-control-mode=explicit", "--log-verbose=1"]
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
-    healthcheck:
-      # Triton health endpoint: /v2/health/ready
-      test: ["CMD", "curl", "-f", "http://localhost:8000/v2/health/ready"]
-      interval: 30s
-      timeout: 10s
-      retries: 20 # vLLM loading can take minutes
-    restart: unless-stopped
+  # Triton Inference Server — ora gira su HPP (130.192.40.61), non più in locale
+  # Per riportarlo in locale: decommentare il blocco e ripristinare TRITON_BASE_URL=http://triton-server:8000/v1
+#  triton-server:
+#    build:
+#      context: .
+#      dockerfile: Dockerfile.triton
+#    container_name: stm32-ai-triton
+#    ports:
+#      - "8001:8000" # HTTP
+#      - "8002:8001" # GRPC
+#      - "8003:8002" # Metrics
+#    volumes:
+#      - ./model_repository:/models
+#    environment:
+#      - TRITON_MODEL_NAME=thesven/Mistral-7B-Instruct-v0.3-GPTQ
+#      - DEEPSEEK_MODEL_NAME=TheBloke/deepseek-coder-6.7B-instruct-GPTQ
+#      - GPTOSS_MODEL_NAME=TechxGenus/starcoder2-15b-instruct-GPTQ
+#      - EMBED_MODEL_NAME=nomic-ai/nomic-embed-text-v1.5
+#    command: ["tritonserver", "--model-repository=/models", "--model-control-mode=explicit", "--log-verbose=1"]
+#    deploy:
+#      resources:
+#        reservations:
+#          devices:
+#            - driver: nvidia
+#              count: 1
+#              capabilities: [gpu]
+#    healthcheck:
+#      test: ["CMD", "curl", "-f", "http://localhost:8000/v2/health/ready"]
+#      interval: 30s
+#      timeout: 10s
+#      retries: 20
+#    restart: unless-stopped
 
   langgraph-app:
     build: .
@@ -107,7 +113,7 @@ services:
     environment:
       - OLLAMA_BASE_URL=http://ollama:11434
       - USE_TRITON_BACKEND=true
-      - TRITON_BASE_URL=http://triton-server:8000/v1  # Docker internal network
+      - TRITON_BASE_URL=http://130.192.40.61  # HPP Triton (porta 80 via reverse proxy)
       - LOCAL_LLM=${MODEL_NAME:-mistral}
       - REDIS_URL=redis://redis:6379
       - GITHUB_ACCESS_TOKEN=${GITHUB_ACCESS_TOKEN}
@@ -119,10 +125,10 @@ services:
     depends_on:
 #      ollama:
 #        condition: service_healthy
-      triton-server:
-        condition: service_healthy
+#      triton-server:  # ora su HPP, non in locale
+#        condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy   # attende il PONG di Redis prima di avviare LangGraph
     volumes:
       # Source code (hot-reload)
       - ./src:/home/mrusso/stm32-ai-workflow/src

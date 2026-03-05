@@ -157,8 +157,11 @@ def force_unload_triton(models: list = None):
         models = ["mistral"]   # Mistral occupa ~7.8GB, il principale candidato per lo scaricamento
     
     triton_url = os.environ.get("TRITON_BASE_URL", "http://triton-server:8000").rstrip("/")
-    # Rimuovi /v1 se presente (l'API di model control usa /v2, non /v1)
-    triton_url = triton_url.replace("/v1", "")
+    logger.info(f"TRITON_BASE_URL: {triton_url}")
+    if triton_url.endswith("/v1"):
+        triton_url = triton_url[:-3]
+    elif triton_url.endswith("/v2"):
+        triton_url = triton_url[:-3]
     
     for model_name in models:
         url = f"{triton_url}/v2/repository/models/{model_name}/unload"
@@ -187,7 +190,10 @@ def reload_triton_models(models: list = None):
         models = ["mistral"]
     
     triton_url = os.environ.get("TRITON_BASE_URL", "http://triton-server:8000").rstrip("/")
-    triton_url = triton_url.replace("/v1", "")
+    if triton_url.endswith("/v1"):
+        triton_url = triton_url[:-3]
+    elif triton_url.endswith("/v2"):
+        triton_url = triton_url[:-3]
     
     for model_name in models:
         url = f"{triton_url}/v2/repository/models/{model_name}/load"

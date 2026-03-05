@@ -8,6 +8,7 @@ interface ServerResponse {
 }
 
 const SERVER_URL = 'http://127.0.0.1:8000/stream';
+// è corretto così, LangGraph è locale.
 
 export function activate(context: vscode.ExtensionContext) {
 

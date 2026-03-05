@@ -3092,40 +3092,9 @@ try:
         y_val = None
 
     # 4. Resize if needed (fix shape mismatch)
+    # Resizing is now handled dynamically in the tf.data pipeline to prevent OOM
     if X is not None and X.shape[1:] != input_shape:
-        print(f"\\n🔧 Resizing data from {{X.shape[1:]}} to {{input_shape}}...")
-        
-        # Use TensorFlow resize (already available)
-        target_h, target_w = input_shape[0], input_shape[1]
-        
-        # Handle grayscale -> RGB conversion if needed
-        if len(X.shape) == 3 and len(input_shape) == 3 and input_shape[2] == 3:
-            # Grayscale (H, W) -> RGB (H, W, 3)
-            X = np.expand_dims(X, axis=-1)
-            X = np.repeat(X, 3, axis=-1)
-        
-        # Resize in batches to avoid OOM (out of memory) (500 images at a time)
-        batch_size_resize = 500
-        X_resized = []
-        for i in range(0, len(X), batch_size_resize):
-            batch = X[i:i+batch_size_resize]
-            batch_resized = tf.image.resize(batch, [target_h, target_w]).numpy()
-            X_resized.append(batch_resized)
-            if (i // batch_size_resize) % 10 == 0:
-                print(f"  → Resized {{i+len(batch)}}/{{len(X)}} images")
-        X = np.concatenate(X_resized, axis=0)
-        print(f"  ✓ Resized to {{X.shape}}")
-        
-        # Resize validation set if it exists
-        if X_val is not None and X_val.shape[1:] != input_shape:
-            print(f"🔧 Resizing validation data...")
-            X_val_resized = []
-            for i in range(0, len(X_val), batch_size_resize):
-                batch = X_val[i:i+batch_size_resize]
-                batch_resized = tf.image.resize(batch, [target_h, target_w]).numpy()
-                X_val_resized.append(batch_resized)
-            X_val = np.concatenate(X_val_resized, axis=0)
-            print(f"  ✓ Resized validation to {{X_val.shape}}")
+        print(f"\\n🔧 Target shape for tf.data pipeline: {{input_shape}} (original: {{X.shape[1:]}})")
 
     # 5. Fallback a Dummy Data
     if X is None:
@@ -3248,39 +3217,68 @@ try:
         print(f"  📊 Val Class Dist:   {{dict(zip(val_classes, val_counts))}}")
         
         # Check Normalization (MobileNet expects [-1, 1]) 
+        needs_mobilenet_rescale = False
         # CIFAR-10 nativamente è 0-255 (interi). Noi lo convertiamo in 0-1 (float). MobileNet però è stato "educato" a vedere il mondo in [-1, 1]. QUINDI soluzione: prende i dati di CIFAR-10 (che vanno bene) e li trasforma nel formato che MobileNet vuole ([-1, 1]).
         if 'mobilenet' in model.name.lower() or 'mobilenet' in model_path.lower():
             print("  ℹ️  MobileNet detected: Checking normalization...")
             if X.min() >= 0.0 and X.max() <= 1.0:
-                print("  ⚠️  Input is [0, 1] but MobileNet expects [-1, 1]. Rescaling...")
-                X = (X - 0.5) * 2.0
-                X_val = (X_val - 0.5) * 2.0
-                print(f"  ✓ Rescaled range: [{{X.min():.2f}}, {{X.max():.2f}}]")
+                print("  ⚠️  Input is [0, 1] but MobileNet expects [-1, 1]. Rescaling lazily via pipeline...")
+                needs_mobilenet_rescale = True
+                print(f"  ✓ Original range: [{{X.min():.2f}}, {{X.max():.2f}}]")
     except Exception as e:
         print(f"  ⚠️  Debug info error: {{e}}")
 
     
-    # 7. Data Augmentation (for Images)
-    data_gen = None
+    # 7. Convert to robust tf.data.Dataset pipeline
+    # This specifically fixes: "Failed copying input tensor from CPU to GPU... Dst tensor is not initialized"
+    # which happens when TF eager execution races to upload raw NumPy arrays to GPU memory.
+    import tensorflow as tf
+    
+    # Create datasets
+    train_ds = tf.data.Dataset.from_tensor_slices((X, y))
+    val_ds = tf.data.Dataset.from_tensor_slices((X_val, y_val))
+    
+    # Define preprocessing helper to act on tensors
+    def preprocess_image(img, label):
+        # 1. Grayscale to RGB if needed
+        if len(img.shape) == 2 and len(input_shape) == 3 and input_shape[-1] == 3:
+            img = tf.expand_dims(img, -1)
+            img = tf.image.grayscale_to_rgb(img)
+        elif len(img.shape) == 3 and img.shape[-1] == 1 and input_shape[-1] == 3:
+            img = tf.image.grayscale_to_rgb(img)
+            
+        # 2. Resize if shape mismatches
+        if img.shape[:2] != input_shape[:2]:
+            img = tf.image.resize(img, [input_shape[0], input_shape[1]])
+            
+        # 3. Rescale for MobileNet if flagged  
+        if needs_mobilenet_rescale:
+            img = (img - 0.5) * 2.0
+            
+        return img, label
+
+    # Apply preprocessing mapping to both datasets
+    train_ds = train_ds.map(preprocess_image, num_parallel_calls=tf.data.AUTOTUNE)
+    val_ds = val_ds.map(preprocess_image, num_parallel_calls=tf.data.AUTOTUNE)
+    
+    # Apply Data Augmentation using standard Keras layers inside the pipeline
     if len(input_shape) == 3 and not is_object_detection:
-        # ==============================================================================
-        # ENHANCEMENT: DATA AUGMENTATION
-        # ==============================================================================
-        # To prevent overfitting on small datasets (common in embedded AI), we generate
-        # new training samples by applying random transformations (rotation, zoom, flip).
-        # This forces the model to learn robust features rather than memorizing pixels.
-        # ==============================================================================
-        print("📸 Enabling Data Augmentation (Rotation, Zoom, Flip)...")
-        from tensorflow.keras.preprocessing.image import ImageDataGenerator
+        print("📸 Enabling Data Augmentation (Rotation, Zoom, Flip) via tf.data...")
         
-        data_gen = ImageDataGenerator(
-            rotation_range=20,      # Random rotation ±20°
-            width_shift_range=0.2,  # Random horizontal shift 20%
-            height_shift_range=0.2, # Random vertical shift 20%
-            zoom_range=0.2,         # Random zoom 20%
-            horizontal_flip=True,   # Random horizontal flip
-            fill_mode='nearest'     # Fill empty pixels with nearest value
-        )
+        # Define augmentation sequence
+        data_augmentation = tf.keras.Sequential([
+            tf.keras.layers.RandomFlip("horizontal"),
+            tf.keras.layers.RandomRotation(0.2),
+            tf.keras.layers.RandomZoom(0.2),
+            tf.keras.layers.RandomTranslation(0.2, 0.2)
+        ])
+        
+        # Apply only to training data
+        train_ds = train_ds.map(lambda x, y: (data_augmentation(x, training=True), y), num_parallel_calls=tf.data.AUTOTUNE)
+
+    # Batch and prefetch for optimal GPU transfer
+    train_ds = train_ds.shuffle(buffer_size=1000).batch({batch_size}).prefetch(tf.data.AUTOTUNE)
+    val_ds = val_ds.batch({batch_size}).prefetch(tf.data.AUTOTUNE)
     
     # 8. Compile & Train
     model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate={learning_rate}),
@@ -3305,26 +3303,14 @@ try:
         ReduceLROnPlateau(monitor='val_loss', factor=0.2, patience=2, min_lr=1e-7, verbose=0)
     ]
 
-    if data_gen:
-        # Use generator for training
-        history = model.fit(
-            data_gen.flow(X, y, batch_size={batch_size}),
-            steps_per_epoch=len(X) // {batch_size},
-            epochs={epochs},
-            validation_data=(X_val, y_val),
-            callbacks=callbacks_list,
-            verbose=0
-        )
-    else:
-        # Standard fit
-        history = model.fit(
-            X, y, 
-            epochs={epochs}, 
-            batch_size={batch_size}, 
-            validation_data=(X_val, y_val),
-            callbacks=callbacks_list,
-            verbose=0
-        )
+    # Use tf.data pipeline for training
+    history = model.fit(
+        train_ds,
+        validation_data=val_ds,
+        epochs={epochs},
+        callbacks=callbacks_list,
+        verbose=0
+    )
     
     model.save(output_path, save_format='h5')
     
@@ -3358,26 +3344,27 @@ except Exception as e:
         logger.info(f"  [Subprocess] Executing fine-tuning...")
         
         # -----------------------------------------------------------------------
-        # VRAM MANAGEMENT: Scarica Mistral da Triton prima del fine-tuning
+        # VRAM MANAGEMENT: Commented out (HPP Triton has enough VRAM)
+        # Scarica Mistral da Triton prima del fine-tuning
         # Con USE_TRITON_BACKEND, Mistral occupa ~7.8GB della A4000 (16GB).
         # TF training vede solo ~1.1GB → SIGABRT (OOM) dopo Epoch 1.
         # Triton è avviato con --model-control-mode=explicit, quindi possiamo
         # usare l'API /v2/repository/models/{model}/unload per liberare la VRAM.
         # Dopo il training, reload_triton_models() ricarica i modelli.
         # -----------------------------------------------------------------------
-        from src.assistant.utils import force_unload_triton, reload_triton_models
+        # from src.assistant.utils import force_unload_triton, reload_triton_models
         import os as _os
         use_triton = _os.environ.get("USE_TRITON_BACKEND", "false").lower() == "true"
         
-        if use_triton:
-            logger.info("🔫 [fine-tuning] Scaricando Mistral da Triton per liberare VRAM...")
-            force_unload_triton(["mistral"])
-            logger.info("✅ [fine-tuning] VRAM liberata. Avvio training...")
-        else:
+        # if use_triton:
+        #     logger.info("🔫 [fine-tuning] Scaricando Mistral da Triton per liberare VRAM...")
+        #     force_unload_triton(["mistral"])
+        #     logger.info("✅ [fine-tuning] VRAM liberata. Avvio training...")
+        # else:
+        if not use_triton:
+            from src.assistant.utils import force_unload_ollama
             cfg = Configuration.from_runnable_config(config)
             force_unload_ollama(cfg.local_llm or "gpt-oss:20b")
-
-        
         # Define ignore list for real-time suppression
         ignore_list = [
             'tensorflow/core/util/port.cc',
@@ -3471,10 +3458,11 @@ except Exception as e:
         }
     finally:
         # Ricarica Mistral su Triton dopo il training (sia in caso di successo che errore)
-        if use_triton:
-            logger.info("🚀 [fine-tuning] Ricaricando Mistral su Triton post-training...")
-            reload_triton_models(["mistral"])
-    
+        # if use_triton:
+        #     logger.info("🚀 [fine-tuning] Ricaricando Mistral su Triton post-training...")
+        #     reload_triton_models(["mistral"])
+        pass
+        
     return state
 
 

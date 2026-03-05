@@ -2,7 +2,7 @@ import requests
 import json
 import time
 
-URL = "http://127.0.0.1:8000/stream"
+URL = "http://130.192.40.61/stream"
 
 def send_request(user_id, session_id, message):
     payload = {
