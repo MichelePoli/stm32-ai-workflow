@@ -23,6 +23,8 @@ Second, Information Retrieval. LLMs hallucinate technical specifications. To fix
 Third is Neural Network Customization. Say a user wants to deploy a model, but their dataset has 132 classes while the pre-trained model outputs 1000. Under normal conditions, this "class mismatch" breaks the training script. Here, the agent reads the neural network architecture, spots the error, and automatically rewrites the Keras code to fix the final output layer.
 Furthermore, if the user asks for hyperparameter optimization, the system fully integrates with Microsoft's Neural Network Intelligence, or NNI. Setting up NNI manually is notoriously complex. You have to write a custom trial script, define a search space in JSON, and configure a manager. Instead of forcing the developer to do this, our Customization Agent dynamically writes the entire NNI experiment from scratch. It generates the `trial.py` file, defines the search boundary for learning rates and batch sizes, and launches the tuning job automatically. The developer simply asks for "optimization" and waits for the best model to emerge.
 
+# Nota: Forse potresti alleggerire o fondere la slide 7 sulla customizzazione NNI. Spiegare trial, file JSON, ecc., porta via tempo. Potrei dire semplicemente: "Il sistema analizza i dataset e genera automaticamente persino gli esperimenti di hyperparameter optimization tramite Microsoft NNI, che normalmente richiedono ore di configurazione manuale."
+
 [Slide 8: Benchmarks & Productivity Gains]
 A developer tool only matters if it actually saves time, so I benchmarked the automated workflow against experienced developers. The results matter.
 The end-to-end AI deployment dropped from about 4 hours to just 20 to 30 minutes. That is a 9x speed increase.
