@@ -3,9 +3,11 @@
 
 The framework combines several specialized open-source tools to cover inference, web search, quality evaluation, vector storage, and neural network deployment.
 
-\subsection{Agno Framework for Agent Orchestration}
+\subsection{DuckDuckGo Search Integration}
 
-Agno (\url{https://github.com/agno-agi/agno}) is a lightweight Python framework for building tool-augmented LLM agents. In Workflow 4, the web research node wraps an Ollama-served Mistral instance in an Agno \texttt{Agent} and equips it with \texttt{DuckDuckGoTools} for web queries. Agno handles the tool-calling loop transparently, logging each invocation for debugging. All tool calls are synchronous and run within the LangGraph node execution context.
+Workflow 4 uses the \texttt{duckduckgo-search} (\url{https://pypi.org/project/duckduckgo-search/}) Python library to execute web queries. Early prototypes relied on agentic frameworks like Agno, which required LLM-specific function calling to extract parameters and invoke the search engine. 
+
+To ensure compatibility with the centralized Triton Inference Server (which proxies raw token streams and lacks native support for complex tool-calling schemas), we transitioned to a decoupled approach. The LangGraph orchestrator now extracts search queries via structured output prompts. It then executes the search directly using the Python library, bypassing the LLM's function-calling layer entirely.
 
 \subsection{DeepEval for RAG Quality Assessment}
 

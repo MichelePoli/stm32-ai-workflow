@@ -255,24 +255,68 @@ class ChatTriton(BaseChatModel):
         """
         Guarantees that the requested model is READY in Triton (EXPLICIT mode).
 
-        On the HPP server there is sufficient VRAM to keep all LLMs loaded
-        simultaneously, so no model-swapping / mutual-exclusion is required.
-        The method simply checks whether the target model is already READY; if
-        not, it issues a load request and waits for the endpoint to become live.
+        Hybrid strategy for the HPP server:
+        1. Fast-path: if the model is already READY, return immediately.
+        2. Optimistic load: try to load the target model directly. On HPP there
+           is usually enough VRAM to keep multiple LLMs loaded simultaneously,
+           so this path succeeds most of the time with no disruption.
+        3. OOM fallback: if Triton returns HTTP 400 (rejected load, typically due
+           to VRAM exhaustion), unload all other heavy LLMs one by one and retry.
+           This keeps the system functional even when the GPU is saturated.
         """
-        base_url = self.base_v2_url
+        import time
+        from urllib.error import HTTPError
 
-        # Fast-path: model already READY, nothing to do.
+        base_url = self.base_v2_url
+        all_llms = ["mistral", "deepseek-r1", "gpt-oss-20b"]
+
+        # ── Stage 1: fast-path ───────────────────────────────────────────────
         if self._is_model_ready(base_url, self.model_name):
             return
 
-        # Load the target model and wait until it is fully ready.
+        # ── Stage 2: optimistic load ─────────────────────────────────────────
         logger.info(f"⏳ Caricamento modello target: {self.model_name}...")
-        url = f"{self.base_v2_url}/v2/repository/models/{self.model_name}/load"
-        req = urllib.request.Request(url, method="POST")
+        load_url = f"{base_url}/v2/repository/models/{self.model_name}/load"
+        load_succeeded = False
         try:
-            with urllib.request.urlopen(req, timeout=180) as response:
+            req = urllib.request.Request(load_url, method="POST")
+            with urllib.request.urlopen(req, timeout=180) as _:
                 pass
+            load_succeeded = True
+        except HTTPError as http_err:
+            if http_err.code == 400:
+                logger.warning(
+                    f"⚠️ Triton rejected load of '{self.model_name}' (400 – likely VRAM full). "
+                    f"Activating swap fallback..."
+                )
+            else:
+                logger.error(f"❌ Errore HTTP durante caricamento Triton: {http_err}")
+        except Exception as e:
+            logger.error(f"❌ Errore durante caricamento Triton: {e}")
+
+        # ── Stage 3: OOM fallback – unload others and retry ──────────────────
+        if not load_succeeded:
+            for model in all_llms:
+                if model != self.model_name:
+                    status = self._check_model_status(base_url, model)
+                    if status != "UNAVAILABLE":
+                        logger.info(f"⏳ Scaricamento modello {model} per liberare VRAM...")
+                        self._unload_model(base_url, model)
+                        self._wait_for_status(base_url, model, "UNAVAILABLE")
+                        time.sleep(2)  # let the Python backend release CUDA context
+
+            # Retry load after freeing VRAM
+            logger.info(f"🔄 Retry caricamento '{self.model_name}' dopo swap...")
+            try:
+                req = urllib.request.Request(load_url, method="POST")
+                with urllib.request.urlopen(req, timeout=180) as _:
+                    pass
+                load_succeeded = True
+            except Exception as e:
+                logger.error(f"❌ Retry caricamento fallito: {e}")
+                return
+
+        if load_succeeded:
             # Wait until the model appears as READY in the repository index.
             self._wait_for_status(base_url, self.model_name, "READY", timeout=180)
             # Probe the native v2 infer endpoint: a READY repo state does NOT
@@ -280,8 +324,6 @@ class ChatTriton(BaseChatModel):
             # can finish *after* the status flip).
             self._wait_for_endpoint_live(timeout=120)
             logger.info(f"✅ Modello {self.model_name} caricato e endpoint live.")
-        except Exception as e:
-            logger.error(f"❌ Errore durante caricamento Triton: {e}")
 
     def _check_model_status(self, base_url: str, model_name: str) -> str:
         """Controlla lo stato del modello tramite repository API."""

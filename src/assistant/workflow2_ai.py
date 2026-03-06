@@ -1,16 +1,16 @@
 # ============================================================================
-# WORKFLOW 2: AI ANALYSIS CON MODEL DISCOVERY E CUSTOMIZATION
+# WORKFLOW 2: AI ANALYSIS WITH MODEL DISCOVERY AND CUSTOMIZATION
 # ============================================================================
-# Modulo dedicato all'analisi dei modelli AI e generazione codice STEdgeAI
+# Module dedicated to AI model analysis and STEdgeAI code generation
 #
-# Responsabilità:
-#   - Raccolta configurazione AI (target MCU, compression)
-#   - Model discovery (predefiniti, ricerca online, fallback)
-#   - Download modelli da GitHub/Google
+# Responsibilities:
+#   - Collecting AI configuration (target MCU, compression)
+#   - Model discovery (predefined, online search, fallback)
+#   - Downloading models from GitHub/Google
 #   - Model customization (architecture, fine-tuning, quantization)
 #   - STEdgeAI analyze/validate/generate
 #
-# Dipendenze: langgraph, langchain, stedgeai, tensorflow, requests
+# Dependencies: langgraph, langchain, stedgeai, tensorflow, requests
 
 import os
 import subprocess
@@ -51,89 +51,89 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 
 class AnalysisInfoExtraction(BaseModel):
-    """Schema per estrarre target MCU e compression"""
+    """Schema for extracting target MCU and compression"""
     target: Optional[str] = Field(
         default=None,
-        description="Target MCU (es: stm32f401, stm32h743, stm32u5)"
+        description="Target MCU (e.g., stm32f401, stm32h743, stm32u5)"
     )
     compression: Optional[str] = Field(
         default=None,
-        description="Livello di compressione (low, medium, high, very_high)"
+        description="Compression level (low, medium, high, very_high)"
     )
 
 
 class TaskSelectionExtraction(BaseModel):
-    """Estrae la scelta del task da risposta naturale"""
+    """Extracts task selection from natural response"""
     task: Optional[str] = Field(
         default=None,
-        description="Task selezionato (chiave tecnica della categoria)"
+        description="Selected task (technical key of the category)"
     )
     confidence: float = Field(
         ge=0.0, le=1.0,
-        description="Confidenza della classificazione"
+        description="Classification confidence"
     )
 
 
 class ModelSelectionExtraction(BaseModel):
-    """Estrae la scelta del modello da risposta naturale"""
+    """Extracts model selection from natural response"""
     model_index: Optional[int] = Field(
         default=None,
-        description="Indice del modello selezionato (1-based)"
+        description="Selected model index (1-based)"
     )
     model_accepted: bool = Field(
         default=False,
-        description="L'utente ha accettato il modello?"
+        description="Did the user accept the model?"
     )
     wants_another_search: bool = Field(
         default=False,
-        description="L'utente vuole un'altra ricerca?"
+        description="Does the user want another search?"
     )
 
 
 class ModelFeedbackExtraction(BaseModel):
-    """Estrae il feedback dell'utente sul modello proposto"""
+    """Extracts user feedback on the proposed model"""
     model_accepted: bool = Field(
         default=False,
-        description="True se l'utente accetta il modello proposto"
+        description="True if the user accepts the proposed model"
     )
     wants_another_search: bool = Field(
         default=False,
-        description="True se l'utente vuole un'altra ricerca/ricerca diversa"
+        description="True if the user wants another/different search"
     )
     wants_default: bool = Field(
         default=False,
-        description="True se l'utente vuole il modello di default/termina ricerca"
+        description="True if the user wants the default model/terminate search"
     )
     confidence: float = Field(
         ge=0.0, le=1.0,
-        description="Confidenza della classificazione (0-1)"
+        description="Classification confidence (0-1)"
     )
 
 
 class ResolutionExtraction(BaseModel):
-    """Estrae la decisione post-fallimento risorse"""
+    """Extracts decision post resource failure"""
     decision: str = Field(
-        description="Azione da intraprendere: change_board o change_model"
+        description="Action to take: change_board or change_model"
     )
     confidence: float = Field(
         ge=0.0, le=1.0,
-        description="Confidenza della scelta"
+        description="Choice confidence"
     )
 
 
 class SearchResultExtraction(BaseModel):
-    """Estrae modelli AI scaricabili (.h5, .keras, .onnx, .tflite)"""
-    model_name: str = Field(description="Nome modello (es: MobileNetV2 128)")
+    """Extracts downloadable AI models (.h5, .keras, .onnx, .tflite)"""
+    model_name: str = Field(description="Model name (e.g., MobileNetV2 128)")
     download_url: Optional[str] = Field(
         default=None,
-        description="URL diretto a file .h5, .keras, .onnx o .tflite"
+        description="Direct URL to .h5, .keras, .onnx, or .tflite file"
     )
-    model_size: Optional[str] = Field(default=None, description="Size (es: 5.7MB)")
-    accuracy: Optional[str] = Field(default=None, description="Accuracy (es: 64%)")
-    inference_time: Optional[str] = Field(default=None, description="Tempo (es: 40ms (STM32H7))")
+    model_size: Optional[str] = Field(default=None, description="Size (e.g., 5.7MB)")
+    accuracy: Optional[str] = Field(default=None, description="Accuracy (e.g., 64%)")
+    inference_time: Optional[str] = Field(default=None, description="Time (e.g., 40ms (STM32H7))")
     is_valid: bool = Field(
         default=False,
-        description="True solo se download_url è presente e non None"
+        description="True only if download_url is present and not None"
     )
 
 
@@ -141,40 +141,40 @@ class SearchResultExtraction(BaseModel):
 # EXTRACTION INSTRUCTIONS - WORKFLOW 2
 # ============================================================================
 
-analysis_info_extraction_instructions = """Sei un estrattore di informazioni per la configurazione dell'analisi AI.
+analysis_info_extraction_instructions = """You are an information extractor for AI analysis configuration.
 
-Analizza la risposta dell'utente e estrai i seguenti campi:
+Analyze the user's response and extract the following fields:
 
-1. **target**: Target MCU per cui ottimizzare il modello
-     Valori comuni: "stm32f401", "stm32f4", "stm32h743", "stm32h7", "stm32u5", "stm32u575"
-     → Se non specificato: null
+1. **target**: Target MCU to optimize the model for
+     Common values: "stm32f401", "stm32f4", "stm32h743", "stm32h7", "stm32u5", "stm32u575"
+     → If not specified: null
 
-2. **compression**: Livello di compressione per il modello
-     Valori comuni: "low", "medium", "high", "very_high"
-     → Se non specificato: null
+2. **compression**: Compression level for the model
+     Common values: "low", "medium", "high", "very_high"
+     → If not specified: null
 
-Esempi:
-- Input: "STM32H743 con compressione media"
+Examples:
+- Input: "STM32H743 with medium compression"
   Output: {"target": "stm32h743", "compression": "medium"}
 
-- Input: "F4, compressione alta"
+- Input: "F4, high compression"
   Output: {"target": "stm32f4", "compression": "high"}
 
-Rispondi SEMPRE in formato JSON valido.
+ALWAYS reply in valid JSON format.
 """
 
-# Istruzioni estratte dinamicamente
+# Dynamically extracted instructions
 
-model_selection_instructions = """Analizza la risposta dell'utente sulla selezione del modello specifico.
-L'utente sta scegliendo un modello da una lista numerata.
+model_selection_instructions = """Analyze the user's response regarding the specific model selection.
+The user is choosing a model from a numbered list.
 
-REGOLE CRITICAL:
-1. Se la risposta è un numero (es. "1", "2"), mappa rigorosamente verso quell'indice (model_index).
-2. "model_accepted" deve essere true se l'utente sceglie un modello dalla lista.
-3. Se l'utente rifiuta tutti o scrive "no" / "nessuno", imposta wants_another_search: true e model_accepted: false.
-4. Se l'utente vuole usare un default o non sa, imposta model_accepted: false e wants_another_search: false.
+CRITICAL RULES:
+1. If the response is a number (e.g. "1", "2"), strictly map it to that index (model_index).
+2. "model_accepted" must be true if the user chooses a model from the list.
+3. If the user rejects all or writes "no" / "none", set wants_another_search: true and model_accepted: false.
+4. If the user wants to use a default or doesn't know, set model_accepted: false and wants_another_search: false.
 
-Rispondi SEMPRE con un oggetto JSON valido con questa struttura esatta:
+ALWAYS reply with a valid JSON object with this exact structure:
 {
   "model_index": 1,
   "model_accepted": true,
@@ -182,20 +182,20 @@ Rispondi SEMPRE con un oggetto JSON valido con questa struttura esatta:
 }
 """
 
-model_feedback_extraction_instructions = """Analizza il feedback dell'utente sul modello proposto.
+model_feedback_extraction_instructions = """Analyze the user's feedback on the proposed model.
 
-Classifica la risposta in una di queste categorie:
+Classify the response into one of these categories:
 
-1. **model_accepted**: L'utente ACCETTA il modello proposto
-   Esempi: "sì", "perfetto", "ok", "va bene", "accetto", "dimmi come scaricarlo"
+1. **model_accepted**: The user ACCEPTS the proposed model
+   Examples: "yes", "perfect", "ok", "fine", "I accept", "tell me how to download it"
 
-2. **wants_another_search**: L'utente vuole CERCARE UN ALTRO MODELLO
-   Esempi: "no", "non mi piace", "cerchiane un altro", "nope", "troppo grande"
+2. **wants_another_search**: The user wants to SEARCH FOR ANOTHER MODEL
+   Examples: "no", "I don't like it", "search for another", "nope", "too big"
 
-3. **wants_default**: L'utente vuole il MODELLO DI DEFAULT o TERMINA
-   Esempi: "default", "basta ricerche", "stop", "predefinito", "termina"
+3. **wants_default**: The user wants the DEFAULT MODEL or TERMINATES
+   Examples: "default", "stop searching", "stop", "predefined", "terminate"
 
-Rispondi SEMPRE con un oggetto JSON valido con questa struttura esatta:
+ALWAYS reply with a valid JSON object with this exact structure:
 {
   "model_accepted": true,
   "wants_another_search": false,
@@ -203,21 +203,21 @@ Rispondi SEMPRE con un oggetto JSON valido con questa struttura esatta:
   "confidence": 0.95
 }
 
-IMPORTANTE: Solo UNO dei tre (model_accepted, wants_another_search, wants_default) può essere true!
+IMPORTANT: Only ONE of the three (model_accepted, wants_another_search, wants_default) can be true!
 """
 
-search_result_extraction_instructions = """Estrai SOLO questi 5 campi dal risultato della ricerca:
+search_result_extraction_instructions = """Extract ONLY these 5 fields from the search result:
 
-1. **model_name**: Il nome del modello (es: MobileNetV2 128)
-2. **download_url**: L'URL per scaricare il file (.h5, .keras, .onnx, .tflite) (estrarre dalle parentesi tonde se Markdown)
-3. **model_size**: La dimensione del file (es: 5.7MB)
-4. **accuracy**: L'accuratezza del modello (es: 64%)
-5. **inference_time**: Il tempo di inferenza (es: 40ms (STM32H7))
+1. **model_name**: The name of the model (e.g., MobileNetV2 128)
+2. **download_url**: The URL to download the file (.h5, .keras, .onnx, .tflite) (extract from parentheses if Markdown)
+3. **model_size**: The size of the file (e.g., 5.7MB)
+4. **accuracy**: The accuracy of the model (e.g., 64%)
+5. **inference_time**: The inference time (e.g., 40ms (STM32H7))
 
-IMPORTANTE: Cerca link che finiscono con .h5, .keras, .onnx o .tflite.
-Se vedi [testo](https://...) estrai l'URL dalle parentesi tonde (il secondo)
+IMPORTANT: Look for links ending with .h5, .keras, .onnx, or .tflite.
+If you see [text](https://...) extract the URL from the parentheses (the second one)
 
-Rispondi SEMPRE con un oggetto JSON valido con esattamente questi campi:
+ALWAYS reply with a valid JSON object with exactly these fields:
 {
   "model_name": "MobileNetV2 128",
   "download_url": "https://url.com/model.h5",
@@ -231,80 +231,80 @@ Rispondi SEMPRE con un oggetto JSON valido con esattamente questi campi:
 # Attenzione: search_result_extraction_instructions è diverso da research_prompt. Serve per estrarre i risultati trovati, non per fare la ricerca!!
 
 # ============================================================================
-# PREDEFINED_MODELS - URL REALI (Verificati)
+# PREDEFINED_MODELS - REAL URLs (Verified)
 # ============================================================================
 
 
 def get_resource_path(filename: str) -> str:
-    """Restituisce il path assoluto di una risorsa nella cartella resources."""
-    # Cerchiamo prima in src/assistant/resources relativo a questo file
+    """Returns the absolute path of a resource in the resources folder."""
+    # First search in src/assistant/resources relative to this file
     base_dir = os.path.dirname(os.path.abspath(__file__))
     res_path = os.path.join(base_dir, "resources", filename)
     return res_path
 
 def load_predefined_models() -> dict:
-    """Carica i modelli predefiniti dal file JSON."""
+    """Loads predefined models from the JSON file."""
     path = get_resource_path("predefined_models.json")
     if not os.path.exists(path):
-        logger.warning(f"⚠️ Registro modelli non trovato in {path}, ritorno vuoto.")
+        logger.warning(f"⚠️ Models registry not found at {path}, returning empty.")
         return {}
     try:
         with open(path, 'r', encoding='utf-8') as f:
             return json.load(f)
     except Exception as e:
-        logger.error(f"❌ Errore caricamento modelli: {e}")
+        logger.error(f"❌ Error loading models: {e}")
         return {}
 
 def save_predefined_models(models: dict):
-    """Salva i modelli nel file JSON."""
+    """Saves models to the JSON file."""
     path = get_resource_path("predefined_models.json")
     try:
-        # Assicurati che la cartella esista
+        # Ensure the folder exists
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, 'w', encoding='utf-8') as f:
             json.dump(models, f, indent=4, ensure_ascii=False)
-        logger.info(f"✅ Registro modelli aggiornato: {path}")
+        logger.info(f"✅ Models registry updated: {path}")
     except Exception as e:
-        logger.error(f"❌ Errore salvataggio modelli: {e}")
+        logger.error(f"❌ Error saving models: {e}")
 
-# Inizializza PREDEFINED_MODELS dinamicamente (ma caricalo ogni volta se vogliamo essere dinamici al runtime)
+# Initialize PREDEFINED_MODELS dynamically (but load it every time if we want to be dynamic at runtime)
 PREDEFINED_MODELS = load_predefined_models()
-# <- con .h5 e non .tflite
+# <- with .h5 and not .tflite
 
 
 # ============================================================================
-# NODI WORKFLOW 2
+# WORKFLOW 2 NODES
 # ============================================================================
 def collect_analysis_info(state: MasterState, config: RunnableConfig = None) -> MasterState:
     """
-    Raccoglie SOLO target MCU e compression.
-    La selezione modello viene gestita nei nodi successivi !
+    Collects ONLY MCU target and compression.
+    Model selection is handled in subsequent nodes!
     """
     
-    logger.info("📋 Raccolta configurazione analisi AI...")
+    logger.info("📋 Collecting AI analysis configuration...")
     
     cfg = Configuration.from_runnable_config(config)
     
     prompt = {
-        "instruction": """Configurazione Analisi AI con STEdgeAI
+        "instruction": """AI Analysis Configuration with STEdgeAI
 
-Specifica (brevemente):
+Specify (briefly):
 1. Target MCU (STM32F4, STM32H7, STM32U5, etc.)
-2. Livello compressione: low, medium, high, very_high (opzionale, default: high)
+2. Compression level: low, medium, high, very_high (optional, default: high)
 
-Esempi:
+Examples:
 - "STM32H743"
-- "F4 con alta compressione"
+- "F4 with high compression"
 - "STM32U5 medium"
         """,
     }
     
     # === IDEMPOTENCY CHECK ===
-    # Se abbiamo già target e compression (es: iniettati da config o resume), saltiamo.
-    # CRITICO: Non saltare se il target è quello di default ma la board è diversa!
+    # If we already have target and compression (e.g., injected from config or resume), we skip.
+    # CRITICAL: Do not skip if the target is the default one but the board is different!
     board_target = None
     if state.board_name:
-        # Mappa semplice per board note o estrazione serie
+        # Simple map for known boards or series extraction
         b_low = state.board_name.lower()
         targets = ["f0", "f1", "f2", "f3", "f4", "f7", "h5", "h7", "l0", "l1", "l4", "l5", "u5", "g0", "g4", "w5", "c0", "n6"]
         for t in targets:
@@ -312,22 +312,22 @@ Esempi:
                 board_target = f"stm32{t}"
                 break
     
-    # Se la board attuale suggerisce un target diverso da quello salvato, NON saltare
+    # If the current board suggests a different target from the saved one, DO NOT skip
     if state.target and state.compression and not state.user_response:
         if board_target and board_target != state.target:
-            logger.info(f"🔄 Reset target AI per allineamento board: {state.target} -> {board_target}")
+            logger.info(f"🔄 Reset AI target for board alignment: {state.target} -> {board_target}")
             state.target = board_target
         else:
-            logger.info(f"⏭️  Idempotenza: Target '{state.target}' e Compression '{state.compression}' già presenti. Salto interrupt.")
+            logger.info(f"⏭️  Idempotency: Target '{state.target}' and Compression '{state.compression}' already present. Skipping interrupt.")
             return state
 
     from src.assistant.utils import extract_user_response, get_llm
     
-    # --- Passo 1: Prova a usare il messaggio iniziale ---
-    # Cerchiamo se l'utente ha già specificato una board/target nel comando di avvio
+    # --- Step 1: Try to use the initial message ---
+    # We search if the user has already specified a board/target in the start command
     initial_target = None
     if not state.user_response:
-        # Analisi euristica veloce del messaggio iniziale
+        # Fast heuristic analysis of the initial message
         msg_low = state.message.lower()
         targets = ["f0", "f1", "f2", "f3", "f4", "f7", "h5", "h7", "l0", "l1", "l4", "l5", "u5", "g0", "g4", "w5", "c0", "n6"]
         for t in targets:
@@ -335,34 +335,34 @@ Esempi:
                 initial_target = f"stm32{t}"
                 break
     
-    # --- Passo 2: Verifica e Interrupt ---
-    # Forza interruzione se l'intento non è cristallino nel primo messaggio
+    # --- Step 2: Verification and Interrupt ---
+    # Force interrupt if the intent is not crystal clear in the first message
     if not initial_target:
         resume_value = None
         if not state.user_response:
-            # Suggerimento dal profilo
+            # Suggestion from profile
             last_series = state.persistent_context.get("mcu_series", "F4") if state.persistent_context else "F4"
             dynamic_prompt = {
                 "instruction": prompt["instruction"],
-                "suggestion": f"💡 L'ultima volta hai lavorato su serie **{last_series}**. Vuoi continuare con questa o cambiare?"
+                "suggestion": f"💡 Last time you worked on the **{last_series}** series. Do you want to continue with this one or change?"
             }
             logger.info("⏸️ Interrupting for AI analysis config with profile suggestion.")
             resume_value = interrupt(dynamic_prompt)
         
-        # Dopo la ripresa: usa interrupt return value come priorità
+        # After resuming: use interrupt return value as priority
         if resume_value and str(resume_value).strip():
             user_text = str(resume_value).strip()
         else:
             user_text = extract_user_response(state.user_response)
         state.user_response = ""
     else:
-        # Abbiamo già il target dal messaggio iniziale
+        # We already have the target from the initial message
         user_text = state.message
-        logger.info(f"✓ Target '{initial_target}' rilevato nel messaggio iniziale.")
+        logger.info(f"✓ Target '{initial_target}' detected in initial message.")
 
-    # --- Passo 3: Eredità e Parsing ---
-    if not user_text or user_text.strip() == "" or "precedente" in user_text.lower() or "quella di" in user_text.lower() or "profilo" in user_text.lower():
-        # Recupera mcu_series dallo stato corrente O dalla memoria persistente
+    # --- Step 3: Inheritance and Parsing ---
+    if not user_text or user_text.strip() == "" or "previous" in user_text.lower() or "like before" in user_text.lower() or "profile" in user_text.lower() or "precedente" in user_text.lower() or "quella di" in user_text.lower():
+        # Recover mcu_series from current state OR from persistent memory
         current_series = state.mcu_series
         if not current_series and state.persistent_context:
              current_series = state.persistent_context.get("mcu_series")
@@ -377,15 +377,13 @@ Esempi:
             }
             target_mcu = series_to_target.get(current_series.upper(), "stm32f4")
             user_text = f"{target_mcu}, high compression"
-            logger.info(f"📋 Applicata configurazione da profilo: {target_mcu}")
+            logger.info(f"📋 Applied profile configuration: {target_mcu}")
         else:
             user_text = "STM32F4, high compression"
     
     logger.info(f"📝 User input RAW: '{user_text}'")
     
-    # === ESTRAI TARGET E COMPRESSION ===
-    
-    # === ESTRAI TARGET E COMPRESSION ===
+    # === EXTRACT TARGET AND COMPRESSION ===
     
     llm_extractor = get_llm(
         config=config,
@@ -395,7 +393,7 @@ Esempi:
     
     extraction_result = llm_extractor.invoke([
         SystemMessage(content=analysis_info_extraction_instructions),
-        HumanMessage(content=f"Risposta utente: {user_text}")
+        HumanMessage(content=f"User response: {user_text}")
     ])
     
     state.target = extraction_result.target or state.target or "stm32h743"
@@ -404,7 +402,7 @@ Esempi:
     
     os.makedirs(state.ai_output_dir, exist_ok=True)
     
-    logger.info(f"✓ Configurazione estratta:")
+    logger.info(f"✓ Configuration extracted:")
     logger.info(f"  Target: {state.target}")
     logger.info(f"  Compression: {state.compression}")
     
@@ -412,62 +410,61 @@ Esempi:
 
 
 # ============================================================================
-# NODO: SCEGLI DA MODELLI PREDEFINITI (TASK-BASED)
+# NODE: CHOOSE FROM PREDEFINED MODELS (TASK-BASED)
 # ============================================================================
 def choose_predefined_taskbased_model(state: MasterState, config: RunnableConfig = None) -> MasterState:
     """
-    Mostra modelli predefiniti con parsing LLM.
-    Salva il task per fallback intelligente.
-    Usa PREDEFINED_MODELS come unica fonte.
+    Shows predefined models with LLM parsing.
+    Saves the task for intelligent fallback.
+    Uses PREDEFINED_MODELS as the sole source.
     """
     
 def choose_ai_task(state: MasterState, config: RunnableConfig = None) -> MasterState:
     """
-    Nodo 1: Sceglie il TASK (es. Classificazione immagini)
-    Gestisce l'interrupt per il menu principale.
+    Node 1: Chooses the TASK (e.g. Image Classification)
+    Handles the interrupt for the main menu.
     """
-    logger.info("📋 Scelta Task AI...")
+    logger.info("📋 Choosing AI Task...")
     
-    # Ricarica modelli dal JSON
+    # Reload models from JSON
     global PREDEFINED_MODELS
     PREDEFINED_MODELS = load_predefined_models()
     
     cfg = Configuration.from_runnable_config(config)
-    cfg = Configuration.from_runnable_config(config)
     llm = get_llm(config=config, temperature=0)
     
     categories = list(PREDEFINED_MODELS.keys())
-    prompt_lines = ["--- MODELLI PREDEFINITI (Ottimizzati e Garantiti) ---", "Seleziona una categoria per vedere i modelli pronti all'uso:\n"]
+    prompt_lines = ["--- PREDEFINED MODELS (Optimized and Guaranteed) ---", "Select a category to see ready-to-use models:\n"]
     mapping = {}
     for i, cat in enumerate(categories, 1):
         desc = PREDEFINED_MODELS[cat].get("description", cat)
         prompt_lines.append(f"{i}. {desc}")
         mapping[str(i)] = cat
     
-    prompt_lines.append("\n--- ALTRE OPZIONI ---")
+    prompt_lines.append("\n--- OTHER OPTIONS ---")
     reg_idx = len(categories) + 1
-    prompt_lines.append(f"{reg_idx}. Registra un TUO modello locale (già presente sul disco)")
+    prompt_lines.append(f"{reg_idx}. Register YOUR custom local model (already present on disk)")
     mapping[str(reg_idx)] = "register_new"
     
     other_idx = reg_idx + 1
-    prompt_lines.append(f"{other_idx}. Ricerca ONLINE (Cerca nuovi modelli su GitHub/Google)")
+    prompt_lines.append(f"{other_idx}. ONLINE Search (Look for new models on GitHub/Google)")
     mapping[str(other_idx)] = "other"
     
-    prompt_text = "\n".join(prompt_lines) + f"\n\nRispondi con il numero (1-{other_idx}) o descrivi cosa vuoi fare."
+    prompt_text = "\n".join(prompt_lines) + f"\n\nReply with the number (1-{other_idx}) or describe what you want to do."
     
     # === IDEMPOTENCY & INTERRUPT ===
     if state.last_task and state.last_task != "other" and not state.user_response:
-        logger.info(f"⏭️  Idempotenza: Task '{state.last_task}' già selezionato.")
+        logger.info(f"⏭️  Idempotency: Task '{state.last_task}' already selected.")
         return state
 
     resume_value = None
     if not state.user_response or state.user_response.strip() == "":
         logger.info("⏸️ Interrupting for AI task selection.")
         resume_value = interrupt({"instruction": prompt_text})
-        # logger.info("⏭️  BYPASS: Selezione automatica task -> '1' (Classificazione)")
+        # logger.info("⏭️  BYPASS: Automatic task selection -> '1' (Classification)")
         # user_text = "1"
     
-    # Usa interrupt return value come priorità
+    # Use interrupt return value as priority
     if resume_value and str(resume_value).strip():
         user_text = str(resume_value).strip()
     else:
@@ -475,26 +472,26 @@ def choose_ai_task(state: MasterState, config: RunnableConfig = None) -> MasterS
     state.user_response = "" # Clear after use
     if not user_text: user_text = "1"
     
-    logger.info(f"📥 Risposta utente ricevuta: '{user_text}'")
+    logger.info(f"📥 User response received: '{user_text}'")
     
-    # === ESTRAI TASK CON LLM ===
+    # === EXTRACT TASK WITH LLM ===
     mapping_text = "\n".join([f'- "{k}" -> {v}' for k, v in mapping.items()])
-    dynamic_instructions = f"""Analizza la risposta dell'utente e determina il task AI richiesto.
-Usa rigorosamente il mapping numerico se l'utente ha inserito un numero.
+    dynamic_instructions = f"""Analyze the user's response and determine the requested AI task.
+Strictly use the numerical mapping if the user has entered a number.
 
-Menu visualizzato all'utente:
+Menu displayed to the user:
 {prompt_text}
 
-MAPPING ESPLICITO:
+EXPLICIT MAPPING:
 {mapping_text}
 
-REGOLE:
-1. Se l'utente risponde con un numero presente nel mapping, ritorna il task corrispondente.
-2. Se l'utente descrive un'azione, mappa verso la categoria più vicina.
-3. Se l'utente vuole qualcosa di non presente o una ricerca, usa "other".
-4. Il valore di "confidence" deve essere 1.0 per match numerici esatti.
+RULES:
+1. If the user replies with a number present in the mapping, return the corresponding task.
+2. If the user describes an action, map to the closest category.
+3. If the user wants something not present or a search, use "other".
+4. The "confidence" value must be 1.0 for exact numerical matches.
 
-Rispondi in formato JSON: {{"task": "...", "confidence": 0.0-1.0}}
+Reply in JSON format: {{"task": "...", "confidence": 0.0-1.0}}
 """
 
     llm_extractor = get_llm(
@@ -504,13 +501,13 @@ Rispondi in formato JSON: {{"task": "...", "confidence": 0.0-1.0}}
     )
     task_result = llm_extractor.invoke([
         SystemMessage(content=dynamic_instructions),
-        HumanMessage(content=f"Risposta utente: {user_text}")
+        HumanMessage(content=f"User response: {user_text}")
     ])
     
     logger.info(f"🤖 LLM Extraction: task='{task_result.task}', confidence={task_result.confidence}")
     
     state.last_task = task_result.task
-    logger.info(f"✓ Task selezionato: {state.last_task}")
+    logger.info(f"✓ Task selected: {state.last_task}")
     
     if state.last_task == "register_new":
         state.model_discovery_method = "register_new"
@@ -525,17 +522,17 @@ Rispondi in formato JSON: {{"task": "...", "confidence": 0.0-1.0}}
 
 def choose_ai_model(state: MasterState, config: RunnableConfig = None) -> MasterState:
     """
-    Nodo 2: Sceglie il MODELLO specifico dal catalogo del task.
-    Gestisce l'interrupt per la lista modelli.
+    Node 2: Chooses the specific MODEL from the task catalog.
+    Handles the interrupt for the models list.
     """
     if state.model_discovery_method != "taskbased":
         return state
 
-    logger.info(f"📋 Scelta Modello per task '{state.last_task}'...")
+    logger.info(f"📋 Choosing Model for task '{state.last_task}'...")
     
     # === IDEMPOTENCY CHECK ===
     if state.selected_model and not state.user_response:
-        logger.info(f"⏭️  Idempotenza: Modello '{state.selected_model['name']}' già selezionato.")
+        logger.info(f"⏭️  Idempotency: Model '{state.selected_model['name']}' already selected.")
         return state
 
     task_info = PREDEFINED_MODELS.get(state.last_task)
@@ -560,23 +557,23 @@ def choose_ai_model(state: MasterState, config: RunnableConfig = None) -> Master
         model_options_text.append(f"{i}. {model['name']} {status_icon} [{ext}] ({model['size']} - {status_note})")
     
     models_list = "\n".join(model_options_text)
-    prompt_text = f"Quale modello vuoi usare per {task_info['description']}?\n\nOpzioni disponibili:\n{models_list}\n{len(available_models)+1}. Nessuno di questi (ricerca online)\n\nRispondi con il numero."
+    prompt_text = f"Which model do you want to use for {task_info['description']}?\n\nAvailable options:\n{models_list}\n{len(available_models)+1}. None of these (online search)\n\nReply with the number."
     
     resume_value = None
     if not state.user_response or state.user_response.strip() == "":
         logger.info("⏸️ Interrupting for AI model selection.")
         resume_value = interrupt({"instruction": prompt_text})
-        # logger.info("⏭️  BYPASS: Selezione automatica modello -> '2' (MobileNetV1)")
+        # logger.info("⏭️  BYPASS: Automatic model selection -> '2' (MobileNetV1)")
         # model_text = "2"
     
-    # Usa interrupt return value come priorità
+    # Use interrupt return value as priority
     if resume_value and str(resume_value).strip():
         model_text = str(resume_value).strip()
     else:
         model_text = extract_user_response(state.user_response).strip()
     state.user_response = "" # Clear after use
     
-    # === ESTRAZIONE SCELTA ===
+    # === CHOICE EXTRACTION ===
     cfg = Configuration.from_runnable_config(config)
     llm_model_extractor = get_llm(
         config=config,
@@ -584,11 +581,11 @@ def choose_ai_model(state: MasterState, config: RunnableConfig = None) -> Master
         temperature=0
     )
     
-    logger.info(f"📥 Risposta utente per modello: '{model_text}'")
+    logger.info(f"📥 User response for model: '{model_text}'")
     
     model_result = llm_model_extractor.invoke([
         SystemMessage(content=model_selection_instructions),
-        HumanMessage(content=f"Modelli disponibili: {len(available_models)}\nRisposta utente: {model_text}")
+        HumanMessage(content=f"Available models: {len(available_models)}\nUser response: {model_text}")
     ])
     
     logger.info(f"🤖 LLM Model Extraction: index={model_result.model_index}, accepted={model_result.model_accepted}, search_again={model_result.wants_another_search}")
@@ -598,7 +595,7 @@ def choose_ai_model(state: MasterState, config: RunnableConfig = None) -> Master
         if 0 <= model_idx < len(available_models):
             state.selected_model = available_models[model_idx]
             state.model_accepted = True
-            logger.info(f"✓ Modello scelto: {state.selected_model['name']}")
+            logger.info(f"✓ Chosen model: {state.selected_model['name']}")
         else:
             state.model_discovery_method = "search"
     elif model_result.wants_another_search:
@@ -616,31 +613,31 @@ def choose_ai_model(state: MasterState, config: RunnableConfig = None) -> Master
 
 
 # ============================================================================
-# NODO PRINCIPALE per la ricerca modelli !
+# MAIN NODE for model search !
 # ============================================================================
 def search_recommendation_model(state: MasterState, config: RunnableConfig = None) -> MasterState:
     """
-    ✅ NODO PRINCIPALE: Ricerca modello con fallback intelligente
+    ✅ MAIN NODE: Model search with intelligent fallback
     
     TYPE HINTS: state: MasterState, config: RunnableConfig → MasterState
     
-    Flusso:
-    1. GitHub (ibrido Python+LLM) - conta iterazione
-    2. Google (fallback) - NON conta iterazione
-    3. Interrupt per conferma utente
-    4. Ritorno a "search" nel routing (max 3 iterazioni)
-    5. Task-based default - SOLO dopo 3 iterazioni fallite
+    Flow:
+    1. GitHub (hybrid Python+LLM) - counts iteration
+    2. Google (fallback) - DOES NOT count iteration
+    3. Interrupt for user confirmation
+    4. Return to "search" in routing (max 3 iterations)
+    5. Task-based default - ONLY after 3 failed iterations
     """
     
     logger.info("=" * 70)
-    logger.info(f"🔍 RICERCA MODELLO [Iter {state.search_iterations + 1}/3]")
+    logger.info(f"🔍 MODEL SEARCH [Iter {state.search_iterations + 1}/3]")
     logger.info(f"   Task: {state.last_task} | Target: {state.target}")
     logger.info("=" * 70)
     
     # ====================================================================
-    # FASE 1: GITHUB (ibrido) - CONTA ITERAZIONE
+    # PHASE 1: GITHUB (hybrid) - COUNTS ITERATION
     # ====================================================================
-    logger.info(f"\n📍 FASE 1: GitHub (ibrido) - Iter {state.search_iterations + 1}/3")
+    logger.info(f"\n📍 PHASE 1: GitHub (hybrid) - Iter {state.search_iterations + 1}/3")
     
     github_result = search_h5_file_in_repo_hybrid(
         repo_path="STMicroelectronics/stm32ai-modelzoo",
@@ -650,7 +647,7 @@ def search_recommendation_model(state: MasterState, config: RunnableConfig = Non
     )
     
     if github_result and github_result.get('url_raw'):
-        logger.info(f"✓ GitHub: Trovato e validato!")
+        logger.info(f"✓ GitHub: Found and validated!")
         logger.info(f"  {github_result['name']}")
         
         state.selected_model = {
@@ -663,35 +660,35 @@ def search_recommendation_model(state: MasterState, config: RunnableConfig = Non
         state.model_discovery_method = "github_hybrid"
         state.search_iterations += 1
         
-        # ✅ INTERRUPT: Chiedi conferma all'utente
-        logger.info(f"\n✓ MODELLO TROVATO - Richiesta conferma utente...")
+        # ✅ INTERRUPT: Ask user confirmation
+        logger.info(f"\n✓ MODEL FOUND - Requesting user confirmation...")
         
-        # Estrai formato
+        # Extract format
         import os
         filename = github_result.get('local_filename', github_result['url_raw'])
         _, ext = os.path.splitext(filename)
         ext = ext.upper() if ext else "N/D"
 
         prompt = {
-            "instruction": f"""Modello AI trovato per {state.last_task}
+            "instruction": f"""AI Model found for {state.last_task}
 
-📦 Dettagli:
-- Nome: {github_result['name']}
-- Formato: {ext}
+📦 Details:
+- Name: {github_result['name']}
+- Format: {ext}
 - Size: {github_result.get('size', 'N/A')}
 - Source: {github_result.get('source', 'GitHub')}
 - Method: {github_result.get('selection_method', 'N/A')}
 
 🔗 URL: {github_result['url_raw']}
 
-❓ Accetti questo modello? (rispondi: si/no oppure yes/no)
-- 'si' o 'yes': Procedi con il download
-- 'no': Continua la ricerca di altri modelli""",
+❓ Do you accept this model? (reply: yes/no or si/no)
+- 'yes' or 'si': Proceed with download
+- 'no': Continue searching for other models""",
         }
         
         user_confirmation = interrupt(prompt)
         
-        # Gestisci dict o stringa
+        # Handle dict or string
         if isinstance(user_confirmation, dict):
             confirmation_text = str(user_confirmation.get("response", user_confirmation.get("input", ""))).lower().strip()
         else:
@@ -701,64 +698,64 @@ def search_recommendation_model(state: MasterState, config: RunnableConfig = Non
         if not confirmation_text or confirmation_text.strip() == "":
             confirmation_text = "si"
         
-        logger.info(f"📝 Risposta utente: '{confirmation_text}'")
+        logger.info(f"📝 User response: '{confirmation_text}'")
         
-        # Accetto se: si, yes, ok, accetto, conferma, y, sì
+        # Accept if: si, yes, ok, accetto, conferma, y, sì
         accepted_keywords = ["si", "yes", "ok", "accetto", "conferma", "y", "sì"]
         
-        # Se ACCETTA → return state (rimane github_hybrid/google_search/taskbased_fallback)
+        # If ACCEPTS → return state (remains github_hybrid/google_search/taskbased_fallback)
         if any(keyword in confirmation_text for keyword in accepted_keywords):
-            logger.info(f"✓ Modello ACCETTATO dall'utente")
-            return state  # ← Va al download
+            logger.info(f"✓ Model ACCEPTED by user")
+            return state  # ← Goes to download
 
-        # Se RIFIUTA → ritorna al loop
+        # If REJECTS → returns to loop
         else:
-            logger.warning(f"❌ Modello RIFIUTATO dall'utente")
-            state.model_discovery_method = "search"  # ← Torna al loop, continua ricerca se iterazioni rimaste
+            logger.warning(f"❌ Model REJECTED by user")
+            state.model_discovery_method = "search"  # ← Back to loop, continue search if iterations remain
 
     else:
-        logger.warning(f"❌ GitHub fallito")
+        logger.warning(f"❌ GitHub failed")
     
     state.search_iterations += 1
     
     # ====================================================================
-    # FASE 2: GOOGLE (fallback) - NON CONTA ITERAZIONE
+    # PHASE 2: GOOGLE (fallback) - NO ITERATION COUNT
     # ====================================================================
-    logger.info(f"\n📍 FASE 2: Google (fallback, NO iter++)")
+    logger.info(f"\n📍 PHASE 2: Google (fallback, NO iter++)")
     
     if state.search_iterations <= 3:
         google_result = search_via_google_tools_hybrid(state, config)
         
         if google_result['success'] and google_result['url_valid']:
-            logger.info(f"✓ Google: Trovato e validato!")
+            logger.info(f"✓ Google: Found and validated!")
             logger.info(f"  {google_result['model']['name']}")
             
             state.selected_model = google_result['model']
             state.model_discovery_method = "google_search"
             
-            # ✅ INTERRUPT: Chiedi conferma all'utente (anche per Google)
-            logger.info(f"\n✓ MODELLO TROVATO (Google) - Richiesta conferma utente...")
+            # ✅ INTERRUPT: Ask user confirmation (also for Google)
+            logger.info(f"\n✓ MODEL FOUND (Google) - Requesting user confirmation...")
             
-            # Estrai formato
+            # Extract format
             import os
             filename = google_result['model'].get('local_filename', google_result['model']['url'])
             _, ext = os.path.splitext(filename)
             ext = ext.upper() if ext else "N/D"
             
             prompt = {
-                "instruction": f"""Modello AI trovato per {state.last_task}
+                "instruction": f"""AI Model found for {state.last_task}
 
-📦 Dettagli:
-- Nome: {google_result['model']['name']}
-- Formato: {ext}
+📦 Details:
+- Name: {google_result['model']['name']}
+- Format: {ext}
 - Size: {google_result['model'].get('size', 'N/A')}
 - Source: {google_result['model'].get('source', 'Google Search')}
 
 🔗 URL: {google_result['model']['url']}
 
-❓ Accetti questo modello? (rispondi: si/no oppure yes/no)
-- 'si' o 'yes': Procedi con il download
-- 'no': Continua la ricerca di altri modelli""",
+❓ Do you accept this model? (reply: yes/no or si/no)
+- 'yes' or 'si': Proceed with download
+- 'no': Continue searching for other models""",
             }
             
             user_confirmation = interrupt(prompt)
@@ -768,63 +765,63 @@ def search_recommendation_model(state: MasterState, config: RunnableConfig = Non
             else:
                 confirmation_text = str(user_confirmation).lower().strip()
             
-            logger.info(f"📝 Risposta utente: '{confirmation_text}'")
+            logger.info(f"📝 User response: '{confirmation_text}'")
             
             accepted_keywords = ["si", "yes", "ok", "accetto", "conferma", "y", "sì"]
             
             if any(keyword in confirmation_text for keyword in accepted_keywords):
-                logger.info(f"✓ Modello ACCETTATO dall'utente")
+                logger.info(f"✓ Model ACCEPTED by user")
                 logger.info("=" * 70)
-                return state  # ← Procedi al download
+                return state  # ← Proceed to download
             else:
-                logger.warning(f"❌ Modello RIFIUTATO dall'utente - Continua ricerca")
+                logger.warning(f"❌ Model REJECTED by user - Continue search")
         else:
-            logger.warning(f"❌ Google: Fallito")
+            logger.warning(f"❌ Google: Failed")
     
     # ====================================================================
-    # FASE 3: VERIFICA ITERAZIONI
+    # PHASE 3: VERIFY ITERATIONS
     # ====================================================================
     
     if state.search_iterations < 3:
-        # ✅ RITORNA AL ROUTING CON "search" - PROSSIMO TENTATIVO
-        logger.info(f"\n📍 FASE 3: Iterazione {state.search_iterations}/3 completata")
-        logger.info(f"   ↻ Ritorno al routing per prossimo tentativo...")
+        # ✅ RETURN TO ROUTING WITH "search" - NEXT ATTEMPT
+        logger.info(f"\n📍 PHASE 3: Iteration {state.search_iterations}/3 completed")
+        logger.info(f"   ↻ Returning to routing for next attempt...")
         
-        state.model_discovery_method = "search"  # ← TORNA AL LOOP
+        state.model_discovery_method = "search"  # ← BACK TO LOOP
         
         logger.info("=" * 70)
         return state
     
     # ====================================================================
-    # FASE 4: MAX ITERAZIONI RAGGIUNTO - FALLBACK TASK-BASED
+    # PHASE 4: MAX ITERATIONS REACHED - TASK-BASED FALLBACK
     # ====================================================================
     else:
-        logger.warning(f"\n⚠️  FASE 4: Max iterazioni raggiunto (3/3)")
-        logger.info(f"   → Attivazione fallback task-based...")
+        logger.warning(f"\n⚠️  PHASE 4: Max iterations reached (3/3)")
+        logger.info(f"   → Activating task-based fallback...")
         
         fallback_model = get_task_based_default_model(state.last_task)
         
         if fallback_model:
-            logger.info(f"✓ Fallback trovato: {fallback_model['name']}")
+            logger.info(f"✓ Fallback found: {fallback_model['name']}")
             
             state.selected_model = fallback_model
             state.model_discovery_method = "taskbased_fallback"
             
-            # ✅ AUTO-ACCETTA il fallback (niente interrupt — LangGraph re-esegue il nodo
-            # dall'inizio ad ogni resume, impedendo all'interrupt di ricevere il valore 'si')
+            # ✅ AUTO-ACCEPT fallback (no interrupt — LangGraph re-executes node
+            # from start on every resume, preventing interrupt from receiving 'yes' value)
             import os
             filename = fallback_model.get('local_filename', fallback_model.get('url', ''))
             _, ext = os.path.splitext(filename)
             ext = ext.upper() if ext else "N/D"
             
-            logger.info(f"\n✓ MODELLO FALLBACK AUTO-SELEZIONATO")
-            logger.info(f"  Nome: {fallback_model['name']}")
-            logger.info(f"  Formato: {ext} | Size: {fallback_model.get('size', 'N/A')}")
+            logger.info(f"\n✓ FALLBACK MODEL AUTO-SELECTED")
+            logger.info(f"  Name: {fallback_model['name']}")
+            logger.info(f"  Format: {ext} | Size: {fallback_model.get('size', 'N/A')}")
             logger.info(f"  URL: {fallback_model.get('url', 'N/A')}")
             logger.info("=" * 70)
-            return state  # ← Procedi al download automaticamente
+            return state  # ← Proceed to download automatically
         else:
-            logger.warning(f"❌ Nessun fallback disponibile")
+            logger.warning(f"❌ No fallback available")
             
             cfg = Configuration.from_runnable_config(config)
             state.model_path = cfg.ai_model_path
@@ -836,8 +833,8 @@ def search_recommendation_model(state: MasterState, config: RunnableConfig = Non
 
 def model_selection_routing(state: MasterState) -> Literal["run_analyze", "download_model", "search_recommendation_model", "add_custom_model_procedure"]:
     """
-    Routing intelligente dopo selezione modello.
-    Gestisce il loop di ricerca fino a max 3 tentativi e la registrazione di nuovi modelli.
+    Intelligent routing after model selection.
+    Handles the search loop up to max 3 attempts and new model registration.
     """
     
     logger.info(f"\n🔄 ROUTING DECISION:")
@@ -845,75 +842,75 @@ def model_selection_routing(state: MasterState) -> Literal["run_analyze", "downl
     logger.info(f"   search_iterations: {state.search_iterations}")
     
     # ====================================================================
-    # CASO 0: Registrazione nuovo modello
+    # CASE 0: Register new model
     # ====================================================================
     if state.model_discovery_method == "register_new":
-        logger.info("   → Registrazione nuovo modello, va a add_custom_model_procedure")
+        logger.info("   → Registering new model, goes to add_custom_model_procedure")
         return "add_custom_model_procedure"
 
     # ====================================================================
-    # CASO 1: Default model (niente ricerca)
+    # CASE 1: Default model (no search)
     # ====================================================================
     if state.model_discovery_method == "default":
-        logger.info("   → Modello pronto/selezionato, va a download_model per ispezione")
+        logger.info("   → Model ready/selected, goes to download_model for inspection")
         return "download_model"
     
     # ====================================================================
-    # CASO 2: Ricerca attiva (ritorna al loop se rifiutato)
+    # CASE 2: Active search (returns to loop if rejected)
     # ====================================================================
     elif state.model_discovery_method == "search":
         if state.search_iterations < 3:
-            logger.info(f"   → Ricerca in corso ({state.search_iterations}/3), ritorno a search_recommendation_model")
+            logger.info(f"   → Search in progress ({state.search_iterations}/3), returning to search_recommendation_model")
             return "search_recommendation_model"
         else:
-            logger.info(f"   → Max iterazioni (3/3) raggiunto, vai a run_analyze (default)")
+            logger.info(f"   → Max iterations (3/3) reached, goes to run_analyze (default)")
             return "run_analyze"
     
     # ====================================================================
-    # CASO 3: Modello trovato e ACCETTATO
+    # CASE 3: Model found and ACCEPTED
     # ====================================================================
     else:  # github_hybrid, google_search, taskbased_fallback
-        logger.info(f"   → {state.model_discovery_method} ACCETTATO dall'utente, vai a download_model")
+        logger.info(f"   → {state.model_discovery_method} ACCEPTED by user, goes to download_model")
         return "download_model"
 
 # ============================================================================
-# PARTE 1 della ricerca di modelli: RICERCA GITHUB IBRIDA (Python + LLM con Structured Output)
+# PART 1 of model search: HYBRID GITHUB SEARCH (Python + LLM with Structured Output)
 # ============================================================================
 
-def search_h5_file_in_repo_hybrid( #fondamentale 
+def search_h5_file_in_repo_hybrid( # fundamental 
     repo_path: str,
     task: str,
     target_mcu: Optional[str] = None,
     config: RunnableConfig = None,
-    max_depth: int = 5  # ← LIMITE DI PROFONDITÀ
+    max_depth: int = 5  # ← DEPTH LIMIT
 ) -> Optional[dict]:
     """
-    Ricerca file .h5 con approccio ibrido (OTTIMIZZATO)
+    Search for .h5 files with hybrid approach (OPTIMIZED)
     
-    ✅ Migliorie:
-    - Limite di profondità per evitare loop infiniti
-    - Logging dettagliato per trovare i blocchi
-    - Early exit su file trovati
-    - Timeout virtualizzato su API GitHub
+    ✅ Improvements:
+    - Depth limit to avoid infinite loops
+    - Detailed logging to find blockages
+    - Early exit on found files
+    - Virtualized timeout on GitHub API
     """
     
     try:
-        logger.info(f"🔗 Ricerca GitHub IBRIDA: {task}")
+        logger.info(f"🔗 HYBRID GitHub Search: {task}")
         
-        # STEP 1: PYTHON → Scansione repo
-        logger.info(f"→ STEP 1: Scansione repo (Python)...")
+        # STEP 1: PYTHON → Repo scan
+        logger.info(f"→ STEP 1: Repo scan (Python)...")
         
         token = os.getenv("GITHUB_ACCESS_TOKEN")
         if not token:
-            logger.error("❌ GITHUB_ACCESS_TOKEN non impostato!")
+            logger.error("❌ GITHUB_ACCESS_TOKEN not set!")
             return None
         
         try:
             g = Github(token)
             repo = g.get_repo(repo_path)
-            logger.info(f"✓ Connesso a {repo_path}")
+            logger.info(f"✓ Connected to {repo_path}")
         except Exception as e:
-            logger.error(f"❌ Errore connessione: {str(e)[:80]}")
+            logger.error(f"❌ Connection error: {str(e)[:80]}")
             return None
         
         # ✅ TASK → FOLDER
@@ -921,33 +918,33 @@ def search_h5_file_in_repo_hybrid( #fondamentale
         
         try:
             root_contents = repo.get_contents(folder)
-            logger.info(f"✓ Cartella trovata: {folder}/")
+            logger.info(f"✓ Folder found: {folder}/")
         except Exception as e:
-            logger.error(f"❌ Cartella non trovata: {folder}")
-            logger.error(f"   Dettagli: {str(e)[:80]}")
+            logger.error(f"❌ Folder not found: {folder}")
+            logger.error(f"   Details: {str(e)[:80]}")
             return None
         
         h5_files: List[dict] = []
-        items_checked = 0  # Counter per debugging
+        items_checked = 0  # Counter for debugging
         
         def scan_repo(contents_list, depth=0):
             """
-            Scansiona repo e raccoglie file .h5
-            ✅ OTTIMIZZATO: Early exit, limit depth, logging
+            Scans repo and collects .h5 files
+            ✅ OPTIMIZED: Early exit, limit depth, logging
             """
             nonlocal items_checked
             
             if depth >= max_depth:
-                logger.debug(f"  ⚠️  Max depth ({max_depth}) raggiunta, stop")
+                logger.debug(f"  ⚠️  Max depth ({max_depth}) reached, stop")
                 return
             
             try:
                 for item in contents_list:
                     items_checked += 1
                     
-                    # Log ogni 50 item
+                    # Log every 50 items
                     if items_checked % 50 == 0:
-                        logger.info(f"  📊 Scansionati {items_checked} item ({len(h5_files)} .h5 trovati)...")
+                        logger.info(f"  📊 Scanned {items_checked} items ({len(h5_files)} .h5 found)...")
                     
                     try:
                         if item.type == "dir":
@@ -957,7 +954,7 @@ def search_h5_file_in_repo_hybrid( #fondamentale
                                 sub = repo.get_contents(item.path)
                                 scan_repo(sub, depth + 1)
                             except Exception as e:
-                                logger.debug(f"  {'  ' * depth}⚠️  Errore lettura {item.path}: {type(e).__name__}")
+                                logger.debug(f"  {'  ' * depth}⚠️  Error reading {item.path}: {type(e).__name__}")
                                 continue
                         
                         elif item.type == "file" and any(item.name.endswith(ext) for ext in [".h5", ".keras", ".onnx", ".tflite"]):
@@ -969,40 +966,40 @@ def search_h5_file_in_repo_hybrid( #fondamentale
                                 'description': description,
                                 'folder': item.path.rsplit('/', 1)[0] if '/' in item.path else folder
                             })
-                            logger.debug(f"  {'  ' * depth}✅ File trovato: {item.name}")
+                            logger.debug(f"  {'  ' * depth}✅ File found: {item.name}")
                             
-                            # ✅ EARLY EXIT se trovi abbastanza file
-                            if len(h5_files) >= 20:  # Limite pratico
-                                logger.info(f"  ℹ️  Trovati {len(h5_files)} file, stop ricerca")
+                            # ✅ EARLY EXIT if enough files found
+                            if len(h5_files) >= 20:  # Practical limit
+                                logger.info(f"  ℹ️  Found {len(h5_files)} files, stopping search")
                                 return
                     
                     except Exception as e:
-                        logger.debug(f"  ⚠️  Errore item {item.name}: {type(e).__name__}")
+                        logger.debug(f"  ⚠️  Error parsing item {item.name}: {type(e).__name__}")
                         continue
             
             except Exception as e:
-                logger.error(f"❌ Errore durante scan_repo: {str(e)[:100]}")
+                logger.error(f"❌ Error during scan_repo: {str(e)[:100]}")
                 import traceback
                 logger.debug(traceback.format_exc())
         
-        logger.info(f"→ Inizio scansione ricorsiva...")
+        logger.info(f"→ Beginning recursive scan...")
         scan_repo(root_contents)
         
-        logger.info(f"✓ Scansione completata: {items_checked} item, {len(h5_files)} file .h5 trovati")
+        logger.info(f"✓ Scan completed: {items_checked} items, {len(h5_files)} .h5 files found")
         
         if not h5_files:
-            logger.warning(f"❌ Nessun file .h5 trovato dopo {items_checked} controlli")
+            logger.warning(f"❌ No .h5 files found after {items_checked} checks")
             return None
         
-        logger.info(f"✓ Trovati {len(h5_files)} file .h5")
+        logger.info(f"✓ Found {len(h5_files)} .h5 files")
         for f in h5_files[:5]:
             logger.info(f"  - {f['name']} ({format_bytes(f['size'])}) [{f['description']}]")
         
         if len(h5_files) > 5:
-            logger.info(f"  ... e altri {len(h5_files) - 5} file")
+            logger.info(f"  ... and {len(h5_files) - 5} more files")
         
-        # STEP 2: LLM → Selezione sofisticata
-        logger.info(f"→ STEP 2: Ragionamento con LLM (structured)...")
+        # STEP 2: LLM → Sophisticated selection
+        logger.info(f"→ STEP 2: Reasoning with LLM (structured)...")
         
         selected_file = llm_select_best_model(
             h5_files=h5_files,
@@ -1012,15 +1009,15 @@ def search_h5_file_in_repo_hybrid( #fondamentale
         )
         
         if not selected_file:
-            logger.warning(f"❌ LLM fallito, uso primo file")
+            logger.warning(f"❌ LLM failed, using first file fallbacl")
             selected_file = h5_files[0]
             selection_method = "fallback_first"
         else:
             selection_method = "llm_reasoning"
-            logger.info(f"✓ LLM ha scelto: {selected_file['name']}")
+            logger.info(f"✓ LLM selected: {selected_file['name']}")
         
-        # STEP 3: PYTHON → URL e Validazione
-        logger.info(f"→ STEP 3: Costruzione URL e validazione...")
+        # STEP 3: PYTHON → URL and Validation
+        logger.info(f"→ STEP 3: URL Construction and validation...")
         
         url_raw = f"https://raw.githubusercontent.com/{repo_path}/main/{selected_file['path']}"
         logger.info(f"🔗 URL: {url_raw[:70]}...")
@@ -1028,25 +1025,25 @@ def search_h5_file_in_repo_hybrid( #fondamentale
         is_valid = validate_model_url_quick(url_raw)
         
         if not is_valid:
-            logger.warning(f"❌ URL non scaricabile (404?)")
+            logger.warning(f"❌ Un-downloadable URL (404?)")
             
-            # Fallback: prova altri file
+            # Fallback: try other files
             for alt_file in h5_files[1:3]:
-                logger.info(f"→ Tentativo alternativo: {alt_file['name']}...")
+                logger.info(f"→ Alternative attempt: {alt_file['name']}...")
                 alt_url = f"https://raw.githubusercontent.com/{repo_path}/main/{alt_file['path']}"
                 
                 if validate_model_url_quick(alt_url):
-                    logger.info(f"✓ Alternativo valido!")
+                    logger.info(f"✓ Formatter valid!")
                     selected_file = alt_file
                     url_raw = alt_url
                     is_valid = True
                     break
         
         if not is_valid:
-            logger.error(f"❌ Nessun URL valido")
+            logger.error(f"❌ No valid URLs found")
             return None
         
-        logger.info(f"✓ URL validato! Size: {format_bytes(selected_file['size'])}")
+        logger.info(f"✓ URL validated! Size: {format_bytes(selected_file['size'])}")
         
         return {
             'name': selected_file['name'],
@@ -1059,7 +1056,7 @@ def search_h5_file_in_repo_hybrid( #fondamentale
         }
     
     except Exception as e:
-        logger.error(f"❌ Errore: {str(e)[:150]}")
+        logger.error(f"❌ Error: {str(e)[:150]}")
         import traceback
         logger.debug(traceback.format_exc())
         return None
@@ -1072,31 +1069,31 @@ def llm_select_best_model(
     config: RunnableConfig = None
 ) -> Optional[dict]:
     """
-    LLM ragiona e seleziona il migliore file .h5
-    ✅ STRUTTURATO: Forza formato con Pydantic
+    LLM reasons and selects the best .h5 file
+    ✅ STRUCTURED: Forces format with Pydantic
     """
     
     try:
-        logger.info(f"→ Invio a LLM ({len(h5_files)} file)...")
+        logger.info(f"→ Sending to LLM ({len(h5_files)} file(s))...")
         
         h5_list_text = "\n".join([
             f"{i+1}. {f['name']:40} | {format_bytes(f['size']):>10} | {f['description']}"
             for i, f in enumerate(h5_files)
         ])
         
-        prompt = f"""Sei un esperto di modelli AI per STM32 embedded systems.
+        prompt = f"""You are an AI model expert for STM32 embedded systems.
 
-TASK RICHIESTA: {task}
+REQUESTED TASK: {task}
 TARGET MCU: {target_mcu}
 
-FILE DISPONIBILI NEL REPO:
+AVAILABLE FILES IN REPO:
 {h5_list_text}
 
-⚠️ ISTRUZIONI CRITICHE:
-1. Analizza TUTTI i modelli (.h5, .keras, .onnx, .tflite)
-2. Scegli il MIGLIORE per la task (considera: compatibilità, dimensione, architettura)
-3. Ritorna SOLO il numero dell'indice (1-{len(h5_files)})
-4. NON aggiungere altro testo
+⚠️ CRITICAL INSTRUCTIONS:
+1. Analyze ALL models (.h5, .keras, .onnx, .tflite)
+2. Choose the BEST one for the task (consider: compatibility, size, architecture)
+3. Return ONLY the index number (1-{len(h5_files)})
+4. DO NOT add any other text
 
 SCORING:
 - Exact match task: +100
@@ -1104,64 +1101,64 @@ SCORING:
 - Size < 10MB: +25
 - Size < 1MB: +50
 
-RISPOSTA - SOLO IL NUMERO:
+RESPONSE - JUST THE NUMBER:
 {1}"""
         
-        logger.debug(f"Prompt LLM: {prompt[:350]}...")
+        logger.debug(f"LLM Prompt: {prompt[:350]}...")
         
         # Use centralized LLM setup
         from src.assistant.utils import get_llm
         llm = get_llm(config)
         
-        # ✅ STRUCTURED OUTPUT - Forza formato
+        # ✅ STRUCTURED OUTPUT - Force format
         class ModelSelection(BaseModel):
             selected_index: int = Field(
-                description=f"Indice 1-based OBBLIGATORIO (1-{len(h5_files)}). Niente altro.",
-                ge=1,  # Minimo 1
-                le=len(h5_files)  # Massimo len(h5_files)
+                description=f"MANDATORY 1-based index (1-{len(h5_files)}). Nothing else.",
+                ge=1,  # Min 1
+                le=len(h5_files)  # Max len(h5_files)
             )
         
         llm_selector = llm.with_structured_output(ModelSelection)
         
-        logger.info(f"→ Invio prompt a LLM...")
+        logger.info(f"→ Sending prompt to LLM...")
         
         selection = llm_selector.invoke([
-            SystemMessage(content="""Tu sei un task di selezione modello.
-DEVI rispondere SOLO con un JSON valido nel formato specificato.
-Niente testo, niente spiegazioni.
-Se hai dubbi, scegli il modello più piccolo e stabile."""),
+            SystemMessage(content="""You are a model selection task.
+YOU MUST answer ONLY with a valid JSON in the specified format.
+No text, no explanations.
+If in doubt, choose the smallest and most stable model."""),
             HumanMessage(content=prompt)
         ])
         
         logger.info(f"📊 LLM Selection:")
         logger.info(f"  Index: {selection.selected_index}")
         
-        # Converti 1-based → 0-based
+        # Convert 1-based → 0-based
         idx_0based = selection.selected_index - 1
         
         if idx_0based < 0 or idx_0based >= len(h5_files):
-            logger.warning(f"❌ Indice fuori range: {selection.selected_index}")
-            logger.warning(f"   Fallback: seleziono il primo file")
+            logger.warning(f"❌ Index out of bounds: {selection.selected_index}")
+            logger.warning(f"   Fallback: choosing the first file")
             return h5_files[0]
         
         selected_file = h5_files[idx_0based]
-        logger.info(f"✓ LLM scelto file #{selection.selected_index}: {selected_file['name']}")
+        logger.info(f"✓ LLM chose file #{selection.selected_index}: {selected_file['name']}")
         logger.info(f"  Size: {format_bytes(selected_file['size'])}")
         logger.info(f"  Description: {selected_file['description']}")
         
         return selected_file
     
     except Exception as e:
-        logger.error(f"❌ Errore LLM selection: {str(e)[:100]}")
+        logger.error(f"❌ LLM selection error: {str(e)[:100]}")
         import traceback
         logger.debug(traceback.format_exc())
         
-        logger.warning(f"→ Fallback: seleziono il primo file")
+        logger.warning(f"→ Fallback: choosing the first file")
         return h5_files[0] if h5_files else None
 
 
 # ============================================================================
-# PARTE 2: RICERCA GOOGLE FALLBACK (con LLM Structured Extraction)
+# PART 2: GOOGLE FALLBACK SEARCH (with LLM Structured Extraction)
 # ============================================================================
 
 def search_via_google_tools_hybrid(
@@ -1169,25 +1166,25 @@ def search_via_google_tools_hybrid(
     config: RunnableConfig
 ) -> dict:
     """
-    Ricerca Google Search come fallback (NON incrementa iterazioni)
-    Usa SearchResultExtraction con structured output
+    Google Search as fallback (DOES NOT increment iterations)
+    Uses SearchResultExtraction with structured output
     """
     
     try:
-        logger.info(f"🔍 Ricerca Google (fallback, NO iter++)...")
+        logger.info(f"🔍 Google Search (fallback, NO iter++)...")
         
-        google_prompt = f"""Ricerca modelli AI (.h5, .keras, .onnx, .tflite) per STM32
+        google_prompt = f"""Search AI models (.h5, .keras, .onnx, .tflite) for STM32
 Target: {state.target}
 Task: {state.last_task}
 
-Criteri:
-1. Link GitHub Raw o Hugging Face
-2. Download diretto
-3. File compatibile con STM32 X-CUBE-AI
+Criteria:
+1. GitHub Raw or Hugging Face links
+2. Direct download
+3. File compatible with STM32 X-CUBE-AI
 
-Ritorna esattamente questo formato JSON:
-- Nome: [titolo_modello]
-- URL: [link_scaricabile]
+Return exactly this JSON format:
+- Name: [model_title]
+- URL: [downloadable_link]
 - Size: [MB]
 - Accuracy: [%]
 - Inference: [ms]
@@ -1199,9 +1196,9 @@ Ritorna esattamente questo formato JSON:
             model=Ollama(id="mistral"),
             tools=[DuckDuckGoTools()],
             instructions=[
-                "Ricerca file .h5 per STM32",
-                "Link GitHub /raw/ diretti",
-                "Non inventare URL"
+                "Search .h5 files for STM32",
+                "Direct GitHub /raw/ links",
+                "Do not invent URLs"
             ],
         )
 
@@ -1216,11 +1213,11 @@ Ritorna esattamente questo formato JSON:
         logger.info(f"📊 Google Response: {response_text[:250]}...")
         
         if "NOT_FOUND" in response_text.upper():
-            logger.warning(f"❌ Google: Non trovato")
+            logger.warning(f"❌ Google: Not found")
             return {'success': False, 'url_valid': False, 'model': None}
         
-        # ✅ ESTRAI CON LLM STRUCTURED OUTPUT (NON regex!)
-        logger.info(f"→ Estrazione con SearchResultExtraction...")
+        # ✅ EXTRACT WITH LLM STRUCTURED OUTPUT (NOT regex!)
+        logger.info(f"→ Extraction with SearchResultExtraction...")
         
         cfg = Configuration.from_runnable_config(config)
         
@@ -1229,7 +1226,7 @@ Ritorna esattamente questo formato JSON:
         try:
             search_extraction = llm_extractor.invoke([
                 SystemMessage(content=search_result_extraction_instructions),
-                HumanMessage(content=f"Risultato ricerca Google:\n\n{response_text}")
+                HumanMessage(content=f"Google search result:\n\n{response_text}")
             ])
             
             logger.info(f"📊 LLM Extraction:")
@@ -1239,21 +1236,21 @@ Ritorna esattamente questo formato JSON:
             logger.info(f"  Valid: {search_extraction.is_valid}")
             
         except Exception as e:
-            logger.error(f"❌ Estrazione LLM fallita: {str(e)[:100]}")
+            logger.error(f"❌ LLM extraction failed: {str(e)[:100]}")
             import traceback
             logger.debug(traceback.format_exc())
             return {'success': False, 'url_valid': False, 'model': None}
         
-        # ✅ VALIDAZIONE
+        # ✅ VALIDATION
         if not search_extraction.is_valid or not search_extraction.download_url:
-            logger.warning(f"❌ URL non valido da LLM extraction")
+            logger.warning(f"❌ Invalid URL from LLM extraction")
             return {'success': False, 'url_valid': False, 'model': None}
         
-        logger.info(f"🔗 Validazione URL...")
+        logger.info(f"🔗 Validating URL...")
         is_valid = validate_model_url_quick(search_extraction.download_url)
         
         if is_valid:
-            logger.info(f"✓ Google: URL VALIDO!")
+            logger.info(f"✓ Google: VALID URL!")
             return {
                 'success': True,
                 'url_valid': True,
@@ -1268,7 +1265,7 @@ Ritorna esattamente questo formato JSON:
                 }
             }
         else:
-            logger.warning(f"❌ Google: URL non scaricabile (404?)")
+            logger.warning(f"❌ Google: Un-downloadable URL (404?)")
             return {'success': True, 'url_valid': False, 'model': None}
     
     except Exception as e:
@@ -1327,8 +1324,8 @@ def validate_model_url_quick(url: str, timeout: int = 5) -> bool:
 
 def extract_description(filename: str, path: str) -> str:
     """
-    Estrae descrizione leggibile da nome file
-    Esempio: "mobilenet_v2_224_224.h5" → "Mobilenet V2 224 224"
+    Extracts readable description from filename
+    Example: "mobilenet_v2_224_224.h5" → "Mobilenet V2 224 224"
     """
     
     # Rimuovi estensione comune
@@ -1347,8 +1344,8 @@ def extract_description(filename: str, path: str) -> str:
 
 def format_bytes(bytes_val: int) -> str:
     """
-    Formatta bytes in formato leggibile
-    Esempio: 1048576 → "1.0MB"
+    Formats bytes into readable format
+    Example: 1048576 → "1.0MB"
     """
     
     if bytes_val == 0:
@@ -1364,8 +1361,8 @@ def format_bytes(bytes_val: int) -> str:
 
 def parse_size_str(size_str: str) -> int:
     """
-    Converte stringa dimensione (es. "14.0MB") in bytes.
-    Gestisce KB, MB, GB.
+    Converts size string (e.g., "14.0MB") to bytes.
+    Handles KB, MB, GB.
     """
     s = size_str.strip().upper()
     multiplier = 1
@@ -1389,10 +1386,10 @@ def parse_size_str(size_str: str) -> int:
 
 
 def get_task_based_default_model(task: str) -> Optional[dict]:
-    """Ritorna il primo modello disponibile per il task da PREDEFINED_MODELS"""
+    """Returns the first available model for the task from PREDEFINED_MODELS"""
     
     if task not in PREDEFINED_MODELS:
-        logger.warning(f"⚠️  Task non trovato: {task}")
+        logger.warning(f"⚠️  Task not found: {task}")
         for task_key, info in PREDEFINED_MODELS.items():
             if info.get("models"):
                 return info["models"][0]
@@ -1402,11 +1399,11 @@ def get_task_based_default_model(task: str) -> Optional[dict]:
     models = task_info.get("models", [])
     
     if not models:
-        logger.warning(f"⚠️  Nessun modello per task: {task}")
+        logger.warning(f"⚠️  No models for task: {task}")
         return None
     
     default_model = models[0]
-    logger.info(f"✓ Default model per '{task}': {default_model['name']}")
+    logger.info(f"✓ Default model for '{task}': {default_model['name']}")
     
     return default_model
 
@@ -1427,10 +1424,10 @@ ARCHITECTURE_ENV_MAP = {
     'custom': 'stm32legacy',
 }
 
-# CONDA_PYTHON_PATHS rimosso in favore di config.get_python_path()
+# CONDA_PYTHON_PATHS removed in favor of config.get_python_path()
 
 def detect_architecture_from_model(model_path: str) -> str:
-    """Detecta architettura dal nome modello"""
+    """Detects architecture from model name"""
     model_name = os.path.basename(model_path).lower()
     if 'mobilenet' in model_name: return 'mobilenet'
     elif 'resnet' in model_name: return 'resnet'
@@ -1442,7 +1439,7 @@ def detect_architecture_from_model(model_path: str) -> str:
     else: return 'custom'
 
 def execute_in_environment(python_code: str, python_path: str, timeout: int = 60) -> dict:
-    """Esegue codice in subprocess con python specifico"""
+    """Executes code in subprocess with specific python"""
     if not python_path:
         raise Exception("python_path required")
     
@@ -1462,8 +1459,8 @@ def execute_in_environment(python_code: str, python_path: str, timeout: int = 60
 
 def inspect_model_via_legacy_env(model_path: str, config: RunnableConfig = None) -> Optional[dict]:
     """
-    Ispeziona modello usando env legacy (per evitare crash Keras 3 con modelli vecchi)
-    Ritorna dict con info architettura o None se fallisce.
+    Inspects model using legacy env (to avoid Keras 3 crashes with old models)
+    Returns dict with architecture info or None if it fails.
     """
     if not model_path.endswith(('.h5', '.keras')):
         logger.info(f"ℹ️  Skip legacy inspection for non-Keras format: {os.path.basename(model_path)}")
@@ -1484,7 +1481,7 @@ def inspect_model_via_legacy_env(model_path: str, config: RunnableConfig = None)
         
         cfg = Configuration.from_runnable_config(config)
         
-        # Scegli environment: .keras -> stm32 (Keras 3), .h5 -> stm32legacy (Keras 2) o stm32
+        # Choose environment: .keras -> stm32 (Keras 3), .h5 -> stm32legacy (Keras 2) or stm32
         if model_path.endswith('.keras'):
             env_name = 'stm32'
         else:
@@ -1493,7 +1490,7 @@ def inspect_model_via_legacy_env(model_path: str, config: RunnableConfig = None)
         python_path = cfg.get_python_path(env_name)
         
         if not python_path or "NOT_FOUND" in python_path:
-            logger.warning(f"⚠️  Python path non trovato per {env_name}: {python_path}")
+            logger.warning(f"⚠️  Python path not found for {env_name}: {python_path}")
             return None
             
         logger.info(f"🔄 Inspecting via subprocess ({env_name})...")
@@ -1540,18 +1537,18 @@ except Exception as e:
         return None
 
 # ============================================================================
-# NODO 3: DOWNLOAD MODELLO
+# NODE 3: DOWNLOAD MODEL
 # ============================================================================
 def download_model(state: MasterState, config: RunnableConfig = None) -> MasterState:
     """
-    Wrapper per scaricare il modello dallo state.selected_model.
-    Viene chiamato dal routing dopo ricerca online accettata.
+    Wrapper to download the model from state.selected_model.
+    Called by routing after online search is accepted.
     """
     
-    logger.info("📥 Nodo download_model (wrapper) avviato...")
+    logger.info("📥 download_model node (wrapper) started...")
     
     if not state.selected_model:
-        logger.error("❌ selected_model non trovato!")
+        logger.error("❌ selected_model not found!")
         cfg = Configuration.from_runnable_config(config)
         state.model_path = cfg.ai_model_path
         state.model_discovery_method = "default"
@@ -1559,17 +1556,17 @@ def download_model(state: MasterState, config: RunnableConfig = None) -> MasterS
     
     logger.info(f"📦 Download: {state.selected_model['name']}")
     
-    # ✅ CHIAMA download_model_to_cache CON il modello
+    # ✅ CALL download_model_to_cache WITH the model
     state = download_model_to_cache(state, config, state.selected_model)
     
     return state
 
 def download_model_to_cache(state: MasterState, config: RunnableConfig, model: dict) -> MasterState:
     """
-    Download modello con skip intelligente + ANALISI ROBUSTA
+    Download model with intelligent skip + ROBUST ANALYSIS
     """
     
-    logger.info(f"📥 Download modello: {model['name']}...")
+    logger.info(f"📥 Downloading model: {model['name']}...")
     
     cache_dir = os.path.expanduser("~/.stm32_ai_models")
     os.makedirs(cache_dir, exist_ok=True)
@@ -1577,7 +1574,7 @@ def download_model_to_cache(state: MasterState, config: RunnableConfig, model: d
     model_filename = model.get("local_filename")
     
     if not model_filename:
-        logger.error("❌ local_filename non trovato nel modello!")
+        logger.error("❌ local_filename not found in model!")
         cfg = Configuration.from_runnable_config(config)
         state.model_path = cfg.ai_model_path
         return state
@@ -1589,25 +1586,25 @@ def download_model_to_cache(state: MasterState, config: RunnableConfig, model: d
     
     cached_path = os.path.join(cache_dir, model_filename)
     
-    # === VERIFICA CACHE ===
+    # === CACHE VERIFICATION ===
     
     if os.path.exists(cached_path) and os.path.isfile(cached_path):
-        logger.info(f"✓ Modello in cache: {cached_path}")
+        logger.info(f"✓ Model in cache: {cached_path}")
         logger.info(f"  Size: {os.path.getsize(cached_path) / (1024*1024):.1f} MB")
         state.model_path = cached_path
         
-        # ✅ STAMPA ARCHITETTURA MODELLO - MODO ROBUSTO
-        logger.info(f"\n📋 ANALISI ARCHITETTURA MODELLO (da cache)")
+        # ✅ PRINT MODEL ARCHITECTURE - ROBUST MODE
+        logger.info(f"\n📋 MODEL ARCHITECTURE ANALYSIS (from cache)")
         logger.info("=" * 80)
-        # ✅ ALGORITMO OTTIMIZZATO (RICHIESTA UTENTE)
-        # 1. Legacy Env Subprocess (Primo tentativo)
+        # ✅ OPTIMIZED ALGORITHM (USER REQUEST)
+        # 1. Legacy Env Subprocess (First attempt)
         # 2. HDF5 Raw (Fallback)
         # 3. NO standard load_model()
         
         legacy_info = inspect_model_via_legacy_env(cached_path, config)
             
         if legacy_info:
-            logger.info(f"✓ Analisi riuscita (via stm32legacy)!")
+            logger.info(f"✓ Analysis successful (via stm32legacy)!")
             logger.info(f"  Input: {legacy_info.get('input_shape')}")
             logger.info(f"  Output: {legacy_info.get('output_shape')}")
             logger.info(f"  Params: {legacy_info.get('total_params'):,}")
@@ -1617,14 +1614,14 @@ def download_model_to_cache(state: MasterState, config: RunnableConfig, model: d
             state.model_info = legacy_info
             state.model_architecture = legacy_info # Sync for workflow5 compatibility
         else:
-            logger.warning(f"⚠️  Legacy subprocess fallito, provo fallback HDF5...")
+            logger.warning(f"⚠️  Legacy subprocess failed, trying HDF5 fallback...")
             
-        # ← SECONDO TENTATIVO: lettura raw HDF5 (più robusta, solo se .h5 o .keras)
+        # ← SECOND ATTEMPT: Raw HDF5 read (more robust, only if .h5 or .keras)
         if cached_path.endswith(('.h5', '.keras')):
             try:
                 with h5py.File(cached_path, 'r') as f:
-                    logger.info(f"\n📋 ANALISI INTERNA (HDF5/Keras)")
-                    logger.info(f"  Keys nel file: {list(f.keys())}")
+                    logger.info(f"\n📋 INTERNAL ANALYSIS (HDF5/Keras)")
+                    logger.info(f"  Keys in file: {list(f.keys())}")
                     
                     if 'model_config' in f.attrs:
                         config_str = f.attrs['model_config']
@@ -1641,24 +1638,24 @@ def download_model_to_cache(state: MasterState, config: RunnableConfig, model: d
                     
                     logger.info("=" * 80 + "\n")
             except Exception as e2:
-                logger.warning(f"⚠️  Analisi HDF5 fallita: {str(e2)[:100]}")
+                logger.warning(f"⚠️  HDF5 analysis failed: {str(e2)[:100]}")
         else:
-            logger.info(f"📋 Formato {os.path.splitext(cached_path)[1]} rilevato. Analisi strutturale saltata.")
+            logger.info(f"📋 Detected {os.path.splitext(cached_path)[1]} format. Structural analysis skipped.")
         
         return state
     
-    # === PRIORITY 1: URL Diretto ===
+    # === PRIORITY 1: Direct URL ===
     
     direct_url = model.get("url")
     
     if direct_url:
         try:
-            logger.info(f"📥 [1/2] Tentativo URL diretto: {direct_url[:80]}...")
+            logger.info(f"📥 [1/2] Direct URL attempt: {direct_url[:80]}...")
             
             response = requests.get(direct_url, stream=True, timeout=30, allow_redirects=True)
             
             if response.status_code == 404:
-                logger.warning(f"⚠️  URL restituisce 404 (Not Found)")
+                logger.warning(f"⚠️  URL returns 404 (Not Found)")
                 return None
             else:
                 response.raise_for_status()
@@ -1678,14 +1675,14 @@ def download_model_to_cache(state: MasterState, config: RunnableConfig, model: d
                                     last_log = (int(pct / 20)) * 20
                                     logger.info(f"  ⬇️  {last_log}%")
                 
-                # ✅ VERIFICA POST-DOWNLOAD
+                # ✅ POST-DOWNLOAD VERIFICATION
                 actual_size = os.path.getsize(cached_path)
                 if actual_size == 0:
-                    logger.error(f"❌ Download fallito: Il file salvato è vuoto (0 bytes)!")
+                    logger.error(f"❌ Download failed: Saved file is empty (0 bytes)!")
                     if os.path.exists(cached_path): os.remove(cached_path)
                     return None
                     
-                logger.info(f"✓ Download completato! Size: {actual_size / (1024*1024):.1f} MB")
+                logger.info(f"✓ Download completed! Size: {actual_size / (1024*1024):.1f} MB")
                 
                 # ===== SECURITY: Verify file integrity (SHA256) =====
                 from src.assistant.utils import verify_file_integrity
@@ -1700,46 +1697,46 @@ def download_model_to_cache(state: MasterState, config: RunnableConfig, model: d
                 else:
                     logger.warning(f"⚠️  No SHA256 hash provided - skipping integrity check")
                 
-                # ✅ STAMPA ARCHITETTURA - MODO ROBUSTO (uguale a sopra)
-                logger.info(f"\n📋 ANALISI ARCHITETTURA MODELLO (appena scaricato)")
+                # ✅ PRINT ARCHITECTURE - ROBUST MODE (same as above)
+                logger.info(f"\n📋 MODEL ARCHITECTURE ANALYSIS (just downloaded)")
                 logger.info("=" * 80)
-                # ✅ ALGORITMO OTTIMIZZATO (RICHIESTA UTENTE)
-                # 1. Legacy Env Subprocess (Primo tentativo)
+                # ✅ OPTIMIZED ALGORITHM (USER REQUEST)
+                # 1. Legacy Env Subprocess (First attempt)
                 # 2. HDF5 Raw (Fallback)
                 
                 legacy_info = inspect_model_via_legacy_env(cached_path, config)
                 
                 if legacy_info:
-                    logger.info(f"✓ Analisi riuscita (via {legacy_info.get('env_used', 'unknown')})!")
+                    logger.info(f"✓ Analysis successful (via {legacy_info.get('env_used', 'unknown')})!")
                     logger.info(f"  Input: {legacy_info['input_shape']}")
                     state.model_info = legacy_info
                     state.model_architecture = legacy_info # Sync for workflow5 compatibility
                 else:
-                    logger.warning(f"⚠️  Legacy subprocess fallito, provo HDF5...")
+                    logger.warning(f"⚠️  Legacy subprocess failed, trying HDF5...")
                     try:
                         with h5py.File(cached_path, 'r') as f:
-                            logger.info(f"  File contiene: {list(f.keys())}")
+                            logger.info(f"  File contains: {list(f.keys())}")
                             if 'model_weights' in f:
-                                logger.info(f"  Peso layers disponibili")
+                                logger.info(f"  Weight layers available")
                     except Exception as e2:
-                        logger.warning(f"⚠️  Analisi HDF5 fallita: {str(e2)[:100]}")
+                        logger.warning(f"⚠️  HDF5 analysis failed: {str(e2)[:100]}")
                 
                 state.model_path = cached_path
                 return state
             
         except Exception as e:
-            logger.warning(f"⚠️  Download fallito: {type(e).__name__}")
+            logger.warning(f"⚠️  Download failed: {type(e).__name__}")
             if os.path.exists(cached_path):
                 os.remove(cached_path)
     
     # === PRIORITY 2: Task-Based Fallback ===
     
-    logger.error(f"❌ Download fallito")
+    logger.error(f"❌ Download failed")
     cfg = Configuration.from_runnable_config(config)
     last_task = state.__dict__.get("last_task")
     
     if last_task:
-        logger.info(f"🔄 Provo fallback task-based: {last_task}")
+        logger.info(f"🔄 Trying task-based fallback: {last_task}")
         fallback_model = get_task_based_default_model(last_task)
         
         if fallback_model:
@@ -1748,7 +1745,7 @@ def download_model_to_cache(state: MasterState, config: RunnableConfig, model: d
             
             if fallback_url:
                 try:
-                    logger.info(f"📥 Download fallback...")
+                    logger.info(f"📥 Downloading fallback...")
                     fallback_filename = fallback_model.get("local_filename", f"fallback_{fallback_model['name'][:20]}.h5")
                     fallback_path = os.path.join(cache_dir, fallback_filename)
                     
@@ -1770,7 +1767,7 @@ def download_model_to_cache(state: MasterState, config: RunnableConfig, model: d
                                             last_log = (int(pct / 20)) * 20
                                             logger.info(f"  ⬇️  {last_log}%")
                         
-                        logger.info(f"✓ Fallback download completato!")
+                        logger.info(f"✓ Fallback download completed!")
                         state.model_path = fallback_path
                         state.model_discovery_method = "taskbased_fallback"
                         state.selected_model = fallback_model
@@ -1778,27 +1775,28 @@ def download_model_to_cache(state: MasterState, config: RunnableConfig, model: d
                         return state
                 
                 except Exception as e:
-                    logger.warning(f"⚠️  Fallback download fallito: {type(e).__name__}")
+                    logger.warning(f"⚠️  Fallback download failed: {type(e).__name__}")
     
-    logger.warning(f"⚠️  Tutti i fallback esauriti")
+    logger.warning(f"⚠️  All fallbacks exhausted")
     state.model_path = cfg.ai_model_path
     state.model_discovery_method = "default"
     
     return state
+
 
 # ============================================================================
 # HELPER: GET DEFAULT MODEL BY TASK
 # ============================================================================
 def get_task_based_default_model(task_name: str) -> Optional[dict]:
     """
-    Ritorna il primo modello disponibile per il task specifico.
-    Fallback intelligente: se l'utente cercava "image_classification" 
-    e la ricerca fallisce, usa il primo MobileNetV2 da PREDEFINED_MODELS
+    Returns the first available model for the specific task.
+    Intelligent fallback: if the user searched for "image_classification" 
+    and the search fails, uses the first MobileNetV2 from PREDEFINED_MODELS
     """
     
     if task_name not in PREDEFINED_MODELS:
-        logger.warning(f"⚠️  Task non trovato: {task_name}, uso generico")
-        # Fallback al primo modello disponibile di qualsiasi task
+        logger.warning(f"⚠️  Task not found: {task_name}, using generic fallback")
+        # Fallback to the first available model of any task
         for task, info in PREDEFINED_MODELS.items():
             if info["models"]:
                 return info["models"][0]
@@ -1808,17 +1806,17 @@ def get_task_based_default_model(task_name: str) -> Optional[dict]:
     models = task_info.get("models", [])
     
     if not models:
-        logger.warning(f"⚠️  Nessun modello per task: {task_name}")
+        logger.warning(f"⚠️  No models available for task: {task_name}")
         return None
     
-    default_model = models[0]  # Prendi il primo (più leggero/veloce)
-    logger.info(f"✓ Default model per '{task_name}': {default_model['name']}")
+    default_model = models[0]  # Take the first (lightest/fastest)
+    logger.info(f"✓ Default model for '{task_name}': {default_model['name']}")
     
     return default_model
 
 
 # ============================================================================
-# ROUTING DECISION - DECIDE QUALE NODO USARE
+# ROUTING DECISION - DECIDES WHICH NODE TO USE
 # ============================================================================
 
 def model_selection_routing(state: MasterState) -> Literal[
@@ -1827,9 +1825,9 @@ def model_selection_routing(state: MasterState) -> Literal[
     "search_recommendation_model" 
 ]:
     """
-    Router che decide il prossimo step dopo model selection.
+    Router that decides the next step after model selection.
     
-    Ora supporta anche il ramo di CUSTOMIZZAZIONE.
+    Now also supports the CUSTOMIZATION branch.
     """
     
     logger.info(f"📍 model_selection_routing:")
@@ -1838,48 +1836,48 @@ def model_selection_routing(state: MasterState) -> Literal[
     logger.info(f"   - wants_customization: {getattr(state, 'wants_customization', False)}")
     
     # ============================================================
-    # CASE 1: Default model (nessuna ricerca)
+    # CASE 1: Default model (no search)
     # ============================================================
     if state.model_discovery_method == "default":
-        logger.info("→ Default model, vai direttamente ad analyze")
+        logger.info("→ Default model, goes directly to analyze")
         return "run_analyze"
     
     # ============================================================
-    # CASE 2: In ricerca, loop di ricerca ancora disponibile
+    # CASE 2: In search, search loop still available
     # ============================================================
     elif state.model_discovery_method == "search":
         if state.search_iterations < 3:
-            logger.info(f"→ Loop ricerca ({state.search_iterations}/3), ricerca di nuovo")
+            logger.info(f"→ Search loop ({state.search_iterations}/3), searching again")
             return "search_recommendation_model"
         else:
-            logger.info("→ Max iterazioni ricerca raggiunte, vai ad analyze")
+            logger.info("→ Max search iterations reached, goes to analyze")
             return "run_analyze"
     
     # ============================================================
-    # CASE 3: Modello trovato (github, google_search, taskbased_fallback)
+    # CASE 3: Model found (github, google_search, taskbased_fallback)
     # ============================================================
     else:
-            logger.info("→ Modello trovato, vai a download_model")
+            logger.info("→ Model found, goes to download_model")
             return "download_model"
 
 
 def run_analyze(state: MasterState, config: RunnableConfig = None) -> MasterState:
     """
-    ✨ Analizza il modello (customizzato O originale)
+    ✨ Analyzes the model (customized OR original)
     
-    Logica:
-    - Se customizzato: final_model_path
-    - Altrimenti: model_path (default)
+    Logic:
+    - If customized: final_model_path
+    - Otherwise: model_path (default)
     """
     
-    logger.info("🔍 Eseguendo analisi del modello...")
+    logger.info("🔍 Executing model analysis...")
     cfg = Configuration.from_runnable_config(config)
     
     try:
-        # ===== DETERMINA MODELLO =====
-        # Prova finale prima, altrimenti usa originale
+        # ===== DETERMINE MODEL =====
+        # Try final first, otherwise use original
         model_path = state.final_model_path if state.customization_applied else state.model_path
-        model_type = "CUSTOMIZZATO" if state.customization_applied else "ORIGINALE"
+        model_type = "CUSTOMIZED" if state.customization_applied else "ORIGINAL"
         
         if not model_path or not os.path.exists(model_path):
             logger.error(f"❌ Model not found: {model_path}")
@@ -1887,19 +1885,19 @@ def run_analyze(state: MasterState, config: RunnableConfig = None) -> MasterStat
             state.ai_error_message = f"Model not found: {model_path}"
             return state
         
-        # ✅ FIX PER Keras 3 (Ambiente 'stm32'): Converti in TFLite per compatibilità stedgeai
-        # stedgeai v2.x non supporta direttamente i modelli Keras 3 (anche se salvati come .h5)
-        # Rileviamo Keras 3 se il file è .keras O se sappiamo di essere in ambiente 'stm32'
+        # ✅ FIX FOR Keras 3 (Environment 'stm32'): Convert to TFLite for stedgeai compatibility
+        # stedgeai v2.x does not directly support Keras 3 models (even if saved as .h5)
+        # We detect Keras 3 if the file is .keras OR if we know we are in 'stm32' environment
         is_keras3 = model_path.endswith('.keras') or state.conda_env == 'stm32'
         
         if is_keras3:
-            logger.info("⚡ Rilevato modello Keras 3. Avvio conversione TFLite per compatibilità stedgeai...")
-            tflite_path = model_path.replace('.keras', '.tflite').replace('.h5', '.tflite') # La funzione .replace() viene chiamata due volte di seguito. 
-            # Primo passaggio: Cerca .keras e lo sostituisce con .tflite.
-            # Secondo passaggio: Prende il risultato del primo e cerca .h5, sostituendolo con .tflite. 
-            # Questo garantisce che il file finale abbia estensione .tflite indipendentemente dal formato originale (.keras o .h5).
+            logger.info("⚡ Keras 3 model detected. Starting TFLite conversion for stedgeai compatibility...")
+            tflite_path = model_path.replace('.keras', '.tflite').replace('.h5', '.tflite') # The .replace() function is called twice in a row. 
+            # First pass: Looks for .keras and replaces it with .tflite.
+            # Second pass: Takes the result of the first and looks for .h5, replacing it with .tflite. 
+            # This ensures that the final file has a .tflite extension regardless of the original format (.keras or .h5).
             
-            if not os.path.exists(tflite_path): # Se il file è già presente, il sistema salta tutto il blocco di conversione. Significa che la conversione è già stata eseguita in precedenza.
+            if not os.path.exists(tflite_path): # If the file is already present, the system skips the entire conversion block. It means the conversion was already executed previously.
                 conversion_script = f"""
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -1939,16 +1937,16 @@ except Exception as e:
                         os.remove(tmp_script)
                 
                 if "CONVERSION_OK" not in conv_stdout:
-                    logger.error(f"❌ Conversione TFLite fallita: {conv_stdout[:500]}")
+                    logger.error(f"❌ TFLite conversion failed: {conv_stdout[:500]}")
                     state.analyze_success = False
                     state.ai_error_message = f"TFLite conversion failed for Keras 3 model."
                     return state
                 
-                logger.info(f"✅ Conversione completata: {tflite_path}")
+                logger.info(f"✅ Conversion completed: {tflite_path}")
             
-            # Usa il TFLite per l'analisi
+            # Use TFLite for analysis
             model_path = tflite_path
-            state.model_path = tflite_path # Aggiorna lo stato così i nodi successivi lo usano
+            state.model_path = tflite_path # Update the state so subsequent nodes use it
         
         logger.info(f"  Model ({model_type}): {model_path}")
         
@@ -1956,7 +1954,7 @@ except Exception as e:
         analyze_dir = os.path.join(state.ai_output_dir, "report_analyze")
         os.makedirs(analyze_dir, exist_ok=True)
         
-        # ===== ESEGUI =====
+        # ===== EXECUTE =====
         cmd = [
             "stedgeai", "analyze",
             "--model", model_path,
@@ -1964,8 +1962,8 @@ except Exception as e:
             "--output", analyze_dir
         ]
         
-        # ✅ FIX: Aggiungi compressione se specificata. 
-        if state.compression: # fondamentale. X-CUBE-AI ha capacità di quantizzazione integrata. Se richiesto dall'utente, X-CUBE-AI usa questo parametro per applicare automaticamente tecniche di compressione/quantizzazione durante l'analisi e la generazione del codice C.
+        # ✅ FIX: Add compression if specified. 
+        if state.compression: # fundamental. X-CUBE-AI has built-in quantization capabilities. If required by user, X-CUBE-AI uses this parameter to automatically apply compression/quantization techniques during analysis and C code generation.
              cmd.extend(["--compression", state.compression])
              logger.info(f"  Compression: {state.compression}")
         
@@ -1974,42 +1972,42 @@ except Exception as e:
         state.analyze_success = (result.returncode == 0)
         
         if state.analyze_success:
-            logger.info(f"✓ Analyze completato")
+            logger.info(f"✓ Analyze completed")
             state.analyze_report_dir = analyze_dir
             
-            # ✅ COMMIT REGISTRAZIONE: Salva il modello nel catalogo permanente solo se l'analisi tecnica ha avuto successo.
-            # Questo evita di registrare link rotti o modelli non supportati dagli strumenti ST.
+            # ✅ REGISTRATION COMMIT: Save the model to the permanent catalog only if technical analysis succeeded.
+            # This avoids registering broken links or models unsupported by ST tools.
             if state.is_new_registration and state.pending_model_entry:
                 try:
-                    # Carica il catalogo attuale dal file JSON
+                    # Load current catalog from JSON file
                     models = load_predefined_models()
                     new_entry = state.pending_model_entry.copy()
                     
-                    # Estrae la categoria (es: image_classification) e la rimuove dai dati del modello
+                    # Extract category (e.g., image_classification) and remove it from model data
                     category = new_entry.pop("category", "other")
                     
-                    # Crea la categoria nel catalogo se non esiste ancora
+                    # Create category in catalog if it doesn't exist yet
                     if category not in models:
                         models[category] = {
                             "description": category.replace("_", " ").title(),
                             "models": []
                         }
                     
-                    # Controllo anti-duplicati: salva solo se l'URL non è già presente nella categoria
+                    # Anti-duplicate check: save only if URL is not already present in the category
                     if not any(m['url'] == new_entry['url'] for m in models[category]['models']):
                         models[category]["models"].append(new_entry)
-                        save_predefined_models(models) # Scrittura fisica su disco (predefined_models.json)
-                        logger.info(f"💾 Modello '{new_entry['name']}' salvato nel catalogo permanente.")
+                        save_predefined_models(models) # Physical write to disk (predefined_models.json)
+                        logger.info(f"💾 Model '{new_entry['name']}' saved to permanent catalog.")
                     
-                    # Reset dello stato: la registrazione è conclusa con successo
+                    # Reset state: registration concluded successfully
                     state.is_new_registration = False # Reset flag
-                    state.pending_model_entry = None  # Pulisci
+                    state.pending_model_entry = None  # Clean up
                     
                 except Exception as ex:
-                    logger.error(f"⚠️ Errore durante il salvataggio nel catalogo: {ex}")
+                    logger.error(f"⚠️ Error saving to catalog: {ex}")
         else:
             state.ai_error_message = result.stderr.strip() or f"Return code {result.returncode}"
-            logger.error(f"✗ Analyze fallito: {state.ai_error_message[:500]}")
+            logger.error(f"✗ Analyze failed: {state.ai_error_message[:500]}")
     
     except Exception as e:
         logger.error(f"❌ Error: {str(e)}")
@@ -2035,7 +2033,7 @@ def run_validate(state: MasterState, config: RunnableConfig = None) -> MasterSta
     if not state.validate_success:
         state.ai_error_message = res.stderr.strip() or f"Return code {res.returncode}"
     state.validate_report = validate_file
-    logger.info("✓ Validate completato" if state.validate_success else f"✗ Validate fallito: {state.ai_error_message}")
+    logger.info("✓ Validate completed" if state.validate_success else f"✗ Validate failed: {state.ai_error_message}")
     return state
 
 
@@ -2057,18 +2055,18 @@ def run_generate(state: MasterState, config: RunnableConfig = None) -> MasterSta
         state.ai_error_message = res.stderr.strip() or f"Return code {res.returncode}"
     state.generate_code_dir = code_dir
     state.ai_code_dir = code_dir
-    logger.info("✓ Generate completato" if state.generate_success else f"✗ Generate fallito: {state.ai_error_message}")
+    logger.info("✓ Generate completed" if state.generate_success else f"✗ Generate failed: {state.ai_error_message}")
     return state
 
 
 def finalize_analysis(state: MasterState, config: RunnableConfig = None) -> MasterState:
     if state.analyze_success and state.validate_success and state.generate_success:
-        print("✓ Analisi AI completata!")
-        print(f" - Report analyze in: {state.analyze_report_dir}")
-        print(f" - Report validate in: {state.validate_report}")
-        print(f" - Codice generato in: {state.generate_code_dir}")
+        print("✓ AI Analysis completed!")
+        print(f" - Analyze report in: {state.analyze_report_dir}")
+        print(f" - Validate report in: {state.validate_report}")
+        print(f" - Generated code in: {state.generate_code_dir}")
     else:
-        print(f"✗ Errore AI: {state.ai_error_message}")
+        print(f"✗ AI Error: {state.ai_error_message}")
     return state
 
 
@@ -2079,8 +2077,8 @@ def finalize_analysis(state: MasterState, config: RunnableConfig = None) -> Mast
 
 def get_mcu_limits(target_mcu: str) -> tuple[int, int]:
     """
-    Ritorna (flash_limit_bytes, ram_limit_bytes) per la MCU target.
-    Valori approssimativi ma sicuri (conservativi).
+    Returns (flash_limit_bytes, ram_limit_bytes) for the target MCU.
+    Approximate but safe (conservative) values.
     """
     target = target_mcu.lower()
     
@@ -2088,7 +2086,7 @@ def get_mcu_limits(target_mcu: str) -> tuple[int, int]:
         # STM32F401: 256KB Flash, 64KB RAM
         return (256 * 1024, 64 * 1024)
     elif "stm32h7" in target or "h743" in target:
-        # STM32H743: 2MB Flash, ~1MB RAM (per attivazioni contigue safe)
+        # STM32H743: 2MB Flash, ~1MB RAM (for safe contiguous activations)
         return (2 * 1024 * 1024, 1024 * 1024)
     elif "stm32u5" in target:
         # STM32U5: 2MB Flash, 786KB RAM
@@ -2097,40 +2095,40 @@ def get_mcu_limits(target_mcu: str) -> tuple[int, int]:
          # STM32L4: 1MB Flash, 128KB RAM
         return (1024 * 1024, 128 * 1024)
     else:
-        # Default safe fallback (assumiamo F4)
-        logger.warning(f"⚠️ Target MCU non riconosciuto: {target_mcu}. Uso limiti default (F4).")
+        # Default safe fallback (assume F4)
+        logger.warning(f"⚠️ Target MCU not recognized: {target_mcu}. Using default limits (F4).")
         return (256 * 1024, 64 * 1024)
 
 
 def check_resource_constraints(state: MasterState, config: RunnableConfig = None) -> MasterState:
     """
-    Analizza il report STEdgeAI per verificare se il modello ci sta.
+    Analyzes the STEdgeAI report to verify if the model fits in the MCU.
     """
     logger.info("⚖️  Checking Resource Constraints...")
     
     if not state.analyze_success:
-        logger.warning("⚠️  Analisi fallita, impossibile verificare constraints.")
+        logger.warning("⚠️  Analysis failed, impossible to verify constraints.")
         state.ai_error_message = (
-            "Impossibile analizzare il modello con gli strumenti ST.\n"
-            "Questo solitamente accade per modelli non supportati o errori di conversione.\n"
-            "L'automazione tornerà alla selezione modello per permetterti di sceglierne un altro."
+            "Impossible to analyze the model with ST tools.\n"
+            "This usually happens for unsupported models or conversion errors.\n"
+            "The automation will return to model selection to allow you to choose another one."
         )
         state.resource_check_result = "error"
         return state
 
     report_path = os.path.join(state.analyze_report_dir, "network_analyze_report.txt")
     if not os.path.exists(report_path):
-        # Fallback: cerca qualsiasi file .txt nella dir
+        # Fallback: search for any .txt file in the dir
         try:
             files = [f for f in os.listdir(state.analyze_report_dir) if f.endswith(".txt")]
             if files:
                 report_path = os.path.join(state.analyze_report_dir, files[0])
             else:
-                logger.error("❌ Report file non trovato.")
+                logger.error("❌ Report file not found.")
                 state.resource_check_result = "error"
                 return state
         except Exception:
-             logger.error("❌ Report dir non trovata.")
+             logger.error("❌ Report dir not found.")
              state.resource_check_result = "error"
              return state
 
@@ -2142,10 +2140,10 @@ def check_resource_constraints(state: MasterState, config: RunnableConfig = None
         with open(report_path, 'r', encoding='utf-8') as f:
             content = f.read()
             
-            # Cerca pattern tipo: "activations  : 4917696 bytes" o "weights      : 8833768 bytes"
-            # O pattern più complessi a seconda versioni. Cerchiamo "activations" e "weights" / "total"
+            # Search for pattern like: "activations  : 4917696 bytes" or "weights      : 8833768 bytes"
+            # Or more complex patterns depending on version. We look for "activations" and "weights" / "total"
             
-            # Esempio report:
+            # Example report:
             #  activations size   : 4917696 bytes (4802.44 KiB)
             #  weights size       : 8833768 bytes (8626.73 KiB)
             #  macc               : ...
@@ -2158,7 +2156,7 @@ def check_resource_constraints(state: MasterState, config: RunnableConfig = None
             if flash_match:
                 flash_usage = int(flash_match.group(1))
 
-            # Se 0, prova pattern alternativi (totale ram/flash report table)
+            # If 0, try alternative patterns (total ram/flash report table)
             if ram_usage == 0:
                  ram_match = re.search(r'(?i)ram\s*:\s*(\d+)', content)
                  if ram_match: ram_usage = int(ram_match.group(1))
@@ -2168,7 +2166,7 @@ def check_resource_constraints(state: MasterState, config: RunnableConfig = None
                  if flash_match: flash_usage = int(flash_match.group(1))
 
     except Exception as e:
-        logger.error(f"❌ Errore parsing report: {e}")
+        logger.error(f"❌ Error parsing report: {e}")
         state.resource_check_result = "error"
         return state
 
@@ -2242,61 +2240,83 @@ def check_resource_constraints(state: MasterState, config: RunnableConfig = None
 
     return state
 
-# Logica Intelligente:
-# -Fits: Procedi.
-# -Warning (<4x overflow): Attiva compression='high' e riprova.
-# -Critical (>4x overflow): Blocca tutto e chiede di scegliere un modello più piccolo (es. ResNet -> MobileNet)
+# Intelligent Logic:
+# -Fits: Proceed.
+# -Warning (<8x overflow): Activate higher compression and retry.
+# -Critical (>8x overflow): Block all and ask to choose a smaller model (e.g. ResNet -> MobileNet)
 
 
-def resource_check_routing(state: MasterState) -> Literal["run_analyze", "run_validate", "run_generate", "choose_predefined_taskbased_model"]:
+def resource_check_routing(state: MasterState) -> Literal["run_analyze", "run_validate", "run_generate", "choose_predefined_taskbased_model", "handle_resource_failure"]:
     """
-    Decide la route basata sui constraints.
-    Gestisce anche il retry automatico con compressione più alta.
+    Decides the route based on constraints.
+    Also handles automatic retry with higher compression.
     """
     res = getattr(state, "resource_check_result", "ok")
-    
+
+    # ── CASE: handle_resource_failure has already processed the decision ──────────
+    # resource_check_result is reset to "resolved" by the function itself.
+    # This avoids the loop when LangGraph re-executes the routing from the checkpoint
+    # on a new VSCode session (otherwise "critical" → handle_resource_failure
+    # → new interrupt → infinite loop).
+    if res == "resolved":
+        route = getattr(state, "route", "change_model")
+        logger.info(f"✅ resource_check_routing: already resolved, following route='{route}'")
+        # change_board returns to collect_project_info → use "run_validate" as passthrough
+        # Actually the graph after handle_resource_failure has its edges, this
+        # "resolved" case should never be reached in a normal run.
+        # We handle it anyway for safety.
+        return "choose_predefined_taskbased_model"
+
     # ✅ NEW: Check if we need to retry with higher compression
     if state.needs_compression_retry and res == "retry":
         logger.info(f"🔄 Routing back to analyze with compression: {state.compression}")
         return "run_analyze"  # Re-analyze with new compression level
-    
+
     if res == "ok":
         return "run_validate"
-    
+
     elif res == "warning":
         return "run_generate"
-        
-    else: # critical or error
-        # Notifica utente e torna alla scelta
+
+    else:  # critical or error
         if not getattr(state, "analyze_success", True):
-             logger.error(f"❌ Errore Tecnico durante l'analisi: {getattr(state, 'ai_error_message', 'Sconosciuto')}")
+            logger.error(f"❌ Technical Error during analysis: {getattr(state, 'ai_error_message', 'Unknown')}")
         else:
             logger.error("🚫 Model rejected due to hardware constraints.")
-            
-            # LOG ONLY - NO INTERRUPT
-            logger.error(f"""⛔ MODELLO TROPPO GRANDE PER {state.target}!
+            logger.error(f"""⛔ MODEL TOO BIG FOR {state.target}!
                 
-Dettagli Risorse:
-- RAM Richiesta: {format_bytes(state.ram_usage)} (Max: {format_bytes(get_mcu_limits(state.target)[1])})
-- Flash Richiesta: {format_bytes(state.flash_usage)} (Max: {format_bytes(get_mcu_limits(state.target)[0])})
+Resource Details:
+- RAM Required: {format_bytes(state.ram_usage)} (Max: {format_bytes(get_mcu_limits(state.target)[1])})
+- Flash Required: {format_bytes(state.flash_usage)} (Max: {format_bytes(get_mcu_limits(state.target)[0])})
 
-L'automazione torna alla selezione modello forzando una scelta più appropriata.""")
-        
+The automation returns to model selection forcing a more appropriate choice.""")
+
         return "handle_resource_failure"
-        # return "run_generate" # per alcuni test fatti la utilizzavo per forzare l'integrazione 
+
 
 
 def handle_resource_failure(state: MasterState, config: RunnableConfig = None) -> MasterState:
     """
-    Chiede all'utente se vuole cambiare board o modello dopo un fallimento di risorse.
+    Asks the user if they want to change board or model after a resource failure.
     """
-    logger.info("📋 Decisione post-errore risorse: Cambio Board o Cambio Modello?")
+    logger.info("📋 Post-error resource decision: Change Board or Change Model?")
     
+    ram_str   = format_bytes(state.ram_usage)   if getattr(state, 'ram_usage', 0)   else "N/A"
+    flash_str = format_bytes(state.flash_usage) if getattr(state, 'flash_usage', 0) else "N/A"
+    ram_lim, flash_lim = get_mcu_limits(getattr(state, 'target', ''))  if getattr(state, 'target', '') else (0, 0)
+    target_str = getattr(state, 'target', 'MCU')
+
     prompt = {
-        "instruction": "Il modello è troppo grande per l'attuale MCU. Cosa vuoi fare?",
+        "instruction": (
+            f"The model requires {ram_str} RAM and {flash_str} Flash, "
+            f"but {target_str} only supports {format_bytes(ram_lim)} RAM / {format_bytes(flash_lim)} Flash.\n\n"
+            "Change Board or Change Model?\n"
+            "0 → Change Board (choose a more powerful MCU)\n"
+            "1 → Change Model (choose a lighter model)"
+        ),
         "options": [
-            "Cambia Microcontrollore (Board)",
-            "Scegli un altro modello AI"
+            "Change Microcontroller (Board)",
+            "Choose another AI model"
         ]
     }
     
@@ -2306,73 +2326,80 @@ def handle_resource_failure(state: MasterState, config: RunnableConfig = None) -
         user_text = user_response.get("response", user_response.get("input", str(user_response)))
     else:
         user_text = str(user_response)
-        
-    cfg = Configuration.from_runnable_config(config)
-    # === ESTRAI DECISIONE CON LLM (Robusto con Structured Output) ===
-    llm_extractor = get_llm(config, structured_schema=ResolutionExtraction)
-    
-    analysis_prompt = f"""Analizza la risposta dell'utente e determina l'azione da intraprendere.
-L'utente ha visto queste opzioni:
-0. Cambia Microcontrollore (Board)
-1. Scegli un altro modello AI
 
-Risposta utente: "{user_text}"
+    user_lower = user_text.lower()
 
-MAPPING:
-- "0" o "board" o "scheda" -> change_board
-- "1" o "modello" o "model" o "scelta" -> change_model
+    # Robust keyword-based classification (does not depend on LLM)
+    BOARD_KEYWORDS  = ["board", "scheda", "mcu", "micro", "microcontroller", "change board", "0"]
+    MODEL_KEYWORDS  = ["model", "modello", "other model", "choose", "light", "lighter", "1"]
 
-Rispondi con un JSON che contiene:
-- "decision": "change_board" o "change_model"
-- "confidence": 0.0-1.0
-"""
-    
-    try:
-        result = llm_extractor.invoke([
-            SystemMessage(content="Sei un classificatore di intenti tecnico."),
-            HumanMessage(content=analysis_prompt)
-        ])
-        
-        decision = result.decision.lower()
-        logger.info(f"🤖 Decisione LLM: {decision} (confidence: {result.confidence:.2f})")
-    except Exception as e:
-        logger.error(f"⚠️ Errore estrazione decisione: {e}. Fallback su change_model.")
+    board_score = sum(1 for kw in BOARD_KEYWORDS if kw in user_lower)
+    model_score = sum(1 for kw in MODEL_KEYWORDS if kw in user_lower)
+
+    if board_score > model_score:
+        decision = "change_board"
+    elif model_score > 0:
         decision = "change_model"
-    
+    else:
+        # Fallback to LLM only if keywords are not enough
+        try:
+            llm_extractor = get_llm(config, structured_schema=ResolutionExtraction)
+            analysis_prompt = f"""Analyze the response and choose between 'change_board' or 'change_model'.
+User response: "{user_text}"
+Board keywords: board, scheda, mcu → change_board
+Model keywords: modello, model, lighter → change_model"""
+            result = llm_extractor.invoke([
+                SystemMessage(content="You are a technical intent classifier."),
+                HumanMessage(content=analysis_prompt)
+            ])
+            decision = result.decision.lower()
+            logger.info(f"🤖 LLM Decision: {decision} (confidence: {result.confidence:.2f})")
+        except Exception as e:
+            logger.warning(f"⚠️ LLM not available ({e}). Using 'change_model' as default.")
+            decision = "change_model"
+
+    logger.info(f"✅ Final decision: {decision} (input: '{user_text}')")
+
     if "board" in decision:
         state.route = "change_board"
-        # Reset board state to force new selection in collect_project_info
         state.board_name = None
         state.mcu_series = ""
-        logger.info("🧹 Reset board state per cambio microcontrollore.")
+        logger.info("🧹 Reset board state for microcontroller change.")
     else:
         state.route = "change_model"
-        # Reset AI state to force new selection
         state.last_task = None
         state.selected_model = None
         state.model_discovery_method = "taskbased"
         state.model_accepted = False
         state.search_iterations = 0
-        logger.info("🧹 Reset AI selection state per cambio modello.")
-        
+        logger.info("🧹 Reset AI selection state for model change.")
+
+    # IMPORTANT: reset resource_check_result to "resolved".
+    # If LangGraph resumes from interrupt with a new VSCode session,
+    # resource_check_routing is re-executed from the checkpoint. If the value
+    # was still "critical", it routes back to handle_resource_failure
+    # creating an infinite loop. With "resolved" the routing doesn't go there.
+    state.resource_check_result = "resolved"
+
     return state
+
 
 def add_custom_model_procedure(state: MasterState, config: RunnableConfig = None) -> MasterState:
     """
-    Procedura per aggiungere un nuovo modello al catalogo.
+    Procedure to add a new model to the catalog.
     """
-    logger.info("🆕 Inizio procedura registrazione nuovo modello...")
+    logger.info("🆕 Starting new model registration procedure...")
     
-    # 1. Chiedi i dettagli all'utente
+    # 1. Ask details to the user
     prompt = {
-        "instruction": """Registrazione Nuovo Modello AI
+        "instruction": """New AI Model Registration
 
-Fornisci i seguenti dettagli Separati da virgola:
-1. Categoria (es: image_classification, object_detection, audio)
-2. Nome Modello (es: MobileNetV3 Small)
-3. Link GitHub (URL Raw .h5, .onnx, .tflite, .keras)
+Provide the following details separated by comma:
+1. Category (e.g.: image_classification, object_detection, audio)
+2. Model Name (e.g.: MobileNetV3 Small)
+3. GitHub Link (URL Raw .h5, .onnx, .tflite, .keras)
 
-Esempio:
+Example:
 "image_classification, MobileNetV3, https://github.com/.../model.keras"
         """
     }
@@ -2383,36 +2410,36 @@ Esempio:
     else:
         user_text = str(user_response)
         
-    # 2. Parsing con LLM
+    # 2. Parsing with LLM
     cfg = Configuration.from_runnable_config(config)
     llm = get_llm(config)
     
-    extraction_prompt = f"""Estrai i dettagli del nuovo modello dalla seguente risposta dell'utente:
+    extraction_prompt = f"""Extract the details of the new model from the following user response:
 "{user_text}"
 
-Rispondi in formato JSON con questi campi:
-- "category": categoria (in minuscolo, snake_case)
-- "name": nome del modello
-- "url": link GitHub Raw completo
-- "is_valid": true se i dati sembrano sensati
+Reply in JSON format with these fields:
+- "category": category (lowercase, snake_case)
+- "name": model name
+- "url": complete Raw GitHub link
+- "is_valid": true if the data seems sensible
 """
     
     response = llm.invoke(extraction_prompt)
     try:
-        # Pulisci risposta se LLM mette markdown
+        # Clean response if LLM puts markdown
         clean_content = response.content.replace("```json", "").replace("```", "").strip()
         data = json.loads(clean_content)
     except Exception as e:
-        logger.error(f"❌ Errore parsing dati nuovo modello: {e}")
+        logger.error(f"❌ Error parsing new model data: {e}")
         return state
 
     if not data.get("is_valid") or not data.get("url"):
-        logger.error("❌ Dati modello non validi o URL mancante.")
+        logger.error("❌ Invalid model data or missing URL.")
         return state
 
-    # 3. Validazione URL e Metadati
+    # 3. URL and Metadata Validation
     url = data["url"]
-    logger.info(f"🔍 Validando URL: {url}")
+    logger.info(f"🔍 Validating URL: {url}")
     
     try:
         res = requests.head(url, timeout=5, allow_redirects=True)
@@ -2420,13 +2447,13 @@ Rispondi in formato JSON con questi campi:
             size_bytes = int(res.headers.get('Content-Length', 0))
             size_str = format_bytes(size_bytes) if size_bytes > 0 else "N/A"
         else:
-            logger.warning(f"⚠️ URL risponde con status {res.status_code}. Procedo comunque?")
+            logger.warning(f"⚠️ URL responds with status {res.status_code}. Proceed anyway?")
             size_str = "N/A"
     except Exception as e:
-        logger.warning(f"⚠️ Errore connessione URL: {e}")
+        logger.warning(f"⚠️ URL connection error: {e}")
         size_str = "N/A"
 
-    # 4. Aggiorna Registro
+    # 4. Update Catalog
     models = load_predefined_models()
     category = data["category"]
     
@@ -2443,17 +2470,17 @@ Rispondi in formato JSON con questi campi:
         "accuracy": "N/A (User Provided)",
         "inference_time": "N/A",
         "url": url,
-        "category": category # Temporaneo per salvarlo dopo
+        "category": category # Temporary to save it later
     }
     
-    logger.info(f"⏳ Modello '{data['name']}' in attesa di validazione tecnica...")
+    logger.info(f"⏳ Model '{data['name']}' waiting for technical validation...")
     
-    # Imposta il nuovo modello come selezionato per procedere subito
+    # Set the new model as selected to proceed immediately
     state.selected_model = new_entry
     state.pending_model_entry = new_entry
     state.is_new_registration = True
     
-    state.model_path = "" # Verrà scaricato nel nodo download_model
-    state.model_discovery_method = "default" # Fai finta che sia predefinito ora
+    state.model_path = "" # Will be downloaded in download_model node
+    state.model_discovery_method = "default" # Pretend it's predefined now
     
     return state

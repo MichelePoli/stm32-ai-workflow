@@ -78,7 +78,7 @@ class TritonPythonModel:
                 trust_remote_code=True,
                 # On our A4000 (16GB), we limit VRAM usage to ~45% for the weight loading
                 # to leave enough room for the KV cache and peak activations.
-                gpu_memory_utilization=0.45,
+                gpu_memory_utilization=0.35,
                 # We limit the maximum sequence length to 2048 to keep the KV cache size
                 # small, as increasing this significantly increases VRAM consumption.
                 max_model_len=2048, 

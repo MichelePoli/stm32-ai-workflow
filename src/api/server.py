@@ -22,7 +22,7 @@ from src.assistant.state import MasterState
 from src.assistant.configuration import Configuration
 from langgraph.checkpoint.redis.aio import AsyncRedisSaver
 
-# Configura Logging
+# Configure Logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("api_server")
 
@@ -36,7 +36,7 @@ logger = logging.getLogger("api_server")
 #     if not expected:
 #         return  # Auth disabilitata: nessuna API_KEY nel .env
 #     if api_key != expected:
-#         raise HTTPException(status_code=403, detail="API key non valida o assente.")
+#         raise HTTPException(status_code=403, detail="Invalid or missing API key.")
 
 
 class ChatMessage(BaseModel):
@@ -49,49 +49,90 @@ class ChatRequest(BaseModel):
     user_id: Optional[str] = "anonymous"
     session_id: Optional[str] = "default-session"
 
-# Global placeholders per il grafo (inizializzati nello startup)
+# Global placeholders for the graph (initialized on startup)
 graph = None
 memory = None
 
 def format_sse(data: str) -> str:
-    """Formatta stringa per Server-Sent Events (opzionale se client gestisce chunk raw)"""
+    """Format string for Server-Sent Events (optional if client handles raw chunks)"""
     return f"data: {data}\n\n"
 
 from contextlib import asynccontextmanager
 
-# Inizializzazione Graph & Redis Checkpointer (lifespan)
+
+async def unload_all_triton_models() -> None:
+    """
+    Sends an unload request to Triton for every known heavy model at startup.
+
+    This guarantees a clean VRAM state regardless of what was left loaded by
+    a previous session. Each call is fire-and-forget: failures are logged as
+    warnings so they never block the server from booting.
+    """
+    import urllib.request
+    from urllib.error import HTTPError
+
+    triton_base = os.getenv("TRITON_BASE_URL", "http://localhost:8000/v1")
+    # Strip the /v1 suffix to reach the native Triton v2 repository API
+    triton_base = triton_base.rstrip("/").removesuffix("/v1")
+
+    # All heavy LLMs managed via explicit model control.
+    # nomic-embed is intentionally excluded: it is small and always needed.
+    models_to_unload = ["mistral", "deepseek-r1", "gpt-oss-20b"]
+
+    logger.info("🧹 [Startup] Unloading all Triton models to reset VRAM...")
+    for model in models_to_unload:
+        url = f"{triton_base}/v2/repository/models/{model}/unload"
+        try:
+            req = urllib.request.Request(url, method="POST")
+            with urllib.request.urlopen(req, timeout=10) as _:
+                pass
+            logger.info(f"   ✅ Unloaded: {model}")
+        except HTTPError as e:
+            if e.code == 400:
+                # Model was not loaded — this is the normal case at first boot.
+                logger.info(f"   ℹ️  {model}: not loaded (skipped)")
+            else:
+                logger.warning(f"   ⚠️  {model}: HTTP {e.code} during unload — {e}")
+        except Exception as e:
+            logger.warning(f"   ⚠️  {model}: unload failed — {e}")
+    logger.info("🧹 [Startup] VRAM reset complete.")
+
+
+# Graph Initialization & Redis Checkpointer (lifespan)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Inizializza il grafo e il checkpointer Redis all'avvio (dentro l'event loop)."""
+    """Initializes the graph and Redis checkpointer on startup (inside the event loop)."""
     global graph, memory
-    logger.info("🚀 Inizializzazione Graph & Redis Checkpointer...")
+    logger.info("🚀 Initializing Graph & Redis Checkpointer...")
     
-    # Retry con backoff: Redis può essere in BusyLoadingError (caricamento RDB ~18s)
+    # Retry with backoff: Redis might be in BusyLoadingError (RDB load ~18s)
     import asyncio
     from redis.exceptions import BusyLoadingError
     max_retries = 20
-    retry_delay = 3  # secondi
+    retry_delay = 3  # seconds
     
     for attempt in range(1, max_retries + 1):
         try:
             memory = AsyncRedisSaver(redis_client=checkpointer_redis)
             await memory.setup()
             graph = builder.compile(checkpointer=memory)
-            logger.info("✅ Grafo compilato e Redis pronto.")
-            break  # successo → esci dal loop
+            logger.info("✅ Graph compiled and Redis ready.")
+            # Unload all Triton models to start from a clean VRAM state
+            # await unload_all_triton_models() # only for debug, then comment this line 
+            break  # success -> exit loop
         except BusyLoadingError as e:
             if attempt < max_retries:
-                logger.warning(f"⏳ Redis ancora in caricamento, riprovo in {retry_delay}s (tentativo {attempt}/{max_retries})...")
+                logger.warning(f"⏳ Redis is still loading, retrying in {retry_delay}s (attempt {attempt}/{max_retries})...")
                 await asyncio.sleep(retry_delay)
             else:
-                logger.error(f"❌ Redis non pronto dopo {max_retries} tentativi: {e}")
+                logger.error(f"❌ Redis not ready after {max_retries} attempts: {e}")
         except Exception as e:
-            logger.error(f"❌ Errore durante startup: {e}")
+            logger.error(f"❌ Error during startup: {e}")
             logger.exception(e)
-            break  # errore non recuperabile
+            break  # unrecoverable error
     
     yield
-    logger.info("👋 Shutdown server...")
+    logger.info("👋 Shutting down server...")
 
 app = FastAPI(title="STM32 AI Assistant API", lifespan=lifespan)
 
@@ -104,12 +145,12 @@ def health_check():
 # @app.post("/stream", dependencies=[Depends(verify_api_key)]) # nel caso in cui vuoi implementare API KEY (al momento no). 
 async def stream_chat(request: ChatRequest):
     """
-    Endpoint principale per la chat.
-    Riceve messaggi dall'estensione VS Code, esegue il grafo e streamma le risposte.
+    Main endpoint for chat.
+    Receives messages from the VS Code extension, executes the graph and streams the responses.
     """
-    logger.info(f"Ricevuta richiesta chat: {len(request.messages)} messaggi")
+    logger.info(f"Received chat request: {len(request.messages)} messages")
     
-    # ultimo messaggio utente è l'input principale per il grafo
+    # last user message is the main input for the graph
     last_user_message = next((m.content for m in reversed(request.messages) if m.role == 'user'), "")
     
     # -------------------------------------------------------------------------
@@ -119,12 +160,12 @@ async def stream_chat(request: ChatRequest):
     try:
         raw_profile = await redis_client.get(user_profile_key)
         user_profile = json.loads(raw_profile) if raw_profile else {}
-        logger.info(f"👤 Profilo utente caricato per {request.user_id}: {json.dumps(user_profile, indent=2)}")
+        logger.info(f"👤 User profile loaded for {request.user_id}: {json.dumps(user_profile, indent=2)}")
     except Exception as e:
-        logger.warning(f"⚠️ Impossibile caricare profilo utente: {e}")
+        logger.warning(f"⚠️ Unable to load user profile: {e}")
         user_profile = {}
 
-    # 3. Definisci lo stato iniziale
+    # 3. Define the initial state
     initial_state = {
         "message": last_user_message,
         "persistent_context": user_profile,
@@ -135,26 +176,26 @@ async def stream_chat(request: ChatRequest):
     }
     
     if request.context:
-        logger.info(f"Context ricevuto: {request.context.keys()}")
+        logger.info(f"Context received: {request.context.keys()}")
     
     async def event_generator():
-        # Coda per aggregare eventi dal grafo e log dal subprocess
+        # Queue to aggregate events from the graph and logs from subprocesses
         queue = asyncio.Queue()
         loop = asyncio.get_event_loop()
 
-        # Handler per catturare i log (es. training progress)
+        # Handler to capture logs (e.g. training progress)
         class QueueHandler(logging.Handler):
             def emit(self, record):
                 try:
                     msg = self.format(record)
-                    # Filtriamo i log interessanti per l'utente in tempo reale
+                    # We filter interesting logs for the user in real-time
                     if any(x in msg for x in ["[Train]", "Epoch ", "accuracy:", "loss:", "[Subprocess]"]):
-                        # Logica safe per spingere nella coda asincrona da un contesto sincrono
+                        # Safe logic to push into the asynchronous queue from a synchronous context
                         loop.call_soon_threadsafe(queue.put_nowait, {"type": "log", "content": msg})
                 except Exception:
                     pass
 
-        # Collega l'handler ai logger interessati
+        # Connect the handler to the interested loggers
         handler = QueueHandler()
         handler.setFormatter(logging.Formatter('%(message)s'))
         loggers_to_stream = [
@@ -194,23 +235,23 @@ async def stream_chat(request: ChatRequest):
                 initial_state["user_response"] = ""
                 stream_input = initial_state
 
-            # Avvia il grafo in un task separato
+            # Execute the graph in a separate task
             async def run_graph_task():
                 try:
                     async for event in graph.astream(stream_input, config=config):
                         await queue.put({"type": "graph_event", "data": event})
                 except Exception as e:
-                    logger.error(f"Errore nel task del grafo: {e}")
+                    logger.error(f"Error in graph task: {e}")
                     await queue.put({"type": "error", "content": str(e)})
                 finally:
                     await queue.put(None) # Signal completion
 
             asyncio.create_task(run_graph_task())
 
-            # Consuma dalla coda con heartbeat
+            # Consume from the queue with heartbeat
             while True:
                 try:
-                    # Timeout di 15s per l'heartbeat
+                    # 15s timeout for heartbeat
                     item = await asyncio.wait_for(queue.get(), timeout=15)
                     if item is None:
                         break
@@ -226,13 +267,13 @@ async def stream_chat(request: ChatRequest):
                     elif item["type"] == "graph_event":
                         event = item["data"]
                         for node_name, node_state in event.items():
-                            logger.info(f"Nodo eseguito: {node_name}")
+                            logger.info(f"Node executed: {node_name}")
                             
                             if node_name == "__interrupt__":
                                 interrupt_data = node_state[0] if isinstance(node_state, (list, tuple)) and node_state else node_state
                                 value = getattr(interrupt_data, 'value', interrupt_data)
                                 if isinstance(value, dict) and "instruction" in value:
-                                    prompt_msg = f"⏸️ **AZIONE RICHIESTA**:\n\n{value['instruction']}\n\n"
+                                    prompt_msg = f"⏸️ **ACTION REQUIRED**:\n\n{value['instruction']}\n\n"
                                     if "suggestion" in value:
                                         prompt_msg += f"> 💡 {value['suggestion']}\n\n"
                                     if "options" in value and isinstance(value["options"], dict):
@@ -240,104 +281,105 @@ async def stream_chat(request: ChatRequest):
                                             prompt_msg += f"* **{key}**: {text}\n"
                                     yield json.dumps({"type": "markdown", "content": prompt_msg}) + "\n"
                                 else:
-                                    yield json.dumps({"type": "markdown", "content": "⏸️ In attesa di input dell'utente...\n\n"}) + "\n"
+                                    yield json.dumps({"type": "markdown", "content": "⏸️ Waiting for user input...\n\n"}) + "\n"
                                 continue
 
-                            # Mappa node_name → etichetta leggibile per il progress bar
+                            # Map node_name → readable label for the progress bar
                             NODE_LABELS = {
                                 # workflow 1 - firmware generation
-                                "route_request": "🔀 Analisi richiesta",
-                                "collect_project_info": "📋 Raccolta info progetto",
-                                "search_and_install_stm32_package": "📦 Verifica package STM32",
-                                "generate_cubemx_script": "📝 Generazione script CubeMX",
-                                "execute_generation": "⚙️ Generazione firmware",
-                                "finalize_project": "✅ Finalizzazione firmware",
-                                "decide_continue_to_ai": "🔀 Decisione: analisi AI",
-                                "collect_analysis_info": "📋 Raccolta info analisi AI",
-                                "choose_ai_task": "🎯 Selezione task AI",
-                                "choose_ai_model": "🧠 Selezione modello AI",
-                                "download_model": "⬇️ Download modello",
-                                "inspect_model_architecture": "🔍 Ispezione architettura",
-                                "ask_modification_intent": "🛠️ Intenzione modifica modello",
-                                "retrieve_best_practices_for_architecture": "📚 Best practices architettura",
-                                # Workflow 5 – customization
-                                "gather_user_modifications": "📝 Descrizione modifiche",
-                                "ask_and_parse_user_modifications": "🧩 Parsing modifiche",
-                                "collect_modification_confirmation": "✅ Conferma modifiche",
-                                "apply_user_customization": "🔧 Applicazione customizzazione",
-                                "ask_optimization_preference": "⚙️ Preferenza ottimizzazione",
-                                "fine_tune_customized_model": "🎓 Fine-tuning modello",
-                                "validate_customized_model": "✔️ Validazione modello customizzato",
-                                "save_customized_model_final": "💾 Salvataggio modello finale",
-                                "ask_continue_after_customization": "🔀 Continuare con analisi AI?",
-                                # Workflow 6 – synthetic data
-                                "ask_synthetic_data_requirements": "🧪 Requisiti dati sintetici",
-                                "generate_synthetic_samples": "⚙️ Generazione dati sintetici",
-                                "validate_synthetic_data": "✔️ Validazione dati sintetici",
-                                # Workflow 7 – dataset
-                                "decide_data_source": "🗄️ Sorgente dati",
-                                "select_predefined_dataset": "📊 Selezione dataset",
-                                "download_dataset": "⬇️ Download dataset",
-                                # Workflow 2 – AI analysis
-                                "apply_modifications": "✏️ Applicazione modifiche",
-                                "run_analyze": "📊 Analisi STEdgeAI",
-                                "check_resource_constraints": "⚖️ Verifica risorse MCU",
-                                "run_validate": "✔️ Validazione modello",
-                                "run_generate": "🏗️ Generazione codice AI",
-                                "finalize_analysis": "✅ Finalizzazione analisi",
-                                # Workflow 3 – integration
-                                "decide_continue_to_integration": "🔀 Decisione: integrazione",
-                                "collect_integration_info": "📋 Raccolta info integrazione",
-                                "scan_ai_files": "🔍 Scansione file AI",
-                                "copy_ai_files": "📂 Copia file AI nel firmware",
-                                "modify_main_c": "✏️ Modifica main.c",
-                                "verify_integration": "✔️ Verifica integrazione",
-                                "finalize_integration": "✅ Finalizzazione integrazione",
-                                # Workflow 4 – web search
-                                "classify_search": "🔀 Classificazione ricerca",
-                                "execute_web_search": "🌐 Esecuzione ricerca web",
-                                "summarize_search_results": "📝 Creazione riassunto",
-                                "finalize_search": "✅ Finalizzazione ricerca",
+                                "route_request": "🔀 Request Analysis",
+                                "collect_project_info": "📋 Collecting Project Info",
+                                "search_and_install_stm32_package": "📦 Checking STM32 Package",
+                                "generate_cubemx_script": "📝 Generating CubeMX Script",
+                                "execute_generation": "⚙️ Generating Firmware",
+                                "finalize_project": "✅ Finalizing Firmware",
+                                "decide_continue_to_ai": "🔀 Decision: AI Analysis",
+                                "collect_analysis_info": "📋 Collecting AI Analysis Info",
+                                "choose_ai_task": "🎯 Selecting AI Task",
+                                "choose_ai_model": "🧠 Selecting AI Model",
+                                "download_model": "⬇️ Downloading Model",
+                                "inspect_model_architecture": "🔍 Inspecting Architecture",
+                                "ask_modification_intent": "🛠️ Model Modification Intent",
+                                "retrieve_best_practices_for_architecture": "📚 Architecture Best Practices",
+                                # Workflow 5 - customization
+                                "gather_user_modifications": "📝 Modifications Description",
+                                "ask_and_parse_user_modifications": "🧩 Parsing Modifications",
+                                "collect_modification_confirmation": "✅ Confirming Modifications",
+                                "apply_user_customization": "🔧 Applying Customization",
+                                "ask_optimization_preference": "⚙️ Optimization Preference",
+                                "optimize_hyperparameters_with_nni": "🧪 Optimize hyperparameters with NNI",
+                                "fine_tune_customized_model": "🎓 Fine-tuning Model",
+                                "validate_customized_model": "✔️ Validating Customized Model",
+                                "save_customized_model_final": "💾 Saving Final Model",
+                                "ask_continue_after_customization": "🔀 Continue with AI Analysis?",
+                                # Workflow 6 - synthetic data
+                                "ask_synthetic_data_requirements": "🧪 Synthetic Data Requirements",
+                                "generate_synthetic_samples": "⚙️ Generating Synthetic Data",
+                                "validate_synthetic_data": "✔️ Validating Synthetic Data",
+                                # Workflow 7 - dataset
+                                "decide_data_source": "🗄️ Data Source",
+                                "select_predefined_dataset": "📊 Selecting Dataset",
+                                "download_dataset": "⬇️ Downloading Dataset",
+                                # Workflow 2 - AI analysis
+                                "apply_modifications": "✏️ Applying Modifications",
+                                "run_analyze": "📊 STEdgeAI Analysis",
+                                "check_resource_constraints": "⚖️ Checking MCU Resources",
+                                "run_validate": "✔️ Validating Model",
+                                "run_generate": "🏗️ Generating AI Code",
+                                "finalize_analysis": "✅ Finalizing Analysis",
+                                # Workflow 3 - integration
+                                "decide_continue_to_integration": "🔀 Decision: Integration",
+                                "collect_integration_info": "📋 Collecting Integration Info",
+                                "scan_ai_files": "🔍 Scanning AI Files",
+                                "copy_ai_files": "📂 Copying AI files to Firmware",
+                                "modify_main_c": "✏️ Modifying main.c",
+                                "verify_integration": "✔️ Verifying Integration",
+                                "finalize_integration": "✅ Finalizing Integration",
+                                # Workflow 4 - web search
+                                "classify_search": "🔀 Classifying Search",
+                                "execute_web_search": "🌐 Executing Web Search",
+                                "summarize_search_results": "📝 Creating Summary",
+                                "finalize_search": "✅ Finalizing Search",
                                 # General chat
-                                "general_chat": "💬 Risposta chat",
+                                "general_chat": "💬 Chat Response",
                             }
-                            label = NODE_LABELS.get(node_name, node_name.replace("_", " ").capitalize())
+                            label = NODE_LABELS.get(node_name, node_name.replace("_", " ").title())
                             yield json.dumps({"type": "progress", "content": label}) + "\n"
                             
                             if node_name == "route_request" and isinstance(node_state, dict) and "route" in node_state:
                                 route = node_state["route"]
-                                msg = f"🔍 Ho analizzato la tua richiesta: **{route.replace('_', ' ')}**."
+                                msg = f"🔍 I have analyzed your request: **{route.replace('_', ' ')}**."
                                 yield json.dumps({"type": "markdown", "content": f"{msg}\n\n"}) + "\n"
                             
-                            # Emetti output testuale solo da nodi che producono risposte finali
+                            # Emit textual output only from nodes that produce final responses
                             if isinstance(node_state, dict):
-                                # Risposta workflow finalizers (finalize_integration etc.)
+                                # Response workflow finalizers (finalize_integration etc.)
                                 if node_state.get("response"):
                                     yield json.dumps({"type": "markdown", "content": f"{node_state['response']}\n\n"}) + "\n"
-                                # Chat generale: risposta salvata in state.message
+                                # General chat: response saved in state.message
                                 elif node_name == "general_chat" and node_state.get("message"):
                                     yield json.dumps({"type": "markdown", "content": f"{node_state['message']}\n\n"}) + "\n"
                                 # Firmware finalizer
                                 elif node_name == "finalize_project" and node_state.get("firmware_project_path"):
                                     path = node_state["firmware_project_path"]
-                                    yield json.dumps({"type": "markdown", "content": f"✓ Progetto firmware generato: `{path}`\n\n"}) + "\n"
+                                    yield json.dumps({"type": "markdown", "content": f"✓ Firmware project generated: `{path}`\n\n"}) + "\n"
                                 # AI analysis finalizer
                                 elif node_name == "finalize_analysis" and node_state.get("ai_code_dir"):
-                                    yield json.dumps({"type": "markdown", "content": f"✓ Analisi AI completata! Codice generato in: `{node_state['ai_code_dir']}`\n\n"}) + "\n"
+                                    yield json.dumps({"type": "markdown", "content": f"✓ AI Analysis completed! Code generated in: `{node_state['ai_code_dir']}`\n\n"}) + "\n"
 
 
                 
                 except asyncio.TimeoutError:
-                    # Heartbeat: manda un pacchetto vuoto o un progress silenzioso
+                    # Heartbeat: send an empty packet or a silent progress
                     yield json.dumps({"type": "progress", "content": "..."}) + "\n"
 
-            # Logica di salvataggio finale profilo (dopo fine coda)
+            # Final profile save logic (after queue ends)
             try:
                 final_snapshot = await graph.aget_state(config)
                 state = final_snapshot.values
                 is_finished = len(final_snapshot.next) == 0
                 
-                # Estraiamo i valori correnti dallo stato
+                # We extract current values from state
                 new_profile = {
                     "board_name": state.get("board_name"),
                     "mcu_series": state.get("mcu_series"),
@@ -347,25 +389,25 @@ async def stream_chat(request: ChatRequest):
                     "timestamp": state.get("timestamp")
                 }
                 
-                # Rimuovi solo i None e le stringhe vuote, ma mantieni tutto il resto (incluso F401)
+                # Remove only None and empty strings, but keep everything else (including F401)
                 new_profile = {k: v for k, v in new_profile.items() if v is not None and v != ""}
                 
-                # Unisci con il profilo esistente (nuovi valori vincono)
+                # Merge with the existing profile (new values win)
                 updated_profile = {**user_profile, **new_profile}
                 
                 if state.get("reset_profile"):
                     updated_profile = {}
                 
                 await redis_client.set(user_profile_key, json.dumps(updated_profile))
-                logger.info(f"💾 Profilo salvato per {request.user_id}: {json.dumps(updated_profile)}")
+                logger.info(f"💾 Profile saved for {request.user_id}: {json.dumps(updated_profile)}")
                 
                 if is_finished:
                     yield json.dumps({"type": "status", "event": "completed", "thread_id": composite_thread_id}) + "\n"
-                    yield json.dumps({"type": "markdown", "content": "✅ Elaborazione completata con successo."}) + "\n"
+                    yield json.dumps({"type": "markdown", "content": "✅ Processing completed successfully."}) + "\n"
                 else:
                     yield json.dumps({"type": "status", "event": "waiting", "thread_id": composite_thread_id}) + "\n"
             except Exception as se:
-                logger.warning(f"⚠️ Errore salvataggio profilo: {se}")
+                logger.warning(f"⚠️ Error saving profile: {se}")
 
         finally:
             for l in loggers_to_stream:

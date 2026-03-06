@@ -1,168 +1,44 @@
 import os
 import logging
-import json
 import re
-import urllib.request
-from src.assistant.utils import force_unload_ollama
+from typing import Dict, Any
 
-
-from typing import Dict, Any, Optional
-from agno.agent import Agent
-# agno model backends are imported conditionally inside generate_nni_experiment()
-# based on USE_TRITON_BACKEND: agno.models.openai.OpenAIChat (Triton) or agno.models.ollama.Ollama
-
-# Configure logging
 logger = logging.getLogger(__name__)
 
-def normalize_code_escapes(text: str) -> str:
-    """
-    Normalize ALL escape sequences in code string.
-    """
-    if not isinstance(text, str):
-        return text
-    text = text.replace(r'\\n', '\\n')
-    text = text.replace(r'\\t', '\\t')
-    text = text.replace(r'\\r', '\\r')
-    text = text.replace(r'\\"', '"')
-    return text
-
-def extract_files_from_code(code: str, verbose: bool = True) -> Dict[str, str]:
-    """
-    Extract individual files from code with # FILE: markers.
-    More permissive regex to handle various LLM output formats.
-    """
-    if not code:
-        return {}
-        
-    if '# FILE:' not in code and '#FILE:' not in code:
-        if verbose:
-            logger.warning("⚠️  No '# FILE:' markers found, returning as single file")
-        return {"main.py": code}
-    
-    # More permissive regex:
-    # - Allows optional space after #
-    # - Allows anything after filename (e.g., comments)
-    # - Captures filename with dots, underscores, dashes
-    file_pattern = re.compile(r'^#\s*FILE:\s*([a-zA-Z0-9_\-\.]+)', re.MULTILINE | re.IGNORECASE)
-    file_matches = list(file_pattern.finditer(code))
-    
-    if verbose:
-        logger.info(f"   Found {len(file_matches)} file markers")
-        for match in file_matches:
-            logger.info(f"      - {match.group(1)}")
-    
-    if not file_matches:
-        logger.warning("⚠️  # FILE: markers exist but regex didn't match, returning as single file")
-        return {"main.py": code}
-    
-    files = {}
-    for i, match in enumerate(file_matches):
-        filename = match.group(1)
-        start = match.end()
-        
-        # Find next file marker or end of string
-        if i + 1 < len(file_matches):
-            end = file_matches[i + 1].start()
-        else:
-            end = len(code)
-        
-        file_content = code[start:end].strip()
-        files[filename] = file_content
-        
-    return files
 
 def generate_nni_experiment(
     model_info: Dict[str, Any],
     dataset_info: Dict[str, Any],
     optimization_goal: str = "Maximize validation accuracy and minimize latency",
     output_dir: str = "./nni_experiment",
-    num_ctx: int = 8192
+    num_ctx: int = 8192,
 ) -> Dict[str, str]:
     """
-    Generates NNI experiment scripts (manager.py, trial.py) using an LLM Agent.
-    
+    Generates NNI experiment scripts (manager.py, trial.py) using Python templates.
+
+    Previously this function called an LLM to generate the scripts, but the prompt
+    exceeded max_model_len=2048 of gpt-oss-20b, causing vLLM to silently return an
+    empty string. Since manager.py / trial.py have a deterministic structure and only
+    the dataset/model PATHS change per experiment, we now use Python f-string templates
+    with direct path injection — faster, 100% reliable, no LLM call needed.
+
     Args:
-        model_info: Dictionary containing model architecture details (layers, input_shape, etc.)
-        dataset_info: Dictionary containing dataset details (path, shapes, classes)
-        optimization_goal: The objective of the optimization
-        output_dir: Directory to save generated files
-        num_ctx: LLM context window (default 8192)
-        
+        model_info:  Dictionary containing model architecture details (name, path, …).
+        dataset_info: Dictionary containing dataset details (path, num_classes, …).
+        optimization_goal: Objective description (informational only).
+        output_dir: Directory to save generated files.
+        num_ctx: (kept for API compatibility, unused).
+
     Returns:
         Dict mapping filenames to their generated content.
     """
-    
     logger.info(f"🤖 Generating NNI experiment for model: {model_info.get('name', 'Unknown')}")
-    
-    # Construct Context Description
-    context_desc = f"""
-    TARGET MODEL:
-    - Name: {model_info.get('name', 'Custom Model')}
-    - Input Shape: {model_info.get('input_shape')}
-    - Output Shape: {model_info.get('output_shape')}
-    - Layers: {model_info.get('n_layers')}
-    - File Path: {model_info.get('path')}
-    
-    TARGET DATASET:
-    - Path: {dataset_info.get('path')}
-    - Input Shape: {dataset_info.get('x_shape')}
-    - Classes: {dataset_info.get('num_classes')}
-    - Source: {dataset_info.get('source', 'numpy files')}
-    
-    OPTIMIZATION GOAL:
-    {optimization_goal}
-    """
-    
-    # Prompt Construction - ULTRA EXPLICIT
-    prompt = f"""You are an expert NNI (Neural Network Intelligence) Engineer.
 
-Your task: Generate EXACTLY TWO PYTHON FILES for an NNI hyperparameter optimization experiment.
+    data_path  = dataset_info.get("path", "")
+    model_path = model_info.get("path", "")
 
-{context_desc}
-
-🚨 CRITICAL PATH REQUIREMENTS 🚨:
-- Dataset files are at: {dataset_info.get('path')}
-  Load data using: np.load('{dataset_info.get('path')}/x_train.npy', mmap_mode='r'), np.load('{dataset_info.get('path')}/y_train.npy', mmap_mode='r'), etc.
-- Model file is at: {model_info.get('path')}
-  Load model using: keras.models.load_model('{model_info.get('path')}')
-
-NEVER use placeholder paths like ~/data or ~/models!
-ALWAYS use the EXACT paths specified above!
-
-CRITICAL REQUIREMENTS:
-🔴 YOU MUST GENERATE EXACTLY 2 FILES: manager.py AND trial.py
-🔴 Both files are MANDATORY - DO NOT skip either one
-🔴 Use the exact format shown below with # FILE: markers
-🔴 DO NOT use keras.datasets.load_data(). ALWAYS load data from the provided path.
-🔴 IMPORTANT: If data labels (y_train) have shape (N, 1), they are SPARSE. Convert them to categorical (one-hot) before training.
-
-FILE 1: manager.py
-- Configure NNI experiment (TPE tuner, maximize mode)
-- Define search space (learning_rate, batch_size, optimizer)
-- Set trial_command = "python trial.py"
-- Launch experiment with experiment.run(port=8080, wait_completion=True)
-- AFTER experiment: Find the best trial USING ONLY experiment.list_trial_jobs()
-- Trigger RETRAIN: Run "trial.py" as a subprocess with env RETRAIN_MODE='true' and best NNI_PARAMS
-
-FILE 2: trial.py
-- Get parameters (from NNI_PARAMS if RETRAIN_MODE, else from nni.get_next_parameter())
-- Load model and data from provided paths (USE EXACT PATHS ABOVE!)
-- MEMORY OPTIMIZATION: Load data with `mmap_mode='r'` to avoid RAM overload.
-- DATASET SUBSET: Use only 50% of the dataset to save RAM.
-- Adapt model final layer if classes mismatch
-- Train model for 3 epochs
-- Report accuracy to NNI (if not retrain) or Save 'best_model.h5' (if retrain)
-
-⚠️ CRITICAL RULES:
-🔴 DO NOT USE experiment.export_top_trial() OR experiment.get_best_trial() - THEY DO NOT EXIST.
-🔴 ALWAYS USE experiment.list_trial_jobs() to find the best trial manually.
-🔴 KEEP manager.py simple and follow the structure below.
-🔴 Use exact paths from context: {dataset_info.get('path')} and {model_info.get('path')}
-
-OUTPUT FORMAT (COPY THIS STRUCTURE EXACTLY):
-
-# FILE: manager.py
-```python
+    # ── manager.py ────────────────────────────────────────────────────────────
+    manager_content = f"""\
 import nni
 import os
 import sys
@@ -170,375 +46,215 @@ import json
 import subprocess
 from nni.experiment import Experiment
 
-# FORCE LOAD CUDA LIBRARIES (Fix for Conda Envs)
+# Fix for Conda environments that lack CUDA libs in LD_LIBRARY_PATH
 conda_lib_path = os.path.join(sys.prefix, 'lib')
 if os.path.exists(conda_lib_path):
-    os.environ['LD_LIBRARY_PATH'] = f"{{conda_lib_path}}:{{os.environ.get('LD_LIBRARY_PATH', '')}}"
-    print(f"[NNI] 🔧 Added Conda lib to LD_LIBRARY_PATH: {{conda_lib_path}}")
+    os.environ['LD_LIBRARY_PATH'] = conda_lib_path + ':' + os.environ.get('LD_LIBRARY_PATH', '')
 
-# Get absolute path to current directory
 current_dir = os.path.dirname(os.path.abspath(__file__))
 
-# Define search space
 search_space = {{
-    'learning_rate': {{'_type': 'choice', '_value': [0.001, 0.0005, 0.0001]}},
-    'batch_size': {{'_type': 'choice', '_value': [16, 32, 64]}},
-    'optimizer': {{'_type': 'choice', '_value': ['Adam']}},
+    'learning_rate':   {{'_type': 'choice', '_value': [0.001, 0.0005, 0.0001]}},
+    'batch_size':      {{'_type': 'choice', '_value': [16, 32, 64]}},
+    'optimizer':       {{'_type': 'choice', '_value': ['Adam']}},
     'freeze_backbone': {{'_type': 'choice', '_value': [True, False]}},
-}} # tolto False da freeze_backbone per testing più veloce. dopo rimetti. 
+}}
 
-# Create experiment
 experiment = Experiment('local')
-# CRITICAL: Use same Python interpreter for trials
 experiment.config.trial_command = f'{{sys.executable}} trial.py'
-experiment.config.trial_code_directory = current_dir  # Use absolute path
+experiment.config.trial_code_directory = current_dir
 experiment.config.search_space = search_space
 experiment.config.tuner.name = 'Random'
 experiment.config.tuner.class_args = {{'optimize_mode': 'maximize'}}
-experiment.config.max_trial_number = 8 
-experiment.config.trial_concurrency = 2 # REDUCE TO 1 IF YOU WANT TO SAVE MORE RAM
-experiment.config.training_service.use_active_gpu = True # Enable GPU Usage
+experiment.config.max_trial_number = 8
+experiment.config.trial_concurrency = 2
+experiment.config.training_service.use_active_gpu = True
 
-# Run with error handling
 try:
-    print(f"[NNI] Starting experiment in {{current_dir}}")
-    
-    # --- PORT HUNTING ---
     import socket
-    def find_free_port(start_port=8080, max_attempts=20):
-        for port in range(start_port, start_port + max_attempts):
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                if s.connect_ex(('localhost', port)) != 0:
-                    return port
-        return start_port
 
-    target_port = find_free_port(8080)
-    print(f"[NNI] Web UI will be available at http://localhost:{{target_port}}")
-    
-    experiment.run(port=target_port, wait_completion=True)
-    print("[NNI] Experiment completed successfully")
-    
-    # --- AUTO-RETRAIN BEST MODEL ---
-    print("\\n[NNI] 🏆 Exporting best trial...")
-    
-    # Robust way to get best trial (export_top_trial might be missing)
+    def find_free_port(start=8080, n=20):
+        for p in range(start, start + n):
+            with socket.socket() as s:
+                if s.connect_ex(('localhost', p)) != 0:
+                    return p
+        return start
+
+    port = int(os.environ.get('NNI_PORT', '0')) or find_free_port()
+    print(f'[NNI] 🌐 Starting experiment on port {{port}}  →  http://localhost:{{port}}')
+    experiment.run(port=port, wait_completion=True)
+    print('[NNI] Experiment completed')
+
     trials = experiment.list_trial_jobs()
-    valid_trials = [t for t in trials if t.status == 'SUCCEEDED' and t.finalMetricData]
-    
-    if not valid_trials:
-        raise Exception("No successful trials found.")
-        
-    # Sort by metric (assuming 'maximize' mode -> higher is better)
-    # finalMetricData is a list of MetricData, we take the last one (or index 0 if only one)
-    # data is usually a string, convert to float
-    best_trial = max(valid_trials, key=lambda t: float(t.finalMetricData[0].data))
-    
-    # DEBUG: Inspect structure
-    print(f"   • Raw hyperParameters type: {{type(best_trial.hyperParameters)}}")
-    print(f"   • Raw hyperParameters value: {{best_trial.hyperParameters}}")
-    sys.stdout.flush()
-    # le print di debug appariranno subito.
+    valid  = [t for t in trials if t.status == 'SUCCEEDED' and t.finalMetricData]
+    if not valid:
+        raise Exception('No successful trials')
 
-
-    # Handle hyperParameters structure
-    hp = best_trial.hyperParameters
-    
-    # 1. If list, take the latest one
+    best = max(valid, key=lambda t: float(t.finalMetricData[0].data))
+    hp = best.hyperParameters
     if isinstance(hp, list):
-         latest_hp = hp[-1]
+        hp = hp[-1]
+    if hasattr(hp, 'parameters'):
+        best_params = hp.parameters
+    elif isinstance(hp, dict):
+        best_params = hp.get('parameters', hp)
     else:
-         latest_hp = hp
-         
-    # 2. Extract 'parameters' dict (handle Object vs Dict)
-    if hasattr(latest_hp, 'parameters'):
-        best_params = latest_hp.parameters
-    elif isinstance(latest_hp, dict):
-        best_params = latest_hp['parameters']
-    else:
-        # Fallback: assume latest_hp IS the params dict (very old NNI?)
-        print(f"[NNI] Warning: Unknown HP structure. Type: {{type(latest_hp)}}")
-        best_params = latest_hp
-    print(f"   • Best Params: {{best_params}}")
-    
-    print("\\n[NNI] 💾 Retraining best model for saving...")
-    
-    # Prepare environment for retrain
+        best_params = hp
+
+    print(f'[NNI] Best params: {{best_params}}')
     env = os.environ.copy()
     env['RETRAIN_MODE'] = 'true'
-    env['NNI_PARAMS'] = json.dumps(best_params)
-    
-    # Re-run trial.py with best params
-    subprocess.run(
-        [sys.executable, 'trial.py'],
-        cwd=current_dir,
-        env=env,
-        check=True
-    )
-    
-    print(f"[NNI] ✅ Best model saved to: {{os.path.join(current_dir, 'best_model.h5')}}")
+    env['NNI_PARAMS']   = json.dumps(best_params)
+    subprocess.run([sys.executable, 'trial.py'], cwd=current_dir, env=env, check=True)
+    print('[NNI] Best model saved.')
 
 except Exception as e:
-    print(f"[NNI] Error during experiment: {{e}}")
+    print(f'[NNI] Error: {{e}}')
     import traceback
     traceback.print_exc()
 
 finally:
-    # Stop experiment and exit
-    print("\\n[NNI] 🛑 Experiment flow finished. Stopping NNI...")
     experiment.stop()
-```
+"""
 
-
-# FILE: trial.py
-```python
+    # ── trial.py ──────────────────────────────────────────────────────────────
+    trial_content = f"""\
 import sys
 import os
-import nni
+
+# TF_USE_LEGACY_KERAS=True is set in the Docker container environment, but
+# tf_keras is not installed in the stm32 conda env. Unsetting it here prevents
+# the "you must install tf_keras" crash that silently kills every NNI trial.
+os.environ.pop('TF_USE_LEGACY_KERAS', None)
+
 import json
+import nni
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
 
-# --- AUTO-CONFIGURE CUDA PATH (Robust) ---
-# Must be done BEFORE loading TensorFlow
+# Fix LD_LIBRARY_PATH for Conda envs
 if 'LD_LIBRARY_PATH' not in os.environ:
-    conda_lib_path = os.path.join(sys.prefix, 'lib')
-    if os.path.exists(conda_lib_path):
-        os.environ['LD_LIBRARY_PATH'] = f"{{conda_lib_path}}:{{os.environ.get('LD_LIBRARY_PATH', '')}}"
-        print(f"[TRIAL] 🔧 Added Conda lib to LD_LIBRARY_PATH: {{conda_lib_path}}")
-        
-        # Self-restart to apply env vars to dynamic linker
-        if 'RESTARTED_WITH_LD' not in os.environ:
-             print("[TRIAL] 🔄 Restarting script to apply environment...")
-             os.environ['RESTARTED_WITH_LD'] = 'true'
-             try:
-                 os.execv(sys.executable, [sys.executable] + sys.argv)
-             except Exception as e:
-                 print(f"[TRIAL] ⚠️ Restart failed: {{e}}")
+    lp = os.path.join(sys.prefix, 'lib')
+    if os.path.exists(lp) and 'RESTARTED_WITH_LD' not in os.environ:
+        os.environ['LD_LIBRARY_PATH'] = lp
+        os.environ['RESTARTED_WITH_LD'] = 'true'
+        try:
+            os.execv(sys.executable, [sys.executable] + sys.argv)
+        except Exception:
+            pass
 
-# GPU Memory Growth (Prevent OOM)
-gpus = tf.config.list_physical_devices('GPU')
-if gpus:
+# GPU memory growth
+for g in tf.config.list_physical_devices('GPU'):
     try:
-        for gpu in gpus:
-            tf.config.experimental.set_memory_growth(gpu, True)
-        print(f"[TRIAL] 🎮 GPU initialized: {{len(gpus)}} devices")
-    except RuntimeError as e:
-        print(e)
+        tf.config.experimental.set_memory_growth(g, True)
+    except RuntimeError:
+        pass
 
-# Check mode
 IS_RETRAIN = os.environ.get('RETRAIN_MODE', 'false').lower() == 'true'
+params = json.loads(os.environ.get('NNI_PARAMS', '{{}}')) if IS_RETRAIN else nni.get_next_parameter()
 
-if IS_RETRAIN:
-    print("[TRIAL] 🔄 Retraining mode activated!")
-    params = json.loads(os.environ.get('NNI_PARAMS', '{{}}'))
+lr          = params.get('learning_rate', 0.001)
+batch_size  = params.get('batch_size', 32)
+opt_name    = params.get('optimizer', 'Adam')
+freeze_bb   = params.get('freeze_backbone', False)
+
+# ── Load data (50% subset to save RAM) ───────────────────────────────────────
+DATA    = r'{data_path}'
+x_train = np.load(DATA + '/x_train.npy', mmap_mode='r')
+y_train = np.load(DATA + '/y_train.npy', mmap_mode='r')
+x_test  = np.load(DATA + '/x_test.npy',  mmap_mode='r')
+y_test  = np.load(DATA + '/y_test.npy',  mmap_mode='r')
+
+n = len(x_train) // 2
+x_train = x_train[:n]
+y_train = y_train[:n]
+
+# One-hot encode sparse labels
+if y_train.ndim == 1 or (y_train.ndim == 2 and y_train.shape[-1] == 1):
+    nc      = len(np.unique(y_train))
+    y_train = keras.utils.to_categorical(y_train, nc)
+    y_test  = keras.utils.to_categorical(y_test,  nc)
 else:
-    # Standard NNI Mode
-    params = nni.get_next_parameter()
+    nc = y_train.shape[-1]
 
-# Get hyperparameters
-lr = params.get('learning_rate', 0.001)
-batch_size = params.get('batch_size', 32)
-optimizer_name = params.get('optimizer', 'Adam')
-freeze_backbone = params.get('freeze_backbone', False)
+# ── Load model ────────────────────────────────────────────────────────────────
+model = keras.models.load_model(r'{model_path}', compile=False)
 
-# Load data with MMAP to save RAM
-print("[TRIAL] 📂 Loading data (Memory Mapped)...")
-x_train = np.load(f'{dataset_info.get('path')}/x_train.npy', mmap_mode='r')
-y_train = np.load(f'{dataset_info.get('path')}/y_train.npy', mmap_mode='r')
-x_test = np.load(f'{dataset_info.get('path')}/x_test.npy', mmap_mode='r')
-y_test = np.load(f'{dataset_info.get('path')}/y_test.npy', mmap_mode='r')
+# Adapt output head if needed
+if model.output_shape[-1] != nc:
+    x   = model.layers[-2].output
+    out = keras.layers.Dense(nc, activation='softmax', name='out')(x)
+    model = keras.Model(inputs=model.input, outputs=out)
 
-# --- DATASET SUBSETTING (Memory Optimization - 50%) ---
-# We take only a subset of the data to reduce RAM usage during training
-subset_ratio = 0.5
-num_samples = int(len(x_train) * subset_ratio)
-
-# Simple slicing for mmap efficiency (avoid random access on risk of thrashing if not careful, 
-# but linear slice is safe and effective for memory)
-x_train = x_train[:num_samples]
-y_train = y_train[:num_samples]
-
-print(f"[TRIAL] ✂️ Subsetting dataset: {{len(x_train)}} samples ({{subset_ratio*100}}%)")
-
-# --- DATASET FIX: Ensure One-Hot Labels (Categorical) ---
-# Check if labels are sparse (1D or 2D with last dim 1)
-if len(y_train.shape) == 1 or (len(y_train.shape) == 2 and y_train.shape[-1] == 1):
-    num_classes = len(np.unique(y_train))
-    print(f"[TRIAL] Sparse labels detected. Classes: {{num_classes}}")
-    y_train = keras.utils.to_categorical(y_train, num_classes)
-    y_test = keras.utils.to_categorical(y_test, num_classes)
-else:
-    num_classes = y_train.shape[-1]
-    print(f"[TRIAL] Categorical labels detected. Classes: {{num_classes}}")
-
-print(f"[TRIAL] Dataset classes: {{num_classes}}")
-
-# Load model
-model = keras.models.load_model('{model_info.get('path')}')
-
-# --- MODEL FIX: Adaptive Output Layer ---
-if model.output_shape[-1] != num_classes:
-    print(f"[TRIAL] ⚠️ Class Mismatch: Model={{model.output_shape[-1]}}, Data={{num_classes}}")
-    print("[TRIAL] 🔧 Replacing final layer...")
-    
-    # Simple replacement for Sequential/Functional (assumes last layer is Dense)
-    x = model.layers[-2].output
-    output = keras.layers.Dense(num_classes, activation='softmax', name='adaptive_output')(x)
-    model = keras.Model(inputs=model.input, outputs=output)
-    print(f"[TRIAL] ✓ New output shape: {{model.output_shape}}")
-
-# --- TRANSFER LEARNING: TUNABLE FREEZING ---
-if freeze_backbone:
-    print("[TRIAL] 🧊 Freezing backbone (all layers except last 5)...")
+if freeze_bb:
     for layer in model.layers[:-5]:
         layer.trainable = False
-else:
-    print("[TRIAL] 🔥 Unfrozen backbone: Model will learn on all layers.")
 
-# --- PARAMETER APPLICATION ---
-# Optimizer Selection (Adam vs SGD)
-if optimizer_name.lower() == 'sgd':
-    opt = keras.optimizers.SGD(learning_rate=lr)
-else:
-    opt = keras.optimizers.Adam(learning_rate=lr)
+opt = (keras.optimizers.SGD(lr)
+       if opt_name.lower() == 'sgd'
+       else keras.optimizers.Adam(lr))
 
-# --- SHAPE FIX: Resize images if needed ---
-expected_shape = model.input_shape[1:3]  # (H, W)
-print(f"Model expects: {{expected_shape}}, Data has: {{x_train.shape[1:3]}}")
+hw, hh = model.input_shape[1], model.input_shape[2]
+
 
 def preprocess(x, y):
-    # 1. Cast to float32 (CRITICAL for compatibility)
-    x = tf.cast(x, tf.float32)
-    # 2. Normalize to [0...1]
-    x = x / 255.0
-    # 3. Resize to expected shape
-    x = tf.image.resize(x, expected_shape)
+    x = tf.cast(x, tf.float32) / 255.0
+    x = tf.image.resize(x, [hw, hh])
     return x, y
 
-# Datasets (Removed caching of resized images to save RAM)
-# --- DATA AUGMENTATION ---
-data_augmentation = keras.Sequential([
-    keras.layers.RandomFlip("horizontal"),
+
+aug = keras.Sequential([
+    keras.layers.RandomFlip('horizontal'),
     keras.layers.RandomRotation(0.1),
     keras.layers.RandomZoom(0.1),
 ])
 
-def augment(x, y):
-    x = data_augmentation(x)
-    return x, y
+train_ds = (
+    tf.data.Dataset.from_tensor_slices((x_train, y_train))
+    .shuffle(1000)
+    .map(preprocess, num_parallel_calls=tf.data.AUTOTUNE)
+    .batch(batch_size)
+    .map(lambda x, y: (aug(x), y), num_parallel_calls=tf.data.AUTOTUNE)
+    .prefetch(tf.data.AUTOTUNE)
+)
+val_ds = (
+    tf.data.Dataset.from_tensor_slices((x_test, y_test))
+    .map(preprocess, num_parallel_calls=tf.data.AUTOTUNE)
+    .batch(batch_size)
+    .prefetch(tf.data.AUTOTUNE)
+)
 
-train_ds = tf.data.Dataset.from_tensor_slices((x_train, y_train))
-# Apply augment AFTER batching usually, but for tf.data it can be map. 
-# Better: Shuffle -> Batch -> Augment -> Prefetch
-train_ds = train_ds.shuffle(1000).map(preprocess).batch(batch_size).map(augment, num_parallel_calls=tf.data.AUTOTUNE).prefetch(tf.data.AUTOTUNE)
+model.compile(optimizer=opt, loss='categorical_crossentropy', metrics=['accuracy'])
+history = model.fit(train_ds, validation_data=val_ds, epochs=3, verbose=1)
 
-val_ds = tf.data.Dataset.from_tensor_slices((x_test, y_test))
-val_ds = val_ds.map(preprocess).batch(batch_size).prefetch(tf.data.AUTOTUNE)
-
-# FINAL COMPILE (Generate ONLY this block)
-model.compile(optimizer=opt,
-              loss='categorical_crossentropy',
-              metrics=['accuracy'])
-
-# Train
-print(f"[TRIAL] 🚀 Starting training (First epoch may be slow due to resizing/caching)...")
-history = model.fit(train_ds, 
-                    validation_data=val_ds,
-                    epochs=3, verbose=1)
-
-# Report or Save
-if not IS_RETRAIN:
-    val_accuracy = history.history['val_accuracy'][-1]
-    print(f"[TRIAL] Validation accuracy: {{val_accuracy:.4f}}")
-    nni.report_final_result(val_accuracy)
-else:
+if IS_RETRAIN:
     model.save('best_model.h5')
-    print(f"[TRIAL] ✅ Best model saved.")
-```
-
-NOW GENERATE BOTH FILES FOLLOWING THIS EXACT FORMAT.
-Start with # FILE: manager.py, then # FILE: trial.py.
-DO NOT SKIP EITHER FILE.
-USE THE EXACT PATHS PROVIDED ABOVE - DO NOT USE PLACEHOLDERS!
+    print('[TRIAL] Best model saved.')
+else:
+    nni.report_final_result(history.history['val_accuracy'][-1])
 """
-    
-    # -----------------------------------------------------------------------
-    # BACKEND SELECTION: Triton (OpenAI-compat) oppure Ollama
-    # Quando USE_TRITON_BACKEND=true, gpt-oss-20b gira su Triton con la stessa
-    # logica di model-swapping usata per Mistral (mutex + carica/scarica L'LLM).
-    # In modalità Ollama (fallback), force_unload_ollama viene chiamato al termine
-    # per liberare la VRAM prima del training NNI.
-    # -----------------------------------------------------------------------
-    import os
-    triton_enabled = os.environ.get("USE_TRITON_BACKEND", "false").lower() == "true"
-    
-    if triton_enabled:
-        from agno.models.openai import OpenAIChat
-        triton_url = os.environ.get("TRITON_BASE_URL", "http://triton-server:8000/v1")
-        logger.info(f"🚀 [generator.py] Routing gpt-oss-20b → Triton ({triton_url})")
-        llm_model = OpenAIChat(
-            id="gpt-oss-20b",    # Deve corrispondere al nome del modello nel repo Triton
-            base_url=triton_url,
-            api_key="triton"     # Triton non richiede autenticazione reale
-        )
-    else:
-        from agno.models.ollama import Ollama
-        logger.info("🦙 [generator.py] Routing gpt-oss-20b → Ollama (fallback)")
-        llm_model = Ollama(
-            id="gpt-oss:20b",
-            options={"num_ctx": num_ctx}
-        )
-    
-    # Initialize Agent with GPT-OSS 20B for code generation
-    agent = Agent(
-        model=llm_model,
-        description="You are an AI specialized in writing NNI optimization code.",
-        instructions="""Return ONLY valid Python code with # FILE markers. Generate BOTH manager.py and trial.py. Don't add explanations or your personal comments.""",
-        tools=[],
-        markdown=False
-    ) # agno.Agent è model-agnostic — è solo un orchestratore che prende qualsiasi modello tu gli passi! La parte che determina dove vanno le chiamate è llm_model . Agno supporta nativamente sia Ollama che modelli OpenAI-compatible (come Triton).
-    
-    # Generate Code
-    logger.info("   ⏳ Waiting for LLM generation...")
-    try:
-        response = agent.run(prompt)
-        content = getattr(response, "content", str(response))
-        
-        # Clean potential markdown wrappers
-        content = normalize_code_escapes(content)
-        
-        # Extract files
-        files = extract_files_from_code(content)
-        
-        if not files:
-            logger.error("❌ No files extracted from LLM response")
-            return {}
-            
-        # Save files
-        os.makedirs(output_dir, exist_ok=True)
-        for filename, file_content in files.items():
-            # Remove markdown code blocks if present inside the file content
-            file_content = file_content.replace("```python", "").replace("```", "")
-            
-            path = os.path.join(output_dir, filename)
-            with open(path, "w") as f:
-                f.write(file_content)
-            logger.info(f"   ✓ Written: {path}")  # Show full path
-            
-        return files
-        
-    except Exception as e:
-        logger.error(f"❌ Generation failed: {e}")
-        return {}
-    finally:
-        # Ollama only: forza lo scaricamento del modello dalla VRAM prima del training NNI.
-        # Triton gestisce il proprio model-swapping internamente tramite mutex.
-        if not triton_enabled:
-            force_unload_ollama("gpt-oss:20b")
+
+    files = {
+        "manager.py": manager_content,
+        "trial.py":   trial_content,
+    }
+
+    # ── Save to disk ──────────────────────────────────────────────────────────
+    os.makedirs(output_dir, exist_ok=True)
+    for filename, content in files.items():
+        path = os.path.join(output_dir, filename)
+        with open(path, "w") as f:
+            f.write(content)
+        logger.info(f"   ✓ Written: {path}")
+
+    logger.info("✅ NNI experiment files generated via template (no LLM call)")
+    return files
+
 
 if __name__ == "__main__":
     # Test stub
-    model_dummy = {"name": "TestModel", "path": "model.h5", "input_shape": "(32,32,3)", "n_layers": 10}
-    data_dummy = {"path": "./data", "x_shape": "(100,32,32,3)", "num_classes": 10}
-    generate_nni_experiment(model_dummy, data_dummy)
+    model_dummy = {"name": "TestModel", "path": "/tmp/model.h5", "input_shape": "(32,32,3)", "n_layers": 10}
+    data_dummy  = {"path": "/tmp/data", "num_classes": 10}
+    result = generate_nni_experiment(model_dummy, data_dummy, output_dir="/tmp/nni_test")
+    print(f"Generated: {list(result.keys())}")

@@ -30,70 +30,70 @@ logger.setLevel(logging.DEBUG)  # Abilita DEBUG logging
 
 
 class ProjectInfoExtraction(BaseModel):
-    """Schema per estrarre informazioni progetto dalla risposta naturale"""
+    """Schema for extracting project info from natural language response"""
     ioc_file_path: Optional[str] = Field(
         default=None,
-        description="Path al file .ioc se specificato, altrimenti None"
+        description="Path to the .ioc file if specified, otherwise None"
     )
     board_name: Optional[str] = Field(
         default=None,
-        description="Nome della board STM32 (es: STM32F401VCHx, STM32H743ZI)"
+        description="Name of the STM32 board (e.g., STM32F401VCHx, STM32H743ZI)"
     )
-    mcu_series: Optional[str] = Field(  # ✅ NUOVO
+    mcu_series: Optional[str] = Field(  # ✅ NEW
         default=None,
-        description="Serie MCU estratta dal board_name (es: F4, H7, N6, L4, U5)"
+        description="MCU series extracted from board_name (e.g., F4, H7, N6, L4, U5)"
     )
     project_name: Optional[str] = Field(
         default=None,
-        description="Nome del progetto (es: MyProject, NeuroControl)"
+        description="Name of the project (e.g., MyProject, NeuroControl)"
     )
     toolchain: Optional[str] = Field(
         default=None,
-        description="Toolchain da usare (es: STM32CubeIDE, Keil, IAR)"
+        description="Toolchain to use (e.g., STM32CubeIDE, Keil, IAR)"
     )
     peripheral_config: Optional[List[str]] = Field(
         default_factory=list,
-        description="Lista di pin o periferiche da attivare (es: ['set_pin PA5 GPIO_Output', 'set_peripheral TIM1'])"
+        description="List of pins or peripherals to enable (e.g., ['set_pin PA5 GPIO_Output', 'set_peripheral TIM1'])"
     )
 
-project_info_extraction_instructions = """Sei un estrattore di informazioni per la configurazione di progetti STM32.
+project_info_extraction_instructions = """You are an information extractor for STM32 project configurations.
 
-Analizza la risposta dell'utente e estrai i seguenti campi:
+Analyze the user's response and extract the following fields:
 
-1. **ioc_file_path**: Se l'utente specifica un path a un file .ioc (esempio: "/path/to/config.ioc", "~/projects/board.ioc")
-   → Se non specificato: null
+1. **ioc_file_path**: If the user specifies a path to an .ioc file (example: "/path/to/config.ioc", "~/projects/board.ioc")
+   → If not specified: null
 
-2. **board_name**: Il nome della board STM32 (esempio: "STM32F401VCHx", "STM32H743ZI", "STM32N657Z0HxQ")
-   → Se non specificato: null
+2. **board_name**: The name of the STM32 board (example: "STM32F401VCHx", "STM32H743ZI", "STM32N657Z0HxQ")
+   → If not specified: null
 
-3. **mcu_series**: La serie MCU estratta dal board_name
-   Valori comuni: "F0", "F1", "F2", "F3", "F4", "F7", "H5", "H7", "L0", "L1", "L4", "L5", "U5", "G0", "G4", "W5", "C0", "N6"
-   → Se il board_name è specificato, estrai SEMPRE la serie!
-   → Logica: STM32 + Lettera + Cifra = serie (es: STM32F401 → F4, STM32N657 → N6)
-   → Se non puoi estrarre: null
+3. **mcu_series**: The MCU series extracted from the board_name
+   Common values: "F0", "F1", "F2", "F3", "F4", "F7", "H5", "H7", "L0", "L1", "L4", "L5", "U5", "G0", "G4", "W5", "C0", "N6"
+   → If board_name is specified, ALWAYS extract the series!
+   → Logic: STM32 + Letter + Digit = series (e.g., STM32F401 → F4, STM32N657 → N6)
+   → If it cannot be extracted: null
 
-4. **project_name**: Il nome del progetto (esempio: "MyProject", "AI_Firmware", "NeuroControl")
-   → Se non specificato: null
+4. **project_name**: The name of the project (example: "MyProject", "AI_Firmware", "NeuroControl")
+   → If not specified: null
 
-5. **toolchain**: L'IDE/toolchain da usare (esempio: "STM32CubeIDE", "Keil uVision", "IAR Embedded Workbench")
-   → Se non specificato: null
+5. **toolchain**: The IDE/toolchain to use (example: "STM32CubeIDE", "Keil uVision", "IAR Embedded Workbench")
+   → If not specified: null
 
-Rispondi SEMPRE in formato JSON valido, anche se alcuni campi sono null.
+ALWAYS reply in valid JSON format, even if some fields are null.
 
-**Note Speciali:**
-- Se l'utente dice "usa la precedente", "come l'altra volta", "quella di ieri", "usa il profilo" -> imposta `board_name` come "USE_PROFILE".
-- Altrimenti estrai i dati reali.
-- Se l'utente menziona pin o timer specifici, estraili come comandi CubeMX (es: "attiva il pin PA5 come output" -> "set_pin PA5 GPIO_Output", "usa il timer 1" -> "set_peripheral TIM1").
-- I file .ioc NON sono obbligatori se viene specificata la board.
+**Special Notes:**
+- If the user says "use the previous one", "like last time", "yesterday's", or "use profile" -> set `board_name` to "USE_PROFILE".
+- Otherwise extract real data.
+- If the user mentions specific pins or timers, extract them as CubeMX commands (e.g., "activate pin PA5 as output" -> "set_pin PA5 GPIO_Output", "use timer 1" -> "set_peripheral TIM1").
+- The .ioc files are NOT mandatory if the board is specified.
 
-Esempi:
-- Input: "Crea un progetto per STM32F401 con CubeIDE, nome MyApp"
+Examples:
+- Input: "Create a project for STM32F401 with CubeIDE, name MyApp"
   Output: {"ioc_file_path": null, "board_name": "STM32F401", "mcu_series": "F4", "project_name": "MyApp", "toolchain": "STM32CubeIDE"}
 
-- Input: "Usa la board di ieri"
+- Input: "Use yesterday's board"
   Output: {"board_name": "USE_PROFILE", "mcu_series": null, "project_name": null, "toolchain": null}
 
-- Input: "Ho un file config.ioc in ~/boards/, usa quello"
+- Input: "I have a config.ioc file in ~/boards/, use that one"
   Output: {"ioc_file_path": "~/boards/config.ioc", "board_name": null, "mcu_series": null, "project_name": null, "toolchain": null}
 """
 # ============================================================================
@@ -102,8 +102,8 @@ Esempi:
 
 def extract_mcu_series_from_board(board_name: str) -> Optional[str]:
     """
-    Estrae la serie MCU dal nome della board.
-    Es: "STM32F401VCHx" → "F4"
+    Extracts the MCU series from the board name.
+    Ex: "STM32F401VCHx" → "F4"
         "STM32N657Z0HxQ" → "N6"
         "STM32H743ZI" → "H7"
     """
@@ -121,26 +121,26 @@ def extract_mcu_series_from_board(board_name: str) -> Optional[str]:
 
 def get_template_ioc_path(board_name: Optional[str], mcu_series: Optional[str]) -> Optional[str]:
     """
-    Cerca un file .ioc pre-generato nella cartella templates/ioc_files.
-    Priorità: 
-    1. Nome esatto della board
-    2. Serie MCU (F4, H7, U5, N6)
+    Looks for a pre-generated .ioc file in the templates/ioc_files folder.
+    Priority: 
+    1. Exact board name
+    2. MCU series (F4, H7, U5, N6)
     """
     template_dir = os.path.join(os.path.dirname(__file__), "templates", "ioc_files")
     if not os.path.exists(template_dir):
-        logger.warning(f"⚠️  Cartella template non trovata: {template_dir}")
+        logger.warning(f"⚠️  Template folder not found: {template_dir}")
         return None
 
-    # Tenta match esatto board
+    # Try exact board match
     if board_name:
         board_path = os.path.join(template_dir, f"{board_name}.ioc")
         if os.path.exists(board_path):
-            logger.info(f"🎯 Template trovato per board: {board_name}")
+            logger.info(f"🎯 Template found for board: {board_name}")
             return board_path
 
-    # Tenta match serie
+    # Try series match
     if mcu_series:
-        # Mappa serie a file rappresentativo se non c'è match esatto
+        # Map series to representative file if there is no exact match
         SERIES_MAP = {
             "F4": "STM32F401VCHx.ioc",
             "H7": "STM32H7A3ZITx.ioc",
@@ -151,10 +151,10 @@ def get_template_ioc_path(board_name: Optional[str], mcu_series: Optional[str]) 
         if filename:
             series_path = os.path.join(template_dir, filename)
             if os.path.exists(series_path):
-                logger.info(f"🎯 Template trovato per serie: {mcu_series}")
+                logger.info(f"🎯 Template found for series: {mcu_series}")
                 return series_path
 
-    logger.warning(f"⚠️  Nessun template trovato per {board_name} ({mcu_series})")
+    logger.warning(f"⚠️  No template found for {board_name} ({mcu_series})")
     return None
 
 
@@ -165,31 +165,31 @@ def get_template_ioc_path(board_name: Optional[str], mcu_series: Optional[str]) 
 
 def collect_project_info(state: MasterState, config: RunnableConfig = None) -> MasterState:
     """
-    Raccoglie info progetto da risposta naturale dell'utente.
-    La risposta viene analizzata da LLM per estrarre gli attributi, inclusa mcu_series.
+    Collects project info from user's natural response.
+    The response is parsed by LLM to extract attributes, including mcu_series.
     """
     
-    logger.info("📋 Raccolta configurazione progetto STM32CubeMX...")
+    logger.info("📋 Collecting STM32CubeMX project configuration...")
     
     prompt = {
-        "instruction": """Configurazione Progetto STM32CubeMX
+        "instruction": """STM32CubeMX Project Configuration
         
-Per favore specifica (in linguaggio naturale):
-- Path file .ioc (se disponibile, altrimenti non necessario)
-- Nome della board STM32 (es: STM32F401VCHx, STM32H743ZI, STM32N657Z0HxQ)
-- Nome del progetto
-- Toolchain (es: STM32CubeIDE, Keil, IAR)
+Please specify (in natural language):
+- .ioc file path (if available, otherwise not required)
+- STM32 board name (e.g., STM32F401VCHx, STM32H743ZI, STM32N657Z0HxQ)
+- Project name
+- Toolchain (e.g., STM32CubeIDE, Keil, IAR)
 
-Esempio: "Crea progetto MyApp per STM32F401 con CubeIDE"
+Example: "Create project MyApp for STM32F401 with CubeIDE"
         """,
     }
     
-    # === ESTRATTORE LLM ===
+    # === LLM EXTRACTOR ===
     # === IDEMPOTENCY CHECK ===
     # SKIP if board is already set, unless we are explicitly coming from a "change_board" route
     is_backtracking = state.route == "change_board"
     if state.board_name and state.board_name != "STM32F401VCHx" and not state.user_response and not is_backtracking:
-        logger.info(f"⏭️  Idempotenza: Board '{state.board_name}' già configurata. Salto interrupt.")
+        logger.info(f"⏭️  Idempotency: Board '{state.board_name}' already configured. Skipping interrupt.")
         return state
 
     from src.assistant.utils import extract_user_response, get_llm
@@ -198,16 +198,16 @@ Esempio: "Crea progetto MyApp per STM32F401 con CubeIDE"
     llm = get_llm(config)
     llm_extractor = llm.with_structured_output(ProjectInfoExtraction)
     
-    # --- Passo 1: Prova a usare il messaggio iniziale ---
+    # --- Step 1: Try using initial message ---
     # SKIP Discovery if we are backtracking to change board (force new input)
     initial_board = None
     if not state.user_response and not is_backtracking:
         res = llm_extractor.invoke([
             SystemMessage(content=project_info_extraction_instructions),
-            HumanMessage(content=f"Messaggio: {state.message}")
+            HumanMessage(content=f"Message: {state.message}")
         ])
         initial_board = res.board_name
-        # Salviamo quello che abbiamo trovato finora
+        # Save what we found so far
         if res.board_name: state.board_name = res.board_name
         if res.mcu_series: state.mcu_series = res.mcu_series
         if res.project_name: state.project_name = res.project_name
@@ -217,26 +217,26 @@ Esempio: "Crea progetto MyApp per STM32F401 con CubeIDE"
             state.peripheral_config = res.peripheral_config
 
 
-    # --- Passo 2: Verifica e Interrupt ---
-    # Se non c'è una board nel messaggio o è generico, CHIEDI.
+    # --- Step 2: Verification and Interrupt ---
+    # If there is no board in the message or it's generic, ASK.
     if not initial_board or initial_board.lower() == "unknown":
         resume_value = None
         if not state.user_response:
-            # Recupera board dal profilo per suggerimento
-            last_board = state.persistent_context.get("board_name", "Nessuna") if state.persistent_context else "Nessuna"
+            # Recover board from profile for suggestion
+            last_board = state.persistent_context.get("board_name", "None") if state.persistent_context else "None"
             
-            # Arricchiamo il prompt per l'utente
+            # Enrich prompt for the user
             dynamic_prompt = {
                 "instruction": prompt["instruction"],
-                "suggestion": f"� Ho visto che l'ultima volta hai usato: **{last_board}**. Vuoi usare la stessa o una nuova?"
+                "suggestion": f" I noticed last time you used: **{last_board}**. Do you want to use the same one, or a new one?"
             }
         if not state.user_response:
             # logger.info("⏸️ Interrupting: Requesting project info with profile suggestion.")
             # resume_value = interrupt(dynamic_prompt)
-            logger.info("⏭️  BYPASS: Selezione automatica board -> 'STM32H7A3ZI'")
+            logger.info("⏭️  BYPASS: Automatic board selection -> 'STM32H7A3ZI'")
             user_text = "STM32H7A3ZI"
         else:
-            # Dopo la ripresa: usa interrupt return value come priorità
+            # After resume: use interrupt return value as priority
             if resume_value and str(resume_value).strip():
                 user_text = str(resume_value).strip()
             else:
@@ -245,15 +245,15 @@ Esempio: "Crea progetto MyApp per STM32F401 con CubeIDE"
         
         res = llm_extractor.invoke([
             SystemMessage(content=project_info_extraction_instructions),
-            HumanMessage(content=f"Risposta: {user_text}")
+            HumanMessage(content=f"Response: {user_text}")
         ])
         
-        # Gestione "USE_PROFILE"
+        # Handle "USE_PROFILE"
         context_board = state.persistent_context.get("board_name") if state.persistent_context else None
         if res.board_name == "USE_PROFILE" and context_board:
             state.board_name = context_board
             state.mcu_series = state.persistent_context.get("mcu_series")
-            logger.info(f"📋 Applicata board da profilo: {state.board_name}")
+            logger.info(f"📋 Applied board from profile: {state.board_name}")
         else:
             if res.board_name: state.board_name = res.board_name
             if res.mcu_series: state.mcu_series = res.mcu_series
@@ -263,86 +263,86 @@ Esempio: "Crea progetto MyApp per STM32F401 con CubeIDE"
         if hasattr(res, 'peripheral_config') and res.peripheral_config:
             state.peripheral_config = res.peripheral_config
 
-    # --- Passo 3: Finalizzazione ---
+    # --- Step 3: Finalization ---
     if not state.board_name:
         state.board_name = "STM32F401VCHx"
         state.mcu_series = "F4"
     
-    # Estrazione automatica mcu_series se mancante
+    # Automatic extraction mcu_series if missing
     if not state.mcu_series and state.board_name:
         extracted = extract_mcu_series_from_board(state.board_name)
         if extracted:
             state.mcu_series = extracted
-            logger.info(f"📊 MCU series estratta automaticamente da board_name: {extracted}")
+            logger.info(f"📊 MCU series automatically extracted from board_name: {extracted}")
         else:
-            # Fallback finale a F4
+            # Final fallback to F4
             state.mcu_series = "F4"
-            logger.warning(f"⚠️  Impossibile estrarre serie, fallback a F4")
+            logger.warning(f"⚠️  Unable to extract series, fallback to F4")
         
     state.project_name = state.project_name or "MySTM32Project"
     state.toolchain = state.toolchain or "STM32CubeIDE"
     
-    logger.info(f"✓ Configurazione finale: {state.board_name} ({state.mcu_series})")
+    logger.info(f"✓ Final Configuration: {state.board_name} ({state.mcu_series})")
     
-    # Sincronizza target per workflow AI (evita discrepanze e problemi di idempotenza)
+    # Synchronize target for AI workflow (avoids discrepancies and idempotency issues)
     if state.mcu_series:
         state.target = f"stm32{state.mcu_series.lower()}"
         state.compression = "high" # Default
-        logger.info(f"🎯 Sincronizzato target AI: {state.target}")
+        logger.info(f"🎯 Synchronized AI target: {state.target}")
 
     state.timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     return state
 
 def search_and_install_stm32_package(state: MasterState, config: RunnableConfig = None) -> MasterState:
     """
-    Nodo che clona l'intero package STM32 da GitHub e lo salva in ~/STM32Cube/Repository/
-    Scarica AUTOMATICAMENTE l'ultima versione disponibile dal repository.
+    Node that clones the entire STM32 package from GitHub and saves it in ~/STM32Cube/Repository/
+    AUTOMATICALLY downloads the latest version available from the repository.
     """
     
-    logger.info("🔍 Ricerca e installazione package STM32 da GitHub...")
+    logger.info("🔍 Searching and installing STM32 package from GitHub...")
     
     cfg = Configuration.from_runnable_config(config)
     
-    # === 0. ESTRAI MCU_SERIES DALLO STATE ===
+    # === 0. EXTRACT MCU_SERIES FROM STATE ===
     
     board_series = state.mcu_series
     
     if not board_series:
-        logger.error(f"❌ mcu_series non specificato nello state!")
+        logger.error(f"❌ mcu_series not specified in state!")
         state.package_installation_success = False
-        state.package_error_message = "mcu_series non disponibile"
+        state.package_error_message = "mcu_series unavailable"
         return state
     
-    logger.info(f"📊 Serie MCU: {board_series}")
+    logger.info(f"📊 MCU Series: {board_series}")
     
-    # === 1. VERIFICA SE PACKAGE È GIÀ INSTALLATO ===
+    # === 1. CHECK IF PACKAGE IS ALREADY INSTALLED ===
     
     stm32_cube_repo = cfg.stm32_repo_path
     os.makedirs(stm32_cube_repo, exist_ok=True)
     
-    # Cartelle package per questa serie (es: STM32Cube_FW_N6_*)
+    # Package folders for this series (e.g., STM32Cube_FW_N6_*)
     existing_packages = []
     for folder in os.listdir(stm32_cube_repo):
         if board_series in folder and os.path.isdir(os.path.join(stm32_cube_repo, folder)):
             existing_packages.append(folder)
     
     if existing_packages:
-        logger.info(f"✓ Package STM32{board_series} già presente!")
-        # Ordina per trovare la più recente (per nome)
+        logger.info(f"✓ Package STM32{board_series} already present!")
+        # Sort to find the most recent one (by name)
         existing_packages.sort()
-        latest = existing_packages[-1]  # Ultim'ultima in ordine alfabetico
-        logger.info(f"  Cartelle trovate: {len(existing_packages)}")
+        latest = existing_packages[-1]  # The latest in alphabetical order
+        logger.info(f"  Folders found: {len(existing_packages)}")
         for pkg in existing_packages:
             marker = " ← LATEST" if pkg == latest else ""
             logger.info(f"    - {pkg}{marker}")
         
         state.package_installation_success = True
         state.package_installation_path = os.path.join(stm32_cube_repo, latest)
-        logger.info(f"✓ Uso: {latest}")
-        logger.info("✓ Installazione saltata (già presente)")
+        logger.info(f"✓ Using: {latest}")
+        logger.info("✓ Installation skipped (already present)")
         return state
     
-    logger.info(f"📥 Package non trovato, procedo al download da GitHub...")
+    logger.info(f"📥 Package not found, proceeding with download from GitHub...")
     
     # === 2. MAPPA SERIE → GITHUB URL ===
     
@@ -377,20 +377,20 @@ def search_and_install_stm32_package(state: MasterState, config: RunnableConfig 
     
     logger.info(f"🎯 Repository GitHub: {github_url}")
     
-    # === 3. SCARICA LATEST RELEASE TAG DA GITHUB ===
+    # === 3. DOWNLOAD LATEST RELEASE TAG FROM GITHUB ===
     
     try:
-        logger.info(f"🔎 Ricerca latest release tag...")
+        logger.info(f"🔎 Searching for latest release tag...")
         
-        # Usa git ls-remote per ottenere i tag senza clonare tutto
+        # Use git ls-remote to get tags without cloning everything
         cmd_tags = ["git", "ls-remote", "--tags", github_url]
         result_tags = subprocess.run(cmd_tags, capture_output=True, text=True, timeout=30)
         
         if result_tags.returncode != 0:
-            logger.warning(f"⚠️  Impossibile leggere i tag, uso main branch")
+            logger.warning(f"⚠️  Unable to read tags, using main branch")
             latest_version = "main"  # Fallback
         else:
-            # Estrai i tag (filtro solo "v*" e no "^{}")
+            # Extract tags (filter only "v*" and no "^{}")
             tags = []
             for line in result_tags.stdout.strip().split('\n'):
                 if 'refs/tags/' in line:
@@ -399,29 +399,29 @@ def search_and_install_stm32_package(state: MasterState, config: RunnableConfig 
                         tags.append(tag)
             
             if tags:
-                # Ordina versioni (vX.Y.Z) in ordine decrescente
+                # Sort versions (vX.Y.Z) in descending order
                 tags.sort(key=lambda x: [int(p) if p.isdigit() else 0 for p in x[1:].split('.')], reverse=True)
                 latest_version = tags[0]
-                logger.info(f"✓ Latest release trovato: {latest_version}")
-                logger.info(f"  Disponibili: {len(tags)} version(i)")
+                logger.info(f"✓ Latest release found: {latest_version}")
+                logger.info(f"  Available: {len(tags)} version(s)")
                 logger.info(f"    Top 3: {', '.join(tags[:3])}")
             else:
-                logger.warning(f"⚠️  Nessun tag trovato, uso main branch")
+                logger.warning(f"⚠️  No tags found, using main branch")
                 latest_version = "main"
     
     except Exception as e:
-        logger.warning(f"⚠️  Errore durante lettura tag: {e}, uso main branch")
+        logger.warning(f"⚠️  Error during tag reading: {e}, using main branch")
         latest_version = "main"
     
-    logger.info(f"📥 Versione da installare: {latest_version}")
+    logger.info(f"📥 Version to install: {latest_version}")
     
-    # === 4. CLONE DA GITHUB ===
+    # === 4. CLONE FROM GITHUB ===
     
-    # Path temporanei
+    # Temporary Paths
     temp_clone_path = f"/tmp/STM32Cube{board_series}_{state.timestamp}"
     
     try:
-        logger.info(f"📥 Clone ricorsivo in corso (timeout: 10 minuti)...")
+        logger.info(f"📥 Recursive clone in progress (timeout: 10 minutes)...")
         logger.info(f"   Branch: {latest_version}")
         
         cmd_clone = [
@@ -437,32 +437,32 @@ def search_and_install_stm32_package(state: MasterState, config: RunnableConfig 
             cmd_clone,
             capture_output=True,
             text=True,
-            timeout=600  # 10 minuti
+            timeout=600  # 10 minutes
         )
         
         if result.returncode != 0:
-            logger.error(f"❌ Clone fallito!")
+            logger.error(f"❌ Clone failed!")
             logger.error(f"Return code: {result.returncode}")
             logger.error(f"Stderr: {result.stderr}")
             raise RuntimeError(f"Git clone failed: {result.stderr}")
         
-        logger.info(f"✓ Repository clonato: {temp_clone_path}")
+        logger.info(f"✓ Repository cloned: {temp_clone_path}")
         
-        # === 5. VERIFICA STRUTTURA ===
+        # === 5. VERIFY STRUCTURE ===
         
-        logger.info(f"✅ Verifica struttura repository...")
+        logger.info(f"✅ Verifying repository structure...")
         
         required_dirs = ["Drivers", "Middlewares", "Projects"]
         for dir_name in required_dirs:
             dir_path = os.path.join(temp_clone_path, dir_name)
             if os.path.isdir(dir_path):
-                logger.info(f"  ✓ {dir_name}/ presente")
+                logger.info(f"  ✓ {dir_name}/ present")
             else:
-                logger.warning(f"  ⚠️  {dir_name}/ mancante (continuo comunque)")
+                logger.warning(f"  ⚠️  {dir_name}/ missing (continuing anyway)")
         
-        # === 6. ESTRAI VERSIONE DAL FOLDER O TAG ===
+        # === 6. EXTRACT VERSION FROM FOLDER OR TAG ===
         
-        # Cerca Release_Notes.html per estrarre versione
+        # Look for Release_Notes.html to extract version
         release_notes_path = os.path.join(temp_clone_path, "Release_Notes.html")
         version_info = latest_version  # Default
         
@@ -470,16 +470,16 @@ def search_and_install_stm32_package(state: MasterState, config: RunnableConfig 
             try:
                 with open(release_notes_path, 'r', encoding='utf-8', errors='ignore') as f:
                     content = f.read()
-                    # Cerca pattern tipo "V1.2.0" o "v1.2.0"
+                    # Look for pattern like "V1.2.0" or "v1.2.0"
                     
                     match = re.search(r'[Vv](\d+\.\d+\.\d+)', content)
                     if match:
                         version_info = f"V{match.group(1)}"
-                        logger.info(f"✓ Versione estratta da Release_Notes: {version_info}")
+                        logger.info(f"✓ Version extracted from Release_Notes: {version_info}")
             except Exception as e:
-                logger.warning(f"⚠️  Non posso leggere Release_Notes: {e}")
+                logger.warning(f"⚠️  Cannot read Release_Notes: {e}")
         
-        # Converti tag format: v1.2.0 → V1_2_0
+        # Convert tag format: v1.2.0 → V1_2_0
         if version_info.startswith('v'):
             version_str = version_info[1:].replace(".", "_")
         else:
@@ -489,28 +489,28 @@ def search_and_install_stm32_package(state: MasterState, config: RunnableConfig 
         
         final_install_path = os.path.join(stm32_cube_repo, final_folder_name)
         
-        logger.info(f"📂 Cartella installazione: {final_folder_name}")
+        logger.info(f"📂 Installation folder: {final_folder_name}")
         
-        # === 7. SPOSTA IL REPOSITORY NEL POSTO FINALE ===
+        # === 7. MOVE REPOSITORY TO FINAL DESTINATION ===
         
-        logger.info(f"📦 Spostamento repository nella cartella finale...")
+        logger.info(f"📦 Moving repository to final folder...")
         
-        # Se esiste già, rinomina il vecchio
+        # If it already exists, rename the old one
         if os.path.exists(final_install_path):
-            logger.warning(f"Cartella già presente, rinomino il vecchio...")
+            logger.warning(f"Folder already present, renaming the old one...")
             old_backup = f"{final_install_path}_backup_{state.timestamp}"
             os.rename(final_install_path, old_backup)
-            logger.info(f"  Vecchia cartella: {old_backup}")
+            logger.info(f"  Old folder: {old_backup}")
         
-        # Sposta clone path → final path
+        # Move clone path → final path
         shutil.move(temp_clone_path, final_install_path)
-        logger.info(f"✓ Repository spostato")
+        logger.info(f"✓ Repository moved")
         
-        # === 8. VERIFICA INSTALLAZIONE ===
+        # === 8. VERIFY INSTALLATION ===
         
-        logger.info(f"✅ Verifica installazione...")
+        logger.info(f"✅ Verifying installation...")
         
-        # Controlla che i file critici esistano
+        # Check that critical files exist
         critical_files = [
             "Drivers/CMSIS/Device",
             "Drivers/STM32" + board_series + "xx_HAL_Driver",
@@ -524,9 +524,9 @@ def search_and_install_stm32_package(state: MasterState, config: RunnableConfig 
                 logger.info(f"  ✓ {critical_path}/")
                 files_found += 1
             else:
-                logger.warning(f"  ⚠️  {critical_path}/ non trovato")
+                logger.warning(f"  ⚠️  {critical_path}/ not found")
         
-        # === 9. CONTA FILE TOTALI ===
+        # === 9. COUNT TOTAL FILES ===
         
         total_files = 0
         total_dirs = 0
@@ -542,27 +542,27 @@ def search_and_install_stm32_package(state: MasterState, config: RunnableConfig 
                 except OSError:
                     pass
         
-        logger.info(f"📊 Statistiche installazione:")
-        logger.info(f"  Directory: {total_dirs}")
-        logger.info(f"  File: {total_files}")
-        logger.info(f"  Spazio: {total_size / 1024 / 1024:.1f} MB")
-        logger.info(f"  Versione: {version_info}")
+        logger.info(f"📊 Installation statistics:")
+        logger.info(f"  Directories: {total_dirs}")
+        logger.info(f"  Files: {total_files}")
+        logger.info(f"  Size: {total_size / 1024 / 1024:.1f} MB")
+        logger.info(f"  Version: {version_info}")
         
         state.package_installation_success = True
         state.package_installation_path = final_install_path
-        logger.info(f"✓✓✓ Package {board_series} installato con successo! ✓✓✓")
+        logger.info(f"✓✓✓ Package {board_series} installed successfully! ✓✓✓")
         
     except Exception as e:
-        logger.error(f"❌ Errore durante installazione: {str(e)}")
+        logger.error(f"❌ Error during installation: {str(e)}")
         logger.exception(e)
         state.package_installation_success = False
         state.package_error_message = str(e)
         
-        # Cleanup se fallisce
+        # Cleanup if it fails
         try:
             if os.path.exists(temp_clone_path):
                 shutil.rmtree(temp_clone_path)
-                logger.info("Cleanup completato (errore)")
+                logger.info("Cleanup completed (error)")
         except:
             pass
     
@@ -571,14 +571,14 @@ def search_and_install_stm32_package(state: MasterState, config: RunnableConfig 
 
 def check_package_installation(state: MasterState) -> Literal["generate_cubemx_script", "finalize_project"]:
     """
-    Controlla se l'installazione del package è andata a buon fine.
-    Se fallisce, salta direttamente a finalize con errore.
+    Checks if the package installation was successful.
+    If it fails, skips directly to finalize with error.
     """
     if state.package_installation_success:
-        logger.info("✓ Package installato, continuo con generazione script")
+        logger.info("✓ Package installed, continuing with script generation")
         return "generate_cubemx_script"
     else:
-        logger.error(f"❌ Installazione package fallita: {state.package_error_message}")
+        logger.error(f"❌ Package installation failed: {state.package_error_message}")
         state.firmware_generation_success = False
         state.firmware_error_message = f"Package installation failed: {state.package_error_message}"
         return "finalize_project"
@@ -590,19 +590,19 @@ def generate_cubemx_script(state: MasterState, config: RunnableConfig = None) ->
 
     lines = [f"login {state.st_email} {state.st_password} y"]
     
-    # Cerca un template pre-generato se l'utente non ha fornito un suo .ioc
+    # Search for a pre-generated template if the user hasn't provided their own .ioc
     effective_ioc = state.ioc_file_path
     if not effective_ioc:
         effective_ioc = get_template_ioc_path(state.board_name, state.mcu_series)
 
     if effective_ioc:
-        # Se abbiamo un .ioc (utente o template), usiamo SOLO config load
-        # Questo bypassa tutti i pop-up interattivi di raccomandazione
-        logger.info(f"📂 Usando caricamento configurazione: {effective_ioc}")
+        # If we have an .ioc (user or template), we ONLY use config load
+        # This bypasses all interactive recommendation pop-ups
+        logger.info(f"📂 Using configuration load: {effective_ioc}")
         lines.append(f'config load "{effective_ioc}"')
     else:
-        # Fallback estremo: load board (rischio pop-up)
-        logger.warning(f"⚠️  Nessun .ioc disponibile, fallback su caricamento board generico")
+        # Extreme fallback: load board (risk of pop-ups)
+        logger.warning(f"⚠️  No .ioc available, falling back to generic board load")
         lines.append(f"load {state.board_name}")
 
     lines += [
@@ -611,15 +611,15 @@ def generate_cubemx_script(state: MasterState, config: RunnableConfig = None) ->
         f"project path {state.firmware_project_path}"
     ]
 
-    # Iniezione custom peripheral config
+    # Custom peripheral config injection
     if hasattr(state, 'peripheral_config') and state.peripheral_config:
-        logger.info(f"🔧 Iniezione {len(state.peripheral_config)} comandi di configurazione periferiche")
+        logger.info(f"🔧 Injecting {len(state.peripheral_config)} peripheral configuration commands")
         for cmd in state.peripheral_config:
-            # Pulisci e normalizza comando
+            # Clean and normalize command
             clean_cmd = cmd.strip()
-            # Accettiamo solo comandi sicuri/conosciuti
+            # We only accept safe/known commands
             if not any(clean_cmd.startswith(prefix) for prefix in ["set_pin", "set_peripheral", "config"]):
-                logger.warning(f"⚠️  Comando periferica ignorato (formato non valido): {clean_cmd}")
+                logger.warning(f"⚠️  Peripheral command ignored (invalid format): {clean_cmd}")
                 continue
             lines.append(clean_cmd)
 
@@ -633,24 +633,24 @@ def generate_cubemx_script(state: MasterState, config: RunnableConfig = None) ->
     with open(state.firmware_script_path, "w") as f:
         f.write(state.firmware_script_content)
     
-    logger.info("✓ Script CubeMX generato")
+    logger.info("✓ CubeMX script generated")
     return state
 
 
 def recover_with_ioc_fallback(state: MasterState) -> bool:
     """
-    Tenta di recuperare generando un file .ioc valido e modificando lo script.
+    Attempts recovery by generating a valid .ioc file and modifying the script.
     """
     logger.info("🚑 Attempting Recovery with IOC Fallback...")
     
-    # 1. Cerca il template più adatto
+    # 1. Search for the best template
     fallback_ioc = get_template_ioc_path(state.board_name, state.mcu_series)
     
     if not fallback_ioc:
-        logger.error("❌ Nessun template disponibile per il fallback!")
+        logger.error("❌ No template available for fallback!")
         return False
         
-    # 2. Aggiorna lo script per caricare il template
+    # 2. Update the script to load the template
     lines = [
         f"login {state.st_email} {state.st_password} y",
         f'config load "{fallback_ioc}"',
@@ -661,9 +661,9 @@ def recover_with_ioc_fallback(state: MasterState) -> bool:
         "exit"
     ]
     
-    # Sovrascrive lo script esistente
+    # Overwrites the existing script
     state.firmware_script_content = "\n".join(lines)
-    # state.firmware_script_path è già settato, lo riusiamo
+    # state.firmware_script_path is already set, reuse it
     with open(state.firmware_script_path, "w") as f:
         f.write(state.firmware_script_content)
         
@@ -673,40 +673,40 @@ def recover_with_ioc_fallback(state: MasterState) -> bool:
 
 def execute_generation(state: MasterState, config: RunnableConfig = None) -> MasterState:
     """
-    Genera il progetto in una directory TEMPORANEA LOCALE (/tmp) 
-    e poi lo sposta nella cartella finale per evitare problemi di locking su filesystem di rete.
+    Generates the project in a LOCAL TEMPORARY directory (/tmp) 
+    and then moves it to the final folder to avoid locking issues on network filesystems.
     """
     import time
     
-    # === 1. CREA DIRECTORY TEMPORANEA LOCALE ===
+    # === 1. CREATE LOCAL TEMPORARY DIRECTORY ===
     temp_project_path = f"/tmp/stm32_{state.timestamp}"
     os.makedirs(temp_project_path, exist_ok=True)
-    logger.info(f"📂 Directory temporanea creata: {temp_project_path}")
+    logger.info(f"📂 Temporary directory created: {temp_project_path}")
     
-    # === 2. MODIFICA LO SCRIPT PER USARE IL PATH TEMPORANEO ===
-    # Lo script è già stato creato da generate_cubemx_script, lo rileggiamo e modifichiamo
+    # === 2. MODIFY THE SCRIPT TO USE THE TEMPORARY PATH ===
+    # The script was already created by generate_cubemx_script, we read and modify it
     with open(state.firmware_script_path, "r") as f:
         original_script = f.read()
     
-    # Sostituiamo il path finale con quello temporaneo
+    # Replace final path with temporary path
     temp_script = original_script.replace(
         f"project path {state.firmware_project_path}",
         f"project path {temp_project_path}"
     )
     
-    # Scriviamo lo script modificato
+    # Write the modified script
     temp_script_path = f"/tmp/script_temp_{state.timestamp}.scr"
     with open(temp_script_path, "w") as f:
         f.write(temp_script)
     
-    logger.info(f"✏️  Script modificato per usare path temporaneo")
+    logger.info(f"✏️  Script modified to use temporary path")
     
-    # === 3. ESEGUI CUBEMX SULLA DIRECTORY TEMPORANEA ===
-    # Su macOS (Darwin) non usiamo xvfb-run. Su Linux lo usiamo se necessario.
+    # === 3. EXECUTE CUBEMX ON THE TEMPORARY DIRECTORY ===
+    # On macOS (Darwin) we don't use xvfb-run. On Linux we use it if necessary.
     if platform.system() == "Darwin":
         cmd = [state.cubemx_path, "-q", temp_script_path]
     else:
-        # Tenta di usare xvfb-run su Linux se disponibile, altrimenti fallback diretto
+        # Try to use xvfb-run on Linux if available, otherwise direct fallback
         if shutil.which("xvfb-run"):
             cmd = ["xvfb-run", "-a", state.cubemx_path, "-q", temp_script_path]
         else:
@@ -718,9 +718,9 @@ def execute_generation(state: MasterState, config: RunnableConfig = None) -> Mas
         
         if res.returncode != 0:
             logger.warning(f"⚠️  Generation Failed (RC={res.returncode}). Trying Fallback...")
-            # FALLBACK: Riprova con template .ioc
+            # FALLBACK: Retry with template .ioc
             if recover_with_ioc_fallback(state):
-                # Aggiorna anche lo script temporaneo
+                # Update the temporary script as well
                 with open(state.firmware_script_path, "r") as f:
                     fallback_script = f.read()
                 temp_fallback_script = fallback_script.replace(
@@ -736,49 +736,49 @@ def execute_generation(state: MasterState, config: RunnableConfig = None) -> Mas
         state.firmware_generation_success = (res.returncode == 0)
         
         if state.firmware_generation_success:
-            logger.info("✓ Generazione completata in temp dir, attendo creazione cartelle...")
+            logger.info("✓ Generation completed in temp dir, waiting for folder creation...")
             time.sleep(2)
             
-            # === 4. VERIFICA CHE LA GENERAZIONE SIA COMPLETA ===
+            # === 4. VERIFY THAT GENERATION IS COMPLETE ===
             for attempt in range(10):
-                # Cerchiamo Src e Inc nella directory temporanea
+                # We look for Src and Inc in the temporary directory
                 src_exists = any(os.path.isdir(os.path.join(dp, "Src")) for dp, dn, filenames in os.walk(temp_project_path))
                 inc_exists = any(os.path.isdir(os.path.join(dp, "Inc")) for dp, dn, filenames in os.walk(temp_project_path))
                 
                 if src_exists and inc_exists:
-                    logger.info("✓ Cartelle Src/ e Inc/ verificate nella directory temporanea")
+                    logger.info("✓ Src/ and Inc/ folders verified in temporary directory")
                     break
                 
-                logger.info(f"Attesa cartelle in temp dir... attempt {attempt+1}/10")
+                logger.info(f"Waiting for folders in temp dir... attempt {attempt+1}/10")
                 time.sleep(1)
             else:
-                logger.warning("⚠️  Cartelle potrebbero non essere completamente create")
+                logger.warning("⚠️  Folders might not be completely created")
             
-            # === 5. SPOSTA DALLA DIRECTORY TEMPORANEA ALLA FINALE ===
-            logger.info(f"📦 Spostamento progetto dalla temp dir alla destinazione finale...")
+            # === 5. MOVE FROM TEMPORARY TO FINAL DIRECTORY ===
+            logger.info(f"📦 Moving project from temp dir to final destination...")
             
-            # Crea la directory base se non esiste
+            # Create base directory if it doesn't exist
             os.makedirs(os.path.dirname(state.firmware_project_path), exist_ok=True)
             
-            # Se la destinazione finale esiste già, rimuovila
+            # If the final destination already exists, remove it
             if os.path.exists(state.firmware_project_path):
-                logger.warning(f"⚠️  Cartella di destinazione già esistente, rimuovo...")
+                logger.warning(f"⚠️  Destination folder already exists, removing...")
                 shutil.rmtree(state.firmware_project_path)
             
-            # Sposta tutto dalla temp alla finale
+            # Move everything from temp to final
             shutil.move(temp_project_path, state.firmware_project_path)
-            logger.info(f"✓✓✓ Progetto spostato con successo in: {state.firmware_project_path}")
+            logger.info(f"✓✓✓ Project successfully moved to: {state.firmware_project_path}")
             
         else:
             state.firmware_error_message = res.stderr or f"Return code {res.returncode}"
-            logger.error(f"❌ Generazione fallita: {state.firmware_error_message}")
+            logger.error(f"❌ Generation failed: {state.firmware_error_message}")
     
     except subprocess.TimeoutExpired:
         logger.error("❌ First attempt TIMED OUT. Trying Fallback...")
         # FALLBACK on timeout
         try:
             if recover_with_ioc_fallback(state):
-                # Aggiorna script temporaneo con fallback
+                # Update temporary script with fallback
                 with open(state.firmware_script_path, "r") as f:
                     fallback_script = f.read()
                 temp_fallback_script = fallback_script.replace(
@@ -793,13 +793,13 @@ def execute_generation(state: MasterState, config: RunnableConfig = None) -> Mas
                 state.firmware_generation_success = (res.returncode == 0)
                 
                 if state.firmware_generation_success:
-                    # Sposta anche in caso di fallback riuscito
-                    logger.info("✓ Fallback riuscito, sposto in destinazione finale...")
+                    # Move even in case of successful fallback
+                    logger.info("✓ Fallback successful, moving to final destination...")
                     os.makedirs(os.path.dirname(state.firmware_project_path), exist_ok=True)
                     if os.path.exists(state.firmware_project_path):
                         shutil.rmtree(state.firmware_project_path)
                     shutil.move(temp_project_path, state.firmware_project_path)
-                    logger.info(f"✓ Progetto spostato dopo fallback")
+                    logger.info(f"✓ Project moved after fallback")
                 else:
                     state.firmware_error_message = res.stderr or f"Fallback Return code {res.returncode}"
             else:
@@ -818,38 +818,38 @@ def execute_generation(state: MasterState, config: RunnableConfig = None) -> Mas
         logger.exception(e)
     
     finally:
-        # === 6. CLEANUP SCRIPT TEMPORANEI ===
+        # === 6. CLEANUP TEMPORARY SCRIPTS ===
         try:
             os.remove(state.firmware_script_path)
-            logger.info("✓ Cleanup script originale")
+            logger.info("✓ Cleanup original script")
         except OSError:
             pass
         
         try:
             os.remove(temp_script_path)
-            logger.info("✓ Cleanup script temporaneo")
+            logger.info("✓ Cleanup temporary script")
         except OSError:
             pass
         
-        # Cleanup temp dir SE ancora esiste (caso di errore)
+        # Cleanup temp dir IF it still exists (error case)
         if os.path.exists(temp_project_path):
             try:
                 shutil.rmtree(temp_project_path)
-                logger.info("✓ Cleanup temp directory (errore)")
+                logger.info("✓ Cleanup temp directory (error)")
             except Exception as cleanup_err:
-                logger.warning(f"⚠️  Non posso rimuovere temp dir: {cleanup_err}")
+                logger.warning(f"⚠️  Cannot remove temp dir: {cleanup_err}")
     
-    logger.info(f"✓ Firmware generato: {state.firmware_project_path}" if state.firmware_generation_success else f"✗ Firmware fallito: {state.firmware_error_message}")
+    logger.info(f"✓ Firmware generated: {state.firmware_project_path}" if state.firmware_generation_success else f"✗ Firmware failed: {state.firmware_error_message}")
     return state
 
 
 
 def finalize_project(state: MasterState, config: RunnableConfig = None) -> MasterState:
     if state.firmware_generation_success:
-        print(f"✓ Progetto firmware generato: {state.firmware_project_path}")
+        print(f"✓ Firmware project generated: {state.firmware_project_path}")
         state.firmware_project_dir = state.firmware_project_path
     else:
-        print(f"✗ Errore firmware: {state.firmware_error_message}")
+        print(f"✗ Firmware error: {state.firmware_error_message}")
     return state
 
     return state

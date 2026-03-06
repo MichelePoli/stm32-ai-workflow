@@ -3557,9 +3557,9 @@ def optimize_hyperparameters_with_nni(state: MasterState, config: RunnableConfig
             "num_classes": state.model_architecture.get("output_classes", 10) 
         }
         
-        # Output Directory for Generated Scripts - Save in current working directory or base_dir
-        project_root = os.getcwd()
-        experiment_dir = os.path.join(project_root, "nni_experiments", f"exp_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
+        # Output Directory for Generated Scripts.
+        # Use /tmp to avoid permission errors on the read-only mounted project volume.
+        experiment_dir = os.path.join("/tmp", "nni_experiments", f"exp_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
         os.makedirs(experiment_dir, exist_ok=True)
         
         logger.info(f"📁 NNI Experiment directory: {experiment_dir}")
@@ -3636,14 +3636,29 @@ def optimize_hyperparameters_with_nni(state: MasterState, config: RunnableConfig
         python_path = cfg.get_python_path(env_name)
         
         logger.info(f"▶️  Launching NNI Manager with: {python_path}")
-        
+
+        # Trova la porta libera QUI, così possiamo loggarla via logger.info
+        # prima ancora che il subprocess parta — il manager.py la leggerà da NNI_PORT.
+        import socket as _socket
+        nni_port = 8080
+        for _p in range(8080, 8100):
+            with _socket.socket() as _s:
+                if _s.connect_ex(('localhost', _p)) != 0:
+                    nni_port = _p
+                    break
+        logger.info(f"🌐 NNI Web UI sarà disponibile su: http://localhost:{nni_port}")
+
+        nni_env = os.environ.copy()
+        nni_env['NNI_PORT'] = str(nni_port)
+
         try:
             result = subprocess.run(
                 [python_path, manager_script],  # Use environment Python
                 cwd=experiment_dir,
                 capture_output=True,
                 text=True,
-                timeout=10800  # 3 hours timeout for NNI to start/run
+                timeout=10800,  # 3 hours timeout for NNI to start/run
+                env=nni_env,
             )
             
             logger.info("✓ Esperimento concluso (o interrotto).")

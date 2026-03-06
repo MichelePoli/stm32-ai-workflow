@@ -133,72 +133,28 @@ if dataset_num_classes != model_num_classes:
 
 Images are also resized in batches of 500 if the loaded data shape does not match the model's expected input, handling grayscale-to-RGB conversion along the way.
 
-\subsection{NNI Code Generation: Architecture and Prompt Engineering}
+\subsection{NNI Script Generation}
 
-The main technical contribution of this workflow is the autonomous generation of complete NNI experiment code from high-level specifications. Instead of using rigid templates, the system employs a large language model to dynamically synthesize Python scripts. These scripts address complex cases such as sparse versus categorical label formats, input shape mismatches requiring dynamic image resizing, and class count discrepancies.
+A key requirement of this step is producing complete, correct NNI experiment code tailored to the specific model and dataset in use. The generated scripts must handle non-trivial edge cases: sparse versus categorical label formats, input shape mismatches that require dynamic resizing, and class count discrepancies between the model head and the target dataset. They also need to cap memory usage, resolve port conflicts for the NNI Web UI, and avoid API calls that changed across NNI versions.
 
-The generated code also manages memory limits on consumer hardware through dataset subsetting and memory-mapping, resolves port conflicts for the NNI Web UI, and includes fallbacks for missing NNI API methods across different library versions.
+An initial implementation delegated code synthesis to the hosted LLM via a structured prompt. Testing on the HPP deployment revealed a hard limitation: the prompt, which must embed model metadata, dataset paths, and reference code templates, exceeded the 2048-token context window configured for \texttt{gpt-oss-20b} under GPTQ quantization. When the input exceeds \texttt{max\_model\_len}, vLLM silently returns an empty string, making the failure non-obvious. Increasing the context window would have required reducing \texttt{gpu\_memory\_utilization} further, leaving insufficient headroom for other concurrent models on the HPP GPU.
 
-\subsubsection{Prompt Engineering Strategy}
+Since the structure of \texttt{manager.py} and \texttt{trial.py} is fully determined by the dataset path, the model path, and a fixed search space, a template-based strategy was adopted. The \texttt{generate\_\allowbreak nni\_\allowbreak experiment()} function in \texttt{nni\_optimization/generator.py} now writes both files through Python f-strings with direct variable injection, as illustrated below:
 
-The \texttt{generate\_\allowbreak nni\_\allowbreak experiment()} function in \texttt{nni\_optimization/generator.py} uses a detailed 480-line prompt to produce accurate generation. This prompt relies on context injection by providing the LLM with exact model metadata, such as layer counts and tensor shapes, together with specific dataset requirements. To prevent common errors, the instructions forbid the use of placeholder paths or the reference of non-existent API methods. It also includes functional code templates for both \texttt{manager.py} and \texttt{trial.py}, with inline comments explaining the most significant logic blocks.
+\begin{lstlisting}[language=Python, caption={Template-based path injection for the NNI trial script}, label={lst:nni_template}]
+data_path  = dataset_info.get("path", "")
+model_path = model_info.get("path", "")
 
-Specific rules are included to address known inconsistencies in the NNI API. For example, the prompt explicitly warns that \texttt{experiment.get\_\allowbreak best\_\allowbreak trial()} is unavailable in certain versions. To ensure the output remains easy to parse, the system also mandates a strict format using \texttt{\# FILE:} markers for multi-file generation.
+trial_content = f"""
+DATA  = r'{data_path}'
+MODEL = r'{model_path}'
 
-A representative extract from the prompt:
-
-\begin{verbatim}
-CRITICAL REQUIREMENTS:
-- Generate exactly 2 files: manager.py AND trial.py
-- Use the exact format shown below with # FILE: markers
-- DO NOT use keras.datasets.load_data(). Load data from {dataset_path}.
-- If labels (y_train) have shape (N, 1), they are SPARSE.
-  Convert them to categorical (one-hot) before training.
-
-FILE 1: manager.py
-- Configure NNI (TPE tuner, maximize mode)
-- Define search space (learning_rate, batch_size, optimizer)
-- Launch with experiment.run(port=8080, wait_completion=True)
-- Find best trial via experiment.list_trial_jobs() only
-- Trigger retrain: run trial.py with RETRAIN_MODE='true'
-
-FILE 2: trial.py
-- Load model and data from provided paths
-- MEMORY OPTIMIZATION: Load data with mmap_mode='r'
-- DATASET SUBSET: Use only 50% of the dataset
-- Adapt final layer if class count mismatches
-- Do NOT use experiment.export_top_trial() -- it does not exist.
-\end{verbatim}
-
-The LLM temperature is set to 0 for deterministic code generation. Before generation starts, the Triton LLM model is explicitly unloaded from GPU to free VRAM for the TensorFlow training process:
-
-\begin{lstlisting}[language=Python, caption={Triton model unloading before NNI generation}, label={lst:gpu_cleanup}]
-def force_unload_triton(model_name: str = "mistral"):
-    url = f"http://localhost:8000/v2/repository/models/{model_name}/unload"
-    req = urllib.request.Request(url, method='POST')
-    try:
-        with urllib.request.urlopen(req) as response:
-            logger.info(f"Triton model '{model_name}' unloaded.")
-    except Exception as e:
-        logger.error(f"Failed to unload Triton model: {e}")
+x_train = np.load(DATA + '/x_train.npy', mmap_mode='r')
+model   = keras.models.load_model(MODEL, compile=False)
+"""
 \end{lstlisting}
 
-This call runs in the \texttt{finally} block of \texttt{generate\_\allowbreak nni\_\allowbreak experiment()} so that VRAM is released regardless of whether generation succeeds or fails.
-
-\subsubsection{Multi-File Parser}
-
-The LLM output is a single string containing both files, separated by \texttt{\# FILE: filename.py} markers. The \texttt{extract\_\allowbreak files\_\allowbreak from\_\allowbreak code()} function parses it with a permissive regex:
-
-\begin{lstlisting}[language=Python, caption={Multi-file code extraction}, label={lst:file_extraction}]
-file_pattern = re.compile(
-    r'^\#\s*FILE:\s*([a-zA-Z0-9_\-\.]+)',
-    re.MULTILINE | re.IGNORECASE
-)
-\end{lstlisting}
-
-The parser handles common variations in the raw output string. It ignores optional spacing around the hash or \texttt{FILE:} markers, strips away markdown code fences (like \texttt{```python}), and identifies trailing comments mistaken for part of the filename.
-
-If no markers are found, the output is saved as \texttt{main.py} as a fallback for single-file tasks.
+This approach removes the LLM dependency from this step entirely. Generation is instantaneous and deterministic; the only inputs are the paths already present in the graph state. The experiment directory is created under \texttt{/tmp/nni\_experiments/} to avoid permission errors on the read-only project volume mounted inside the Docker container.
 
 \subsubsection{Generated File Structure}
 
@@ -211,7 +167,7 @@ Furthermore, only 50\% of the data is used per trial to strictly bound memory us
 
 \subsection{Hyperparameter Optimization Execution}
 
-Once the NNI scripts are successfully generated and saved to \texttt{./nni\_experiment/}, the training is started by \texttt{optimize\_\allowbreak hyperparameters\_\allowbreak with\_\allowbreak nni()}:
+Once the NNI scripts are written to \texttt{/tmp/nni\_experiments/}, the training is started by \texttt{optimize\_\allowbreak hyperparameters\_\allowbreak with\_\allowbreak nni()}:
 
 \begin{enumerate}[noitemsep, topsep=2pt]
   \item \textbf{Validation}: Checks that both \texttt{manager.py} and \texttt{trial.py} exist and are syntactically valid Python.
