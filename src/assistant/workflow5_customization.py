@@ -1,18 +1,18 @@
 # ============================================================================
-# WORKFLOW 5: MODEL CUSTOMIZATION CON AI EMBEDDING E BEST PRACTICES
+# WORKFLOW 5: MODEL CUSTOMIZATION WITH AI EMBEDDING AND BEST PRACTICES
 # ============================================================================
-# Modulo dedicato alla customizzazione architettura modelli AI per STM32
+# Module dedicated to customizing AI model architectures for STM32
 #
-# Responsabilità:
-#   - Ispezionamento dettagliato architettura modello
-#   - Retrieval best practices via embeddings (sentence-transformers)
-#   - Parsing richieste customizzazione utente
-#   - Applicazione modifiche all'architettura (layer, activation, etc.)
-#   - Fine-tuning con dataset
-#   - Validazione e quantizzazione INT8
-#   - Salvataggio con metadata
+# Responsibilities:
+#   - Detailed inspection of model architecture
+#   - Retrieval of best practices via embeddings (sentence-transformers)
+#   - Parsing user customization requests
+#   - Applying architecture modifications (layers, activation, etc.)
+#   - Fine-tuning with dataset
+#   - Validation and INT8 quantization
+#   - Saving with metadata
 #
-# Dipendenze: tensorflow, langchain, sentence-transformers, h5py, numpy
+# Dependencies: tensorflow, langchain, sentence-transformers, h5py, numpy
 
 
 import subprocess
@@ -33,23 +33,23 @@ from langgraph.types import interrupt
 from src.assistant.configuration import Configuration
 from typing import Any
 
-# any  = builtin function Python (all lowercase)
+# any  = Python builtin function (all lowercase)
 #         ↓
-#         Ritorna True/False
+#         Returns True/False
 
-# Any  = type hint da typing module (CamelCase)
+# Any  = type hint from typing module (CamelCase)
 #         ↓
-#         Significa "qualsiasi tipo"
+#         Means "any type"
 
-# Pydantic capisce: Any ✅
-# Pydantic NON capisce: any ❌
+# Pydantic understands: Any ✅
+# Pydantic DOES NOT understand: any ❌
 
 from pydantic import BaseModel, Field
 from langchain_core.messages import SystemMessage, HumanMessage
 
 from agno.agent import Agent
 #from agno.tools.github import GithubTools
-#utilizza altri tools oltre GoogleSearchTools, vedi dai tools di agno
+#uses other tools besides GoogleSearchTools, see agno tools
 from agno.models.ollama import Ollama
 from agno.tools.duckduckgo import DuckDuckGoTools
 
@@ -58,7 +58,7 @@ import numpy as np
 from tensorflow.keras.layers import (
     Dense, Dropout, Input, Resizing, Conv2D, 
     GlobalAveragePooling2D, GlobalMaxPooling2D,
-    BatchNormalization, Activation, Add,  # ← Deve esserci BatchNormalization
+    BatchNormalization, Activation, Add,  # ← Must have BatchNormalization
     AveragePooling2D, Flatten
 )
 from tensorflow.keras.models import Model, load_model
@@ -113,170 +113,168 @@ SUBPROCESS_NOISE_FILTER = [
 # When whitelist is active, ONLY lines containing these patterns (or SUCCESS/ERROR) are shown to the user.
 # This keeps the VS Code streaming output completely clean and beautiful.
 SUBPROCESS_CLEAN_ALLOWLIST = [
-    "Epoch",        # Solo il progresso training
-    "[Phase",       # Fasi di modifica
-    "[Saving]",     # Inizio salvataggio
-    "[Train] SUCCESS:", # Fine training (se c'era, ma SUCCESS è già hardcoded in run_subprocess_streaming)
-    "[Train] ERROR:",   # Errori (già coperti da "ERROR:" in run_subprocess_streaming)
+    "Epoch",        # Only the training progress
+    "[Phase",       # Modification phases
+    "[Saving]",     # Start saving
+    "[Train] SUCCESS:", # End of training (if any, but SUCCESS is already hardcoded in run_subprocess_streaming)
+    "[Train] ERROR:",   # Errors (already covered by "ERROR:" in run_subprocess_streaming)
 ]
 
 class ModificationDecision(BaseModel):
-    """Decisione se applicare modifiche al modello"""
+    """Decision on whether to apply modifications to the model"""
     wants_modifications: bool = Field(
-        description="L'utente vuole apportare modifiche al modello?"
+        description="Does the user want to make modifications to the model?"
     )
     reasoning: str = Field(
-        description="Breve spiegazione della decisione"
+        description="Brief explanation of the decision"
     )
     confidence: float = Field(
         ge=0.0, le=1.0,
-        description="Confidenza della classificazione"
+        description="Confidence of the classification"
     )
 
 
 class ContinueDecision(BaseModel):
-    """Decisione se continuare con AI analysis dopo customization"""
+    """Decision on whether to continue with AI analysis after customization"""
     wants_to_continue: bool = Field(
-        description="L'utente vuole continuare con l'analisi X-CUBE-AI?"
+        description="Does the user want to continue with X-CUBE-AI analysis?"
     )
     reasoning: str = Field(
-        description="Breve spiegazione della decisione"
+        description="Brief explanation of the decision"
     )
     confidence: float = Field(
         ge=0.0, le=1.0,
-        description="Confidenza della classificazione"
+        description="Confidence of the classification"
     )
 
-continue_decision_instructions = """Sei un classificatore di intenzioni per workflow X-CUBE-AI.
+continue_decision_instructions = """You are an intent classifier for the X-CUBE-AI workflow.
 
-Analizza la risposta dell'utente alla domanda: "Do you want to continue with X-CUBE-AI analysis?"
+Analyze the user's response to the question: "Do you want to continue with X-CUBE-AI analysis?"
 
-RISPOSTE AFFERMATIVE (vuole continuare):
-- "sì", "si", "yes", "certo", "ok", "continua", "vai", "procedi", "avanti"
-- "continue", "continue_ai", "analyze", "yes please"
-- Qualsiasi conferma esplicita
+AFFIRMATIVE RESPONSES (wants to continue):
+- "yes", "y", "sure", "ok", "continue", "go", "proceed", "forward", "yes please", "analyze", "continue_ai"
+- Any explicit confirmation
 
-RISPOSTE NEGATIVE (termina):
-- "no", "nope", "stop", "end", "fine", "basta", "termina", "esci"
-- "end", "quit", "exit", "no thanks"
+NEGATIVE RESPONSES (terminate):
+- "no", "nope", "stop", "end", "done", "enough", "terminate", "exit", "quit", "no thanks"
 
-Rispondi SEMPRE in JSON:
+ALWAYS respond in JSON:
 - "wants_to_continue": true/false
-- "reasoning": breve spiegazione (max 50 caratteri)
+- "reasoning": brief explanation (max 50 characters)
 - "confidence": 0.0-1.0
 
-Esempi:
+Examples:
 
-Input: "si"
-Output: {"wants_to_continue": true, "reasoning": "Conferma esplicita", "confidence": 1.0}
+Input: "yes"
+Output: {"wants_to_continue": true, "reasoning": "Explicit confirmation", "confidence": 1.0}
 
-Input: "no grazie, ho finito"
-Output: {"wants_to_continue": false, "reasoning": "Rifiuto esplicito", "confidence": 1.0}
+Input: "no thanks, I'm done"
+Output: {"wants_to_continue": false, "reasoning": "Explicit refusal", "confidence": 1.0}
 
 Input: "analyze"
-Output: {"wants_to_continue": true, "reasoning": "Richiesta di analisi", "confidence": 0.95}
+Output: {"wants_to_continue": true, "reasoning": "Analysis request", "confidence": 0.95}
 """
 
 
-modification_decision_instructions = """Sei un classificatore di intenzioni per la customizzazione di modelli AI.
+modification_decision_instructions = """You are an intent classifier for AI model customization.
 
-Analizza la risposta dell'utente alla domanda: "Vuoi apportare modifiche all'architettura del modello scaricato, oppure procedere direttamente con l'analisi STEdgeAI?"
+Analyze the user's response to the question: "Do you want to make modifications to the downloaded model's architecture, or proceed directly with STEdgeAI analysis?"
 
-RISPOSTE AFFERMATIVE (vuole modifiche):
-- "sì", "si", "yes", "certo", "ok", "voglio", "voglio modificare", "voglio cambiare", "regolarizza", "riduci", "compressione", "ottimizza"
-- "meno layer", "più leggero", "efficiente", "dropout", "cambia attivazione"
-- Qualsiasi richiesta esplicita di cambiamento
+AFFIRMATIVE RESPONSES (wants modifications):
+- "yes", "y", "sure", "ok", "I want to", "I want to modify", "I want to change", "regularize", "reduce", "compression", "optimize"
+- "fewer layers", "lighter", "efficient", "dropout", "change activation"
+- Any explicit request for change
 
-RISPOSTE NEGATIVE (procede senza modifiche):
-- "no", "nope", "niente", "skip", "avanti", "procedi", "andiamo avanti", "mantieni", "ok così", "va bene così"
-- "no, procedi direttamente", "nessuna modifica", "default"
+NEGATIVE RESPONSES (proceeds without modifications):
+- "no", "nope", "nothing", "skip", "forward", "proceed", "let's go forward", "keep", "it's ok like this", "fine as is"
+- "no, proceed directly", "no modifications", "default"
 
-Rispondi SEMPRE con un oggetto JSON valido con questa struttura esatta:
+ALWAYS respond with a valid JSON object with this exact structure:
 {
   "wants_modifications": true,
-  "reasoning": "spiegazione (max 50 caratteri)",
+  "reasoning": "explanation (max 50 characters)",
   "confidence": 0.95
 }
 
-Esempi:
+Examples:
 
-Input: "Riduci il numero di layer, è troppo complesso"
-Output: {"wants_modifications": true, "reasoning": "Richiesta esplicita di riduzione layer", "confidence": 0.95}
+Input: "Reduce the number of layers, it's too complex"
+Output: {"wants_modifications": true, "reasoning": "Explicit request to reduce layers", "confidence": 0.95}
 
-Input: "No, procedi direttamente con l'analisi"
-Output: {"wants_modifications": false, "reasoning": "Rifiuto esplicito, skip modifiche", "confidence": 0.95}
+Input: "No, proceed directly with the analysis"
+Output: {"wants_modifications": false, "reasoning": "Explicit refusal, skip modifications", "confidence": 0.95}
 
-Input: "Hmm, non so... che cosa consigli?"
-Output: {"wants_modifications": false, "reasoning": "Indecisione, mantiene default", "confidence": 0.6}
+Input: "Hmm, I don't know... what do you recommend?"
+Output: {"wants_modifications": false, "reasoning": "Indecision, keeps default", "confidence": 0.6}
 """
 
 
 class ModelModification(BaseModel):
-    """Schema per le modifiche richieste dall'utente"""
-    freeze_layers: Optional[str] = Field(description="Quali layer freezare (es. 'all', 'none', 'first_10')")
-    target_output_classes: Optional[int] = Field(description="Numero di classi di output desiderate")
-    dropout_rate: Optional[float] = Field(description="Rate di dropout da aggiungere (0.0 - 1.0)")
-    learning_rate: Optional[float] = Field(description="Learning rate suggerito")
-    additional_layers: Optional[List[str]] = Field(description="Layer aggiuntivi richiesti")
-    confidence: float = Field(description="Confidenza del parsing (0-1)")
+    """Schema for user-requested modifications"""
+    freeze_layers: Optional[str] = Field(description="Which layers to freeze (e.g. 'all', 'none', 'first_10')")
+    target_output_classes: Optional[int] = Field(description="Desired number of output classes")
+    dropout_rate: Optional[float] = Field(description="Dropout rate to add (0.0 - 1.0)")
+    learning_rate: Optional[float] = Field(description="Suggested learning rate")
+    additional_layers: Optional[List[str]] = Field(description="Additional layers requested")
+    confidence: float = Field(description="Parsing confidence (0-1)")
 
-model_modification_instructions = """Sei un esperto di Deep Learning che interpreta richieste di modifica ai modelli.
+model_modification_instructions = """You are a Deep Learning expert interpreting model modification requests.
 
-Analizza la richiesta dell'utente e estrai le modifiche architetturali desiderate.
+Analyze the user's request and extract the desired architectural modifications.
 
-PARAMETRI DA ESTRARRE:
+PARAMETERS TO EXTRACT:
 1. freeze_layers: 
-   - 'all': freeza tutto (tranne l'ultima parte)
-   - 'none': sblocca tutto
-   - 'first_N': freeza i primi N layer
-   - 'last_N': freeza gli ultimi N layer
-   - 'base': freeza solo il backbone
+   - 'all': freeze everything (except the last part)
+   - 'none': unfreeze everything
+   - 'first_N': freeze the first N layers
+   - 'last_N': freeze the last N layers
+   - 'base': freeze only the backbone
 
-2. target_output_classes: Numero intero. Se l'utente dice "2 classi", estrai 2.
+2. target_output_classes: Integer. If the user says "2 classes", extract 2.
 
-3. dropout_rate: Float tra 0.0 e 1.0. Se l'utente dice "Aggiungi dropout", usa 0.5 come default se non specificato.
+3. dropout_rate: Float between 0.0 and 1.0. If the user says "Add dropout", use 0.5 as default if not specified.
 
-4. learning_rate: Float (es. 0.001).
+4. learning_rate: Float (e.g. 0.001).
 
-ESEMPI:
+EXAMPLES:
 
-Input: "Voglio classificare cani e gatti, freeza tutto il resto."
+Input: "I want to classify dogs and cats, freeze everything else."
 Output: {
     "freeze_layers": "all",
     "target_output_classes": 2,
     "confidence": 0.95
 }
 
-Input: "Aggiungi un dropout del 30% e usa learning rate 1e-4"
+Input: "Add a 30% dropout and use learning rate 1e-4"
 Output: {
     "dropout_rate": 0.3,
     "learning_rate": 0.0001,
     "confidence": 0.98
 }
 
-Se un parametro non è menzionato, lascialo null.
+If a parameter is not mentioned, leave it null.
 """
 
 
 def load_or_create_sample_dataset(num_samples: int = 100, 
                                    img_size: Tuple[int, int] = (32, 32),
                                    num_classes: int = 10) -> Tuple[np.ndarray, np.ndarray]:
-    """Carica o crea dataset di sample"""
-    logger.info(f"📊 Creando dataset di sample ({num_samples} immagini)...")
+    """Loads or creates a sample dataset"""
+    logger.info(f"📊 Creating sample dataset ({num_samples} images)...")
     
     X = np.random.rand(num_samples, img_size[0], img_size[1], 3).astype(np.float32)
     y = tf.keras.utils.to_categorical(np.random.randint(0, num_classes, num_samples), num_classes)
     
     X = X / 255.0
     
-    logger.info(f"✓ Dataset creato: X.shape={X.shape}, y.shape={y.shape}")
+    logger.info(f"✓ Dataset created: X.shape={X.shape}, y.shape={y.shape}")
     return X, y
 
 
 def save_model_with_metadata(model: Model, 
                              output_path: str,
                              metadata: dict[str, any]) -> None:
-    """Salva modello + metadata per tracciabilità"""
+    """Saves model + metadata for traceability"""
     os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
     
     model.save(output_path)
@@ -294,26 +292,26 @@ def save_model_with_metadata(model: Model,
         }
         json.dump(metadata_clean, f, indent=2)
     
-    logger.info(f"✓ Modello salvato: {output_path}")
+    logger.info(f"✓ Model saved: {output_path}")
 
 
 def inspect_model_architecture(state: MasterState, config: RunnableConfig = None) -> MasterState:
-    """Ispeziona dettagliatamente il modello scaricato con fallback robusto"""
+    """Detailed inspection of the downloaded model with a robust fallback"""
 
-    logger.info("🔍 Ispezionando architettura modello...")
+    logger.info("🔍 Inspecting model architecture...")
 
-    # ✅ SKIP ANALISI SE GIA' FATTA IN WORKFLOW 2
+    # ✅ SKIP ANALYSIS IF ALREADY DONE IN WORKFLOW 2
     if state.model_architecture and state.model_architecture.get('n_layers', 0) > 0:
-        logger.info("✓ Info architettura già presenti, skip analisi.")
+        logger.info("✓ Architecture info already present, skipping analysis.")
         return state
 
-    # === CONTROLLO FORMATO E ESISTENZA FILE ===
+    # === FILE FORMAT AND EXISTENCE CHECK ===
     ext = os.path.splitext(state.model_path)[1].lower() if state.model_path else ""
     
     file_exists = os.path.exists(state.model_path) if state.model_path else False
     if not file_exists:
-        logger.warning(f"⚠️  Il file del modello non esiste: {state.model_path}")
-        logger.info("ℹ️  Continuo con metadati virtuali per scopi di integrazione.")
+        logger.warning(f"⚠️  The model file does not exist: {state.model_path}")
+        logger.info("ℹ️  Continuing with virtual metadata for integration purposes.")
         state.model_architecture = {
             "input_shape": "Variable (Missing File)",
             "output_shape": "Variable (Missing File)",
@@ -328,12 +326,12 @@ def inspect_model_architecture(state: MasterState, config: RunnableConfig = None
             "output_classes": 0,
             "format": ext or "unknown"
         }
-        state.model_summary_text = "Il file del modello selezionato non è stato trovato sul file system locale.\nIl workflow prosegue in modalità 'Virtual' per permettere il test dell'interfaccia VS Code."
+        state.model_summary_text = "The selected model file was not found on the local file system.\nThe workflow continues in 'Virtual' mode to allow testing the VS Code interface."
         return state
 
-    # === GESTIONE FORMATI NON-KERAS (ONNX, TFLITE) ===
+    # === HANDLING NON-KERAS FORMATS (ONNX, TFLITE) ===
     if ext in ['.onnx', '.tflite']:
-        logger.info(f"ℹ️  Formato {ext} rilevato. Fornisco metadati generici.")
+        logger.info(f"ℹ️  Format {ext} detected. Providing generic metadata.")
         file_size = os.path.getsize(state.model_path)
         state.model_architecture = {
             "input_shape": "Variable (External Format)",
@@ -349,12 +347,12 @@ def inspect_model_architecture(state: MasterState, config: RunnableConfig = None
             "output_classes": 0,
             "format": ext
         }
-        state.model_summary_text = f"Modello in formato {ext.upper()}.\nL'ispezione dettagliata dei layer è supportata nativamente solo per H5/Keras.\nSTEdgeAI gestirà la conversione e l'ottimizzazione."
+        state.model_summary_text = f"Model in {ext.upper()} format.\nDetailed layer inspection is only natively supported for H5/Keras.\nSTEdgeAI will handle conversion and optimization."
         return state
 
     try:
-        # ✅ Primo tentativo: load_model standard
-        logger.info("   Tentativo 1: load_model() standard...")
+        # ✅ First attempt: standard load_model
+        logger.info("   Attempt 1: standard load_model()...")
         model = tf.keras.models.load_model(state.model_path, compile=False)
         
         trainable_params = int(sum([tf.size(w).numpy() for w in model.trainable_weights]))
@@ -380,7 +378,7 @@ def inspect_model_architecture(state: MasterState, config: RunnableConfig = None
         model.summary(print_fn=lambda x: stream.write(x + '\n'))
         state.model_summary_text = stream.getvalue()
         
-        logger.info(f"✓ Architettura analizzata (load_model):")
+        logger.info(f"✓ Architecture analyzed (load_model):")
         logger.info(f"  - Layers: {state.model_architecture['n_layers']}")
         logger.info(f"  - Total params: {state.model_architecture['total_params']:,}")
         logger.info(f"  - Model size: {state.model_architecture['model_size_mb']:.2f} MB")
@@ -388,15 +386,15 @@ def inspect_model_architecture(state: MasterState, config: RunnableConfig = None
         return state
     
     except Exception as e:
-        # ❌ load_model fallisce, prova fallback HDF5 raw (solo se .h5 o .keras)
-        logger.warning(f"⚠️  load_model() fallito: {str(e)[:100]}")
+        # ❌ load_model fails, try raw HDF5 fallback (only if .h5 or .keras)
+        logger.warning(f"⚠️  load_model() failed: {str(e)[:100]}")
         
         if ext in ['.h5', '.keras']:
-            logger.info("   Tentativo 2: Analisi HDF5 raw...")
+            logger.info("   Attempt 2: Raw HDF5 analysis...")
             try:
-                # ✅ Fallback: Estrai info direttamente dal file HDF5
+                # ✅ Fallback: Extract info directly from HDF5 file
                 with h5py.File(state.model_path, 'r') as f:
-                    # Estrai layer info
+                    # Extract layer info
                     if 'model_config' in f.attrs:
                         config_data = json.loads(f.attrs['model_config'])
                         if isinstance(config_data, str): # Keras 3 might store it differently
@@ -407,12 +405,12 @@ def inspect_model_architecture(state: MasterState, config: RunnableConfig = None
                         layer_names = [l.get('name', 'unknown') for l in layers_list]
                         layer_types = [l.get('class_name', 'unknown') for l in layers_list]
                     else:
-                        # Fallback: estrai da model_weights
+                        # Fallback: extract from model_weights
                         layer_names = list(f.get('model_weights', {}).keys()) if 'model_weights' in f else []
                         n_layers = len(layer_names)
                         layer_types = ['Unknown'] * n_layers
                     
-                    # Estrai shape info
+                    # Extract shape info
                     input_shape = "Unknown"
                     if 'model_weights' in f:
                         weights_group = f['model_weights']
@@ -439,10 +437,10 @@ def inspect_model_architecture(state: MasterState, config: RunnableConfig = None
                     }
                     return state
             except Exception as e2:
-                logger.error(f"❌ HDF5 raw fallito: {str(e2)[:100]}")
+                logger.error(f"❌ Raw HDF5 failed: {str(e2)[:100]}")
         
-        # ❌ Fallback finale: default minimo
-        logger.warning("⚠️  Usando default minimale per continuare il workflow")
+        # ❌ Final fallback: minimal default
+        logger.warning("⚠️  Using minimal default to continue the workflow")
         
         file_size = os.path.getsize(state.model_path) if os.path.exists(state.model_path) else 0
         
@@ -464,9 +462,9 @@ def inspect_model_architecture(state: MasterState, config: RunnableConfig = None
 
 
 def ask_modification_intent(state, config: RunnableConfig = None):
-    """Chiede all'utente se vuole modificare il modello"""
+    """Asks the user if they want to modify the model"""
     
-    logger.info("💬 Richiesta intenzione di modifica...")
+    logger.info("💬 Requesting modification intent...")
     
     cfg = Configuration.from_runnable_config(config)
     
@@ -474,9 +472,9 @@ def ask_modification_intent(state, config: RunnableConfig = None):
     llm = get_llm(config)
     llm_classifier = llm.with_structured_output(ModificationDecision)
     
-    # --- Passo 1: Fast-path SOLO se il messaggio originale chiede ESPLICITAMENTE modifiche ---
-    # Se l'LLM dice wants_modifications=False (anche con alta confidenza) chiediamo comunque:
-    # l'utente potrebbe non aver menzionato modifiche nel messaggio di avvio AI.
+    # --- Step 1: Fast-path ONLY if the original message EXPLICITLY asks for modifications ---
+    # If the LLM says wants_modifications=False (even with high confidence) we still ask:
+    # the user might not have mentioned modifications in the original AI initial message.
     initial_intent = None
     if not state.user_response:
         msg_clean = state.message.lower().strip()
@@ -486,39 +484,39 @@ def ask_modification_intent(state, config: RunnableConfig = None):
         if not is_generic:
             res = llm_classifier.invoke([
                 SystemMessage(content=modification_decision_instructions),
-                HumanMessage(content=f"Messaggio: {state.message}")
+                HumanMessage(content=f"Message: {state.message}")
             ])
-            # Fast-path SOLO se vuole esplicitamente modificare (True con alta confidenza)
+            # Fast-path ONLY if explicitly wants to modify (True with high confidence)
             if res.wants_modifications and res.confidence > 0.9:
                 initial_intent = True
-                logger.info(f"🤖 Intento di modifica esplicito rilevato (Conf: {res.confidence}), salto interrupt.")
+                logger.info(f"🤖 Explicit modification intent detected (Conf: {res.confidence}), skipping interrupt.")
             else:
-                logger.info(f"🤔 Intento non esplicito (wants={res.wants_modifications}, Conf: {res.confidence}), chiedo conferma.")
+                logger.info(f"🤔 Non-explicit intent (wants={res.wants_modifications}, Conf: {res.confidence}), asking for confirmation.")
 
     if initial_intent is True:
         decision = ModificationDecision(wants_modifications=True, reasoning="Detected in initial message", confidence=1.0)
     else:
-        # --- Passo 2: Interrupt – chiedi all'utente ---
+        # --- Step 2: Interrupt – ask the user ---
         resume_value = None
         if not state.user_response:
             prompt = {
-                "instruction": """Vuoi apportare modifiche all'architettura del modello?
+                "instruction": """Do you want to make modifications to the model architecture?
 
-Opzioni:
-- SÌ: Procediamo con la customizzazione (ridurre layer, aggiungere regularizzazione, etc.)
-- NO: Andiamo avanti direttamente con STEdgeAI analyze/validate/generate
+Options:
+- YES: We proceed with customization (reduce layers, add regularization, etc.)
+- NO: We go forward directly with STEdgeAI analyze/validate/generate
 
-Cosa preferisci? (si/no)""",
+What do you prefer? (yes/no)""",
             }
             has_modified = state.persistent_context.get("last_workflow") == "customization" if state.persistent_context else False
             if has_modified:
-                prompt["suggestion"] = "💡 L'ultima volta hai personalizzato il modello. Vuoi farlo di nuovo?"
+                prompt["suggestion"] = "💡 Last time you customized the model. Do you want to do it again?"
             
             logger.info("⏸️ Interrupting for modification intent.")
             resume_value = interrupt(prompt)
-            # user_text = "si"
+            # user_text = "yes"
 
-        # Dopo la ripresa
+        # After resume
         if resume_value and str(resume_value).strip():
             user_text = str(resume_value).strip().lower()
         else:
@@ -528,7 +526,7 @@ Cosa preferisci? (si/no)""",
         try:
             decision = llm_classifier.invoke([
                 SystemMessage(content=modification_decision_instructions),
-                HumanMessage(content=f"Risposta utente: {user_text}")
+                HumanMessage(content=f"User response: {user_text}")
             ])
 
             # Guard: In case LLM returns non-dict or validation fails (via triton_client _to_pydantic)
@@ -536,29 +534,29 @@ Cosa preferisci? (si/no)""",
                 logger.warning(f"⚠️ Classification failed/invalid (type: {type(decision)}). Defaulting to NO modifications.")
                 decision = ModificationDecision(wants_modifications=False, reasoning="Classification error fallback", confidence=0.0)
         except Exception as e:
-            logger.warning(f"❌ Errore critico nel parsing dell'intento LLM: {str(e)}. Defaulting to NO modifications.")
+            logger.warning(f"❌ Critical error parsing LLM intent: {str(e)}. Defaulting to NO modifications.")
             decision = ModificationDecision(wants_modifications=False, reasoning="Parser exception fallback", confidence=0.0)
 
-    # === SALVA NELLO STATE ===
+    # === SAVE INTENT INTO STATE ===
     state.wants_model_modifications = decision.wants_modifications
     state.modification_intent_confidence = decision.confidence
     
-    logger.info(f"✓ Decisione finale: wants_modifications={state.wants_model_modifications}")
+    logger.info(f"✓ Final decision: wants_modifications={state.wants_model_modifications}")
     return state
 
 
 
 def decide_after_inspection(state) -> Literal["retrieve_best_practices_for_architecture", "run_analyze"]:
-    """Decide se procedere a customizzazione o diretto ad analyze"""
+    """Decides whether to proceed to customization or directly to analyze"""
     
-    logger.info(f"📍 Routing post-inspection:")
+    logger.info(f"📍 Post-inspection routing:")
     logger.info(f"   wants_modifications: {state.wants_model_modifications}")
     
     if state.wants_model_modifications:
-        logger.info("   → Percorso: CUSTOMIZZAZIONE")
+        logger.info("   → Route: CUSTOMIZATION")
         return "retrieve_best_practices_for_architecture"
     else:
-        logger.info("   → Percorso: SKIP A ANALYZE")
+        logger.info("   → Route: SKIP TO ANALYZE")
         return "run_analyze"
 
 
@@ -567,7 +565,7 @@ def decide_after_inspection(state) -> Literal["retrieve_best_practices_for_archi
 # ===========================================================================
 
 def retrieve_best_practices_for_architecture(state: MasterState, config: RunnableConfig = None) -> MasterState:
-    """Con web fetch optional (timeout 10s max)"""
+    """With optional web fetch (max 10s timeout)"""
     
     model_name = state.selected_model.get('name', 'Unknown') if state.selected_model else None
     
@@ -604,7 +602,7 @@ def retrieve_best_practices_for_architecture(state: MasterState, config: Runnabl
         except Exception as e:
             logger.warning(f"  ⚠️  Cache lookup failed: {str(e)[:60]}")
     
-    # ===== STEP 2: Generazione LLM (MAX 20 SECONDI) =====
+    # ===== STEP 2: LLM Generation (MAX 20 SECONDS) =====
     logger.info(f"  [Step 2/3] Generating practices with LLM...")
     
     import time
@@ -640,8 +638,8 @@ def _generate_and_cache_with_llm(
     persist_dir: str
 ) -> Optional[List]:
     """
-    Genera best practices usando LLM locale (Ollama) e le salva su Chroma.
-    Sostituisce la ricerca web per maggiore affidabilità.
+    Generates best practices using local LLM (Ollama) and saves them to Chroma.
+    Replaces web search for greater reliability.
     """
     import time
     from langchain_core.documents import Document
@@ -650,11 +648,11 @@ def _generate_and_cache_with_llm(
     logger.info(f"  Generating best practices for {arch_type} with LLM...")
     
     try:
-        # 1. Configura LLM
-        # Usa il modello configurato centralmente (più robusto di hardcoded 'mistral')
+        # 1. Setup LLM
+        # Use centrally configured model (more robust than hardcoded 'mistral')
         llm = get_llm(None, temperature=0.3, keep_alive="5m")
         
-        # 2. Prompt per Best Practices (CONCISO & SCHEMATICO)
+        # 2. Best Practices Prompt (CONCISE & SCHEMATIC)
         prompt = f"""You are an expert embedded AI engineer.
         Provide a **concise, bullet-point checklist** for fine-tuning {model_name} ({arch_type}) on STM32.
         
@@ -668,14 +666,14 @@ def _generate_and_cache_with_llm(
         Keep it under 200 words. No intro/outro. Schematic only.
         """
         
-        # 3. Generazione
+        # 3. Generation
         logger.info(f"  Invoking LLM (this may take 10-20s)...")
         response = llm.invoke(prompt)
         content = response.content
         
         logger.info(f"  ✓ Native LLM generation complete ({len(content)} chars)")
         
-        # 4. Crea Documento LangChain
+        # 4. Create LangChain Document
         doc = Document(
             page_content=content,
             metadata={
@@ -692,7 +690,7 @@ def _generate_and_cache_with_llm(
         logger.error(f"❌ LLM Generation failed: {str(e)}")
         return None
 
-    # ===== STEP 3: Save to Chroma ===== (Riutilizzo logica esistente)
+    # ===== STEP 3: Save to Chroma ===== (Reuse existing logic)
     if all_docs:
         try:
             logger.info(f"  Saving to Chroma ({arch_type})...")
@@ -761,15 +759,15 @@ def _generate_and_cache_with_llm(
 
 def search_web(queries: List[str]) -> List[dict[str, str]]:
     """
-    ✨ Ricerca web per recuperare URL best practices per architettura
+    ✨ Web search to retrieve best practice URLs by architecture
     
-    Basato su execute_web_search ma ottimizzato per ritornare lista di URL.
+    Based on execute_web_search but optimized to return a list of URLs.
     
     Args:
-        queries: Lista di query (max 3 per efficienza)
+        queries: List of queries (max 3 for efficiency)
     
     Returns:
-        List[dict] con formato:
+        List[dict] with format:
         [
             {"url": "https://...", "title": "...", "content": "..."},
             {"url": "https://...", "title": "...", "content": "..."},
@@ -777,7 +775,7 @@ def search_web(queries: List[str]) -> List[dict[str, str]]:
         ]
     
     Raises:
-        Exception se ricerca fallisce
+        Exception if search fails
     """
     
     logger.info(f"🌐 Search web: {len(queries)} queries")
@@ -796,13 +794,13 @@ def search_web(queries: List[str]) -> List[dict[str, str]]:
                 markdown=True
             )
             
-            # ===== PROMPT SEMPLICE E DIRETTO =====
+            # ===== SIMPLE AND DIRECT PROMPT =====
             search_prompt = f"""Search for information about:
 "{query}"
 
 Return the top 5 most relevant results with URLs and brief descriptions."""
             
-            # ===== ESEGUI RICERCA =====
+            # ===== EXECUTE SEARCH =====
             logger.debug(f"  Invoking Agno Agent...")
             response = agent.run(search_prompt)
             
@@ -815,7 +813,7 @@ Return the top 5 most relevant results with URLs and brief descriptions."""
             
             logger.debug(f"  Response length: {len(content)} chars")
             
-            # Estrai URL dalla response (parse markdown links)
+            # Extract URLs from the response (parse markdown links)
             urls = _extract_urls_from_response(content)
             
             if urls:
@@ -825,7 +823,7 @@ Return the top 5 most relevant results with URLs and brief descriptions."""
                     all_results.append({
                         "url": url_info.get('url'),
                         "title": url_info.get('title', ''),
-                        "content": content[:200]  # Snippet della response
+                        "content": content[:200]  # Snippet of the response
                     })
             else:
                 logger.debug(f"  No URLs extracted")
@@ -834,11 +832,11 @@ Return the top 5 most relevant results with URLs and brief descriptions."""
             logger.warning(f"  Query failed: {query} - {str(e)[:60]}")
             continue
     
-    # ===== FALLBACK SIMULATO (PER SVILUPPO/DEBUG) =====
+    # ===== SIMULATED FALLBACK (FOR DEVELOPMENT/DEBUG) =====
     if not all_results:
-        logger.warning("⚠️  Nessun URL trovato (o Rate Limit). Uso risultati SIMULATI per testare Chroma.")
+        logger.warning("⚠️  No URLs found (or Rate Limit). Using SIMULATED results to test Chroma.")
         
-        # Simulazione basata sulla query
+        # Simulation based on query
         simulated_data = []
         q_str = " ".join(queries).lower()
         
@@ -863,7 +861,7 @@ Return the top 5 most relevant results with URLs and brief descriptions."""
 
     logger.info(f"✓ Total results: {len(all_results)} URLs")
     
-    return all_results[:10]  # Ritorna top 10 risultati
+    return all_results[:10]  # Return top 10 results
 
 
 # ============================================================================
@@ -872,12 +870,12 @@ Return the top 5 most relevant results with URLs and brief descriptions."""
 
 def _extract_urls_from_response(content: str) -> List[dict[str, str]]:
     """
-    Estrae URL dalla response di Agno Agent.
+    Extracts URLs from the Agno Agent response.
     
-    Supporta formati:
+    Supports formats:
     - Markdown links: [Title](URL)
     - Plain URLs: https://...
-    - Numbered lists con URL
+    - Numbered lists with URL
     """
     
     import re
@@ -890,7 +888,7 @@ def _extract_urls_from_response(content: str) -> List[dict[str, str]]:
         title = match.group(1).strip()
         url = match.group(2).strip()
         
-        # Valida URL
+        # Validate URL
         if url.startswith('http'):
             urls.append({
                 'url': url,
@@ -902,7 +900,7 @@ def _extract_urls_from_response(content: str) -> List[dict[str, str]]:
     for match in re.finditer(url_pattern, content):
         url = match.group(0).strip()
         
-        # Valida URL (non è già incluso)
+        # Validate URL (not already included)
         if url not in [u['url'] for u in urls]:
             urls.append({
                 'url': url,
@@ -910,7 +908,7 @@ def _extract_urls_from_response(content: str) -> List[dict[str, str]]:
             })
     
     # ===== PATTERN 3: Numbered list with URL =====
-    # Es: "1. Title - https://example.com"
+    # Ex: "1. Title - https://example.com"
     list_pattern = r'\d+\.\s+([^-]+)\s*-?\s*(https?://[^\s]+)'
     for match in re.finditer(list_pattern, content):
         title = match.group(1).strip()
@@ -934,7 +932,7 @@ def _fetch_and_cache_architecture_practices(
     arch_type: str,
     persist_dir: str
 ) -> Optional[List]:
-    """Fetch best practices online e salva in Chroma DEDICATED"""
+    """Fetch best practices online and save in DEDICATED Chroma"""
     
     logger.info(f"  Fetching practices for {arch_type}...")
     
@@ -945,7 +943,7 @@ def _fetch_and_cache_architecture_practices(
     logger.info(f"  Searching web for {len(queries)} queries...")
     
     try:
-        search_results = search_web(queries)  # ← CHIAMA LA NUOVA FUNZIONE
+        search_results = search_web(queries)  # ← CALL THE NEW FUNCTION
     except Exception as e:
         logger.warning(f"  Web search failed: {str(e)[:60]}")
         search_results = []
@@ -956,7 +954,7 @@ def _fetch_and_cache_architecture_practices(
     
     logger.info(f"  Found {len(search_results)} URLs to load")
     
-    # ===== STEP 2: Load da URLs =====
+    # ===== STEP 2: Load from URLs =====
     for i, result in enumerate(search_results, 1):
         url = result.get('url')
         title = result.get('title', 'Unknown')
@@ -978,7 +976,7 @@ def _fetch_and_cache_architecture_practices(
             docs = loader.load()
             
             if docs:
-                # Aggiungi metadata
+                # Add metadata
                 for doc in docs:
                     doc.metadata['architecture'] = arch_type
                     doc.metadata['model_name'] = model_name
@@ -1020,7 +1018,7 @@ def _fetch_and_cache_architecture_practices(
         #     collection_name=f"{arch_type}_best_practices"
         # )
 
-        # DA SISTEMARE !!! CHROMA CREA PROBLEMI. TRA L'ALTRO VECTORSTORE NON VENIVA UTILIZZATO DA NESSUNA PARTE...
+        # TO BE FIXED !!! CHROMA IS CAUSING ISSUES. ALSO VECTORSTORE WAS NOT USED ANYWHERE...
         
         logger.info(f"  ✓ Saved {len(chunks)} chunks to {persist_dir}")
     
@@ -1032,7 +1030,7 @@ def _fetch_and_cache_architecture_practices(
 
 
 def _get_search_queries_for_architecture(arch_type: str) -> List[str]:
-    """Ritorna query specifiche per architettura"""
+    """Returns specific queries for architecture"""
     
     queries_map = {
         'mobilenet': [
@@ -1086,7 +1084,7 @@ def _retrieve_from_chroma(
     arch_type: str,
     embeddings_override: Any = None
 ) -> Optional[List]:
-    """Recupera da Chroma DEDICATO per architettura"""
+    """Retrieves from DEDICATED Chroma by architecture"""
     
     try:
         embeddings = embeddings_override or get_embeddings(model="mistral")
@@ -1097,8 +1095,8 @@ def _retrieve_from_chroma(
             collection_name=f"{arch_type}_best_practices"
         )
         
-        # ✅ CORRETTO: Usa similarity_search senza filter
-        # (il filtro è implicito perché usiamo collection_name specifica per arch)
+        # ✅ CORRECT: Use similarity_search without filter
+        # (the filter is implicit because we use an arch-specific collection_name)
         results = vectorstore.similarity_search(query, k=5)
         
         return results if results else None
@@ -1109,7 +1107,7 @@ def _retrieve_from_chroma(
 
 
 def _detect_architecture_type(model_name: str) -> str:
-    """Detecta architettura dal nome modello"""
+    """Detects architecture from model name"""
     
     model_lower = model_name.lower()
     
@@ -1134,13 +1132,13 @@ def _detect_architecture_type(model_name: str) -> str:
 
 
 def _format_practices(docs: List, source: str = "UNKNOWN") -> str:
-    """Formatta documenti per visualizzazione"""
+    """Formats documents for display"""
     
     formatted = f"\n════════════════════════════════════════════════════════════\n"
     formatted += f"📋 BEST PRACTICES ({source})\n"
     formatted += f"════════════════════════════════════════════════════════════\n\n"
     
-    for doc in docs[:1]: # Prendi solo il primo se ce ne sono tanti (di solito è 1)
+    for doc in docs[:1]: # Take only the first one if there are many (usually just 1)
         content = doc.page_content if hasattr(doc, 'page_content') else str(doc)
         formatted += f"{content.strip()}\n"
     
@@ -1151,7 +1149,7 @@ def _format_practices(docs: List, source: str = "UNKNOWN") -> str:
 
 
 def _get_architecture_specific_practices(arch_type: str) -> str:
-    """Ritorna best practices hardcoded per architettura"""
+    """Returns hardcoded best practices for architecture"""
     
     practices_map = {
         'mobilenet': """
@@ -1232,7 +1230,7 @@ def _get_architecture_specific_practices(arch_type: str) -> str:
 
 
 def _get_generic_practices() -> str:
-    """Fallback generico quando modello non noto"""
+    """Generic fallback when model is unknown"""
     
     return """
 ════════════════════════════════════════════════════════════
@@ -1271,12 +1269,12 @@ def _get_generic_practices() -> str:
 
 # ============================================================================
 # PYDANTIC SCHEMAS FOR STRUCTURED OUTPUT
-# 🔴 ERRORE PYDANTIC: any type non supportato
-# Problema: Nella classe Modification (riga 970 di workflow5_customization.py), hai usato any (builtin function) come type hint, ma Pydantic non lo supporta.
+# 🔴 PYDANTIC ERROR: 'any' type not supported
+# Problem: In the Modification class, 'any' (builtin function) was used as a type hint, but Pydantic doesn't support it.
 # ============================================================================
 
 class Modification(BaseModel):
-    """Singola modifica strutturata"""
+    """Single structured modification"""
     type: str = Field(
         description="Modification type: freeze_layers, freeze_almost_all, change_output_layer, add_dropout, change_input_shape, change_learning_rate, add_resizing_layer"
     )
@@ -1289,7 +1287,7 @@ class Modification(BaseModel):
 
 
 class TrainingRecommendation(BaseModel):
-    """Raccomandazioni di training"""
+    """Training recommendations"""
     learning_rate: float = Field(
         ge=1e-6, le=1e-1,
         description="Suggested learning rate"
@@ -1311,7 +1309,7 @@ class TrainingRecommendation(BaseModel):
 
 
 class ValidationInfo(BaseModel):
-    """Info validazione"""
+    """Validation info"""
     is_valid: bool = Field(description="Are all modifications valid?")
     issues: List[str] = Field(
         default_factory=list,
@@ -1320,7 +1318,7 @@ class ValidationInfo(BaseModel):
 
 
 class ParsedModificationsPlan(BaseModel):
-    """Plan completo di modifiche - OUTPUT FINALE"""
+    """Complete modifications plan - FINAL OUTPUT"""
     modifications: List[Any] = Field(
         description="List of modifications to apply. Each item should be a dictionary with 'type', 'description', 'params'.",
         default_factory=list
@@ -1341,28 +1339,28 @@ class ParsedModificationsPlan(BaseModel):
         default=None
     )
 
-# Lista modelli che NON supportano change_input_shape
+# List of models that DO NOT support change_input_shape
 INCOMPATIBLE_INPUT_SHAPE_MODELS = {
     'yolo': ['tiny_yolo_v2', 'yolov2', 'yolov3', 'yolov4', 'yolov5', 'yolov8'],
     'ssd': [
         'ssd_mobilenet', 
         'ssd_inception', 
         'ssd_resnet', 
-        'st_ssd_mobilenet_v1',  # ⭐ NUOVO dal catalogo
+        'st_ssd_mobilenet_v1',  # ⭐ NEW from catalog
     ],
     'other_detectors': ['faster_rcnn', 'mask_rcnn', 'retinanet'],
-    'time_series_models': [  # ⭐ NUOVO
+    'time_series_models': [  # ⭐ NEW
         'gmp',
         'har',
         'activity_recognition',
     ]
 }
-# Grid output fissa in detection. Cambiar input → cambia grid → mismatch con label → crash loss function. 
-# YOLO è progettato per 416x416, SSD per 300/512. Cambiarli rompe l'integrità del modello.
-# Bloccato per evitare crash silenzioso. Alternativa: Resizing Layer (nel backlog)
+# Fixed grid output in detection. Changing input → changes grid → mismatch with label → loss function crashes. 
+# YOLO is designed for 416x416, SSD for 300/512. Changing them breaks model integrity.
+# Blocked to avoid silent crash. Alternative: Resizing Layer (in backlog)
 
 def is_model_compatible_with_input_shape_change(model_name: str) -> bool:
-    """Verifica se il modello supporta change_input_shape"""
+    """Checks if the model supports change_input_shape"""
     model_lower = model_name.lower()
     
     for category, models in INCOMPATIBLE_INPUT_SHAPE_MODELS.items():
@@ -1384,30 +1382,30 @@ def is_model_compatible_with_input_shape_change(model_name: str) -> bool:
 
 def ask_and_parse_user_modifications(state: any, config: RunnableConfig = None) -> any:
     """
-    ✨ VERSIONE CONSOLIDATA: Chiedi all'utente e parsa immediatamente
+    ✨ CONSOLIDATED VERSION: Asks the user and parses immediately
     
-    Flusso atomico:
-    1. Mostra UI con best practices
-    2. Utente inserisce richieste (natural language)
-    3. LLM parsa e valida
-    4. Ritorna piano strutturato
+    Atomic flow:
+    1. Show UI with best practices
+    2. User inputs requests (natural language)
+    3. LLM parses and validates
+    4. Returns structured plan
     
     Args:
         state: MasterState object
         config: Configuration dict
     
     Returns:
-        state aggiornato con parsed_modifications
+        Updated state with parsed_modifications
     """
     
-    logger.info("🤔 Chiedendo all'utente quali modifiche applicare...")
+    logger.info("🤔 Asking user which modifications to apply...")
 
     # ===== STEP 0: Retrieve architecture-specific best practices =====
     logger.info("  [Step 0/3] Fetching best practices...")
     state = retrieve_best_practices_for_architecture(state, config)
     best_practices = state.best_practices_display
     
-    # ===== ESTRAI INFO =====
+    # ===== EXTRACT INFO =====
     input_shape = state.model_architecture.get('input_shape', 'Unknown')
     output_classes = state.model_architecture.get('output_classes', 0)
     total_params = state.model_architecture.get('total_params', 0)
@@ -1415,7 +1413,7 @@ def ask_and_parse_user_modifications(state: any, config: RunnableConfig = None) 
     
     formatted_params = f"{total_params:,}" if total_params else "N/A"
     
-    # ===== PROMPT UTENTE =====
+    # ===== USER PROMPT =====
     prompt = {
         "instruction": f"""
 ╔═══════════════════════════════════════════════════════════╗
@@ -1449,13 +1447,13 @@ Write your modifications in natural language (or leave empty for defaults):
         "best_practices": best_practices,
     }
     
-    # === ESTRATTORE LLM ===
+    # === LLM EXTRACTOR ===
     from src.assistant.utils import extract_user_response, get_llm
     cfg = Configuration.from_runnable_config(config)
     llm = get_llm(config)
     llm_extractor = llm.with_structured_output(ParsedModificationsPlan)
     
-    # --- Passo 1: Prova a usare il messaggio iniziale ---
+    # --- Step 1: Try to use the initial message ---
     initial_mods_detected = False
     if not state.user_response:
         try:
@@ -1466,7 +1464,7 @@ STRICT RULES:
 2. Do NOT invent modifications based on examples provided in the prompt.
 3. If the user just says 'yes', 'si', or 'ok' without specifying WHAT to change, return EMPTY.
 4. ONLY extract: freeze_layers, freeze_almost_all, change_output_layer, add_dropout, change_input_shape, change_learning_rate, add_resizing_layer."""),
-                HumanMessage(content=f"Messaggio: {state.message}")
+                HumanMessage(content=f"Message: {state.message}")
             ])
             # res might be a raw dict if Pydantic validation failed in _to_pydantic
             mods = res.modifications if hasattr(res, 'modifications') else res.get('modifications', [])
@@ -1474,21 +1472,21 @@ STRICT RULES:
             if mods and conf >= 0.7:
                 state.user_custom_modifications = state.message
                 initial_mods_detected = True
-                logger.info(f"🤖 Modifiche rilevate nel messaggio iniziale (confidence: {conf:.0%}).")
+                logger.info(f"🤖 Modifications detected in initial message (confidence: {conf:.0%}).")
             else:
-                logger.info(f"ℹ️ Nessuna modifica nel messaggio iniziale (confidence: {conf:.0%}), chiedo all'utente.")
+                logger.info(f"ℹ️ No modifications in initial message (confidence: {conf:.0%}), asking user.")
         except Exception as e:
-            logger.warning(f"⚠️ Rilevamento iniziale modifiche fallito: {e}. Procedo con interrupt.")
+            logger.warning(f"⚠️ Initial modification detection failed: {e}. Proceeding with interrupt.")
 
-    # --- Passo 2: Verifica e Interrupt ---
+    # --- Step 2: Verification and Interrupt ---
     if not initial_mods_detected:
         if not state.user_response:
             prompt = {
-                "instruction": """Descrivi le modifiche che vuoi apportare al modello.
-Esempi:
-- "Freeze primi 10 layer e aggiungi dropout 0.3"
-- "Cambia input a 128x128"
-- "Usa learning rate 1e-4"
+                "instruction": """Describe the modifications you want to apply to the model.
+Examples:
+- "Freeze first 10 layers and add dropout 0.3"
+- "Change input to 128x128"
+- "Use learning rate 1e-4"
 """,
             }
             
@@ -1508,9 +1506,9 @@ Esempi:
         user_modifications = state.user_custom_modifications
 
     user_modifications = user_modifications.strip() if user_modifications else ""
-    logger.info(f"📝 User request finale: {user_modifications[:80]}...")
+    logger.info(f"📝 Final user request: {user_modifications[:80]}...")
     
-    # ===== STEP 2: Parsare con LLM =====
+    # ===== STEP 2: Parse with LLM =====
     logger.info("  [Step 2/2] Parsing with LLM structured output...")
     
     try:
@@ -1521,8 +1519,8 @@ Esempi:
             temperature=0.3
         )
         
-        # Prompt per LLM - con esempio concreto per evitare che Mistral confonda
-        # i campi dello schema con i valori della lista modifications
+        # LLM Prompt - with a concrete example to prevent Mistral from confusing
+        # the schema fields with the values of the modifications list
         llm_prompt = f"""Parse this neural network modification request and return ONLY a JSON object.
 
 USER REQUEST: "{user_modifications}"
@@ -1613,7 +1611,7 @@ DO NOT list type names as strings in the array. Always use object notation."""),
         logger.info("  ✓ LLM parsing successful")
 
 
-        # ===== VALIDAZIONE: change_input_shape INCOMPATIBILE? =====
+        # ===== VALIDATION: is change_input_shape INCOMPATIBLE? =====
         model_name = state.selected_model.get('name', '') if state.selected_model else ''
         mods_to_remove = []
 
@@ -1634,14 +1632,14 @@ DO NOT list type names as strings in the array. Always use object notation."""),
                             f"change_input_shape: Blocked - {model_name} has fixed input structure"
                         )
 
-        # Rimuovi in ordine inverso
+        # Remove in reverse order
         for i in reversed(mods_to_remove):
             result.modifications.pop(i)
 
         if mods_to_remove:
             result.validation.is_valid = False
         
-        # ===== VALIDAZIONE PARAMETRI =====
+        # ===== PARAMETER VALIDATION =====
         issues = []
         from src.assistant.utils import get_llm, validate_modification_params
         
@@ -1683,11 +1681,11 @@ DO NOT list type names as strings in the array. Always use object notation."""),
                 result.validation.issues = issues
                 result.validation.is_valid = False
         
-        # ===== SALVA STATO =====
+        # ===== SAVE STATE =====
         # Pydantic dict() to convert models, but also handles our raw dicts correctly
         state.parsed_modifications = result.dict() if hasattr(result, 'dict') else dict(result)
         
-        # ===== LOG RISULTATI =====
+        # ===== LOG RESULTS =====
         logger.info(f"✅ Modifications parsed successfully!")
         logger.info(f"   • Modifications: {len(result.modifications)}")
         
@@ -1727,7 +1725,7 @@ DO NOT list type names as strings in the array. Always use object notation."""),
         logger.error(f"❌ LLM parsing failed: {str(e)}")
         logger.warning("⚠️  Using fallback configuration...")
         
-        # Fallback minimo
+        # Minimal fallback
         state.parsed_modifications = {
             "modifications": [],
             "summary": f"Error: {str(e)[:50]}",
@@ -1753,16 +1751,16 @@ DO NOT list type names as strings in the array. Always use object notation."""),
 
 def get_modification_best_practices(model_architecture: dict) -> str:
     """
-    ✨ FUNZIONE: Genera best practices personalizzate per il modello.
+    ✨ FUNCTION: Generates personalized best practices for the model.
     
     Args:
-        model_architecture: dict con info architettura modello
+        model_architecture: dict with model architecture info
     
     Returns:
-        String formattato con best practices
+        Formatted string with best practices
     """
     
-    logger.info("📚 Generando best practices per il modello...")
+    logger.info("📚 Generating best practices for the model...")
     
     total_params = model_architecture.get('total_params', 0)
     n_layers = model_architecture.get('n_layers', 0)
@@ -1775,7 +1773,7 @@ def get_modification_best_practices(model_architecture: dict) -> str:
     
     # ===== LAYER FREEZING RECOMMENDATIONS =====
     if n_layers > 5:
-        frozen_count = max(1, n_layers // 3)  # Congela 1/3 dei layer
+        frozen_count = max(1, n_layers // 3)  # Freeze 1/3 of the layers
         practices.append(f"🔒 Freeze first {frozen_count} layers to preserve pre-trained features")
     
     # ===== DROPOUT RECOMMENDATIONS =====
@@ -1824,7 +1822,7 @@ def get_modification_best_practices(model_architecture: dict) -> str:
     # ===== QUANTIZATION RECOMMENDATIONS =====
     practices.append("🔢 Use INT8 quantization (4× size reduction) for STM32 deployment")
     
-    # Formatta output
+    # Format output
     formatted = "\n".join([f"  {p}" for p in practices])
     
     return f"""\n════════════════════════════════════════════════════════════
@@ -1839,10 +1837,10 @@ def get_modification_best_practices(model_architecture: dict) -> str:
 
 def collect_modification_confirmation(state: any, config: RunnableConfig = None) -> any:
     """
-    Mostra preview delle modifiche e chiede conferma all'utente.
-    Usa LLM per comprendere risposte in linguaggio naturale.
+    Shows modification preview and asks the user for confirmation.
+    Uses LLM to understand natural language responses.
     
-    Supporta vari tipi di risposte:
+    Supports various response types:
       ✓ Positive: "yes", "ok", "apply", "confirm", "proceed"
       ✓ Negative: "no", "cancel", "reject", "stop"
       ✓ Edit: "edit", "modify", "change", "back"
@@ -1852,24 +1850,24 @@ def collect_modification_confirmation(state: any, config: RunnableConfig = None)
         config: Configuration dict
     
     Returns:
-        state aggiornato con modification_confirmed bool
+        updated state with modification_confirmed bool
     """
-    logger.info("👀 Chiedendo conferma per le modifiche...")
+    logger.info("👀 Asking confirmation for modifications...")
     
-    # Protezione: se non ci sono modifiche, ritorna subito
+    # Protection: if there are no modifications, return immediately
     if not state.parsed_modifications:
-        logger.warning("⚠️  Nessuna modifica da confermare")
+        logger.warning("⚠️  No modifications to confirm")
         state.modification_confirmed = False
         return state
     
-    # ==================== CREAZIONE PREVIEW ====================
+    # ==================== PREVIEW CREATION ====================
     
-    # Estrai info dalle modifiche per il preview
+    # Extract info from modifications for the preview
     summary = state.parsed_modifications.get('summary', 'N/A')
     confidence = state.parsed_modifications.get('confidence', 0.9)
     num_modifications = len(state.parsed_modifications.get('modifications', []))
     
-    # Lista delle modifiche per il preview
+    # List of modifications for the preview
     modifications_list = state.parsed_modifications.get('modifications', [])
     modifications_text = "\n".join([
         f"  {i+1}. [{m.get('type', 'unknown')}] {m.get('description', 'No description')}"
@@ -1890,18 +1888,18 @@ def collect_modification_confirmation(state: any, config: RunnableConfig = None)
     is_valid = validation.get('is_valid', True)
     validation_icon = "✅" if is_valid else "⚠️"
     
-    # Costruisci il preview formattato
+    # Build the formatted preview
     preview = f"""
 ════════════════════════════════════════════════════════════
-🔍 PREVIEW: Modifiche che saranno applicate
+🔍 PREVIEW: Modifications that will be applied
 ════════════════════════════════════════════════════════════
 
 Summary: {summary}
 Confidence: {confidence:.0%}
-Numero modifiche: {num_modifications}
+Number of modifications: {num_modifications}
 Status: {validation_icon}
 
-Dettagli modifiche:
+Modification details:
 {modifications_text}
 
 Training Recommendation:{train_text}
@@ -1911,16 +1909,16 @@ Training Recommendation:{train_text}
     
     logger.info(preview)
 
-    # ==================== RICHIESTA CONFERMA ====================
+    # ==================== CONFIRMATION REQUEST ====================
     
-    # Prompt mostrato all'utente (supporta risposte naturali)
+    # Prompt shown to the user (supports natural responses)
     confirmation_prompt = {
         "instruction": f"{preview}\n\nDo you want to apply these modifications? (Yes/No/Edit)",
         "options": ["yes", "no", "edit"],
         "hint": "You can respond naturally (e.g., 'yes please', 'apply it', 'go back')"
     }
     
-    # ⏸️ INTERRUPT: Attendi risposta utente
+    # ⏸️ INTERRUPT: Wait for user response
     from src.assistant.utils import extract_user_response
     resume_value = None
     if not state.user_response or state.user_response.strip() == "":
@@ -1928,28 +1926,28 @@ Training Recommendation:{train_text}
         resume_value = interrupt(confirmation_prompt)
         user_response = str(resume_value).strip() if resume_value else ""
     else:
-        # Usa il return value di interrupt() come priorità (compatibilità LangGraph Studio),
-        # altrimenti usa state.user_response (compatibilità server.py/VS Code)
+        # Uses the return value of interrupt() as priority (LangGraph Studio compatibility),
+        # otherwise uses state.user_response (server.py/VS Code compatibility)
         if resume_value and str(resume_value).strip():
             raw_response = str(resume_value).strip()
-            logger.info(f"📝 Risposta utente (interrupt return): '{raw_response}'")
+            logger.info(f"📝 User response (interrupt return): '{raw_response}'")
             user_response = raw_response
         else:
-            logger.info(f"📝 Risposta utente (state): '{state.user_response}'")
+            logger.info(f"📝 User response (state): '{state.user_response}'")
             user_response = extract_user_response(state.user_response)
     state.user_response = "" # Clear
     
-    # ==================== PARSING LLM DELLA RISPOSTA ====================
+    # ==================== LLM RESPONSE PARSING ====================
     
     try:
-        logger.info(" [Step 1] Interpretando risposta con LLM...")
+        logger.info(" [Step 1] Interpreting response with LLM...")
         
-        # Usa il LLM Triton (mistral) invece di Ollama
+        # Use the Triton LLM (mistral) instead of Ollama
         from src.assistant.utils import get_llm
         from langchain_core.messages import SystemMessage, HumanMessage
         llm = get_llm(config)
         
-        # Costruisci prompt per interpretare la decisione dell'utente
+        # Build prompt to interpret the user's decision
         interpretation_prompt = f"""Interpret user confirmation response for model modifications.
 
 CONTEXT:
@@ -1977,12 +1975,12 @@ If empty response, return confirm.
             HumanMessage(content=interpretation_prompt)
         ])
         
-        # Normalizza la risposta
+        # Normalize the response
         content = response_msg.content if hasattr(response_msg, 'content') else str(response_msg)
         
         logger.debug(f"   LLM response: {content[:150]}...")
         
-        # Estrai JSON dalla risposta
+        # Extract JSON from the response
         json_match = re.search(r'\{[\s\S]*\}', content)
         
         if json_match:
@@ -1991,9 +1989,9 @@ If empty response, return confirm.
         else:
             decision_data = json.loads(content)
         
-        # Estrai la decisione (default: reject per sicurezza) 
+        # Extract the decision (default: reject for safety) 
         #decision = decision_data.get('decision', 'reject').lower().strip()
-        # PER TESTING veloce: default a confirm
+        # FOR fast TESTING: default to confirm
         decision= decision_data.get('decision', 'confirm').lower().strip()
         confidence = decision_data.get('confidence', 0.5)
         reasoning = decision_data.get('reasoning', 'LLM interpretation')
@@ -2003,54 +2001,54 @@ If empty response, return confirm.
         logger.info(f"    • Confidence: {confidence:.0%}")
         logger.info(f"    • Reasoning: {reasoning}")
         
-        # Converti decision in booleano e imposta flag di edit se necessario
+        # Convert decision to boolean and set edit flag if necessary
         if decision == "confirm":
             state.modification_confirmed = True
             state.user_wants_to_edit = False
-            logger.info("✅ Modifiche CONFERMATE")
+            logger.info("✅ Modifications CONFIRMED")
             
         elif decision == "reject":
             state.modification_confirmed = False
             state.user_wants_to_edit = False
-            logger.info("❌ Modifiche RIFIUTATE")
+            logger.info("❌ Modifications REJECTED")
             
         elif decision == "edit_request":
             state.modification_confirmed = False
             state.user_wants_to_edit = True
-            logger.info("✏️  Utente vuole MODIFICARE le modifiche")
+            logger.info("✏️  User wants to EDIT the modifications")
         
         else:
             state.modification_confirmed = False
             state.user_wants_to_edit = False
-            logger.warning(f"⚠️  Decisione non riconosciuta: '{decision}', defaulting to reject")
+            logger.warning(f"⚠️  Decision not recognized: '{decision}', defaulting to reject")
     
-    # SE IL PARSING LLM FALLISCE
+    # IF LLM PARSING FAILS
     except (json.JSONDecodeError, ValueError, AttributeError) as e:
-        logger.error(f"❌ Errore parsing LLM: {str(e)[:100]}")
-        logger.warning(" [Step 2] Fallback a parsing keyword...")
+        logger.error(f"❌ LLM parsing error: {str(e)[:100]}")
+        logger.warning(" [Step 2] Fallback to keyword parsing...")
         
-        # ==================== FALLBACK: PARSING DIRETTO ====================
+        # ==================== FALLBACK: DIRECT PARSING ====================
         
         if isinstance(user_response, dict):
              response_lower = str(user_response.get("response", user_response.get("input", ""))).lower().strip()
         else:
              response_lower = str(user_response).lower().strip()
         
-        # Parole chiave per "si"
+        # Keywords for "yes"
         positive_keywords = [
             'yes', 'si', 'sì', 'yeah', 'yep', 'ok', 'okay',
             'apply', 'confirm', 'proceed', 'continue', 'go',
             'approve', 'perfect', 'good', 'sure', 'absolutely'
         ]
         
-        # Parole chiave per "no"
+        # Keywords for "no"
         negative_keywords = [
             'no', 'nope', 'reject', 'cancel', 'stop', 'abort',
             'dont', 'don\'t', 'skip', 'refuse', 'decline', 'nah',
             'absolutely not', 'never', 'no way'
         ]
         
-        # Parole chiave per "edit/modifica"
+        # Keywords for "edit/modify"
         edit_keywords = [
             'edit', 'modifica', 'change', 'modify', 'back',
             'again', 'different', 'redo', 'rethink', 'again',
@@ -2060,35 +2058,35 @@ If empty response, return confirm.
         if any(kw in response_lower for kw in positive_keywords):
             state.modification_confirmed = True
             state.user_wants_to_edit = False
-            logger.info("✅ Modifiche CONFERMATE (keyword match)")
+            logger.info("✅ Modifications CONFIRMED (keyword match)")
         
         elif any(kw in response_lower for kw in negative_keywords):
             state.modification_confirmed = False
             state.user_wants_to_edit = False
-            logger.info("❌ Modifiche RIFIUTATE (keyword match)")
+            logger.info("❌ Modifications REJECTED (keyword match)")
         
         elif any(kw in response_lower for kw in edit_keywords):
             state.modification_confirmed = False
             state.user_wants_to_edit = True
-            logger.info("✏️  MODIFICA richiesta (keyword match)")
+            logger.info("✏️  EDIT requested (keyword match)")
         
         else:
             state.modification_confirmed = False
             state.user_wants_to_edit = False
-            logger.warning(f"⚠️  Risposta non interpretata, defaulting to reject")
+            logger.warning(f"⚠️  Response not interpreted, defaulting to reject")
     
     except Exception as e:
-        logger.error(f"❌ Errore imprevisto: {str(e)}", exc_info=True)
-        logger.warning("⚠️  Defaulting a reject per sicurezza")
+        logger.error(f"❌ Unexpected error: {str(e)}", exc_info=True)
+        logger.warning("⚠️  Defaulting to reject for safety")
         
         state.modification_confirmed = False
         state.user_wants_to_edit = False
     
-    # ==================== LOG FINALE ====================
+    # ==================== FINAL LOG ====================
     
     logger.info(f"═══════════════════════════════════════════════════════")
-    logger.info(f"👀 Modifica confermata: {state.modification_confirmed}")
-    logger.info(f"✏️  Edit richiesto: {getattr(state, 'user_wants_to_edit', False)}")
+    logger.info(f"👀 Modification confirmed: {state.modification_confirmed}")
+    logger.info(f"✏️  Edit requested: {getattr(state, 'user_wants_to_edit', False)}")
     logger.info(f"═══════════════════════════════════════════════════════")
     
     return state
@@ -2109,17 +2107,17 @@ ARCHITECTURE_ENV_MAP = {
     'custom': 'stm32legacy',
 }
 
-# CONDA_PYTHON_PATHS rimosso in favore di cfg.get_python_path()
-# ho creato un environment stm32legacy per usare keras 2.x (per modelli vecchi) in modo da non causare errori.
-# in caso in cui vi è bisogno di creare un nuovo environment con pacchetti diversi si può aggiungere qui il path del python corrispondente.
-# la funzione load_model_with_conda_env si occuperà di usare il python corretto in base all'architettura del modello.
+# CONDA_PYTHON_PATHS removed in favor of cfg.get_python_path()
+# I created an stm32legacy environment to use keras 2.x (for older models) in order to avoid errors.
+# In case there is a need to create a new environment with different packages, the corresponding Python path can be added here.
+# The load_model_with_conda_env function will take care of using the correct python based on the model's architecture.
 
 # ============================================================================
-# HELPER: Detecta architettura da model_path
+# HELPER: Detect architecture from model_path
 # ============================================================================
 
 def detect_architecture_from_model(model_path: str) -> str:
-    """Detecta architettura dal nome modello"""
+    """Detects architecture from model name"""
     
     model_name = os.path.basename(model_path).lower()
     
@@ -2150,9 +2148,9 @@ import pickle
 
 def execute_in_environment(python_code: str, state: MasterState, timeout: int = 600, ignore_list: list = None, whitelist_patterns: list = None) -> dict:
     """
-    ✨ Esegui codice Python nell'ambiente specificato in state.python_path
+    ✨ Execute Python code in the environment specified by state.python_path
     
-    Funziona per stm32legacy, stm32, o qualsiasi ambiente conda
+    Works for stm32legacy, stm32, or any conda environment
     
     Returns: {'success': bool, 'stdout': str, 'stderr': str, 'returncode': int}
     """
@@ -2205,15 +2203,15 @@ def execute_in_environment(python_code: str, state: MasterState, timeout: int = 
 
 def load_model_with_conda_env(model_path: str, architecture: str, state: MasterState) -> str:
     """
-    ✨ Carica modello IN SUBPROCESS e RITORNA il PATH
+    ✨ Loads model IN SUBPROCESS and RETURNS the PATH
     
-    Mantiene ARCHITECTURE_ENV_MAP logic dentro questa funzione
+    Maintains ARCHITECTURE_ENV_MAP logic inside this function
     """
     
     logger.info(f"🔄 Loading {architecture} model...")
     
-    # ===== DETERMINA AMBIENTE E PYTHON PATH (LOGICA ORIGINALE) =====
-    cfg = Configuration.from_runnable_config() # Configuration carica da env se non pssato
+    # ===== DETERMINE ENVIRONMENT AND PYTHON PATH (ORIGINAL LOGIC) =====
+    cfg = Configuration.from_runnable_config() # Configuration loads from env if not passed
     
     # .keras -> stm32, .h5 -> stm32legacy
     if model_path.endswith('.keras'):
@@ -2230,11 +2228,11 @@ def load_model_with_conda_env(model_path: str, architecture: str, state: MasterS
     logger.info(f"  Environment: {conda_env}")
     logger.info(f"  Python: {python_path}")
     
-    # ===== AGGIORNA state.python_path e state.conda_env =====
+    # ===== UPDATE state.python_path and state.conda_env =====
     state.python_path = python_path
     state.conda_env = conda_env
     
-    # ===== PYTHON SCRIPT DA ESEGUIRE =====
+    # ===== PYTHON SCRIPT TO EXECUTE =====
     python_code = f"""
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -2279,8 +2277,8 @@ except Exception as e:
     sys.exit(1)
 """
     
-    # ===== ESEGUI USING NEW FUNCTION =====
-    logger.info(f"  [Subprocess] Esecuzione...")
+    # ===== EXECUTE USING NEW FUNCTION =====
+    logger.info(f"  [Subprocess] Execution...")
     
     try:
         result = execute_in_environment(
@@ -2304,7 +2302,7 @@ except Exception as e:
         
         logger.info(f"  ✓ Model loaded in subprocess")
         
-        # ===== ESTRAI INFO E PATH =====
+        # ===== EXTRACT INFO AND PATH =====
         parts = output.split("SUCCESS:")[-1].strip().split('|')
         temp_model_path = parts[0].strip()
         info_json = parts[1].strip()
@@ -2324,14 +2322,14 @@ except Exception as e:
 
 
 # ============================================================================
-# LOAD STM32 MODEL SAFE - VERSIONE SEMPLIFICATA
+# LOAD STM32 MODEL SAFE - SIMPLIFIED VERSION
 # ============================================================================
 
 def load_stm32_model_safe(model_path: str, state: MasterState) -> str:
     """
-    ✨ Carica modello e ritorna PATH (NON il modello)
+    ✨ Loads model and returns PATH (NOT the model)
     
-    Setta state.python_path e state.conda_env per uso successivo
+    Sets state.python_path and state.conda_env for later use
     """
     
     logger.info(f"📥 Loading model: {model_path}")
@@ -2340,30 +2338,30 @@ def load_stm32_model_safe(model_path: str, state: MasterState) -> str:
         logger.error(f"❌ Model file not found: {model_path}")
         raise FileNotFoundError(f"Model not found: {model_path}")
     
-    # ✅ FIX: Controllo estensione. 
-    # La customizzazione (Workflow 5) richiede formati nativi Keras (.h5, .keras)
-    # Formati come .onnx o .tflite sono ottimi per l'analisi (Workflow 2) ma non per l'editing strutturale.
+    # ✅ FIX: Extension check. 
+    # Customization (Workflow 5) requires native Keras formats (.h5, .keras)
+    # Formats like .onnx or .tflite are great for analysis (Workflow 2) but not for structural editing.
     ext = os.path.splitext(model_path)[1].lower()
     if ext not in ['.h5', '.keras']:
-        error_msg = f"Il formato {ext} non supporta la customizzazione strutturale. " \
-                    "La manipolazione dei layer e il fine-tuning richiedono modelli nativi Keras (.h5 o .keras). " \
-                    "Puoi comunque procedere all'analisi e generazione del firmware (Workflow 2)."
+        error_msg = f"The {ext} format does not support structural customization. " \
+                    "Layer manipulation and fine-tuning require native Keras models (.h5 or .keras). " \
+                    "You can still proceed to analysis and firmware generation (Workflow 2)."
         logger.error(f"❌ {error_msg}")
         raise ValueError(error_msg)
     
     try:
-        # Detecta architettura
+        # Detect architecture
         architecture = detect_architecture_from_model(model_path)
         logger.info(f"  Architecture: {architecture}")
         
-        # Carica e ritorna PATH (setta anche state.python_path e state.conda_env)
+        # Load and return PATH (also sets state.python_path and state.conda_env)
         model_path_ready = load_model_with_conda_env(model_path, architecture, state)
         
         logger.info(f"✓ Model path: {model_path_ready}")
         logger.info(f"✓ Python path set: {state.python_path}")
         logger.info(f"✓ Conda env set: {state.conda_env}")
         
-        return model_path_ready  # ← PATH, non Model!
+        return model_path_ready  # ← PATH, not Model!
     
     except Exception as e:
         logger.error(f"❌ Model loading failed: {str(e)}")
@@ -2376,10 +2374,10 @@ def load_stm32_model_safe(model_path: str, state: MasterState) -> str:
 
 def apply_user_customization(state: MasterState, config: RunnableConfig = None) -> MasterState:
     """
-    ✨ Applicazione modifiche CON GESTIONE CORRETTA DI MULTIPLE RECONSTRUCTIONS (applica le ricostruzioni insieme e da in output un solo modello customizzato. Prima per ogni ricostruzione veniva creato un nuovo modello aggiornato versione 1, versione 2, etc)
+    ✨ Apply modifications WITH CORRECT MANANGEMENT OF MULTIPLE RECONSTRUCTIONS (applies reconstructions together and outputs a single customized model. Previously for each reconstruction a new updated model was created version 1, version 2, etc)
     """
     
-    logger.info("🔧 Applicando customizzazioni al modello STM32...")
+    logger.info("🔧 Applying customizations to the STM32 model...")
     
     if not state.modification_confirmed:
         state.customization_applied = False
@@ -2441,7 +2439,7 @@ try:
     
     modifications_log = []
 
-    # ===== FASE 1: MODIFICHE NON-RICOSTRUTTIVE =====
+    # ===== PHASE 1: NON-RECONSTRUCTIVE MODIFICATIONS =====
     print("\\n[Phase 1] Applying non-reconstructive modifications...")
     for mod in modifications:
         mod_type = mod.get('type', '').strip()
@@ -2473,10 +2471,10 @@ try:
             modifications_log.append(f"✓ Learning rate: {{lr}}")
             print(f"  [✓] Learning rate: {{lr}}")
     
-    # ===== FASE 2: RACCOGLI MODIFICHE RICOSTRUTTIVE =====
+    # ===== PHASE 2: COLLECT RECONSTRUCTIVE MODIFICATIONS =====
     print("\\n[Phase 2] Collecting reconstructive modifications...")
-    # ===== ESTRAI original_input_shape SUBITO (CRITICA!) =====
-    original_input_shape = model.input_shape  # Es: (None, 416, 416, 3)
+    # ===== EXTRACT original_input_shape IMMEDIATELY (CRITICAL!) =====
+    original_input_shape = model.input_shape  # Ex: (None, 416, 416, 3)
     original_h = original_input_shape[1] if original_input_shape and len(original_input_shape) > 1 else 224
     original_w = original_input_shape[2] if original_input_shape and len(original_input_shape) > 2 else 224
     original_c = original_input_shape[3] if original_input_shape and len(original_input_shape) > 3 else 3
@@ -2486,7 +2484,7 @@ try:
 
     reconstructive_mods = {{}}
     has_input_shape_change = False
-    has_resizing_layer = False  # ← Fix #1 (dichiarazione)
+    has_resizing_layer = False  # ← Fix #1 (declaration)
     
     for mod in modifications:
         mod_type = mod.get('type', '').strip()
@@ -2513,51 +2511,51 @@ try:
             print(f"  [queued] add_resizing_layer: {{target_h}}x{{target_w}}")
  
     
-    # ===== FASE 3: HANDLE INPUT SHAPE CHANGE (NO SKIP LAYERS) =====
+    # ===== PHASE 3: HANDLE INPUT SHAPE CHANGE (NO SKIP LAYERS) =====
     if has_input_shape_change and 'input_shape' in reconstructive_mods:
         print("\\n[Phase 3] INPUT SHAPE CHANGE: Reloading model with new input shape...")
         
-        new_shape = reconstructive_mods['input_shape']  # Es: (64, 64, 3)
-        original_shape = model.input_shape[1:]  # Es: (224, 224, 3)
+        new_shape = reconstructive_mods['input_shape']  # Ex: (64, 64, 3)
+        original_shape = model.input_shape[1:]  # Ex: (224, 224, 3)
         
         print(f"  Original input: {{original_shape}}")
         print(f"  New input: {{new_shape}}")
         
-        # Ricrea modello con nuovo input shape
-        model_config = model.get_config()  # Estrae la configurazione completa del modello (non i pesi, solo la struttura/architettura in formato JSON)
+        # Recreate model with new input shape
+        model_config = model.get_config()  # Extracts the full model configuration (not weights, just structure/architecture in JSON format)
         
-        # Modifica input layer config  # Accede al primo layer (l'Input layer) e cambia batch_input_shape da (None, 224, 224, 3) → (None, 64, 64, 3)
+        # Modify input layer config  # Accesses the first layer (Input layer) and changes batch_input_shape from (None, 224, 224, 3) → (None, 64, 64, 3)
         if 'layers' in model_config and len(model_config['layers']) > 0:
             input_layer_config = model_config['layers'][0]
             if 'config' in input_layer_config:
-                input_layer_config['config']['batch_input_shape'] = (None, *new_shape)  # !!! Cambia input shape qui
+                input_layer_config['config']['batch_input_shape'] = (None, *new_shape)  # !!! Change input shape here
         
-        # Ricrea modello
-        model_new = tf.keras.Model.from_config(model_config)  # Ricrea il modello intero USANDO la config modificata # IMPORTANTE: questa operazione cambia input shape, preserva architettura (tutti i layer rimangono) e inizializza pesi a random (non copia pesi da modello vecchio).
-        # Model.from_config() ricrea il modello con le GIUSTE PROPORZIONI INTERNE! Quando Keras legge la config modificata, calcola automaticamente tutte le shape successive.
+        # Recreate model
+        model_new = tf.keras.Model.from_config(model_config)  # Recreates the entire model USING the modified config # IMPORTANT: this operation changes input shape, preserves architecture (all layers remain) and initializes weights randomly (does not copy weights from old model).
+        # Model.from_config() recreates the model with the RIGHT INTERNAL PROPORTIONS! When Keras reads the modified config, it automatically calculates all subsequent shapes.
 
-        # Copia TUTTI i pesi - NON saltare nessun layer. Copia i pesi dal modello vecchio al modello nuovo
+        # Copy ALL weights - DO NOT skip any layer. Copy weights from the old model to the new model
         for new_layer, old_layer in zip(model_new.layers, model.layers):
             try:
                 new_layer.set_weights(old_layer.get_weights())
             except Exception as e:
                 print(f"  ⚠️  Layer {{new_layer.name}}: weight shape may need retraining")
         
-        model = model_new  # sostituisce il modello vecchio con il nuovo
+        model = model_new  # Replaces the old model with the new one
         print(f"  ✓ Model reloaded with input shape {{new_shape}}")
         modifications_log.append(f"✓ Changed input shape to {{new_shape}}")
-        # input shape funziona!
+        # input shape works!
         
-        # Applica altre modifiche con nuovo modello
-        # IMPORTANTE: Applicare in ordine: PRIMA output_classes, POI dropout
+        # Apply other modifications with new model
+        # IMPORTANT: Apply in order: FIRST output_classes, THEN dropout
         
         if 'output_classes' in reconstructive_mods:
             print("  [applying] Changing output layer...")
             
-            # ✅ METODO CORRETTO: get_config() preserva skip connections
+            # ✅ CORRECT METHOD: get_config() preserves skip connections
             model_config = model.get_config()
             
-            # Modifica solo l'ultimo layer Dense
+            # Modify only the last Dense layer
             if 'layers' in model_config and len(model_config['layers']) > 0:
                 last_layer = model_config['layers'][-1]
                 if last_layer.get('class_name') == 'Dense':
@@ -2565,10 +2563,10 @@ try:
                     last_layer['config']['units'] = reconstructive_mods['output_classes']
                     print(f"    ✓ Dense layer: {{old_units}} → {{reconstructive_mods['output_classes']}}")
             
-            # Ricrea modello (skip connections INTATTE!)
+            # Recreate model (skip connections INTACT!)
             model_new = tf.keras.Model.from_config(model_config)
             
-            # Copia pesi (tutti TRANNE l'ultimo Dense)
+            # Copy weights (all EXCEPT the last Dense)
             for new_layer, old_layer in zip(model_new.layers[:-1], model.layers[:-1]):
                 try:
                     new_layer.set_weights(old_layer.get_weights())
@@ -2581,7 +2579,7 @@ try:
             modifications_log.append(f"✓ Changed output to {{reconstructive_mods['output_classes']}} classes")
             print(f"    ✓ Changed output to {{reconstructive_mods['output_classes']}} classes")
         
-        # Applica dropout come ULTIMO passo (dopo output_classes)
+        # Apply dropout as LAST step (after output_classes)
         if 'dropout' in reconstructive_mods:
             print("  [applying] Adding dropout...")
             
@@ -2596,18 +2594,18 @@ try:
             modifications_log.append(f"✓ Added Dropout (rate={{reconstructive_mods['dropout']}})")
             print(f"    ✓ Added Dropout ({{reconstructive_mods['dropout']}}) BEFORE output layer")
     
-    # ===== FASE 3B: ALTRE MODIFICHE RICOSTRUTTIVE (senza input shape change) =====
+    # ===== PHASE 3B: OTHER RECONSTRUCTIVE MODIFICATIONS (without input shape change) =====
     elif reconstructive_mods and not has_resizing_layer:
         print("\\n[Phase 3B] Applying reconstructive modifications...")
         
-        # ===== CASO 1: Solo output_classes =====
+        # ===== CASE 1: Only output_classes =====
         if 'output_classes' in reconstructive_mods and 'dropout' not in reconstructive_mods:
             print("  [output_classes only] Using get_config method...")
             
-            # ✅ METODO CORRETTO: get_config() preserva skip connections
+            # ✅ CORRECT METHOD: get_config() preserves skip connections
             model_config = model.get_config()
             
-            # Modifica solo l'ultimo layer Dense
+            # Modify only the last Dense layer
             if 'layers' in model_config and len(model_config['layers']) > 0:
                 last_layer = model_config['layers'][-1]
                 if last_layer.get('class_name') == 'Dense':
@@ -2615,10 +2613,10 @@ try:
                     last_layer['config']['units'] = reconstructive_mods['output_classes']
                     print(f"    ✓ Dense layer: {{old_units}} → {{reconstructive_mods['output_classes']}}")
             
-            # Ricrea modello (skip connections INTATTE!)
+            # Recreate model (skip connections INTACT!)
             model_new = tf.keras.Model.from_config(model_config)
             
-            # Copia pesi (tutti TRANNE l'ultimo Dense)
+            # Copy weights (all EXCEPT the last Dense)
             for new_layer, old_layer in zip(model_new.layers[:-1], model.layers[:-1]):
                 try:
                     new_layer.set_weights(old_layer.get_weights())
@@ -2632,7 +2630,7 @@ try:
             modifications_log.append(f"✓ Changed output to {{reconstructive_mods['output_classes']}} classes")
             print(f"  ✓ Changed output to {{reconstructive_mods['output_classes']}} classes")
         
-        # ===== CASO 2: Solo dropout =====
+        # ===== CASE 2: Only dropout =====
         elif 'dropout' in reconstructive_mods and 'output_classes' not in reconstructive_mods:
             print("  [dropout only] Inserting dropout...")
             
@@ -2647,11 +2645,11 @@ try:
             modifications_log.append(f"✓ Added Dropout (rate={{reconstructive_mods['dropout']}})")
             print(f"  ✓ Added Dropout ({{reconstructive_mods['dropout']}}) BEFORE output layer")
         
-        # ===== CASO 3: Sia dropout che output_classes =====
+        # ===== CASE 3: Both dropout and output_classes =====
         else:  # 'dropout' in reconstructive_mods and 'output_classes' in reconstructive_mods
             print("  [dropout + output_classes] Applying combined modifications...")
             
-            # Step 1: Cambia output_classes con get_config
+            # Step 1: Change output_classes with get_config
             model_config = model.get_config()
             
             if 'layers' in model_config and len(model_config['layers']) > 0:
@@ -2661,10 +2659,10 @@ try:
                     last_layer['config']['units'] = reconstructive_mods['output_classes']
                     print(f"    ✓ Dense layer: {{old_units}} → {{reconstructive_mods['output_classes']}}")
             
-            # Ricrea modello
+            # Recreate model
             model_new = tf.keras.Model.from_config(model_config)
             
-            # Copia pesi (tranne ultimo Dense)
+            # Copy weights (except last Dense)
             for new_layer, old_layer in zip(model_new.layers[:-1], model.layers[:-1]):
                 try:
                     new_layer.set_weights(old_layer.get_weights())
@@ -2677,7 +2675,7 @@ try:
             modifications_log.append(f"✓ Changed output to {{reconstructive_mods['output_classes']}} classes")
             print(f"    ✓ Changed output to {{reconstructive_mods['output_classes']}} classes")
             
-            # Step 2: Aggiungi Dropout prima del nuovo output
+            # Step 2: Add Dropout before new output
             penultimate_layer = model.layers[-2]
             output_layer = model.layers[-1]
             
@@ -2689,7 +2687,7 @@ try:
             modifications_log.append(f"✓ Added Dropout (rate={{reconstructive_mods['dropout']}})")
             print(f"    ✓ Added Dropout ({{reconstructive_mods['dropout']}}) BEFORE output layer")
 
-    # ===== FASE 3A: ADD RESIZING LAYER WRAPPER =====
+    # ===== PHASE 3A: ADD RESIZING LAYER WRAPPER =====
     if has_resizing_layer and 'resizing' in reconstructive_mods:
         print(f"  Original model input: {{original_input_shape}}")
         print(f"  Wrapper will resize any image to: {{target_h}}x{{target_w}}")
@@ -2704,12 +2702,12 @@ try:
         modifications_log.append(f"✓ Added automatic Resizing to {{target_h}}x{{target_w}}")
         print(f"  [applied] Added automatic Resizing layer → {{target_h}}x{{target_w}}")
 
-    # ===== SALVA MODELLO =====
+    # ===== SAVE MODEL =====
     print(f"\\n[Saving] Model saving...")
     model.save(output_path, save_format='h5')
     print(f"✓ Model saved: {{output_path}}")
     
-    # ===== INFO FINALE =====
+    # ===== FINAL INFO =====
     info = {{
         'input_shape': str(model.input_shape),
         'output_shape': str(model.output_shape),
@@ -2741,7 +2739,7 @@ except Exception as e:
         stderr = result['stderr']
         logger.info(f"Subprocess output:\n{output}")
         
-        # Rilevamento errori nel testo (anche se exit_code=0)
+        # Text-based error detection (even if exit_code=0)
         lowered_output = (output + "\n" + stderr).lower()
         has_error = "error:" in lowered_output or "exception encountered:" in lowered_output or "traceback" in lowered_output
         
@@ -2776,7 +2774,7 @@ except Exception as e:
                 logger.info(f"    {mod_desc}")
     
     except ValueError as ve:
-        # Errore specifico per formato non supportato
+        # Specific error for unsupported format
         state.customization_applied = False
         state.ai_error_message = str(ve)
         return state
@@ -2792,7 +2790,7 @@ except Exception as e:
 
 def _validate_modifications(modifications: dict) -> bool:
     """
-    Valida i parametri delle modifiche prima di applicarle.
+    Validates modification parameters before applying them.
     """
     required_params = {
         'freeze_layers': ['num_frozen_layers'],
@@ -2802,14 +2800,14 @@ def _validate_modifications(modifications: dict) -> bool:
         'change_input_shape': ['new_shape'],
         'change_learning_rate': ['learning_rate'],
         'add_resizing_layer': [],
-    } #Definisce per ogni tipo di modifica i parametri obbligatori, ad esempio:
+    } # Defines the mandatory parameters for each modification type, for example:
         # freeze_layers → 'num_frozen_layers'
         # add_dropout → 'rate'
-        # ecc.
-      #Cicla su tutte le modifiche richieste:
-        # Per ogni modifica (es. "type": "freeze_layers") controlla che tutti i parametri richiesti siano nel sotto-dizionario "params".
-        # Se ne manca uno (es. mancanza di 'rate' per "add_dropout"), avverte con un warning e restituisce False immediatamente (interrompendo il ciclo).
-      #Se tutte le modifiche hanno i parametri richiesti, ritorna True.
+        # etc.
+      # Loops over all requested modifications:
+        # For each modification (e.g. "type": "freeze_layers") it checks that all required parameters are in the "params" sub-dictionary.
+        # If one is missing (e.g. missing 'rate' for "add_dropout"), it warns and returns False immediately (breaking the loop).
+      # If all modifications have the required parameters, it returns True.
 
     for mod in modifications.get('modifications', []):
         mod_type = mod.get('type', '').strip()
@@ -2818,7 +2816,7 @@ def _validate_modifications(modifications: dict) -> bool:
         if mod_type in required_params:
             for param in required_params[mod_type]:
                 if param not in mod_params:
-                    logger.warning(f"⚠️ Parametro mancante '{param}' per {mod_type}")
+                    logger.warning(f"⚠️ Missing parameter '{param}' for {mod_type}")
                     return False
     
     return True
@@ -2827,11 +2825,11 @@ def _validate_modifications(modifications: dict) -> bool:
 #                    MAIN CUSTOMIZATION FUNCTION
 # ============================================================================
 
-# Funzione molto importante. 
+# Very important function. 
 def fine_tune_customized_model(state: MasterState, config: RunnableConfig = None) -> MasterState:
     """
-    ✨ Fine-tuning usando execute_in_environment (state.python_path)
-    Supporta sia Classification che Object Detection (YOLO)
+    ✨ Fine-tuning using execute_in_environment (state.python_path)
+    Supports both Classification and Object Detection (YOLO)
     """
     
     logger.info("═══════════════════════════")
@@ -2919,14 +2917,14 @@ try:
     print(f"  Input: {{model.input_shape}}")
     print(f"  Output: {{model.output_shape}}")
     
-    # ===== DETECTA TIPO DI MODELLO E LOSS =====
+    # ===== DETECT MODEL TYPE AND LOSS =====
     output_shape = model.output_shape
     num_last_dim = int(output_shape[-1]) if len(output_shape) > 1 else None
     
-    # Object detection: output ha 4 dimensioni (batch, H, W, channels)
+    # Object detection: output has 4 dimensions (batch, H, W, channels)
     is_object_detection = (len(output_shape) == 4 and num_last_dim and num_last_dim < 100)
     
-    # Scegli loss function appropriata
+    # Choose appropriate loss function
     if is_object_detection:
         loss_fn = 'mse'  # Per YOLO, object detection, etc
         print(f"  → Object detection model (MSE loss)")
@@ -2969,7 +2967,7 @@ try:
                 except:
                     pass
 
-    # ===== DETERMINA input_shape =====
+    # ===== DETERMINE input_shape =====
     print()
     if target_height is not None and target_width is not None:
         channels = input_shape_raw[-1] if input_shape_raw[-1] is not None else 3
@@ -2979,7 +2977,7 @@ try:
         input_shape = tuple(dim if dim is not None else 224 for dim in input_shape_raw)
         print(f"⚠️  Input shape (fallback): {{input_shape}}")
 
-    # ===== CREA DATASET =====
+    # ===== CREATE DATASET =====
     X = None
     y = None
     
@@ -2988,7 +2986,7 @@ try:
     X_synth = None
     y_synth = None
     
-    # 1. Carica Real Dataset
+    # 1. Load Real Dataset
     if dataset_source == "real" and os.path.exists(real_dataset_path):
         print(f"\\n📦 Loading Real Dataset from {{real_dataset_path}}...")
         try:
@@ -3004,11 +3002,11 @@ try:
             
             print(f"  ✓ Loaded {{len(X_real)}} real samples. Shape: {{X_real.shape}}")
             
-            # Normalizzazione se necessario (es. immagini 0-255 -> 0-1)
+            # Normalization if necessary (e.g. images 0-255 -> 0-1)
             if X_real.max() > 1.0:
                 X_real = X_real.astype('float32') / 255.0
                 
-            # One-hot encoding se y è scalare
+            # One-hot encoding if y is scalar
             if len(y_real.shape) == 1 or y_real.shape[-1] == 1:
                 # Determine classes from data instead of model
                 real_num_classes = len(np.unique(y_real))
@@ -3044,7 +3042,7 @@ try:
             X_val_real = None
             y_val_real = None
     
-    # 2. Carica Synthetic Data
+    # 2. Load Synthetic Data
     if dataset_source == "synthetic" and os.path.exists(synthetic_data_path):
         print(f"\\n🧪 Loading Synthetic Data from {{synthetic_data_path}}...")
         files = glob.glob(os.path.join(synthetic_data_path, "*.npy"))
@@ -3062,7 +3060,7 @@ try:
                 X_synth = np.array(loaded_data)
                 print(f"  ✓ Loaded {{len(X_synth)}} synthetic samples. Shape: {{X_synth.shape}}")
                 
-                # Dummy labels per synthetic
+                # Dummy labels for synthetic
                 # Use real_num_classes if available, else model classes
                 if 'real_num_classes' in locals():
                     synth_num_classes = real_num_classes
@@ -3103,7 +3101,7 @@ try:
         X = np.random.randn(num_samples, *input_shape).astype('float32')
         X = (X - X.mean()) / (X.std() + 1e-7)
     
-        # Generazione Labels (Dummy)
+        # Generate Labels (Dummy)
         if is_object_detection:
             y = np.random.randn(len(X), *output_shape[1:]).astype('float32')
         else:
@@ -3218,7 +3216,7 @@ try:
         
         # Check Normalization (MobileNet expects [-1, 1]) 
         needs_mobilenet_rescale = False
-        # CIFAR-10 nativamente è 0-255 (interi). Noi lo convertiamo in 0-1 (float). MobileNet però è stato "educato" a vedere il mondo in [-1, 1]. QUINDI soluzione: prende i dati di CIFAR-10 (che vanno bene) e li trasforma nel formato che MobileNet vuole ([-1, 1]).
+        # CIFAR-10 natively is 0-255 (integers). We convert it to 0-1 (float). MobileNet however was "trained" to see the world in [-1, 1]. SO the solution: takes CIFAR-10 data (which is fine) and transforms it into the format MobileNet wants ([-1, 1]).
         if 'mobilenet' in model.name.lower() or 'mobilenet' in model_path.lower():
             print("  ℹ️  MobileNet detected: Checking normalization...")
             if X.min() >= 0.0 and X.max() <= 1.0:
@@ -3314,13 +3312,13 @@ try:
     
     model.save(output_path, save_format='h5')
     
-    # Estrai metriche corrette in base al tipo
+    # Extract correct metrics based on type
     if is_object_detection:
         final_mse = float(history.history['mse'][-1])
         final_val_mse = float(history.history['val_mse'][-1])
         final_loss = float(history.history['loss'][-1])
         final_val_loss = float(history.history['val_loss'][-1])
-        # Converti MSE a "accuracy-like" metric (più basso = più accurato)
+        # Convert MSE to "accuracy-like" metric (lower = more accurate)
         final_acc = 1.0 / (1.0 + final_mse)
         final_val_acc = 1.0 / (1.0 + final_val_mse)
     else:
@@ -3345,21 +3343,21 @@ except Exception as e:
         
         # -----------------------------------------------------------------------
         # VRAM MANAGEMENT: Commented out (HPP Triton has enough VRAM)
-        # Scarica Mistral da Triton prima del fine-tuning
-        # Con USE_TRITON_BACKEND, Mistral occupa ~7.8GB della A4000 (16GB).
-        # TF training vede solo ~1.1GB → SIGABRT (OOM) dopo Epoch 1.
-        # Triton è avviato con --model-control-mode=explicit, quindi possiamo
-        # usare l'API /v2/repository/models/{model}/unload per liberare la VRAM.
-        # Dopo il training, reload_triton_models() ricarica i modelli.
+        # Unload Mistral from Triton before fine-tuning
+        # With USE_TRITON_BACKEND, Mistral occupies ~7.8GB of the A4000 (16GB).
+        # TF training sees only ~1.1GB → SIGABRT (OOM) after Epoch 1.
+        # Triton starts with --model-control-mode=explicit, so we can
+        # use the /v2/repository/models/{model}/unload API to free VRAM.
+        # After training, reload_triton_models() reloads the models.
         # -----------------------------------------------------------------------
         # from src.assistant.utils import force_unload_triton, reload_triton_models
         import os as _os
         use_triton = _os.environ.get("USE_TRITON_BACKEND", "false").lower() == "true"
         
         # if use_triton:
-        #     logger.info("🔫 [fine-tuning] Scaricando Mistral da Triton per liberare VRAM...")
+        #     logger.info("🔫 [fine-tuning] Unloading Mistral from Triton to free VRAM...")
         #     force_unload_triton(["mistral"])
-        #     logger.info("✅ [fine-tuning] VRAM liberata. Avvio training...")
+        #     logger.info("✅ [fine-tuning] VRAM freed. Starting training...")
         # else:
         if not use_triton:
             from src.assistant.utils import force_unload_ollama
@@ -3389,7 +3387,7 @@ except Exception as e:
             'Compiled cluster using XLA'
         ]
         
-        # ===== USA execute_in_environment =====
+        # ===== USE execute_in_environment =====
         full_ignore_list = (ignore_list or []) + SUBPROCESS_NOISE_FILTER
         result = execute_in_environment(
             python_code, 
@@ -3457,9 +3455,9 @@ except Exception as e:
             "error": str(e)
         }
     finally:
-        # Ricarica Mistral su Triton dopo il training (sia in caso di successo che errore)
+        # Reload Mistral on Triton after training (both on success and error)
         # if use_triton:
-        #     logger.info("🚀 [fine-tuning] Ricaricando Mistral su Triton post-training...")
+        #     logger.info("🚀 [fine-tuning] Reloading Mistral on Triton post-training...")
         #     reload_triton_models(["mistral"])
         pass
         
@@ -3467,16 +3465,16 @@ except Exception as e:
 
 
 def ask_optimization_preference(state: MasterState, config: RunnableConfig = None) -> MasterState:
-    """Chiede all'utente se vuole usare NNI o training standard"""
+    """Asks the user whether to use NNI or standard training"""
     logger.info("=" * 70)
     logger.info("🤔 ASK_OPTIMIZATION_PREFERENCE NODE EXECUTING")
     logger.info("=" * 70)
     
     prompt = {
-        "instruction": "Vuoi eseguire l'ottimizzazione degli iperparametri con NNI o procedere con il fine-tuning standard? (nni/standard)",
+        "instruction": "Do you want to run hyperparameter optimization with NNI or proceed with standard fine-tuning? (nni/standard)",
         "options": {
-            "nni": "Usa NNI per trovare i parametri migliori (AutoML) - ⚠️ Richiede maggior tempo rispetto al fine-tuning standard",
-            "standard": "Fine-tuning standard (parametri fissi)"
+            "nni": "Use NNI to find the best parameters (AutoML) - ⚠️ Requires more time than standard fine-tuning",
+            "standard": "Standard fine-tuning (fixed parameters)"
         }
     }
     
@@ -3488,7 +3486,7 @@ def ask_optimization_preference(state: MasterState, config: RunnableConfig = Non
         resume_value = interrupt(prompt)
         response = str(resume_value).strip() if resume_value else ""
     else:
-        # Usa interrupt return value come priorità
+        # Use interrupt return value as priority
         if resume_value and str(resume_value).strip():
             response = str(resume_value).strip()
         else:
@@ -3497,32 +3495,32 @@ def ask_optimization_preference(state: MasterState, config: RunnableConfig = Non
     
     # Default if empty
     if not response or response.strip() == "":
-        response = "nni" # default a NNI !
+        response = "nni" # default to NNI !
         
     state.optimization_mode = "nni" if "nni" in response.lower() else "standard"
-    logger.info(f"✓ Modalità selezionata: {state.optimization_mode}")
+    logger.info(f"✓ Selected mode: {state.optimization_mode}")
     logger.info("=" * 70)
     return state
 
 def optimization_routing(state: MasterState) -> Literal["optimize_hyperparameters_with_nni", "fine_tune_customized_model"]:
     if getattr(state, "optimization_mode", "standard") == "nni": 
-        logger.info("→ Routing verso: NNI Optimization")
+        logger.info("→ Routing to: NNI Optimization")
         return "optimize_hyperparameters_with_nni"
     
-    logger.info("→ Routing verso: Standard Fine-Tuning")
+    logger.info("→ Routing to: Standard Fine-Tuning")
     return "fine_tune_customized_model"
 
-# getattr(state, "optimization_mode", "standard") -> Legge l'attributo optimization_mode dall'oggetto state. Se l'attributo esiste, restituisce il suo valore (es. "nni" o "standard"). Se l'attributo NON esiste o è None, restituisce il valore di default: "standard"
+# getattr(state, "optimization_mode", "standard") -> Reads the attribute optimization_mode from the state object. If the attribute exists, it returns its value (e.g. "nni" or "standard"). If it does NOT exist or is None, it returns the default value: "standard"
 
-# == "nni" -> confronta il valore ottenuto con la stringa "nni"
-# Se state.optimization_mode == "nni" → Entra nell'if → Routing verso NNI
-# Altrimenti → Va nell'else → Routing verso Fine-Tuning Standard
+# == "nni" -> compares the obtained value with the string "nni"
+# If state.optimization_mode == "nni" → Enters the if → Routing to NNI
+# Otherwise → Goes to else → Routing to Standard Fine-Tuning
     
     
 def optimize_hyperparameters_with_nni(state: MasterState, config: RunnableConfig = None) -> MasterState:
     """
-    ✨ Esegue ottimizzazione iperparametri con NNI (Agentic/Adaptive Mode)
-    Generate script dinamici basati su modello e dataset.
+    ✨ Runs hyperparameter optimization with NNI (Agentic/Adaptive Mode)
+    Generate dynamic scripts based on model and dataset.
     """
     logger.info("═══════════════════════════")
     logger.info("🧠 NNI ADAPTIVE OPTIMIZATION")
@@ -3600,7 +3598,7 @@ def optimize_hyperparameters_with_nni(state: MasterState, config: RunnableConfig
         dataset_info["path"] = nni_data_path
 
         # 1. GENERATE
-        logger.info("🚀 Generazione esperimento NNI su misura...")
+        logger.info("🚀 Generating custom NNI experiment...")
         generated_files = generate_nni_experiment(
             model_info=model_info,
             dataset_info=dataset_info,
@@ -3609,36 +3607,36 @@ def optimize_hyperparameters_with_nni(state: MasterState, config: RunnableConfig
         )
         
         if not generated_files:
-            logger.error("❌ Generazione fallita. Abort.")
+            logger.error("❌ Generation failed. Abort.")
             return state
             
-        logger.info("✓ Script generati con successo.")
+        logger.info("✓ Scripts generated successfully.")
         
         # 2. EXECUTE
         manager_script = os.path.join(experiment_dir, "manager.py")
         if not os.path.exists(manager_script):
-             logger.error(f"❌ manager.py non trovato in {experiment_dir}")
+             logger.error(f"❌ manager.py not found in {experiment_dir}")
              return state
              
         logger.info(f"▶️  Launching NNI Manager: {manager_script}")
         
         cfg = Configuration.from_runnable_config()
-        # Se abbiamo già usato un env specifico per la personalizzazione, usiamo lo stesso per NNI. Infatti già nella customization si capisce quale ambiente utilizzare in base al modello con la funzione load_model_with_conda_env. 
-        # Altrimenti capiamo dall'estensione
+        # If we already used a specific env for customization, we use the same for NNI. In fact, already in the customization it understands which environment to use based on the model with the load_model_with_conda_env function. 
+        # Otherwise we understand from the extension
         if state.conda_env:
             env_name = state.conda_env
-            logger.info(f"📋 Usando ambiente memorizzato nello stato: {env_name}")
+            logger.info(f"📋 Using environment stored in state: {env_name}")
         elif model_path.endswith('.keras'):
-            env_name = 'stm32' # Per i modelli moderni (Keras 3). È l'ambiente predefinito per i nuovi progetti.
+            env_name = 'stm32' # For modern models (Keras 3). It is the default environment for new projects.
         else:
-            env_name = 'stm32_legacy' # Serve quando carichi file .h5 creati con versioni precedenti o architetture che non sono state ancora migrate a Keras 3.
+            env_name = 'stm32_legacy' # Needs when loading .h5 files created with previous versions or architectures that have not yet been migrated to Keras 3.
             
         python_path = cfg.get_python_path(env_name)
         
         logger.info(f"▶️  Launching NNI Manager with: {python_path}")
 
-        # Trova la porta libera QUI, così possiamo loggarla via logger.info
-        # prima ancora che il subprocess parta — il manager.py la leggerà da NNI_PORT.
+        # Find the free port HERE, so we can log it via logger.info
+        # even before the subprocess starts — manager.py will read it from NNI_PORT.
         import socket as _socket
         nni_port = 8080
         for _p in range(8080, 8100):
@@ -3646,7 +3644,7 @@ def optimize_hyperparameters_with_nni(state: MasterState, config: RunnableConfig
                 if _s.connect_ex(('localhost', _p)) != 0:
                     nni_port = _p
                     break
-        logger.info(f"🌐 NNI Web UI sarà disponibile su: http://localhost:{nni_port}")
+        logger.info(f"🌐 NNI Web UI will be available at: http://localhost:{nni_port}")
 
         nni_env = os.environ.copy()
         nni_env['NNI_PORT'] = str(nni_port)
@@ -3661,9 +3659,9 @@ def optimize_hyperparameters_with_nni(state: MasterState, config: RunnableConfig
                 env=nni_env,
             )
             
-            logger.info("✓ Esperimento concluso (o interrotto).")
+            logger.info("✓ Experiment concluded (or interrupted).")
             if result.stdout:
-                logger.info(f"STDOUT (last 5000 chars):\n...{result.stdout[-5000:]}") # non mi servono i primi 500 caratteri. Mostro gli ultimi 5000 caratteri ([-5000:]) invece dei primi 500. 
+                logger.info(f"STDOUT (last 5000 chars):\n...{result.stdout[-5000:]}") # I don't need the first 500 characters. I show the last 5000 characters ([-5000:]) instead of the first 500. 
             if result.stderr:
                 logger.warning(f"STDERR:\n{result.stderr[:500]}...")
                 
@@ -3686,7 +3684,7 @@ def optimize_hyperparameters_with_nni(state: MasterState, config: RunnableConfig
                 logger.error(f"⚠️ Error during cleanup: {cleanup_err}")
                 
         except Exception as exec_err:
-             logger.error(f"❌ Errore durante esecuzione manager: {exec_err}")
+             logger.error(f"❌ Error executing manager: {exec_err}")
              
         # --- RETRIEVE BEST MODEL ---
         best_model_path = os.path.join(experiment_dir, "best_model.h5")
@@ -3694,7 +3692,7 @@ def optimize_hyperparameters_with_nni(state: MasterState, config: RunnableConfig
             logger.info(f"🏆 Found optimized model at: {best_model_path}")
             state.customized_model_path = best_model_path
             state.model_path = best_model_path # Update source for validation
-            state.customization_applied = True # Indichiamo che il modello è stato modificato
+            state.customization_applied = True # Indicate that the model has been modified
         else:
             logger.warning("⚠️  Optimized model NOT found. Using original/customized path.")
         
@@ -3710,10 +3708,10 @@ import shutil
 
 def validate_customized_model(state: MasterState, config: RunnableConfig = None) -> MasterState:
     """
-    ✨ Valida il modello customizzato IN SUBPROCESS (usa state.python_path)
+    ✨ Validates the customized model IN SUBPROCESS (uses state.python_path)
     """
     
-    logger.info("✅ Validando modello customizzato...")
+    logger.info("✅ Validating customized model...")
     
     try:
         model_path = state.customized_model_path
@@ -3739,7 +3737,7 @@ try:
     except Exception:
         model = tf.keras.models.load_model(model_path, compile=False, safe_mode=False)
     
-    # Estrai informazioni
+    # Extract info
     info = {{
         'input_shape': str(model.input_shape),
         'output_shape': str(model.output_shape),
@@ -3756,7 +3754,7 @@ except Exception as e:
     traceback.print_exc()
 """
         
-        # ===== USA execute_in_environment =====
+        # ===== USE execute_in_environment =====
         result = execute_in_environment(python_code, state, timeout=120, ignore_list=SUBPROCESS_NOISE_FILTER, whitelist_patterns=SUBPROCESS_CLEAN_ALLOWLIST)
         
         if not result['success']:
@@ -3790,11 +3788,11 @@ except Exception as e:
 
 def save_customized_model_final(state: MasterState, config: RunnableConfig = None) -> MasterState:
     """
-    ✨ Salva il modello customizzato come .h5 (compatibile con stedgeai)
-    Valida usando state.python_path
+    ✨ Saves the customized model as .h5 (compatible with stedgeai)
+    Validates using state.python_path
     """
     
-    logger.info("💾 Salvando modello customizzato definitivamente...")
+    logger.info("💾 Saving customized model definitively...")
     
     try:
         model_path = state.customized_model_path
@@ -3812,7 +3810,7 @@ def save_customized_model_final(state: MasterState, config: RunnableConfig = Non
         
         logger.info(f"  Copying model: {model_path} → {final_path}")
         
-        # ===== COPIA FILE =====
+        # ===== COPY FILE =====
         shutil.copy(model_path, final_path)
         logger.info(f"✓ Model copied: {final_path}")
         
@@ -3850,7 +3848,7 @@ except Exception as e:
     traceback.print_exc()
 """
         
-        # ===== USA execute_in_environment =====
+        # ===== USE execute_in_environment =====
         result = execute_in_environment(python_code, state, timeout=120, ignore_list=SUBPROCESS_NOISE_FILTER, whitelist_patterns=SUBPROCESS_CLEAN_ALLOWLIST)
         
         if not result['success']:
@@ -3864,11 +3862,11 @@ except Exception as e:
             info = json.loads(json_str)
             
             state.final_model_path = final_path
-            state.customization_applied = True # Assicuriamoci che sia True
+            state.customization_applied = True # Make sure it is True
             state.customized_model_info.update({
                 **info,
                 "model_size_mb": round(os.path.getsize(final_path) / (1024*1024), 2),
-                "format": "H5"  # ← Formato finale
+                "format": "H5"  # ← Final format
             })
             
             logger.info("✅ Model saved successfully")
@@ -3887,9 +3885,9 @@ except Exception as e:
 
 
 def ask_continue_after_customization(state: MasterState, config: RunnableConfig = None) -> MasterState:
-    """Chiedi se continuare con AI analysis"""
+    """Ask whether to continue with AI analysis"""
     
-    logger.info("🤔 Chiedendo se continuare...")
+    logger.info("🤔 Asking whether to continue...")
     
     
     
@@ -3925,7 +3923,7 @@ Quantized: {state.should_quantize}
     if not state.user_response or state.user_response.strip() == "":
         resume_value = interrupt(prompt)
     
-    # Usa interrupt return value come priorità
+    # Use interrupt return value as priority
     if resume_value and str(resume_value).strip():
         user_response = str(resume_value).strip()
     else:
@@ -3938,7 +3936,7 @@ Quantized: {state.should_quantize}
     
     # ===== LLM CLASSIFICATION =====
     try:
-        logger.info(f"🤖 Chiedendo all'utente se continuare...")
+        logger.info(f"🤖 Asking the user whether to continue...")
         
         from src.assistant.utils import get_llm
         llm_classifier = get_llm(config, structured_schema=ContinueDecision)
@@ -3948,7 +3946,7 @@ Quantized: {state.should_quantize}
             HumanMessage(content=str(user_response))
         ])
         
-        logger.info(f"✓ Decisione classificata:")
+        logger.info(f"✓ Decision classified:")
         logger.info(f"  wants_to_continue: {decision.wants_to_continue}")
         logger.info(f"  confidence: {decision.confidence:.2f}")
         
@@ -3956,26 +3954,26 @@ Quantized: {state.should_quantize}
     
     except Exception as e:
         logger.warning(f"⚠️  Classification failed, using fallback: {str(e)[:100]}")
-        # Fallback: se la risposta contiene "continue", "si", "yes" → continua
+        # Fallback: if the response contains "continue", "si", "yes" → continue
         user_lower = str(user_response).lower()
         state.continue_after_customization = any(kw in user_lower for kw in ["continue", "si", "yes", "ok", "analyze"])
     
-    # Se l'utente decide di continuare verso l'analisi AI, dobbiamo resettare i flag di
-    # idempotenza (model_selected, task_selected) altrimenti workflow2 salterà la selezione
-    # e terrà in memoria il primissimo modello scelto invece di questo nuovo customizzato!
+    # If the user decides to continue towards AI analysis, we must reset the 
+    # idempotency flags (model_selected, task_selected) otherwise workflow2 will skip selection
+    # and keep in memory the very first chosen model instead of this new customized one!
     if state.continue_after_customization:
         state.model_selected = False
         state.task_selected = False
         state.selected_model = None
         state.ai_task = None
-        logger.info("🗑️  Reset dei flag di idempotenza per forzare la nuova selezione del modello in Workflow 2")
+        logger.info("🗑️  Reset of idempotency flags to force new model selection in Workflow 2")
         
     return state
 
 
-# 🥇 Deepseek-r1      (BEST: reasoning perfetto, JSON impeccabile). Qualche secondo in più per riflettere, ma più leggero di Mistral (70 B vs 72 B) e qualità migliore. 
-# 🥈 Mistral 72B      (GOOD: veloce, OK qualità)
-# 🥉 Qwen2 7B         (OK: leggero ma qualità minore)
+# 🥇 Deepseek-r1      (BEST: perfect reasoning, impeccable JSON). A few more seconds to reflect, but lighter than Mistral (70 B vs 72 B) and better quality. 
+# 🥈 Mistral 72B      (GOOD: fast, OK quality)
+# 🥉 Qwen2 7B         (OK: light but lower quality)
 
 
 # ============================================================================
@@ -3984,10 +3982,10 @@ Quantized: {state.should_quantize}
 
 def modification_confirmation_routing(state: MasterState) -> Literal["apply_user_customization", "ask_and_parse_user_modifications", "run_analyze"]:
     """
-    Route basato su modifica_confirmed e user_wants_to_edit.
-    - Se modification_confirmed=True: procedi con applicazione
-    - Se user_wants_to_edit=True: torna a chiedere modifiche
-    - Se modification_confirmed=False (e no edit): annulla tutto e vai ad analyze
+    Route based on modification_confirmed and user_wants_to_edit.
+    - If modification_confirmed=True: proceed with application
+    - If user_wants_to_edit=True: go back and ask for modifications
+    - If modification_confirmed=False (and no edit): abort everything and go to analyze
     """
     if state.modification_confirmed:
         return "apply_user_customization"

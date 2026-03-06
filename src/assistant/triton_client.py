@@ -1,8 +1,8 @@
-# Questo è il codice che gira dentro l'App Python (LangGraph container). È il "traduttore" che permette all'assistente AI di parlare con Triton.
+# This is the code that runs inside the Python App (LangGraph container). It is the "translator" that allows the AI assistant to talk to Triton.
 
-# * A cosa serve: Espone interfacce compatibili con LangChain (es. ChatTritonVLLM), permettendo al tuo workflow di fare richieste ai modelli usando una sintassi AI standard. Gestisce internamente le chiamate di rete (HTTP/gRPC) verso la porta 8000 di Triton, si occupa di caricare/scaricare i modelli dalla VRAM automagicamente tramite API, ed estrae il testo generato.
+# * What it does: Exposes LangChain-compatible interfaces (e.g. ChatTritonVLLM), allowing your workflow to make requests to models using standard AI syntax. It internally handles network calls (HTTP/gRPC) to Triton's port 8000, automagically loads/unloads models from VRAM via API, and extracts the generated text.
 
-# * Perché esiste: LangGraph si aspetta di parlare con "OpenAI" o "Anthropic". Questo file inganna LangGraph facendogli credere che Triton sia una normale API AI.
+# * Why it exists: LangGraph expects to talk to "OpenAI" or "Anthropic". This file tricks LangGraph into believing Triton is a normal AI API.
 
 import logging
 import json
@@ -79,7 +79,7 @@ class ChatTriton(BaseChatModel):
 
         def _inject_schema(messages: List[BaseMessage]) -> List[BaseMessage]:
             """Inject JSON schema instructions into the system message.
-            Keep it short — ottimizzazione valida (prompt più corto = meno rischio di timeout vuoti), ma non era la causa root.
+            Keep it short — valid optimization (shorter prompt = less risk of empty timeouts), but it wasn't the root cause.
             """
             # Minimal instruction: just list field names from the schema
             if hasattr(schema, 'model_fields'):
@@ -275,7 +275,7 @@ class ChatTriton(BaseChatModel):
             return
 
         # ── Stage 2: optimistic load ─────────────────────────────────────────
-        logger.info(f"⏳ Caricamento modello target: {self.model_name}...")
+        logger.info(f"⏳ Loading target model: {self.model_name}...")
         load_url = f"{base_url}/v2/repository/models/{self.model_name}/load"
         load_succeeded = False
         try:
@@ -290,9 +290,9 @@ class ChatTriton(BaseChatModel):
                     f"Activating swap fallback..."
                 )
             else:
-                logger.error(f"❌ Errore HTTP durante caricamento Triton: {http_err}")
+                logger.error(f"❌ HTTP Error during Triton load: {http_err}")
         except Exception as e:
-            logger.error(f"❌ Errore durante caricamento Triton: {e}")
+            logger.error(f"❌ Error during Triton load: {e}")
 
         # ── Stage 3: OOM fallback – unload others and retry ──────────────────
         if not load_succeeded:
@@ -300,20 +300,20 @@ class ChatTriton(BaseChatModel):
                 if model != self.model_name:
                     status = self._check_model_status(base_url, model)
                     if status != "UNAVAILABLE":
-                        logger.info(f"⏳ Scaricamento modello {model} per liberare VRAM...")
+                        logger.info(f"⏳ Unloading model {model} to free VRAM...")
                         self._unload_model(base_url, model)
                         self._wait_for_status(base_url, model, "UNAVAILABLE")
                         time.sleep(2)  # let the Python backend release CUDA context
 
             # Retry load after freeing VRAM
-            logger.info(f"🔄 Retry caricamento '{self.model_name}' dopo swap...")
+            logger.info(f"🔄 Retry loading '{self.model_name}' after swap...")
             try:
                 req = urllib.request.Request(load_url, method="POST")
                 with urllib.request.urlopen(req, timeout=180) as _:
                     pass
                 load_succeeded = True
             except Exception as e:
-                logger.error(f"❌ Retry caricamento fallito: {e}")
+                logger.error(f"❌ Retry load failed: {e}")
                 return
 
         if load_succeeded:
@@ -323,10 +323,10 @@ class ChatTriton(BaseChatModel):
             # guarantee the HTTP endpoint is registered yet (CUDA graph capturing
             # can finish *after* the status flip).
             self._wait_for_endpoint_live(timeout=120)
-            logger.info(f"✅ Modello {self.model_name} caricato e endpoint live.")
+            logger.info(f"✅ Model {self.model_name} loaded and endpoint live.")
 
     def _check_model_status(self, base_url: str, model_name: str) -> str:
-        """Controlla lo stato del modello tramite repository API."""
+        """Check model status via repository API."""
         url = f"{base_url}/v2/repository/index"
         payload = {"name": model_name}
         try:
@@ -341,7 +341,7 @@ class ChatTriton(BaseChatModel):
             return "UNAVAILABLE"
 
     def _wait_for_status(self, base_url: str, model_name: str, target_state: str, timeout: int = 120) -> None:
-        """Polling dello stato del modello."""
+        """Polling for model status."""
         import time
         start = time.time()
         while time.time() - start < timeout:
@@ -351,10 +351,10 @@ class ChatTriton(BaseChatModel):
             if target_state == "UNAVAILABLE" and current == "UNAVAILABLE":
                 return
             time.sleep(2)
-        logger.warning(f"⚠️ Timeout attendendo stato {target_state} per {model_name}")
+        logger.warning(f"⚠️ Timeout waiting for state {target_state} for {model_name}")
 
     def _is_model_ready(self, base_url: str, model_name: str) -> bool:
-        """Shorthand per verificare se un modello è READY."""
+        """Shorthand to check if a model is READY."""
         return self._check_model_status(base_url, model_name) == "READY"
 
     def _wait_for_endpoint_live(self, timeout: int = 60) -> None:
@@ -391,7 +391,7 @@ class ChatTriton(BaseChatModel):
         logger.warning(f"⚠️ Endpoint probe timed out after {timeout}s – proceeding anyway.")
 
     def _unload_model(self, base_url: str, model_to_unload: str) -> None:
-        """Invia comando di scaricamento."""
+        """Sends unload command."""
         url = f"{base_url}/v2/repository/models/{model_to_unload}/unload"
         req = urllib.request.Request(url, method="POST")
         try:

@@ -72,14 +72,14 @@ class MasterState:
 
     # === DISCOVERY FIELDS ===
     model_discovery_method: str = ""  # "default", "taskbased", "recommendation", "search"
-    available_models: List[dict] = field(default_factory=list)  # Modelli suggeriti
-    selected_model: Optional[dict] = None  # Modello scelto
-    search_iterations: int = 0  # Contatore ricerche online (max 3)
-    model_accepted: bool = False  # Utente ha accettato il modello?
+    available_models: List[dict] = field(default_factory=list)  # Suggested models
+    selected_model: Optional[dict] = None  # Chosen model
+    search_iterations: int = 0  # Online search counter (max 3)
+    model_accepted: bool = False  # Has user accepted the model?
     last_task: str = ""  # image_classification, object_detection, human_activity_recognition
-    custom_use_case: str = ""  # Nuovo: use case specifico utente
-    is_new_registration: bool = False  # True se è un modello appena registrato dall'utente
-    pending_model_entry: Optional[dict] = None  # Dati del modello in attesa di validazione tecnica
+    custom_use_case: str = ""  # New: specific user use case
+    is_new_registration: bool = False  # True if it's a newly registered model by the user
+    pending_model_entry: Optional[dict] = None  # Model data pending technical validation
 
     # === WORKFLOW 3: INTEGRATION ===
     ai_code_dir: str = ""
@@ -102,34 +102,34 @@ class MasterState:
     # === WORKFLOW 5: MODEL CUSTOMIZATION ===
     # Architecture inspection
     model_architecture: dict = field(default_factory=dict)  # Input/output shapes, n_layers, etc.
-    model_summary_text: str = ""  # Testo completo del model.summary()
+    model_summary_text: str = ""  # Full text of model.summary()
 
     wants_model_modifications: bool = False  
     modification_intent_confidence: float = 0.0  
     
     # Best practices
-    best_practices_display: str = ""  # Formatted best practices per l'utente
+    best_practices_display: str = ""  # Formatted best practices for the user
     best_practices_raw: List[str] = field(default_factory=list)  # Raw best practices docs
     
     # User customization request
-    user_custom_modifications: str = ""  # Prompt libero dell'utente
+    user_custom_modifications: str = ""  # Unconstrained user prompt
     
     # Parsed modifications
     parsed_modifications: Optional[dict] = None  # Structured modifications from LLM
-    modification_confirmed: bool = False  # Utente ha confermato le modifiche?
-    user_wants_to_edit: bool = False  # Utente vuole modificare la richiesta di customizzazione?
+    modification_confirmed: bool = False  # Has user confirmed the modifications?
+    user_wants_to_edit: bool = False  # Does user want to edit the customization request?
     
     # Applied customization
-    customized_model_path: str = ""  # Path del modello customizzato (.h5)
-    customization_applied: bool = False  # Flag se le modifiche sono state applicate
-    customized_model_info: dict = field(default_factory=dict)  # Info dopo customizzazione
+    customized_model_path: str = ""  # Path of the customized model (.h5)
+    customization_applied: bool = False  # Flag if modifications have been applied
+    customized_model_info: dict = field(default_factory=dict)  # Info after customization
     
     # Training validation
-    training_test_result: dict = field(default_factory=dict)  # Risultati test training
+    training_test_result: dict = field(default_factory=dict)  # Training test results
     training_validation_success: bool = False
     
     # Final model
-    final_model_path: str = ""  # Path del modello customizzato salvato definitivamente
+    final_model_path: str = ""  # Path to the finalized saved customized model
 
     # Environment management
     python_path: str = ""  # Path del Python interpreter (es: /usr/bin/python)
@@ -146,13 +146,13 @@ class MasterState:
     # Quantization (per STM32)
     should_quantize: bool = False  # Quantizzare per embedded?
     quantization_bit_width: int = 8  # INT8, INT16, etc.
-    quantized_model_path: str = ""  # Path modello quantizzato (.tflite)
+    quantized_model_path: str = ""  # Path to quantized model (.tflite)
 
     # === COMMON ===
     timestamp: str = field(default_factory=lambda: datetime.now().strftime("%Y%m%d_%H%M%S"))
 
     # === WORKFLOW 6: SYNTHETIC DATA ===
-    synthetic_request: dict = field(default_factory=dict)  # Parametri richiesta
+    synthetic_request: dict = field(default_factory=dict)  # Request parameters
     synthetic_data_path: str = ""  # Path output
     synthetic_files_count: int = 0  # Numero file generati
     use_synthetic_data: bool = False  # Flag se usare dati sintetici
@@ -166,7 +166,7 @@ class MasterState:
     optimization_mode: str = "standard"  # "nni", "standard" - modalità di ottimizzazione iperparametri
 
     # === CROSS-SESSION CONTEXT ===
-    persistent_context: dict = field(default_factory=dict) # Info persistenti dell'utente (es: board preferita)
+    persistent_context: dict = field(default_factory=dict) # Persistent user info (e.g. preferred board)
 
 # ============================================================================
 # INPUT SCHEMA
@@ -177,5 +177,5 @@ class MasterInput(TypedDict, total=False):
     user_response: str
     persistent_context: dict
 
-# Il file server.py caricava correttamente il profilo utente, ma questo file state.py aveva una definizione restrittiva di "Input" che filtrava e scartava silenziosamente quel profilo prima che entrasse nel grafo. 
+# The server.py file successfully loaded the user profile, but this state.py file had a restrictive definition of "Input" that silently filtered and discarded that profile before it entered the graph.
 # Di conseguenza, l'LLM partiva sempre "da zero".

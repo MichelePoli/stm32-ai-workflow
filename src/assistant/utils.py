@@ -151,10 +151,10 @@ def force_unload_triton(models: list = None):
     Requires Triton to run with --model-control-mode=explicit (already configured).
     
     Args:
-        models: Lista di nomi modelli da scaricare. Default: ["mistral"] (il più pesante, ~7.8GB)
+        models: List of model names to unload. Default: ["mistral"] (the heaviest, ~7.8GB)
     """
     if models is None:
-        models = ["mistral"]   # Mistral occupa ~7.8GB, il principale candidato per lo scaricamento
+        models = ["mistral"]   # Mistral occupies ~7.8GB, the primary candidate for unloading
     
     triton_url = os.environ.get("TRITON_BASE_URL", "http://triton-server:8000").rstrip("/")
     logger.info(f"TRITON_BASE_URL: {triton_url}")
@@ -173,18 +173,18 @@ def force_unload_triton(models: list = None):
                 method='POST'
             )
             with urllib.request.urlopen(req, timeout=10) as resp:
-                logger.info(f"🔫 Triton: modello '{model_name}' scaricato dalla VRAM (HTTP {resp.status})")
+                logger.info(f"🔫 Triton: model '{model_name}' unloaded from VRAM (HTTP {resp.status})")
         except Exception as e:
-            logger.warning(f"⚠️ Triton unload '{model_name}' fallito: {e}")
+            logger.warning(f"⚠️ Triton unload '{model_name}' failed: {e}")
 
 
 def reload_triton_models(models: list = None):
     """
-    Ricarica i modelli su Triton dopo il fine-tuning.
-    Usa la stessa API /v2/repository/models/{model}/load.
+    Reloads models on Triton after fine-tuning.
+    Uses the same API /v2/repository/models/{model}/load.
     
     Args:
-        models: Lista di nomi modelli da ricaricare. Default: ["mistral"]
+        models: List of model names to reload. Default: ["mistral"]
     """
     if models is None:
         models = ["mistral"]
@@ -205,9 +205,9 @@ def reload_triton_models(models: list = None):
                 method='POST'
             )
             with urllib.request.urlopen(req, timeout=200) as resp:
-                logger.info(f"🚀 Triton: modello '{model_name}' ricaricato in VRAM (HTTP {resp.status})")
+                logger.info(f"🚀 Triton: model '{model_name}' reloaded to VRAM (HTTP {resp.status})")
         except Exception as e:
-            logger.warning(f"⚠️ Triton reload '{model_name}' fallito: {e}")
+            logger.warning(f"⚠️ Triton reload '{model_name}' failed: {e}")
 
 
 
@@ -498,16 +498,16 @@ def run_subprocess_streaming(
                         elif not any(x in clean_line for x in whitelist_patterns):
                             continue
                             
-                    # VS Code UI Aesthetic: Se inizia con [Phase o Epoch, formattalo come un grande nodo principale "* *Emoji Testo*"
+                    # VS Code UI Aesthetic: If it starts with [Phase or Epoch, format it as a large main node "* *Emoji Text*"
                     if clean_line.startswith("[Phase") or clean_line.startswith("Epoch"):
-                        # Scegli l'emoji adatta
+                        # Choose the appropriate emoji
                         icon = "🔄" if "Epoch" in clean_line else "📌"
-                        # Logga senza il prefisso standard [Train] in modo che il server HTTP lo spedisca nudo
+                        # Log without the standard [Train] prefix so the HTTP server sends it bare
                         logger_instance.info(f"* *{icon} {clean_line}*")
                     elif clean_line.startswith("[Saving]"):
-                        logger_instance.info(f"* *💾 Salvataggio in corso...*")
+                        logger_instance.info(f"* *💾 Saving in progress...*")
                     elif "SUCCESS:" in clean_line:
-                        # Non loggare l'output JSON bruto di SUCCESS, è solo per il parsing interno
+                        # Do not log the raw JSON output of SUCCESS, it is only for internal parsing
                         pass
                     else:
                         logger_instance.info(f"  {prefix} {clean_line}")

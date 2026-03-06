@@ -1,14 +1,14 @@
 # ============================================================================
 # GRAPH.PY - MAIN LLM AGENT ORCHESTRATION
 # ============================================================================
-# Orchestrazione principale dei 5 workflow tramite LangGraph
+# Main orchestration of the 5 workflows via LangGraph
 #
-# Responsabilità:
-#   - Routing primario tra i 5 workflow
-#   - Nodi di decisione tra workflow sequenziali
-#   - StateGraph building e compilation con SUBGRAPHS
+# Responsibilities:
+#   - Primary routing between the 5 workflows
+#   - Decision nodes between sequential workflows
+#   - StateGraph building and compiling with SUBGRAPHS
 #
-# ARCHITETTURA MODULARE (SUBGRAPHS):
+# MODULAR ARCHITECTURE (SUBGRAPHS):
 #   START → route_request → [firmware_flow | ai_flow | integration_flow | search_flow]
 #
 
@@ -124,11 +124,11 @@ logging.basicConfig(
 )
 
 # Silencing noisy internal framework logs
-logging.getLogger("langgraph_api.server").setLevel(logging.WARNING)  # Silenzia log server interni
-logging.getLogger("langgraph_storage.queue").setLevel(logging.WARNING) # Silenzia statistiche periodiche "Worker stats" e "Queue stats"
-logging.getLogger("langgraph_api.metadata").setLevel(logging.ERROR)   # Nasconde errori persistenti di invio metadati a LangSmith
-logging.getLogger("langsmith.client").setLevel(logging.ERROR)         # Silenzia errori 403 Forbidden di LangSmith (come il client di telemetria di LangChain che cercava di inviare dati ai server ufficiali senza avere una chiave API valida.)
-logging.getLogger("httpx").setLevel(logging.WARNING)                 # Silenzia log delle richieste HTTP interne
+logging.getLogger("langgraph_api.server").setLevel(logging.WARNING)  # Silence internal server logs
+logging.getLogger("langgraph_storage.queue").setLevel(logging.WARNING) # Silence periodic "Worker stats" and "Queue stats"
+logging.getLogger("langgraph_api.metadata").setLevel(logging.ERROR)   # Hide persistent errors sending metadata to LangSmith
+logging.getLogger("langsmith.client").setLevel(logging.ERROR)         # Silence 403 Forbidden errors from LangSmith
+logging.getLogger("httpx").setLevel(logging.WARNING)                 # Silence HTTP requests logs
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -138,57 +138,57 @@ logger.setLevel(logging.DEBUG)
 # ============================================================================
 
 class RouteDecision(BaseModel):
-    """Schema per decisione di routing principale"""
+    """Schema for main routing decision"""
     route: Literal["firmware", "ai_analysis", "integration", "web_research", "chat"] = Field(
-        description="Il workflow da eseguire"
+        description="The workflow to execute"
     )
     confidence: float = Field(
         ge=0.0, le=1.0,
-        description="Livello di confidenza della decisione (0-1)"
+        description="Confidence level of the decision (0-1)"
     )
     reasoning: str = Field(
-        description="Breve spiegazione della scelta"
+        description="Brief explanation of the choice"
     )
 
 # ============================================================================
 # EXTRACTION INSTRUCTIONS - ROUTING ONLY
 # ============================================================================
 
-router_instructions = """Sei un router intelligente per un sistema di sviluppo firmware STM32 con AI.
+router_instructions = """You are an intelligent router for an STM32 firmware development system with AI.
 
-Il sistema ha quattro workflow principali:
+The system has four main workflows:
 
-1. **firmware**: Generazione progetto firmware STM32
-   - Keywords: firmware, cubemx, stm32, progetto, board, .ioc, toolchain, generazione
+1. **firmware**: STM32 firmware project generation
+   - Keywords: firmware, cubemx, stm32, project, board, .ioc, toolchain, generation
    
-2. **ai_analysis**: ESEGUIRE analisi, selezione o download di modelli
-   - Usalo per: "Trova un modello per X", "Analizza Moiblenet", "Voglio scaricare YOLO"
-   - Keywords: ai, modello, network, neurale, stedgeai, analyze, validate, generate, .h5
-   - NON usare per domande tipo "Come converto...?", "Spiegami X" -> usa web_research
+2. **ai_analysis**: EXECUTE analysis, selection, or download of models
+   - Use it for: "Find a model for X", "Analyze Mobilenet", "I want to download YOLO"
+   - Keywords: ai, model, network, neural, stedgeai, analyze, validate, generate, .h5
+   - DO NOT use for questions like "How do I convert...?", "Explain X" -> use web_research
    
-3. **integration**: Integrazione codice AI nel firmware
-   - Keywords: integra, copia, merge, combina, main.c, include, linking
+3. **integration**: Integrate AI code into firmware
+   - Keywords: integrate, copy, merge, combine, main.c, include, linking
    
-4. **web_research**: Ricerca online di informazioni, guide e tutorial
-   - Usalo per: "Come converto X in Y?", "Documentazione su Z", "Errori comuni", "Confronto teorico"
-   - Keywords: ricerca, informazioni, aiutami, quale, come, best practice, documentazione, convertire, spiegare
+4. **web_research**: Online search for information, guides, and tutorials
+   - Use it for: "How do I convert X to Y?", "Documentation on Z", "Common errors", "Theoretical comparison"
+   - Keywords: search, information, help me, which, how, best practice, documentation, convert, explain
 
-5. **chat**: Conversazione generale, saluti o domande sulla memoria utente
-   - Usalo per: "Ciao", "Chi sei?", "Cosa stavo facendo?", "Qual'è la mia board preferita?"
-   - Keywords: ciao, ricordi, profilo, chi sei, cosa ho fatto, memoria
+5. **chat**: General conversation, greetings, or questions about user memory
+   - Use it for: "Hello", "Who are you?", "What was I doing?", "What is my favorite board?"
+   - Keywords: hello, hi, remember, profile, who are you, what did I do, memory
 
-**CONTESTO UTENTE (Profilo Persistente):**
-Ti verrà fornito un "Profilo Utente" con informazioni sulle sessioni precedenti (board usata, MCU, ultimo modello). 
-Usa queste informazioni se la richiesta dell'utente è ambigua o fa riferimento al passato (es: "Quale board stavo usando?", "Cosa ho fatto ieri?"). 
-In questi casi di RECALL o conversazione, usa SEMPRE la route "chat".
+**USER CONTEXT (Persistent Profile):**
+You will be provided with a "User Profile" containing information about previous sessions (used board, MCU, last model). 
+Use this information if the user's request is ambiguous or refers to the past (e.g., "Which board was I using?", "What did I do yesterday?"). 
+In these cases of RECALL or conversation, ALWAYS use the "chat" route.
 
-Analizza la richiesta dell'utente e il suo profilo per determinare il workflow più appropriato.
-Se la richiesta è ambigua e non riguarda la memoria, scegli il workflow più generale.
+Analyze the user's request and their profile to determine the most appropriate workflow.
+If the request is ambiguous and does not concern memory, choose the more general workflow.
 
-Rispondi SEMPRE in formato JSON con tre campi:
-- "route": uno tra "firmware", "ai_analysis", "integration", "web_research", "chat"
-- "confidence": numero tra 0.0 e 1.0
-- "reasoning": breve spiegazione (max 100 caratteri)
+ALWAYS answer in JSON format with three fields:
+- "route": one of "firmware", "ai_analysis", "integration", "web_research", "chat"
+- "confidence": number between 0.0 and 1.0
+- "reasoning": brief explanation (max 100 characters)
 """
 
 # ============================================================================
@@ -196,16 +196,16 @@ Rispondi SEMPRE in formato JSON con tre campi:
 # ============================================================================
 
 def route_request(state: MasterState, config: RunnableConfig = None) -> MasterState:
-    """Router principale che classifica tra firmware, AI, integration, web_research"""
+    """Main router that classifies between firmware, AI, integration, web_research"""
     
-    logger.info(f"🔀 Routing messaggio: {state.message[:80]}...")
+    logger.info(f"🔀 Routing message: {state.message[:80]}...")
     
     # Clear transient response so stale integration/finalizer summaries don't persist
     # across sessions (they would otherwise be re-emitted by server.py for every node).
     state.response = ""
 
     
-    # === GESTIONE RESET TOTALE ===
+    # === TOTAL RESET HANDLING ===
     msg_clean = state.message.lower().strip()
     if any(k == msg_clean for k in ["reset", "restart", "riparti"]):
         logger.info("🧹 Resetting ALL workflows state...")
@@ -258,31 +258,31 @@ def route_request(state: MasterState, config: RunnableConfig = None) -> MasterSt
         
         # --- Commmon ---
         state.user_response = ""
-        state.persistent_context = {} # <--- PULIZIA MEMORIA A LUNGO TERMINE (Stato corrente)
-        state.reset_profile = True    # <--- SEGNALE PER IL SERVER (Wipe su Redis)
+        state.persistent_context = {} # <--- LONG TERM MEMORY CLEANUP (Current state)
+        state.reset_profile = True    # <--- SIGNAL FOR SERVER (Wipe on Redis)
         
-        # Cambiamo il messaggio in modo che general_chat dia conferma del reset
-        state.message = "[SYSTEM_MESSAGE] Il sistema è stato resettato COMPLETAMENTE. Saluta l'utente e conferma che hai dimenticato tutto, inclusa la sua board preferita e i progetti passati."
+        # Change the message so general_chat confirms the reset
+        state.message = "[SYSTEM_MESSAGE] The system has been COMPLETELY reset. Greet the user and confirm that you have forgotten everything, including their favorite board and past projects."
         state.route = "chat"
         
-        logger.info("✓ Cleanup totale effettuato (HARD RESET). Routing a 'chat'.")
+        logger.info("✓ Total cleanup performed (HARD RESET). Routing to 'chat'.")
         return state
     
     try:
-        # Gestisci config None (fallback a dict vuoto)
+        # Handle None config (fallback to empty dict)
         if config is None:
             config = {}
             
         cfg = Configuration.from_runnable_config(config)
         
-        # NOTA: Per VS Code integration, permettiamo esecuzione anche senza config completa
-        # La validazione strict è necessaria solo per operazioni che richiedono file system
+        # NOTE: For VS Code integration, we allow execution even without full config
+        # Strict validation is only needed for operations requiring file system
         # if not cfg.validate():
-        #     logger.error("❌ Configurazione non valida!")
+        #     logger.error("❌ Invalid configuration!")
         #     state.route = "unknown"
         #     return state
         
-        # Popola stato con valori da Configuration (se disponibili)
+        # Populate state with Configuration values (if available)
         state.st_email = cfg.st_email
         state.st_password = cfg.st_password
         state.base_dir = cfg.base_dir
@@ -292,20 +292,20 @@ def route_request(state: MasterState, config: RunnableConfig = None) -> MasterSt
         state.target = cfg.ai_target
         state.compression = cfg.ai_compression
         
-        # Sincronizza lo stato con la memoria a lungo termine se non già impostato
-        # All'inizio di ogni richiesta, sincronizza i dati del tuo profilo (come la board salvata) con le variabili di lavoro del grafo
+        # Synchronize state with long term memory if not already set
+        # At the start of each request, synchronize your profile data (like saved board) with the graph's working variables
         if state.persistent_context:
             if not state.board_name: 
                 state.board_name = state.persistent_context.get("board_name")
-                if state.board_name: logger.info(f"🔄 Board caricata da memoria: {state.board_name}")
+                if state.board_name: logger.info(f"🔄 Board loaded from memory: {state.board_name}")
             if not state.mcu_series: 
                 state.mcu_series = state.persistent_context.get("mcu_series")
             if not state.project_name:
                 state.project_name = state.persistent_context.get("project_name")
         
-        logger.info(f"✓ Configurazione caricata")
+        logger.info(f"✓ Configuration loaded")
         
-        # === ROUTING LLM ===
+        # === LLM ROUTING ===
         from src.assistant.utils import get_llm
         llm_router = get_llm(
             config=config,
@@ -313,12 +313,12 @@ def route_request(state: MasterState, config: RunnableConfig = None) -> MasterSt
             temperature=cfg.llm_temperature
         )
         
-        # Includi profilo utente nella richiesta se presente
-        user_info = f"\n\nPROFILO UTENTE: {state.persistent_context}" if state.persistent_context else ""
+        # Include user profile in request if present
+        user_info = f"\n\nUSER PROFILE: {state.persistent_context}" if state.persistent_context else ""
         
         result = llm_router.invoke([
             SystemMessage(content=router_instructions),
-            HumanMessage(content=f"Richiesta: {state.message}{user_info}")
+            HumanMessage(content=f"Request: {state.message}{user_info}")
         ])
         
         # Normalize: support both Pydantic model (result.route) and dict (result['route'])
@@ -328,39 +328,39 @@ def route_request(state: MasterState, config: RunnableConfig = None) -> MasterSt
         
         state.route = result.route
         
-        logger.info(f"✓ Route selezionata: {result.route}")
+        logger.info(f"✓ Route selected: {result.route}")
         logger.info(f"  Confidence: {result.confidence:.2f}")
         logger.info(f"  Reasoning: {result.reasoning}")
         
         confidence_threshold = 0.4 if result.route == "chat" else 0.6
         if result.confidence < confidence_threshold:
-            logger.warning(f"⚠️  Bassa confidence ({result.confidence:.2f}), richiedo clarify")
+            logger.warning(f"⚠️  Low confidence ({result.confidence:.2f}), requesting clarify")
             state.route = "unknown"
         
     except Exception as e:
         # -----------------------------------------------------------------------
-        # FALLBACK: Mistral a volte restituisce un dict Python con virgolette singole
-        # invece di JSON valido con virgolette doppie, es: {'route': 'chat', ...}
-        # LangChain's JsonOutputParser fallisce su questo formato.
-        # Proviamo ast.literal_eval come recover prima di arrenderci.
+        # FALLBACK: Mistral sometimes returns a Python dict with single quotes
+        # instead of valid JSON with double quotes, e.g.: {'route': 'chat', ...}
+        # LangChain's JsonOutputParser fails on this format.
+        # We try ast.literal_eval as a recover before giving up.
         # -----------------------------------------------------------------------
         err_msg = str(e)
         if "Invalid json output:" in err_msg:
             try:
                 import ast
                 raw_dict_str = err_msg.split("Invalid json output:")[-1].strip()
-                # ast.literal_eval gestisce correttamente le virgolette singole Python
+                # ast.literal_eval correctly handles Python single quotes
                 recovered = ast.literal_eval(raw_dict_str)
                 result = RouteDecision(**recovered)
                 state.route = result.route
-                logger.warning(f"⚠️ Router: JSON malformato recuperato via ast.literal_eval → route={result.route}")
+                logger.warning(f"⚠️ Router: Malformed JSON recovered via ast.literal_eval → route={result.route}")
             except Exception as recover_e:
-                logger.error(f"❌ Errore routing: {err_msg}")
-                logger.error(f"   Recover via ast fallito: {recover_e}")
+                logger.error(f"❌ Routing error: {err_msg}")
+                logger.error(f"   Recover via ast failed: {recover_e}")
                 logger.exception(e)
                 state.route = "unknown"
         else:
-            logger.error(f"❌ Errore routing: {err_msg}")
+            logger.error(f"❌ Routing error: {err_msg}")
             logger.exception(e)
             state.route = "unknown"
 
@@ -369,47 +369,47 @@ def route_request(state: MasterState, config: RunnableConfig = None) -> MasterSt
 
 
 def general_chat(state: MasterState, config: RunnableConfig = None) -> MasterState:
-    """Nodo per conversazione generale e recall della memoria"""
-    logger.info("💬 Avvio Workflow: Chat (General Assistant)")
+    """Node for general conversation and memory recall"""
+    logger.info("💬 Start Workflow: Chat (General Assistant)")
     
     try:
         cfg = Configuration.from_runnable_config(config or {})
         from src.assistant.utils import get_llm
         llm = get_llm(
             config=config,
-            temperature=0.7 # Leggermente più alta per chat
+            temperature=0.7 # Slightly higher for chat
         )
         
-        # Bypass LLM per il messaggio di reset
-        if state.message and state.message.startswith("[SYSTEM_MESSAGE] Il sistema è stato resettato"):
-            state.message = "🧠 Bzz... bip... memoria cancellata con successo!\n\nHo dimenticato tutte le tue preferenze, le board, e i modelli precedenti. D'ora in poi ripartiamo da un foglio bianco.\n\nCome posso aiutarti oggi?"
-            logger.info("✓ Risposta di reset hardcoded generata (LLM bypassato)")
+        # Bypass LLM for reset message
+        if state.message and state.message.startswith("[SYSTEM_MESSAGE] The system has been COMPLETELY reset"):
+            state.message = "🧠 Bzz... beep... memory successfully wiped!\n\nI've forgotten all your preferences, boards, and previous models. From now on we start with a blank slate.\n\nHow can I help you today?"
+            logger.info("✓ Hardcoded reset response generated (LLM bypassed)")
             return state
             
-        # Costruisci un sommario della situazione attuale (memoria a breve + lungo termine)
+        # Build a summary of the current situation (short + long term memory)
         session_info = {
-            "board_attuale": state.board_name or "Non ancora selezionata",
-            "mcu_serie": state.mcu_series or "Non rilevata",
-            "progetto_path": state.firmware_project_path or "Nessun progetto generato",
-            "modello_ai": state.selected_model.get("name") if state.selected_model else "Nessuno",
-            "ultimo_workflow": state.route,
-            "data_ultima_operazione": state.timestamp
+            "current_board": state.board_name or "Not selected yet",
+            "mcu_series": state.mcu_series or "Not detected",
+            "project_path": state.firmware_project_path or "No project generated",
+            "ai_model": state.selected_model.get("name") if state.selected_model else "None",
+            "last_workflow": state.route,
+            "last_operation_date": state.timestamp
         }
         
-        user_memory = json.dumps(state.persistent_context, indent=2) if state.persistent_context else "Nessuna info storica."
+        user_memory = json.dumps(state.persistent_context, indent=2) if state.persistent_context else "No historical info."
         current_context = json.dumps(session_info, indent=2)
         
-        instructions = f"""Sei l'Assistente AI ESPERTO per STM32. 
+        instructions = f"""You are the EXPERT AI Assistant for STM32. 
 
-REGOLE ESSENZIALI:
-1. RISPONDI SOLO all'ultima domanda dell'utente.
-2. NON generare mai 'User:', 'Assistant:' o riepiloghi di conversazione.
-3. Se non conosci informazioni sulla board o sul progetto dai dati sotto, chiedi all'utente.
-4. Rispondi in ITALIANO tecnico e conciso.
+ESSENTIAL RULES:
+1. ONLY ANSWER the user's latest question.
+2. NEVER generate 'User:', 'Assistant:' or conversation summaries.
+3. If you don't know information about the board or project from the data below, ask the user.
+4. Answer in ENGLISH briefly and technically.
 
-DATI DI CONTESTO:
-- Memoria Storica: {user_memory}
-- Sessione Corrente: {current_context}
+CONTEXT DATA:
+- Historical Memory: {user_memory}
+- Current Session: {current_context}
 """
         
         logger.info(f"🧠 Context injected into Chat Prompt: {user_memory}")
@@ -420,17 +420,17 @@ DATI DI CONTESTO:
         ])
         
         state.message = response.content
-        logger.info("✓ Risposta chat generata")
+        logger.info("✓ Chat response generated")
         
     except Exception as e:
-        logger.error(f"❌ Errore in general_chat: {e}")
-        state.message = "Spiacente, ho avuto un problema tecnico nel recuperare la nostra conversazione."
+        logger.error(f"❌ Error in general_chat: {e}")
+        state.message = "Sorry, I had a technical problem retrieving our conversation."
 
     return state
 
 
 def route_decision(state: MasterState) -> Literal["firmware_flow", "ai_flow", "integration_flow", "search_flow", "chat", "clarify"]:
-    """Routing condizionale principale verso SUBGRAPHS"""
+    """Conditional routing to SUBGRAPHS"""
     route_map = {
         "firmware": "firmware_flow",
         "ai_analysis": "ai_flow",
@@ -441,24 +441,24 @@ def route_decision(state: MasterState) -> Literal["firmware_flow", "ai_flow", "i
     }
     
     result = route_map.get(state.route, "clarify")
-    logger.info(f"→ Routing verso Subgraph: {result}")
+    logger.info(f"→ Routing to Subgraph: {result}")
     return result
 
 
 def clarify_request(state: MasterState, config: RunnableConfig = None) -> MasterState:
-    """Gestisce richieste non chiare chiedendo all'utente"""
+    """Handles ambiguous requests by asking the user"""
     prompt = {
-        "instruction": "Non ho capito bene cosa vuoi fare. Scegli un'opzione:",
+        "instruction": "I didn't quite get what you want to do. Choose an option:",
         "options": {
-            "1": "Generare un nuovo progetto firmware STM32",
-            "2": "Analizzare o scaricare un modello AI (X-CUBE-AI)",
-            "3": "Integrare un modello AI in un progetto esistente",
-            "4": "Cercare informazioni o guide online",
-            "5": "Annulla e torna alla chat generale"
+            "1": "Generate a new STM32 firmware project",
+            "2": "Analyze or download an AI model (X-CUBE-AI)",
+            "3": "Integrate an AI model into an existing project",
+            "4": "Search for information or online guides",
+            "5": "Cancel and return to general chat"
         }
     }
     
-    # Interrupt attende che l'utente scelga un'opzione dall'estensione VS Code
+    # Interrupt waits for user to choose an option from VS Code extension
     user_choice = interrupt(prompt)
     
     choice_map = {
@@ -471,11 +471,11 @@ def clarify_request(state: MasterState, config: RunnableConfig = None) -> Master
     
     state.route = choice_map.get(str(user_choice), "chat")
     
-    # Aggiorniamo il messaggio in modo che al prossimo passo il router capisca l'intento
+    # Update message so that in the next step the router understands intent
     if state.route != "chat":
-        state.message = f"Voglio procedere con: {state.route}"
+        state.message = f"I want to proceed with: {state.route}"
     
-    logger.info(f"✓ Chiarimento ricevuto dall'utente: {state.route}")
+    logger.info(f"✓ Clarification received from user: {state.route}")
     return state
 
 # ============================================================================
@@ -484,57 +484,57 @@ def clarify_request(state: MasterState, config: RunnableConfig = None) -> Master
 
 def decide_continue_to_ai(state: MasterState, config: RunnableConfig = None) -> MasterState:
     """
-    Nodo di decisione dopo finalize_project.
-    Chiede all'utente se vuole continuare con l'analisi AI, a meno che il
-    messaggio originale non lo abbia già richiesto esplicitamente.
+    Decision node after finalize_project.
+    Asks the user if they want to continue with AI analysis, unless
+    the original message explicitly requested it.
     """
     
-    logger.info("📋 Decisione: Continuare verso analisi AI?")
+    logger.info("📋 Decision: Continue to AI analysis?")
     
     from src.assistant.utils import extract_user_response, get_llm
     cfg = Configuration.from_runnable_config(config)
     llm = get_llm(config)
     
-    classification_prompt = """Analizza la risposta dell'utente e rispondi SOLO con una di queste due parole:
+    classification_prompt = """Analyze the user's response and reply ONLY with one of these two words:
     
-Se l'utente vuole continuare con l'analisi AI / X-CUBE-AI / ottimizzazione -> CONTINUARE
-Se l'utente vuole fermarsi / ha finito / non menziona l'AI -> TERMINARE
+If the user wants to continue with AI analysis / X-CUBE-AI / optimization -> CONTINUE
+If the user wants to stop / is done / does not mention AI -> TERMINATE
 
-Rispondi SOLO con la parola, senza altro testo.
+Answer ONLY with the word, without any other text.
 """
 
-    # --- Passo 1: Controlla se il messaggio ORIGINALE richiedeva ESPLICITAMENTE l'AI ---
-    # SOLO in questo caso saltiamo l'interrupt. "TERMINARE" sul messaggio originale
-    # non significa che l'utente voglia fermarsi: significa solo che non era chiaro,
-    # quindi dobbiamo comunque chiedere.
+    # --- Step 1: Check if the ORIGINAL message EXPLICITLY requested AI ---
+    # ONLY in this case do we skip the interrupt. "TERMINATE" on original message
+    # doesn't mean user wants to stop: it just means it wasn't clear,
+    # so we still have to ask.
     initial_continue = False
     if not state.user_response:
         res = llm.invoke([
             SystemMessage(content=classification_prompt),
-            HumanMessage(content=f"Messaggio: {state.message}")
+            HumanMessage(content=f"Message: {state.message}")
         ])
         decision_text = res.content.strip().upper()
-        if "CONTINUARE" in decision_text:
+        if "CONTINUE" in decision_text:
             initial_continue = True
-            logger.info("🤖 Intento di continuazione esplicito rilevato nel messaggio iniziale.")
+            logger.info("🤖 Explicit continue intent detected in initial message.")
 
     if initial_continue:
-        # L'utente aveva già chiesto l'analisi AI: procedi senza interrompere
+        # User already asked for AI analysis: proceed without interrupting
         logger.info("✓ CONTINUE - Going to AI Analysis (detected from original message)")
         state.route = "continue_to_ai"
         return state
 
-    # --- Passo 2: Interrupt – chiedi sempre all'utente ---
+    # --- Step 2: Interrupt - always ask the user ---
     if not state.user_response:
         prompt = {
-            "instruction": "✅ Firmware generato con successo! Vuoi continuare con l'analisi del modello AI (X-CUBE-AI) o terminare qui?",
+            "instruction": "✅ Firmware successfully generated! Do you want to continue with AI model analysis (X-CUBE-AI) or stop here?",
         }
-        logger.info("⏸️ Chiedendo all'utente se continuare con l'analisi AI...")
+        logger.info("⏸️ Asking user if they want to continue with AI analysis...")
         resume_value = interrupt(prompt)
     else:
         resume_value = None
 
-    # --- Passo 3: Classifica la risposta ricevuta dall'utente ---
+    # --- Step 3: Classify user response ---
     if resume_value and str(resume_value).strip():
         user_text = str(resume_value).strip()
     else:
@@ -543,11 +543,11 @@ Rispondi SOLO con la parola, senza altro testo.
 
     res = llm.invoke([
         SystemMessage(content=classification_prompt),
-        HumanMessage(content=f"Risposta: {user_text}")
+        HumanMessage(content=f"Response: {user_text}")
     ])
     decision_text = res.content.strip().upper()
 
-    if "CONTINUARE" in decision_text:
+    if "CONTINUE" in decision_text:
         logger.info("✓ CONTINUE - Going to AI Analysis")
         state.route = "continue_to_ai"
     else:
@@ -558,40 +558,41 @@ Rispondi SOLO con la parola, senza altro testo.
 
 
 
+
 def decide_continue_to_integration(state: MasterState, config: RunnableConfig = None) -> MasterState:
     """
-    Nodo di decisione dopo finalize_analysis.
-    Chiede SEMPRE all'utente se vuole continuare con l'integrazione.
-    Non usa fast-path LLM sul messaggio originale perché il contesto
-    precedente potrebbe essere ambiguo (es. messaggio AI != intent integrazione).
+    Decision node after finalize_analysis.
+    ALWAYS asks the user if they want to continue with integration.
+    Does not use LLM fast-path on original message because the previous context
+    might be ambiguous (e.g. AI message != integration intent).
     """
     
-    logger.info("📋 Decisione: Continuare verso integrazione?")
+    logger.info("📋 Decision: Continue to Integration?")
     
     from src.assistant.utils import extract_user_response, get_llm
     llm = get_llm(config)
     
-    classification_prompt = """Analizza la risposta dell'utente e rispondi SOLO con una di queste due parole:
+    classification_prompt = """Analyze the user's response and reply ONLY with one of these two words:
     
-Se l'utente vuole integrare il codice nel firmware / procedere con l'unione -> CONTINUARE
-Se l'utente vuole fermarsi / ha finito -> TERMINARE
+If the user wants to integrate the code into firmware / proceed with merging -> CONTINUE
+If the user wants to stop / is done -> TERMINATE
 
-Rispondi SOLO con la parola, senza altro testo.
+Answer ONLY with the word, without any other text.
 """
 
-    # --- Interrupt: chiedi SEMPRE all'utente ---
-    # Non usiamo fast-path LLM sul messaggio originale: il messaggio iniziale
-    # riguardava l'AI/firmware, non l'integrazione, e causerebbe falsi CONTINUARE.
+    # --- Interrupt: ALWAYS ask the user ---
+    # We do not use LLM fast-path on original message: initial message
+    # was about AI/firmware, not integration, and would cause false CONTINUEs.
     if not state.user_response:
         prompt = {
-            "instruction": "✅ Analisi AI completata! Vuoi continuare con l'integrazione del codice AI nel firmware (STM32CubeMX merge) o terminare qui?",
+            "instruction": "✅ AI Analysis complete! Do you want to continue integrating AI code into firmware (STM32CubeMX merge) or stop here?",
         }
-        logger.info("⏸️ Chiedendo all'utente se continuare con l'integrazione...")
+        logger.info("⏸️ Asking user if they want to continue with integration...")
         resume_value = interrupt(prompt)
     else:
         resume_value = None
 
-    # --- Classifica la risposta ---
+    # --- Classify response ---
     if resume_value and str(resume_value).strip():
         user_text = str(resume_value).strip()
     else:
@@ -600,11 +601,11 @@ Rispondi SOLO con la parola, senza altro testo.
 
     res = llm.invoke([
         SystemMessage(content=classification_prompt),
-        HumanMessage(content=f"Risposta: {user_text}")
+        HumanMessage(content=f"Response: {user_text}")
     ])
     decision_text = res.content.strip().upper()
 
-    if "CONTINUARE" in decision_text:
+    if "CONTINUE" in decision_text:
         logger.info("✓ CONTINUE - Going to Integration")
         state.route = "continue_to_integration"
     else:
@@ -617,19 +618,19 @@ Rispondi SOLO con la parola, senza altro testo.
 
 
 def decision_continue_routing(state: MasterState) -> Literal["ai_flow", "integration_flow", "end"]:
-    """Router per decision nodes inter-subgraph"""
+    """Router for inter-subgraph decision nodes"""
     
     if state.route == "continue_to_ai":
-        logger.info("→ Routing verso: ai_flow")
+        logger.info("→ Routing to: ai_flow")
         return "ai_flow"
     elif state.route == "continue_to_integration":
-        logger.info("→ Routing verso: integration_flow")
+        logger.info("→ Routing to: integration_flow")
         return "integration_flow"
     elif state.route == "change_board":
-        logger.info("→ Routing verso: firmware_flow (BACK)")
+        logger.info("→ Routing to: firmware_flow (BACK)")
         return "firmware_flow"
     else:
-        logger.info("→ Routing verso: END")
+        logger.info("→ Routing to: END")
         return "end"
 
 
@@ -721,7 +722,7 @@ def inject_ai_analysis_nodes(builder: StateGraph):
     
     # 1. Model Discovery Routing
     def inner_model_selection_routing(state: MasterState) -> Literal["download_model", "search_recommendation_model", "add_custom_model_procedure"]:
-        """Decide se procedere al download o alla ricerca avanzata o registrazione"""
+        """Decide whether to proceed with download or advanced search or registration"""
         if state.model_discovery_method == "register_new":
             return "add_custom_model_procedure"
         if state.model_discovery_method == "search":
@@ -1020,14 +1021,14 @@ builder.add_edge("finalize_integration", END)
 builder.add_edge("general_chat", END)
 
 # === REDIS CLIENTS ===
-# Helper per risolvere l'URL di Redis (Docker vs Local)
+# Helper to resolve Redis URL (Docker vs Local)
 def get_redis_url():
-    # Priorità 1: Variabile d'ambiente REDIS_URL (es: redis://redis:6379)
+    # Priority 1: REDIS_URL environment variable (e.g. redis://redis:6379)
     env_url = os.environ.get("REDIS_URL")
     if env_url:
         return env_url
     
-    # Priorità 2: Check se siamo in Docker (servizio "redis" invece di "localhost")
+    # Priority 2: Check if we are in Docker (service "redis" instead of "localhost")
     if os.path.exists("/.dockerenv"):
         return "redis://redis:6379"
     
@@ -1036,14 +1037,14 @@ def get_redis_url():
 
 REDIS_URL_FOR_APP = get_redis_url()
 
-# Client per il profilo utente (stringhe/JSON) - Async
+# Client for user profile (strings/JSON) - Async
 redis_client = aioredis.from_url(REDIS_URL_FOR_APP, decode_responses=True)
 
-# Client per il checkpointer (raw bytes) - Async
+# Client for checkpointer (raw bytes) - Async
 checkpointer_redis = aioredis.from_url(REDIS_URL_FOR_APP, decode_responses=False)
 
-# Nota: memory e graph devono essere inizializzati dentro un event loop (es: startup di FastAPI)
-# per evitare "RuntimeError: no running event loop"
+# Note: memory and graph must be initialized inside an event loop (e.g. FastAPI startup)
+# to avoid "RuntimeError: no running event loop"
 
-# Per LangGraph CLI / Dev visualization (senza persistenza Redis)
+# For LangGraph CLI / Dev visualization (without Redis persistence)
 graph = builder.compile()

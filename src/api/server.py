@@ -1,6 +1,6 @@
 # Questo è l'Entrypoint FastAPI Attuale (Il Cuore dell'App). È il file che viene eseguito dal Docker container langgraph-app al comando uvicorn src.api.server:app.
 
-# * A cosa serve: Espone l'endpoint di produzione /stream. È qui che arrivano fisicamente le richieste HTTP esterne (es. dall'estensione VS Code). Riceve i messaggi e lo storico della chat, invoca l'intero Workflow intelligente (graph.py), gestisce la cache su Redis (Checkpointer) e trasforma le risposte in Server-Sent Events (SSE) per aggiornare la UI in tempo reale lettera per lettera.
+# * What it does: Exposes the production endpoint /stream. This is where external HTTP requests physically arrive (e.g., from the VS Code extension). It receives messages and chat history, invokes the entire Intelligent Workflow (graph.py), manages the Redis cache (Checkpointer), and transforms responses into Server-Sent Events (SSE) to update the UI in real time letter by letter.
 
 # * Perché esiste: È l'API ufficiale del tuo assistente AI.
 

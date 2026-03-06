@@ -65,7 +65,7 @@ class Configuration:
     )
 
     # ============================================================================
-    # CONFIGURAZIONE LLM (ROUTING) - ✅ AGGIUNTO
+    # LLM CONFIGURATION (ROUTING) - ✅ ADDED
     # ============================================================================
     
     local_llm: str = field(
@@ -82,7 +82,7 @@ class Configuration:
     )
 
     # ============================================================================
-    # CONFIGURAZIONE AI ANALYSIS - ✅ AGGIUNTO
+    # AI ANALYSIS CONFIGURATION - ✅ ADDED
     # ============================================================================
     
     ai_model_path: str = field(
@@ -252,7 +252,7 @@ class Configuration:
         path = try_find_path(env_name)
         if path: return path
 
-        # Secondo tentativo: se fallisce, prova variazioni comuni (aggiunta/rimozione underscore)
+        # Second attempt: if it fails, try common variations (adding/removing underscores)
         variations = []
         if "_" in env_name:
             variations.append(env_name.replace("_", ""))

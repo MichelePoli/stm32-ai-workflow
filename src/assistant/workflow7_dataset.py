@@ -1,14 +1,14 @@
 # ============================================================================
 # WORKFLOW 7: DATASET SELECTION & MANAGEMENT
 # ============================================================================
-# Modulo per la selezione e il download di dataset reali
+# Module for selecting and downloading real datasets
 #
-# Responsabilità:
-#   - Chiedere all'utente la fonte dei dati (Real, Synthetic, Both)
-#   - Mostrare menu di dataset predefiniti basati sul task (Audio/Vision)
-#   - Scaricare dataset reali (es. CIFAR-10, MNIST, SpeechCommands)
+# Responsibilities:
+#   - Ask the user for the data source (Real, Synthetic, Both)
+#   - Show a menu of predefined datasets based on the task (Audio/Vision)
+#   - Download real datasets (e.g. CIFAR-10, MNIST, SpeechCommands)
 #
-# Dipendenze: tensorflow, keras, requests
+# Dependencies: tensorflow, keras, requests
 
 import os
 import shutil
@@ -24,17 +24,17 @@ from langchain_core.runnables import RunnableConfig
 from typing import Literal, Optional, List, Dict, Any, Union
 
 class DatasetRegistration(BaseModel):
-    """Schema per la registrazione di un nuovo dataset via URL"""
-    name: str = Field(description="Nome leggibile del dataset")
-    key: str = Field(description="Chiave univoca (snake_case, es: my_custom_data)")
+    """Schema for registering a new dataset via URL"""
+    name: str = Field(description="Readable name of the dataset")
+    key: str = Field(description="Unique key (snake_case, e.g. my_custom_data)")
     category: Literal["vision", "audio", "object_detection", "human_activity_recognition"] = Field(
-        description="Categoria del dataset"
+        description="Dataset category"
     )
-    url: str = Field(description="URL diretto per il download (zip, tar.gz)")
-    description: str = Field(description="Breve descrizione del dataset")
+    url: str = Field(description="Direct URL for download (zip, tar.gz)")
+    description: str = Field(description="Brief description of the dataset")
     expected_shape: Optional[List[int]] = Field(
         default=None, 
-        description="Shape atteso degli input (es: [224, 224, 3]). Opzionale."
+        description="Expected shape of inputs (e.g. [224, 224, 3]). Optional."
     )
 
 from src.assistant.configuration import Configuration
@@ -55,55 +55,55 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 
 def get_resource_path(filename: str) -> str:
-    """Ritorna il path assoluto di una risorsa nella cartella resources."""
+    """Returns the absolute path of a resource in the resources folder."""
     base_dir = os.path.dirname(os.path.abspath(__file__))
     res_path = os.path.join(base_dir, "resources", filename)
     return res_path
 
 def load_dataset_catalog() -> dict:
-    """Carica il catalogo dataset dal file JSON."""
+    """Loads the dataset catalog from the JSON file."""
     path = get_resource_path("predefined_datasets.json")
     if not os.path.exists(path):
-        logger.warning(f"⚠️ Catalogo dataset non trovato in {path}, ritorno vuoto.")
+        logger.warning(f"⚠️ Dataset catalog not found in {path}, returning empty.")
         return {}
     try:
         with open(path, 'r', encoding='utf-8') as f:
             return json.load(f)
     except Exception as e:
-        logger.error(f"❌ Errore caricamento catalogo dataset: {e}")
+        logger.error(f"❌ Error loading dataset catalog: {e}")
         return {}
 
 def load_dataset_mapping() -> dict:
-    """Carica il mapping model-to-dataset dal file JSON."""
+    """Loads the model-to-dataset mapping from the JSON file."""
     path = get_resource_path("dataset_mapping.json")
     if not os.path.exists(path):
-        logger.warning(f"⚠️ Mapping dataset non trovato in {path}, ritorno vuoto.")
+        logger.warning(f"⚠️ Dataset mapping not found in {path}, returning empty.")
         return {}
     try:
         with open(path, 'r', encoding='utf-8') as f:
             return json.load(f)
     except Exception as e:
-        logger.error(f"❌ Errore caricamento mapping dataset: {e}")
+        logger.error(f"❌ Error loading dataset mapping: {e}")
         return {}
 
 def save_dataset_catalog(catalog: dict):
-    """Salva il catalogo dataset nel file JSON."""
+    """Saves the dataset catalog to the JSON file."""
     path = get_resource_path("predefined_datasets.json")
     try:
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, 'w', encoding='utf-8') as f:
             json.dump(catalog, f, indent=4, ensure_ascii=False)
     except Exception as e:
-        logger.error(f"❌ Errore salvataggio catalogo dataset: {e}")
+        logger.error(f"❌ Error saving dataset catalog: {e}")
 
 def validate_url(url: str) -> bool:
-    """Verifica se un URL è raggiungibile."""
+    """Checks if a URL is reachable."""
     try:
-        # User Agent per evitare blocchi
+        # User Agent to avoid blocks
         headers = {"User-Agent": "Mozilla/5.0 (STM32-Agent)"}
         response = requests.head(url, timeout=5, allow_redirects=True, headers=headers)
         if response.status_code >= 400:
-            # Fallback a GET se HEAD è bloccato (alcuni server lo fanno)
+            # Fallback to GET if HEAD is blocked (some servers do this)
             response = requests.get(url, timeout=5, stream=True, headers=headers)
         return response.status_code < 400
     except Exception:
@@ -114,36 +114,36 @@ def validate_url(url: str) -> bool:
 # ============================================================================
 
 def decide_data_source(state: MasterState, config: RunnableConfig = None) -> MasterState:
-    """Chiede all'utente quale fonte dati utilizzare"""
+    """Asks the user which data source to use"""
     
     logger.info("📊 Dataset Source Selection")
     
-    # === ESTRATTORE LLM ===
+    # === LLM EXTRACTOR ===
     from src.assistant.utils import extract_user_response, get_llm
     cfg = Configuration.from_runnable_config(config)
     llm = get_llm(config)
     
-    # Prompt semplificato per classificazione sorgente
-    source_classification_prompt = """Classifica la sorgente dei dati dalla richiesta dell'utente.
+    # Simplified prompt for source classification
+    source_classification_prompt = """Classify the data source from the user's request.
     
-1. REAL: L'utente vuole usare dataset famosi o esistenti (CIFAR, MNIST, etc.)
-2. REGISTER: L'utente vuole fornire un URL o registrare un nuovo dataset
-3. SYNTHETIC: L'utente vuole generare dati artificialmente
+1. REAL: The user wants to use famous or existing datasets (CIFAR, MNIST, etc.)
+2. REGISTER: The user wants to provide a URL or register a new dataset
+3. SYNTHETIC: The user wants to generate data artificially
 
-Rispondi SOLO con una parola: REAL, REGISTER, o SYNTHETIC. Se incerto: null.
+Answer ONLY with one word: REAL, REGISTER, or SYNTHETIC. If unsure: null.
 """
 
-    # --- Passo 1: Prova a rilevare dal messaggio iniziale con keyword check ---
-    # NON usiamo l'LLM qui: era troppo aggressivo e "indovinava" SYNTHETIC
-    # anche quando l'utente non lo aveva detto espressamente.
-    # Solo keyword esplicite nel messaggio triggherano l'auto-selezione.
+    # --- Step 1: Try to detect from the initial message with keyword check ---
+    # We DO NOT use the LLM here: it was too aggressive and "guessed" SYNTHETIC
+    # even when the user had not expressly stated it.
+    # Only explicit keywords in the message trigger auto-selection.
     initial_source = None
     if not state.user_response and state.message:
         msg_low = state.message.lower()
-        # Keyword esplicite per ciascuna sorgente
-        real_keywords    = ["real", "reale", "cifar", "mnist", "dataset", "predefinit", "esistente"]
-        synth_keywords   = ["synthetic", "sintetico", "artificiale", "genera", "generat"]
-        register_keywords = ["register", "url", "http", "link", "registra", "aggiungi"]
+        # Explicit keywords for each source
+        real_keywords    = ["real", "reale", "cifar", "mnist", "dataset", "predefined", "predefinit", "esistente", "existing"]
+        synth_keywords   = ["synthetic", "sintetico", "artificiale", "artificial", "genera", "generat"]
+        register_keywords = ["register", "url", "http", "link", "registra", "aggiungi", "add"]
         
         if any(k in msg_low for k in synth_keywords):
             initial_source = "synthetic"
@@ -151,38 +151,38 @@ Rispondi SOLO con una parola: REAL, REGISTER, o SYNTHETIC. Se incerto: null.
             initial_source = "register"
         elif any(k in msg_low for k in real_keywords):
             initial_source = "real"
-        # Se nessuna keyword trovata → initial_source resta None → chiede all'utente
+        # If no keyword found → initial_source remains None → asks the user
         
         if initial_source:
-            logger.info(f"🤖 Sorgente rilevata nel messaggio iniziale: {initial_source}")
+            logger.info(f"🤖 Source detected in the initial message: {initial_source}")
         else:
-            logger.info("ℹ️ Nessuna sorgente rilevata nel messaggio — chiedo all'utente")
+            logger.info("ℹ️ No source detected in the message — asking the user")
 
 
-    # --- Passo 2: Verifica e Interrupt ---
+    # --- Step 2: Verification and Interrupt ---
     if not initial_source:
         resume_value = None
         if not state.user_response:
             prompt = {
-                "instruction": """Quale sorgente dati vuoi utilizzare per il fine-tuning?
+                "instruction": """Which data source do you want to use for fine-tuning?
 
-Opzioni:
-1. **Real Dataset**: Seleziona dai predefiniti (CIFAR, MNIST, SpeechCommands)
-2. **Register New**: Aggiungi tramite URL diretto
-3. **Synthetic Data**: Genera ora dati artificiali (sine, noise, etc.)
+Options:
+1. **Real Dataset**: Select from predefined ones (CIFAR, MNIST, SpeechCommands)
+2. **Register New**: Add via direct URL
+3. **Synthetic Data**: Generate artificial data now (sine, noise, etc.)
 
-Cosa preferisci? (1, 2 o 3)""",
+What do you prefer? (1, 2 or 3)""",
             }
-            # Suggerimento se l'utente ha una preferenza passata
-            last_source = state.persistent_context.get("last_dataset_source", "Si consiglia Synthetic per i test veloci.") if state.persistent_context else "Si consiglia Synthetic per i test veloci."
-            prompt["suggestion"] = f"💡 L'ultima volta hai usato: **{last_source}**."
+            # Suggestion if the user has a past preference
+            last_source = state.persistent_context.get("last_dataset_source", "Synthetic is recommended for fast testing.") if state.persistent_context else "Synthetic is recommended for fast testing."
+            prompt["suggestion"] = f"💡 Last time you used: **{last_source}**."
             
         if not state.user_response:
             logger.info("⏸️ Interrupting for data source decision.")
             resume_value = interrupt(prompt)
             user_text = str(resume_value).strip().lower() if resume_value else ""
         else:
-            # Dopo la ripresa: usa interrupt return value come priorità
+            # After resuming: use interrupt return value as priority
             if resume_value and str(resume_value).strip():
                 user_text = str(resume_value).strip().lower()
             else:
@@ -196,10 +196,10 @@ Cosa preferisci? (1, 2 o 3)""",
         elif "3" in user_text or "synthetic" in user_text or "gener" in user_text:
             state.dataset_source = "synthetic"
         else:
-            # Re-invoca LLM sulla risposta se non banale
+            # Re-invoke LLM on the response if not trivial
             res = llm.invoke([
                 SystemMessage(content=source_classification_prompt),
-                HumanMessage(content=f"Risposta: {user_text}")
+                HumanMessage(content=f"Response: {user_text}")
             ])
             source_text = res.content.strip().upper()
             if "REAL" in source_text: state.dataset_source = "real"
@@ -214,17 +214,17 @@ Cosa preferisci? (1, 2 o 3)""",
 
 
 def register_custom_dataset(state: MasterState, config: RunnableConfig = None) -> MasterState:
-    """Permette all'utente di registrare un nuovo dataset fornendo un URL"""
+    """Allows the user to register a new dataset by providing a URL"""
     
-    logger.info("➕ Registrazione nuovo dataset...")
+    logger.info("➕ Registering new dataset...")
     
-    prompt_text = """Fornisci le informazioni per il nuovo dataset.
-Format richiesto:
-- Nome: [Nome Dataset]
-- Chiave: [chiave_snake_case]
-- Categoria: [vision/audio/object_detection/human_activity_recognition]
-- URL: [URL diretto al file .zip o .tar.gz]
-- Descrizione: [Breve descrizione]
+    prompt_text = """Provide the information for the new dataset.
+Required format:
+- Name: [Dataset Name]
+- Key: [snake_case_key]
+- Category: [vision/audio/object_detection/human_activity_recognition]
+- URL: [Direct URL to the .zip or .tar.gz file]
+- Description: [Brief description]
 """
     
     from src.assistant.utils import extract_user_response
@@ -232,10 +232,10 @@ Format richiesto:
     if not state.user_response or state.user_response.strip() == "":
         resume_value = interrupt({
             "instruction": prompt_text,
-            "hint": "Puoi scrivere in linguaggio naturale, estrarrò io i dati."
+            "hint": "You can write in natural language, I will extract the data."
         })
     
-    # Usa interrupt return value come priorità
+    # Use interrupt return value as priority
     if resume_value and str(resume_value).strip():
         user_input = str(resume_value).strip()
     else:
@@ -244,21 +244,21 @@ Format richiesto:
     
     logger.info(f"📝 User response: {user_input[:100]}")
     
-    # Parse con LLM structured output
+    # Parse with LLM structured output
     from src.assistant.utils import get_llm
     llm = get_llm(config, structured_schema=DatasetRegistration)
     try:
         info = llm.invoke([
-            SystemMessage(content="Sei un esperto di MLOps. Estrai le informazioni del dataset dall'input utente."),
+            SystemMessage(content="You are an MLOps expert. Extract the dataset information from the user input."),
             HumanMessage(content=user_input)
         ])
         
-        logger.info(f"🧐 Validazione URL: {info.url}")
+        logger.info(f"🧐 URL Validation: {info.url}")
         if not validate_url(info.url):
-            logger.warning(f"⚠️ URL non raggiungibile o non valido: {info.url}")
-            # Non blocchiamo, ma avvisiamo
+            logger.warning(f"⚠️ URL unreachable or invalid: {info.url}")
+            # We don't block, but warn
             
-        # Aggiornamento catalogo
+        # Update catalog
         catalog = load_dataset_catalog()
         cat_key = info.category
         if cat_key not in catalog:
@@ -271,19 +271,19 @@ Format richiesto:
             "type": "audio" if cat_key == "audio" else "image" if cat_key != "human_activity_recognition" else "sensor",
             "size": "N/A (Custom)",
             "expected_shape": info.expected_shape,
-            "note": "Aggiunto dall'utente via URL"
+            "note": "Added by user via URL"
         }
         
         save_dataset_catalog(catalog)
-        logger.info(f"✅ Dataset '{info.name}' registrato con successo in '{cat_key}'")
+        logger.info(f"✅ Dataset '{info.name}' registered successfully in '{cat_key}'")
         
-        # Imposta come selezionato
+        # Set as selected
         state.real_dataset_name = info.key
-        state.dataset_source = "real" # Prosegui verso download
+        state.dataset_source = "real" # Proceed towards download
         
     except Exception as e:
-        logger.error(f"❌ Errore durante la registrazione: {e}")
-        state.ai_error_message = f"Registrazione fallita: {e}"
+        logger.error(f"❌ Error during registration: {e}")
+        state.ai_error_message = f"Registration failed: {e}"
         state.dataset_source = "synthetic" # Fallback
         
     return state
@@ -291,37 +291,37 @@ Format richiesto:
 
 def select_predefined_dataset(state: MasterState, config: RunnableConfig = None) -> MasterState:
     """
-    Mostra menu dataset basato sul task del modello selezionato.
-    Determina automaticamente il task_type più appropriato.
+    Shows dataset menu based on the selected model's task.
+    Automatically determines the most appropriate task_type.
     """
     
-    logger.info("📊 Selezione dataset intelligente basata sul modello...")
+    logger.info("📊 Smart dataset selection based on model...")
     
-    # ===== STEP 1: Determina task_type dal modello selezionato =====
+    # ===== STEP 1: Determine task_type from selected model =====
     task_type = "vision"  # Default
     preferred_datasets = []
     mapping_notes = ""
     
-    # Carica mapping e catalogo dinamici
+    # Load dynamic mapping and catalog
     mapping_catalog = load_dataset_mapping()
     dataset_catalog = load_dataset_catalog()
     
-    # Cerca mapping dal last_task salvato (task selezionato dall'utente)
+    # Search mapping from saved last_task (user selected task)
     if state.last_task:
         mapping = mapping_catalog.get(state.last_task)
         if mapping:
             task_type = mapping["task_type"]
             preferred_datasets = mapping["preferred_datasets"]
             mapping_notes = mapping.get("notes", "")
-            logger.info(f"✓ Task type determinato dal modello: {task_type}")
+            logger.info(f"✓ Task type determined by model: {task_type}")
             logger.info(f"  Preferred datasets: {preferred_datasets}")
         else:
-            logger.warning(f"⚠️ Task '{state.last_task}' non mappato, uso euristica")
+            logger.warning(f"⚠️ Task '{state.last_task}' not mapped, using heuristics")
     
-    # ===== Fallback euristica (backward compatibility) =====
+    # ===== Fallback heuristics (backward compatibility) =====
     if not preferred_datasets:
-        logger.info("  Usando euristica basata su keyword nel task...")
-        # Check se last_task è vuoto prima di usare 'in' operator
+        logger.info("  Using keyword-based heuristics on task...")
+        # Check if last_task is empty before using 'in' operator
         if state.last_task:
             if "audio" in state.last_task or "speech" in state.last_task or "sound" in state.last_task:
                 task_type = "audio"
@@ -336,70 +336,70 @@ def select_predefined_dataset(state: MasterState, config: RunnableConfig = None)
                 task_type = "object_detection"
                 preferred_datasets = ["roboflow_vehicles", "pascal_voc_2012"]
         else:
-            # Default se last_task è vuoto
-            logger.warning("⚠️ state.last_task è vuoto, uso default vision")
+            # Default if last_task is empty
+            logger.warning("⚠️ state.last_task is empty, using default vision")
             task_type = "vision"
             preferred_datasets = ["cifar10", "mnist"]
     
-    # ===== STEP 2: Verifica compatibilità input shape (opzionale) =====
+    # ===== STEP 2: Input shape compatibility check (optional) =====
     if state.model_architecture:
         input_shape = state.model_architecture.get('input_shape')
         if input_shape:
             logger.info(f"  Model input shape: {input_shape}")
             
-            # Euristica avanzata basata su input shape
+            # Advanced heuristics based on input shape
             if isinstance(input_shape, (list, tuple)) and len(input_shape) == 3:
                 h, w, c = input_shape
                 
-                # Audio spectrograms: tipicamente piccoli e mono-channel
+                # Audio spectrograms: typically small and mono-channel
                 if c == 1 and (h < 100 or w < 100):
-                    logger.info(f"  ✓ Input shape {input_shape} suggerisce audio (spectrogram)")
-                    if task_type == "vision":  # Solo se non già audio
+                    logger.info(f"  ✓ Input shape {input_shape} suggests audio (spectrogram)")
+                    if task_type == "vision":  # Only if not already audio
                         task_type = "audio"
                         preferred_datasets = ["speech_commands", "fsdd", "esc50"]
                 
-                # HAR: input 1D o molto piccolo
+                # HAR: 1D input or very small
                 elif len(input_shape) == 2 or (h < 50 and w < 50):
-                    logger.info(f"  ⚠️ Input shape {input_shape} potrebbe essere per HAR (sensor data)")
+                    logger.info(f"  ⚠️ Input shape {input_shape} might be for HAR (sensor data)")
     
-    # ===== STEP 3: Seleziona dataset dal catalogo =====
+    # ===== STEP 3: Select dataset from catalog =====
     category_info = dataset_catalog.get(task_type, dataset_catalog.get("vision", {}))
     options = category_info.get("datasets", {})
     
     if not options:
-        logger.error(f"❌ Nessun dataset trovato per task_type '{task_type}'")
-        # Fallback a vision
+        logger.error(f"❌ No dataset found for task_type '{task_type}'")
+        # Fallback to vision
         task_type = "vision"
         category_info = dataset_catalog.get("vision", {})
         options = category_info.get("datasets", {"cifar10": {}})
         preferred_datasets = ["cifar10"]
     
-    # ===== STEP 4: Ordina dataset (preferred prima) =====
-    # Mostra prima i dataset preferiti, poi gli altri
+    # ===== STEP 4: Sort datasets (preferred first) =====
+    # Show preferred datasets first, then the others
     all_keys = list(options.keys())
     
-    # Filtra preferred che esistono effettivamente nel catalogo
+    # Filter preferred that actually exist in the catalog
     valid_preferred = [k for k in preferred_datasets if k in all_keys]
     other_keys = [k for k in all_keys if k not in valid_preferred]
     
     valid_keys = valid_preferred + other_keys
     
-    # ===== STEP 5: Costruisci menu con badge per dataset consigliati =====
+    # ===== STEP 5: Build menu with badges for recommended datasets =====
     menu_text = f"\n{'='*70}\n"
-    menu_text += f"📊 DATASET REALI PER: {task_type.upper().replace('_', ' ')}\n"
+    menu_text += f"📊 REAL DATASETS FOR: {task_type.upper().replace('_', ' ')}\n"
     menu_text += f"{'='*70}\n"
     logger.info(f"  Menu datasets: {valid_keys}") # Debug log
     
     if mapping_notes:
         menu_text += f"💡 Note: {mapping_notes}\n\n"
     
-    menu_text += "Scegli un dataset:\n\n"
+    menu_text += "Choose a dataset:\n\n"
     
     for idx, key in enumerate(valid_keys, 1):
         info = options[key]
         
-        # Badge per dataset consigliati
-        badge = "⭐ CONSIGLIATO" if key in valid_preferred else ""
+        # Badge for recommended datasets
+        badge = "⭐ RECOMMENDED" if key in valid_preferred else ""
         note = info.get('note', '')
         name = info.get('name', key.replace('_', ' ').title())
         
@@ -414,47 +414,47 @@ def select_predefined_dataset(state: MasterState, config: RunnableConfig = None)
     
     menu_text += f"{'='*70}\n"
     
-    # ===== STEP 6: Mostra informazioni modello selezionato =====
+    # ===== STEP 6: Show selected model information =====
     if state.selected_model:
         model_name = state.selected_model.get('name', 'N/A')
-        menu_text += f"\n🤖 Modello: {model_name}\n"
+        menu_text += f"\n🤖 Model: {model_name}\n"
     
     prompt = {
         "instruction": menu_text,
-        "valid_options": ["(Digitare numero / nome)"] + valid_keys,
-        "hint": "Inserisci il numero o il nome del dataset (es: 1 oppure cifar10)"
+        "valid_options": ["(Type number / name)"] + valid_keys,
+        "hint": "Enter the dataset number or name (e.g. 1 or cifar10)"
     }
     
-    # === ESTRATTORE LLM ===
+    # === LLM EXTRACTOR ===
     from src.assistant.utils import extract_user_response, get_llm
     llm = get_llm(config)
     
-    # --- Passo 1: Prova a usare il messaggio iniziale ---
+    # --- Step 1: Try to use the initial message ---
     initial_selection = None
     if not state.user_response:
-        # Check se uno dei nomi dei dataset è nel messaggio trigger
+        # Check if one of the dataset names is in the trigger message
         msg_low = state.message.lower()
         for key in valid_keys:
             if key.lower() in msg_low:
                 initial_selection = key
-                logger.info(f"🤖 Dataset '{key}' rilevato nel messaggio iniziale.")
+                logger.info(f"🤖 Dataset '{key}' detected in the initial message.")
                 break
 
-    # --- Passo 2: Verifica e Interrupt ---
+    # --- Step 2: Verification and Interrupt ---
     if not initial_selection:
         resume_value = None
         if not state.user_response:
-            # Suggerimento se l'utente ha una preferenza passata
-            last_ds = state.persistent_context.get("last_real_dataset", "Nessuno") if state.persistent_context else "Nessuno"
-            if last_ds != "Nessuno" and last_ds in valid_keys:
-                prompt["suggestion"] = f"💡 L'ultima volta hai usato: **{last_ds}**. Vuoi usare lo stesso?"
+            # Suggestion if the user has a past preference
+            last_ds = state.persistent_context.get("last_real_dataset", "None") if state.persistent_context else "None"
+            if last_ds != "None" and last_ds in valid_keys:
+                prompt["suggestion"] = f"💡 Last time you used: **{last_ds}**. Do you want to use the same?"
             
         if not state.user_response:
             logger.info("⏸️ Interrupting for dataset selection.")
             resume_value = interrupt(prompt)
             selection = str(resume_value).strip().lower() if resume_value else ""
         else:
-            # Usa interrupt return value come priorità
+            # Use interrupt return value as priority
             if resume_value and str(resume_value).strip():
                 selection = str(resume_value).strip().lower()
             else:
@@ -463,40 +463,40 @@ def select_predefined_dataset(state: MasterState, config: RunnableConfig = None)
     else:
         selection = initial_selection
 
-    # (Logica di parsing numero/nome rimane uguale e fluisce sotto)
+    # (Number/name parsing logic remains the same and flows below)
     
-    # ===== STEP 8: Parsing risposta utente =====
-    # Default: primo dataset consigliato (o primo disponibile)
+    # ===== STEP 8: Parse user response =====
+    # Default: first recommended dataset (or first available)
     if not selection or selection.strip() == "":
         selection = valid_keys[0] if valid_keys else "cifar10"
-        logger.info(f"  Nessuna selezione, uso default: {selection}")
+        logger.info(f"  No selection, using default: {selection}")
     
-    # Fuzzy matching: cerca per nome o per numero
+    # Fuzzy matching: search by name or by number
     selected_key = None
     
-    # Prova a interpretare come numero
+    # Try to interpret as number
     try:
         idx = int(selection) - 1
         if 0 <= idx < len(valid_keys):
             selected_key = valid_keys[idx]
-            logger.info(f"  ✓ Dataset selezionato per indice {idx+1}: {selected_key}")
+            logger.info(f"  ✓ Dataset selected by index {idx+1}: {selected_key}")
     except ValueError:
         pass
     
-    # Se non è un numero, cerca per match parziale nel nome
+    # If not a number, search by partial match in the name
     if not selected_key:
         for key in valid_keys:
             if key in selection or selection in key:
                 selected_key = key
-                logger.info(f"  ✓ Dataset selezionato per match: {selected_key}")
+                logger.info(f"  ✓ Dataset selected by match: {selected_key}")
                 break
     
-    # Fallback: usa il primo disponibile
+    # Fallback: use first available
     if not selected_key:
         selected_key = valid_keys[0] if valid_keys else "cifar10"
-        logger.warning(f"⚠️ Dataset non riconosciuto '{selection}', uso default: {selected_key}")
+        logger.warning(f"⚠️ Unrecognized dataset '{selection}', using default: {selected_key}")
     
-    # ===== STEP 9: Verifica compatibilità modello-dataset =====
+    # ===== STEP 9: Model-dataset compatibility check =====
     if state.model_architecture and selected_key:
         compatibility_ok = check_dataset_model_compatibility(
             state.model_architecture.get('input_shape'),
@@ -504,11 +504,11 @@ def select_predefined_dataset(state: MasterState, config: RunnableConfig = None)
             task_type
         )
         if not compatibility_ok:
-            logger.warning("⚠️ Potrebbe essere necessario preprocessing/resizing del dataset")
+            logger.warning("⚠️ Dataset preprocessing/resizing might be necessary")
     
-    # ===== STEP 10: Salva selezione =====
+    # ===== STEP 10: Save selection =====
     state.real_dataset_name = selected_key
-    logger.info(f"✅ Dataset finale selezionato: {selected_key}")
+    logger.info(f"✅ Final selected dataset: {selected_key}")
     logger.info(f"   Task type: {task_type}")
     
     return state
@@ -516,13 +516,13 @@ def select_predefined_dataset(state: MasterState, config: RunnableConfig = None)
 
 def check_dataset_model_compatibility(model_input_shape, dataset_name: str, task_type: str) -> bool:
     """
-    Verifica se il dataset è compatibile con l'input del modello.
-    Utilizza i metadata nel catalogo se presenti.
+    Checks if the dataset is compatible with the model input.
+    Uses metadata in the catalog if present.
     """
     
-    logger.info(f"🔍 Verifica compatibilità: {dataset_name} vs {model_input_shape}")
+    logger.info(f"🔍 Compatibility check: {dataset_name} vs {model_input_shape}")
     
-    # 1. Carica catalogo per trovare shape atteso
+    # 1. Load catalog to find expected shape
     catalog = load_dataset_catalog()
     dataset_info = None
     for category in catalog.values():
@@ -531,28 +531,28 @@ def check_dataset_model_compatibility(model_input_shape, dataset_name: str, task
             break
             
     if not dataset_info:
-        logger.warning(f"⚠️ Dataset '{dataset_name}' non trovato nel catalogo per check compatibilità.")
-        return True # Prosegui comunque
+        logger.warning(f"⚠️ Dataset '{dataset_name}' not found in catalog for compatibility check.")
+        return True # Proceed anyway
         
     expected_shape = dataset_info.get("expected_shape")
     
     if not model_input_shape:
-        logger.info("  ℹ️  Input shape modello non disponibile, skip compatibilità check")
+        logger.info("  ℹ️  Model input shape not available, skipping compatibility check")
         return True
     
-    # ===== Se dataset ha shape variabile (None), sempre OK =====
+    # ===== If dataset has variable shape (None), always OK =====
     if expected_shape is None:
-        logger.info(f"  ✓ Dataset '{dataset_name}' ha dimensioni variabili (supporta preprocessing)")
+        logger.info(f"  ✓ Dataset '{dataset_name}' has variable dimensions (supports preprocessing)")
         return True
     
-    # ===== Converti model_input_shape in tuple per confronto =====
+    # ===== Convert model_input_shape to tuple for comparison =====
     model_shape_tuple = None
     if isinstance(model_input_shape, list):
         model_shape_tuple = tuple(model_input_shape)
     elif isinstance(model_input_shape, tuple):
         model_shape_tuple = model_input_shape
     elif isinstance(model_input_shape, str):
-        # Prova a parseare stringa tipo "(None, 224, 224, 3)"
+        # Try parsing string like "(None, 224, 224, 3)"
         try:
             import ast
             parsed = ast.literal_eval(model_input_shape)
@@ -562,39 +562,39 @@ def check_dataset_model_compatibility(model_input_shape, dataset_name: str, task
             pass
             
     if model_shape_tuple is None:
-        logger.warning(f"  ⚠️ Input shape formato non riconosciuto: {type(model_input_shape)} ({model_input_shape})")
-        return True # Prosegui comunque
+        logger.warning(f"  ⚠️ Unrecognized input shape format: {type(model_input_shape)} ({model_input_shape})")
+        return True # Proceed anyway
     
-    # ===== Confronta dimensioni =====
+    # ===== Compare dimensions =====
     if expected_shape == model_shape_tuple:
-        logger.info(f"  ✓✓ Perfetta compatibilità: dataset {expected_shape} = modello {model_shape_tuple}")
+        logger.info(f"  ✓✓ Perfect compatibility: dataset {expected_shape} = model {model_shape_tuple}")
         return True
     
-    # ===== Shape diverso → serve resize =====
-    logger.warning(f"  ⚠️ Incompatibilità shape:")
+    # ===== Different shape → needs resize =====
+    logger.warning(f"  ⚠️ Shape incompatibility:")
     logger.warning(f"     Dataset '{dataset_name}': {expected_shape}")
-    logger.warning(f"     Modello richiede: {model_shape_tuple}")
+    logger.warning(f"     Model requires: {model_shape_tuple}")
     
-    # Suggerimenti specifici
+    # Specific suggestions
     if task_type == "vision":
-        logger.info(f"  💡 Soluzione: Usa resizing layer o preprocessing per adattare {expected_shape} → {model_shape_tuple}")
+        logger.info(f"  💡 Solution: Use resizing layer or preprocessing to adapt {expected_shape} → {model_shape_tuple}")
     elif task_type == "audio":
-        logger.info(f"  💡 Soluzione: Modifica parametri spectrogram processing (target_shape)")
+        logger.info(f"  💡 Solution: Modify spectrogram processing parameters (target_shape)")
     elif task_type in ["human_activity_recognition", "object_detection"]:
-        logger.info(f"  💡 Soluzione: Configura window size o usa data augmentation con resize")
+        logger.info(f"  💡 Solution: Configure window size or use data augmentation with resize")
     
     return False
 
 
 def download_dataset(state: MasterState, config: RunnableConfig = None) -> MasterState:
-    """Scarica il dataset selezionato utilizzando il catalogo dinamico"""
+    """Downloads the selected dataset using the dynamic catalog"""
     
     dataset_name = state.real_dataset_name
-    logger.info(f"📥 Avvio download dataset: {dataset_name}...")
+    logger.info(f"📥 Starting dataset download: {dataset_name}...")
     
     # Check disk space
     if not check_disk_space(state.base_dir, required_gb=5.0):
-        # Proseguiamo comunque ma avvisiamo
+        # We proceed anyway but warn
         pass
 
     # Setup dir
@@ -602,7 +602,7 @@ def download_dataset(state: MasterState, config: RunnableConfig = None) -> Maste
     os.makedirs(dataset_dir, exist_ok=True)
     state.real_dataset_path = dataset_dir
     
-    # 1. Recupera info dal catalogo
+    # 1. Retrieve info from catalog
     catalog = load_dataset_catalog()
     dataset_info = None
     category_name = None
@@ -614,8 +614,8 @@ def download_dataset(state: MasterState, config: RunnableConfig = None) -> Maste
             break
             
     if not dataset_info:
-        logger.error(f"❌ Dataset '{dataset_name}' non trovato nel catalogo.")
-        state.ai_error_message = f"Dataset {dataset_name} non trovato."
+        logger.error(f"❌ Dataset '{dataset_name}' not found in catalog.")
+        state.ai_error_message = f"Dataset {dataset_name} not found."
         return state
 
     url = dataset_info.get("url")
@@ -625,7 +625,7 @@ def download_dataset(state: MasterState, config: RunnableConfig = None) -> Maste
     try:
         # A. Keras Built-in
         if keras_name:
-            logger.info(f"📦 Utilizzo Keras built-in dataset: {keras_name}")
+            logger.info(f"📦 Using Keras built-in dataset: {keras_name}")
             import tensorflow as tf
             if keras_name == "cifar10":
                 (x_train, y_train), (x_test, y_test) = tf.keras.datasets.cifar10.load_data()
@@ -634,30 +634,30 @@ def download_dataset(state: MasterState, config: RunnableConfig = None) -> Maste
             elif keras_name == "fashion_mnist":
                 (x_train, y_train), (x_test, y_test) = tf.keras.datasets.fashion_mnist.load_data()
             else:
-                raise ValueError(f"Keras dataset {keras_name} non supportato direttamente.")
+                raise ValueError(f"Keras dataset {keras_name} not directly supported.")
                 
             np.save(os.path.join(dataset_dir, "x_train.npy"), x_train)
             np.save(os.path.join(dataset_dir, "y_train.npy"), y_train)
             np.save(os.path.join(dataset_dir, "x_test.npy"), x_test)
             np.save(os.path.join(dataset_dir, "y_test.npy"), y_test)
-            logger.info(f"✅ Dataset salvato in {dataset_dir}")
+            logger.info(f"✅ Dataset saved in {dataset_dir}")
 
         # B. URL Download (Generic Archive)
         elif url:
             if "roboflow.com" in url:
-                # Logica manuale per Roboflow (già esistente)
-                logger.info(f"📥 Dataset Roboflow rilevato")
+                # Manual logic for Roboflow (already existing)
+                logger.info(f"📥 Roboflow dataset detected")
                 logger.info(f"")
-                logger.info(f"⚠️  RICHIESTA AZIONE UTENTE:")
-                logger.info(f"   Per scaricare questo dataset:")
+                logger.info(f"⚠️  USER ACTION REQUIRED:")
+                logger.info(f"   To download this dataset:")
                 logger.info(f"")
-                logger.info(f"   1. Visita: {url}")
-                logger.info(f"   2. Crea account Roboflow (gratuito)")
-                logger.info(f"   3. Seleziona formato: COCO JSON")
-                logger.info(f"   4. Download ed estrai in: {dataset_dir}")
+                logger.info(f"   1. Visit: {url}")
+                logger.info(f"   2. Create Roboflow account (free)")
+                logger.info(f"   3. Select format: COCO JSON")
+                logger.info(f"   4. Download and extract to: {dataset_dir}")
                 logger.info(f"")
                 
-                # Salva istruzioni
+                # Save instructions
                 with open(os.path.join(dataset_dir, "DOWNLOAD_INSTRUCTIONS.txt"), "w") as f:
                     f.write(f"Dataset: {dataset_name}\n")
                     f.write(f"Roboflow URL: {url}\n\n")
@@ -670,9 +670,9 @@ def download_dataset(state: MasterState, config: RunnableConfig = None) -> Maste
                     if kaggle_alt:
                         f.write(f"Alternative (Kaggle):\n{kaggle_alt}\n")
                 
-                logger.warning(f"⚠️  Download manuale richiesto. Istruzioni salvate in DOWNLOAD_INSTRUCTIONS.txt")
+                logger.warning(f"⚠️  Manual download required. Instructions saved in DOWNLOAD_INSTRUCTIONS.txt")
                 
-                # Salva metadata minimale
+                # Save minimal metadata
                 metadata = {
                     "dataset_name": dataset_name,
                     "url": url,
@@ -698,15 +698,15 @@ def download_dataset(state: MasterState, config: RunnableConfig = None) -> Maste
                 else:
                     logger.info(f"✅ Extracted dir found")
                 
-                # Processing specifico basato sulla categoria
+                # Specific processing based on category
                 processing_success = True
                 if category_name == "audio":
                     logger.info("🎵 Processing audio spectrograms...")
                     process_speech_commands(extract_dir, dataset_dir)
                     logger.info(f"✅ Audio dataset processed")
                 elif category_name == "human_activity_recognition":
-                    logger.info("⌚ HAR dataset pronto (estratto)")
-                    # Metadata salvataggio
+                    logger.info("⌚ HAR dataset ready (extracted)")
+                    # Metadata saving
                     metadata = {
                         "dataset_name": dataset_name,
                         "download_date": datetime.now().isoformat(),
@@ -717,23 +717,23 @@ def download_dataset(state: MasterState, config: RunnableConfig = None) -> Maste
                     with open(os.path.join(dataset_dir, "metadata.json"), "w") as f:
                         json.dump(metadata, f, indent=2)
                 else:
-                    # Se la categoria è vision o object_detection (immagini), processa automaticamente
+                    # If category is vision or object_detection (images), process automatically
                     if category_name in ["vision", "object_detection"]:
-                        logger.info(f"🖼️  Tentativo di processing automatico per dataset immagini...")
+                        logger.info(f"🖼️  Attempting automatic processing for images dataset...")
                         process_generic_vision_dataset(extract_dir, dataset_dir)
                     else:
-                        logger.info(f"✅ Generic dataset pronto in {extract_dir}")
+                        logger.info(f"✅ Generic dataset ready in {extract_dir}")
                 
-                # 🧹 CLEANUP: Rimuovi cartella estratta e archivio per risparmiare spazio
+                # 🧹 CLEANUP: Remove extracted folder and archive to save space
                 try:
                     if os.path.exists(extract_dir):
-                        logger.info(f"🧹 Cleanup: Rimosso {extract_dir}")
+                        logger.info(f"🧹 Cleanup: Removed {extract_dir}")
                         shutil.rmtree(extract_dir)
                     if os.path.exists(archive_path):
-                        logger.info(f"🧹 Cleanup: Rimosso {archive_path}")
+                        logger.info(f"🧹 Cleanup: Removed {archive_path}")
                         os.remove(archive_path)
                 except Exception as cleanup_err:
-                    logger.warning(f"⚠️ Errore durante cleanup: {cleanup_err}")
+                    logger.warning(f"⚠️ Error during cleanup: {cleanup_err}")
 
         # C. TFDS (TensorFlow Datasets)
         elif tfds_name:
@@ -742,16 +742,16 @@ def download_dataset(state: MasterState, config: RunnableConfig = None) -> Maste
             try:
                 import tensorflow_datasets as tfds
                 
-                # Download dataset con tfds (automatico)
+                # Download dataset con tfds (automatic)
                 logger.info(f"⬇️  Loading from TFDS: {tfds_name}")
                 logger.info(f"   This may take a while for first download (~{dataset_info.get('size', 'unknown size')})...")
                 
-                # Load dataset con info
+                # Load dataset with info
                 ds_train, ds_info = tfds.load(
                     tfds_name,
                     split='train',
                     with_info=True,
-                    data_dir=dataset_dir  # Salva in directory specifica
+                    data_dir=dataset_dir  # Save in specific directory
                 )
                 
                 # Check if validation split exists
@@ -777,7 +777,7 @@ def download_dataset(state: MasterState, config: RunnableConfig = None) -> Maste
                     logger.info(f"   {val_split_name.capitalize()} samples: {ds_info.splits[val_split_name].num_examples}")
                 logger.info(f"   Features: {ds_info.features}")
                 
-                # Salva metadata
+                # Save metadata
                 metadata = {
                     "dataset_name": dataset_name,
                     "download_date": datetime.now().isoformat(),
@@ -792,7 +792,7 @@ def download_dataset(state: MasterState, config: RunnableConfig = None) -> Maste
                 with open(os.path.join(dataset_dir, "metadata.json"), "w") as f:
                     json.dump(metadata, f, indent=2)
                 
-                # Salva info su come usare il dataset
+                # Save info on how to use the dataset
                 with open(os.path.join(dataset_dir, "USAGE_INFO.txt"), "w") as f:
                     f.write(f"{dataset_name} Dataset (via TensorFlow Datasets)\n\n")
                     f.write(f"To load this dataset in your code:\n\n")
@@ -804,7 +804,7 @@ def download_dataset(state: MasterState, config: RunnableConfig = None) -> Maste
                         f.write(f"ds_validation = tfds.load('{tfds_name}', split='{val_split_name}', data_dir='{dataset_dir}')\n\n")
                     f.write(f"Features:\n{ds_info.features}\n")
                 
-                logger.info(f"✅ TFDS {tfds_name} setup completato")
+                logger.info(f"✅ TFDS {tfds_name} setup completed")
                 logger.info(f"💡 Usage instructions saved in USAGE_INFO.txt")
                 if category_name == "object_detection":
                     logger.info(f"⚠️  Note: Dataset includes bounding boxes and segmentation masks")
@@ -815,7 +815,7 @@ def download_dataset(state: MasterState, config: RunnableConfig = None) -> Maste
                 raise
             
     except Exception as e:
-        logger.error(f"❌ Errore durante download/processing: {e}")
+        logger.error(f"❌ Error during download/processing: {e}")
         state.ai_error_message = str(e)
         # Fallback dummy file
         with open(os.path.join(dataset_dir, "README.txt"), "w") as f:
@@ -829,7 +829,7 @@ def download_dataset(state: MasterState, config: RunnableConfig = None) -> Maste
 # ============================================================================
 
 def download_file(url: str, dest_path: str):
-    """Scarica file con progress bar"""
+    """Downloads file with progress bar"""
     response = requests.get(url, stream=True)
     total_size = int(response.headers.get('content-length', 0))
     block_size = 1024 * 1024 # 1MB
@@ -846,7 +846,7 @@ def download_file(url: str, dest_path: str):
             bar.update(size)
 
 def extract_archive(file_path: str, extract_to: str):
-    """Estrae .tar.gz o .zip"""
+    """Extracts .tar.gz or .zip"""
     os.makedirs(extract_to, exist_ok=True)
     if file_path.endswith("tar.gz") or file_path.endswith(".tgz"):
         with tarfile.open(file_path, "r:gz") as tar:
@@ -857,8 +857,8 @@ def extract_archive(file_path: str, extract_to: str):
 
 def audio_to_spectrogram(file_path: str, target_shape=(32, 32)) -> Optional[np.ndarray]:
     """
-    Legge un WAV, calcola STFT spectrogram, ridimensiona a target_shape.
-    Ritorna array (H, W, 1) normalizzato [0,1].
+    Reads a WAV file, computes STFT spectrogram, resizes to target_shape.
+    Returns (H, W, 1) array normalized [0,1].
     """
     try:
         # 1. READ WAV FILE (Load & Resample)
@@ -912,19 +912,19 @@ def audio_to_spectrogram(file_path: str, target_shape=(32, 32)) -> Optional[np.n
 
 def process_speech_commands(extract_dir: str, output_dir: str, target_shape=(32, 32)):
     """
-    Processa Google Speech Commands dataset.
-    Struttura: extracted/speech_commands_v0.02/word/file.wav
+    Processes Google Speech Commands dataset.
+    Structure: extracted/speech_commands_v0.02/word/file.wav
     """
-    # Trova root reale (spesso c'è una cartella intermedia)
-    # Per speech commands v0.02 di solito è diretto o in una cartella
-    # Cerchiamo cartelle che sono le label (es. "yes", "no", "up")
+    # Find real root (often there is an intermediate folder)
+    # For speech commands v0.02 it's usually direct or in a folder
+    # We look for folders which are labels (e.g. "yes", "no", "up")
     
-    # Keywords da usare (subset per semplicità o tutte)
-    # Usiamo le 10 standard + silence/unknown se vogliamo, ma per ora prendiamo le cartelle presenti
-    # Filtriamo cartelle di sistema o file
+    # Keywords to use (subset for simplicity or all)
+    # We use the 10 standard + silence/unknown if we want, but for now we take the existing folders
+    # Filter system folders or files
     
     root_search = extract_dir
-    # Se c'è una sola cartella dentro extracted, entra lì
+    # If there is only one folder inside extracted, enter there
     entries = os.listdir(extract_dir)
     if len(entries) == 1 and os.path.isdir(os.path.join(extract_dir, entries[0])):
         root_search = os.path.join(extract_dir, entries[0])
@@ -949,7 +949,7 @@ def process_speech_commands(extract_dir: str, output_dir: str, target_shape=(32,
         cls_dir = os.path.join(root_search, cls_name)
         files = [f for f in os.listdir(cls_dir) if f.endswith('.wav')]
         
-        # Shuffle e limit
+        # Shuffle and limit
         import random
         random.shuffle(files)
         files = files[:MAX_SAMPLES_PER_CLASS]
@@ -979,15 +979,15 @@ def process_speech_commands(extract_dir: str, output_dir: str, target_shape=(32,
 
 def process_generic_vision_dataset(extract_dir: str, output_dir: str, target_shape=(224, 224), max_samples=5000):
     """
-    Scansiona una cartella estratta alla ricerca di immagini e le converte in .npy.
-    Inferisce le classi dalle sottocartelle.
+    Scans an extracted folder for images and converts them to .npy.
+    Infers classes from subfolders.
     """
-    logger.info(f"📁 Scansione generica immagini in {extract_dir}...")
+    logger.info(f"📁 Generic image scanning in {extract_dir}...")
     
-    # Estensioni supportate
+    # Supported extensions
     valid_exts = ('.jpg', '.jpeg', '.png', '.bmp')
     
-    # 1. Trova tutte le immagini e mappa le classi
+    # 1. Find all images and map classes
     image_paths = []
     for root, dirs, files in os.walk(extract_dir):
         for f in files:
@@ -995,11 +995,11 @@ def process_generic_vision_dataset(extract_dir: str, output_dir: str, target_sha
                 image_paths.append(os.path.join(root, f))
                 
     if not image_paths:
-        logger.warning("⚠️  Nessuna immagine trovata nell'archivio estratto.")
+        logger.warning("⚠️  No images found in the extracted archive.")
         return
 
-    # 2. Inferenza classi dal nome della cartella genitore
-    # Assumiamo struttura: root/classe/immagine.jpg
+    # 2. Class inference from parent folder name
+    # Assume structure: root/class/image.jpg
     path_to_class = {}
     for p in image_paths:
         cls_name = os.path.basename(os.path.dirname(p))
@@ -1010,10 +1010,10 @@ def process_generic_vision_dataset(extract_dir: str, output_dir: str, target_sha
     classes = sorted(list(set(path_to_class.values())))
     class_to_idx = {cls: i for i, cls in enumerate(classes)}
     
-    logger.info(f"✓ Trovate {len(image_paths)} immagini in {len(classes)} classi.")
-    logger.info(f"✓ Classi: {classes[:10]} {'...' if len(classes) > 10 else ''}")
+    logger.info(f"✓ Found {len(image_paths)} images across {len(classes)} classes.")
+    logger.info(f"✓ Classes: {classes[:10]} {'...' if len(classes) > 10 else ''}")
 
-    # 3. Shuffle e Limite per performance/memoria
+    # 3. Shuffle and Limit for performance/memory
     import random
     random.shuffle(image_paths)
     image_paths = image_paths[:max_samples]
@@ -1021,7 +1021,7 @@ def process_generic_vision_dataset(extract_dir: str, output_dir: str, target_sha
     X = []
     y = []
     
-    logger.info(f"⚙️  Processing {len(image_paths)} campioni...")
+    logger.info(f"⚙️  Processing {len(image_paths)} samples...")
     
     X = []
     y = []
@@ -1031,7 +1031,7 @@ def process_generic_vision_dataset(extract_dir: str, output_dir: str, target_sha
             img = tf.io.read_file(p)
             img = tf.image.decode_image(img, channels=3, expand_animations=False)
             img = tf.image.resize(img, target_shape[:2])
-            # Salviamo in uint8 [0, 255] per risparmiare 4x spazio su disco (float32 -> uint8)
+            # Save in uint8 [0, 255] to save 4x disk space (float32 -> uint8)
             img = tf.cast(img, tf.uint8)
             X.append(img.numpy())
             y.append(class_to_idx[path_to_class[p]])
@@ -1039,17 +1039,17 @@ def process_generic_vision_dataset(extract_dir: str, output_dir: str, target_sha
             continue
             
     if not X:
-        logger.error("❌ Errore: Nessuna immagine valida processata.")
+        logger.error("❌ Error: No valid images processed.")
         return
         
     X = np.array(X, dtype='uint8')
     y = np.array(y, dtype='int32')
     
-    # 4. Salvataggio
+    # 4. Save
     np.save(os.path.join(output_dir, "x_train.npy"), X)
     np.save(os.path.join(output_dir, "y_train.npy"), y)
     
-    # Split manuale per validazione (20%)
+    # Manual split for validation (20%)
     split_idx = int(len(X) * 0.8)
     np.save(os.path.join(output_dir, "x_test.npy"), X[split_idx:])
     np.save(os.path.join(output_dir, "y_test.npy"), y[split_idx:])
@@ -1057,14 +1057,14 @@ def process_generic_vision_dataset(extract_dir: str, output_dir: str, target_sha
     with open(os.path.join(output_dir, "classes.json"), "w") as f:
         json.dump(class_to_idx, f, indent=2)
         
-    logger.info(f"✅ Processing completato. Salvati {len(X)} campioni (uint8) in {output_dir}")
+    logger.info(f"✅ Processing completed. Saved {len(X)} samples (uint8) in {output_dir}")
 
 def check_disk_space(path: str, required_gb: float = 5.0) -> bool:
-    """Verifica se c'è abbastanza spazio su disco."""
+    """Checks if there is enough disk space."""
     import shutil
     total, used, free = shutil.disk_usage(path)
     free_gb = free / (2**30)
     if free_gb < required_gb:
-        logger.warning(f"⚠️  Spazio su disco critico: {free_gb:.2f} GB disponibili. Richiesti: {required_gb} GB.")
+        logger.warning(f"⚠️  Critical disk space: {free_gb:.2f} GB available. Required: {required_gb} GB.")
         return False
     return True

@@ -1,14 +1,14 @@
 # ============================================================================
 # WORKFLOW 6: SYNTHETIC DATA GENERATION
 # ============================================================================
-# Modulo per la generazione di dati sintetici (audio/time-series)
+# Module for generating synthetic data (audio/time-series)
 #
-# Responsabilità:
-#   - Chiedere all'utente i requisiti dei dati (tipo, durata, quantità)
-#   - Generare waveform sintetiche (sine, noise, chirp, etc.)
-#   - Salvare i dati in formato .npy o .wav per il fine-tuning
+# Responsibilities:
+#   - Ask the user for data requirements (type, duration, quantity)
+#   - Generate synthetic waveforms (sine, noise, chirp, etc.)
+#   - Save the data in .npy or .wav format for fine-tuning
 #
-# Dipendenze: numpy, scipy, soundfile (opzionale), matplotlib (per debug)
+# Dependencies: numpy, scipy, soundfile (optional), matplotlib (for debugging)
 
 import os
 import logging
@@ -32,50 +32,50 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 
 class SyntheticDataRequest(BaseModel):
-    """Richiesta strutturata per dati sintetici"""
+    """Structured request for synthetic data"""
     signal_type: Literal["sine", "white_noise", "pink_noise", "chirp", "impulse", "silence", "mixed"] = Field(
-        description="Tipo di segnale da generare"
+        description="Type of signal to generate"
     )
-    frequency: Optional[float] = Field(description="Frequenza in Hz (per sine/chirp)")
-    duration_sec: float = Field(default=1.0, description="Durata in secondi per sample")
+    frequency: Optional[float] = Field(description="Frequency in Hz (for sine/chirp)")
+    duration_sec: float = Field(default=1.0, description="Duration in seconds per sample")
     sample_rate: int = Field(default=16000, description="Sample rate in Hz")
-    num_samples: int = Field(default=10, description="Numero di campioni da generare")
-    amplitude: float = Field(default=0.5, description="Ampiezza del segnale (0.0-1.0)")
-    noise_level: float = Field(default=0.0, description="Livello di rumore aggiunto (0.0-1.0)")
+    num_samples: int = Field(default=10, description="Number of samples to generate")
+    amplitude: float = Field(default=0.5, description="Signal amplitude (0.0-1.0)")
+    noise_level: float = Field(default=0.0, description="Added noise level (0.0-1.0)")
 
 # ============================================================================
 # NODES
 # ============================================================================
 
 def ask_synthetic_data_requirements(state: MasterState, config: RunnableConfig = None) -> MasterState:
-    """Chiede all'utente che tipo di dati generare"""
+    """Asks the user what type of data to generate"""
     
-    logger.info("🧪 Avvio procedura generazione dati sintetici...")
+    logger.info("🧪 Starting synthetic data generation procedure...")
     
     prompt = {
-        "instruction": """Generazione Dati Sintetici (Audio/Time-Series)
+        "instruction": """Synthetic Data Generation (Audio/Time-Series)
         
-Che tipo di dati vuoi generare per il training?
-Puoi specificare:
-- Tipo: Sine wave, Noise, Chirp, Impulse
-- Frequenza: es. 1kHz, 440Hz
-- Quantità: es. 50 samples
-- Durata: es. 1 secondo
+What kind of data do you want to generate for training?
+You can specify:
+- Type: Sine wave, Noise, Chirp, Impulse
+- Frequency: e.g. 1kHz, 440Hz
+- Quantity: e.g. 50 samples
+- Duration: e.g. 1 second
 
-Esempi:
-- "Genera 50 campioni di onda sinusoidale a 1kHz con rumore"
-- "Voglio 20 campioni di rumore bianco per 2 secondi"
-- "10 chirp da 100Hz a 1kHz"
+Examples:
+- "Generate 50 sine wave samples at 1kHz with noise"
+- "I want 20 white noise samples for 2 seconds"
+- "10 chirps from 100Hz to 1kHz"
         """
     }
     
-    # === ESTRATTORE LLM ===
+    # === LLM EXTRACTOR ===
     cfg = Configuration.from_runnable_config(config)
     from src.assistant.utils import extract_user_response, get_llm
     llm = get_llm(config)
     llm_parser = llm.with_structured_output(SyntheticDataRequest)
     
-    # --- Passo 1: Prova a usare il messaggio iniziale ---
+    # --- Step 1: Try to use the initial message ---
     initial_req_detected = False
     if not state.user_response:
         res = llm_parser.invoke([
@@ -87,57 +87,57 @@ Esempi:
         if signal_val:
             state.synthetic_request = res if isinstance(res, dict) else res.model_dump()
             initial_req_detected = True
-            logger.info(f"🤖 Parametri rilevati nel messaggio iniziale: {state.synthetic_request}")
+            logger.info(f"🤖 Parameters detected in initial message: {state.synthetic_request}")
 
-    # --- Passo 2: Verifica e Interrupt ---
+    # --- Step 2: Verification and Interrupt ---
     if not initial_req_detected:
         resume_value = None
         if not state.user_response:
             logger.info("⏸️ Interrupting for synthetic data requirements.")
             resume_value = interrupt(prompt)
         
-        # Dopo la ripresa: usa interrupt return value come priorità
+        # After resuming: use interrupt return value as priority
         if resume_value and str(resume_value).strip():
             user_text = str(resume_value).strip()
         else:
             user_text = extract_user_response(state.user_response)
         state.user_response = ""
         
-        # Parsing con LLM sulla risposta specifica (stesso sistema di prima)
-        # usiamo il system_prompt definito sotto per coerenza
+        # Parsing with LLM on the specific response (same system as before)
+        # we use the system_prompt defined below for consistency
     else:
-        user_text = state.message # Usiamo il messaggio originale se rilevato lì
+        user_text = state.message # Use the original message if detected there
 
-    # (L'LLM viene invocato comunque sotto se non saltiamo tutto il blocco)
-    # Ma per seguire il pattern, lo invochiamo qui se siamo in fase di risposta
+    # (The LLM is invoked below anyway if we don't skip the whole block)
+    # But to follow the pattern, we invoke it here if we are in the response phase
     if not initial_req_detected:
-        logger.info(f"📝 User input finale: '{user_text}'")
+        logger.info(f"📝 Final user input: '{user_text}'")
     
-    # === PARSING CON LLM (se non già fatto) ===
+    # === PARSING WITH LLM (if not already done) ===
     if not initial_req_detected:
-        system_prompt = """Sei un esperto di DSP (Digital Signal Processing).
-Analizza la richiesta dell'utente ed estrai i parametri per la generazione del segnale.
-Se l'utente non specifica, usa questi default:
+        system_prompt = """You are a DSP (Digital Signal Processing) expert.
+Analyze the user's request and extract the parameters for signal generation.
+If the user does not specify, use these defaults:
 - Duration: 1.0s
 - Sample Rate: 16000Hz
 - Num Samples: 10
 - Amplitude: 0.5
-- Noise Level: 0.1 (se menziona rumore) o 0.0
+- Noise Level: 0.1 (if noise is mentioned) or 0.0
 
-Per "mixed" o richieste complesse, cerca di mappare al tipo più simile o usa "sine" con rumore.
+For "mixed" or complex requests, try to map to the most similar type or use "sine" with noise.
 """
 
         try:
             request = llm_parser.invoke([
                 SystemMessage(content=system_prompt),
-                HumanMessage(content=f"Richiesta: {user_text}")
+                HumanMessage(content=f"Request: {user_text}")
             ])
             
             state.synthetic_request = request if isinstance(request, dict) else request.model_dump()
-            logger.info(f"✓ Parametri estratti: {state.synthetic_request}")
+            logger.info(f"✓ Extracted parameters: {state.synthetic_request}")
         
         except Exception as e:
-            logger.error(f"❌ Errore parsing richiesta: {e}")
+            logger.error(f"❌ Error parsing request: {e}")
             # Fallback
             state.synthetic_request = {
                 "signal_type": "sine",
@@ -153,10 +153,10 @@ Per "mixed" o richieste complesse, cerca di mappare al tipo più simile o usa "s
 
 
 def generate_synthetic_samples(state: MasterState, config: RunnableConfig = None) -> MasterState:
-    """Genera i campioni usando numpy"""
+    """Generates the samples using numpy"""
     
     req = state.synthetic_request
-    logger.info(f"⚙️  Generazione {req['num_samples']} campioni di tipo {req['signal_type']}...")
+    logger.info(f"⚙️  Generating {req['num_samples']} {req['signal_type']} samples...")
     
     params = SyntheticDataRequest(**req)
     
@@ -172,38 +172,38 @@ def generate_synthetic_samples(state: MasterState, config: RunnableConfig = None
         
         # Base signal
         if params.signal_type == "sine":
-            # Sine Wave: Suono puro, utile per testare frequenze specifiche (es. allarmi)
+            # Sine Wave: Pure sound, useful for testing specific frequencies (e.g. alarms)
             freq = params.frequency or 440.0
-            # Aggiungi leggera variazione di frequenza per realismo
+            # Add slight frequency variation for realism
             freq_var = np.random.uniform(-5, 5) 
             signal = params.amplitude * np.sin(2 * np.pi * (freq + freq_var) * t)
             
         elif params.signal_type == "white_noise":
-            # White Noise: Fruscio costante con tutte le frequenze (es. background)
+            # White Noise: Constant hiss with all frequencies (e.g. background)
             signal = params.amplitude * np.random.uniform(-1, 1, len(t))
             
         elif params.signal_type == "pink_noise":
-            # Pink Noise: Rumore più naturale/cupo (es. pioggia, vento) - 1/f
-            # Approssimazione semplice pink noise (1/f)
+            # Pink Noise: More natural/dark noise (e.g. rain, wind) - 1/f
+            # Simple pink noise (1/f) approximation
             white = np.random.randn(len(t))
             signal = np.cumsum(white) # Brownian noise (1/f^2) actually, but close enough for simple test
             signal = signal / np.max(np.abs(signal)) * params.amplitude
             
         elif params.signal_type == "chirp":
-            # Chirp: Suono che cambia frequenza nel tempo (es. sweep test)
+            # Chirp: Sound that changes frequency over time (e.g. sweep test)
             f_start = params.frequency or 100.0
             f_end = f_start * 10
             k = (f_end - f_start) / params.duration_sec
             signal = params.amplitude * np.sin(2 * np.pi * (f_start * t + (k/2) * t**2))
             
         elif params.signal_type == "impulse":
-            # Impulse: Picco istantaneo (es. click, pop, anomalia improvvisa)
+            # Impulse: Instantaneous peak (e.g. click, pop, sudden anomaly)
             signal = np.zeros_like(t)
             idx = np.random.randint(0, len(t))
             signal[idx] = params.amplitude
             
         elif params.signal_type == "silence":
-            # Silence: Silenzio assoluto, fondamentale per classe "nulla"
+            # Silence: Absolute silence, fundamental for "null" class
             signal = np.zeros_like(t)
             
         else: # mixed or default
@@ -230,36 +230,36 @@ def generate_synthetic_samples(state: MasterState, config: RunnableConfig = None
     state.synthetic_data_path = output_dir
     state.synthetic_files_count = len(generated_files)
     
-    logger.info(f"✓ Generati {len(generated_files)} file in {output_dir}")
+    logger.info(f"✓ Generated {len(generated_files)} files in {output_dir}")
     
     return state
 
 
 def validate_synthetic_data(state: MasterState, config: RunnableConfig = None) -> MasterState:
-    """Mostra riepilogo e chiede conferma"""
+    """Shows summary and asks for confirmation"""
     
     summary = f"""
-✅ Generazione Completata!
+✅ Generation Completed!
 
 📂 Output: {state.synthetic_data_path}
-📊 File generati: {state.synthetic_files_count}
-⚙️  Parametri:
-   - Tipo: {state.synthetic_request['signal_type']}
-   - Durata: {state.synthetic_request['duration_sec']}s
+📊 Generated files: {state.synthetic_files_count}
+⚙️  Parameters:
+   - Type: {state.synthetic_request['signal_type']}
+   - Duration: {state.synthetic_request['duration_sec']}s
    - Sample Rate: {state.synthetic_request['sample_rate']}Hz
     """
     
     logger.info(summary)
     
     prompt = {
-        "instruction": f"{summary}\n\nVuoi procedere con il fine-tuning usando questi dati? (sì/no)",
+        "instruction": f"{summary}\n\nDo you want to proceed with fine-tuning using this data? (yes/no)",
     }
     
     resume_value = None
     if not state.user_response or state.user_response.strip() == "":
         resume_value = interrupt(prompt)
     
-    # Usa interrupt return value come priorità
+    # Use interrupt return value as priority
     if resume_value and str(resume_value).strip():
         user_text = str(resume_value).strip().lower()
     else:
@@ -267,14 +267,14 @@ def validate_synthetic_data(state: MasterState, config: RunnableConfig = None) -
         user_text = extract_user_response(state.user_response).lower()
     state.user_response = "" # Clear
     
-    # Default: proceed with fine-tuning (sì)
+    # Default: proceed with fine-tuning (yes)
     if not user_text or user_text.strip() == "":
-        user_text = "sì"
+        user_text = "yes"
         
-    if "sì" in user_text or "si" in user_text or "yes" in user_text or "ok" in user_text:
+    if "sì" in user_text or "si" in user_text or "yes" in user_text or "ok" in user_text or "y" in user_text:
         state.use_synthetic_data = True
     else:
         state.use_synthetic_data = False
-        logger.warning("⚠️  Dati sintetici scartati dall'utente")
+        logger.warning("⚠️  Synthetic data discarded by user")
         
     return state

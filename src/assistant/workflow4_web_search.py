@@ -1,15 +1,15 @@
 # ============================================================================
-# WORKFLOW 4: WEB RESEARCH E RICERCA INFORMAZIONI ONLINE
+# WORKFLOW 4: WEB RESEARCH AND ONLINE INFORMATION SEARCH
 # ============================================================================
-# Modulo dedicato alla ricerca online di informazioni su board STM32, modelli AI
-# e best practices di ottimizzazione
+# Module dedicated to online search for information about STM32 boards, AI models
+# and optimization best practices
 #
-# Responsabilità:
-#   - Classificazione tipo di ricerca (ai_model, board_selection, optimization, documentation)
-#   - Esecuzione ricerche via Google Search / LLM
-#   - Formattazione risultati per l'utente
+# Responsibilities:
+#   - Classification of search type (ai_model, board_selection, optimization, documentation)
+#   - Execution of searches via Google Search / LLM
+#   - Formatting results for the user
 #
-# Dipendenze: langgraph, langchain, agno.tools, requests
+# Dependencies: langgraph, langchain, agno.tools, requests
 
 import os
 import logging
@@ -33,7 +33,7 @@ import asyncio
 # DEEPEVAL INTEGRATION
 # ============================================================================
 # ===== CRITICAL: SET ENVIRONMENT VARIABLES BEFORE IMPORTING DEEPEVAL =====
-os.environ["DEEPEVAL_RESULTS_FOLDER"] = "/tmp/deepeval"  # Scrivibile anche in Docker
+os.environ["DEEPEVAL_RESULTS_FOLDER"] = "/tmp/deepeval"  # Writable also in Docker
 os.environ["DEEPEVAL_DISABLE_TELEMETRY"] = "1"
 os.environ["DEEPEVAL_TELEMETRY_OPT_OUT"] = "YES"
 os.environ["DEEPEVAL_SKIP_PROMPTS_CACHE"] = "1"
@@ -45,8 +45,8 @@ def _evaluate_summary_sync(
     web_research_results: str
 ) -> dict:
     """
-    Evaluation Synchrone in thread separato.
-    Usa metriche compatibili con web search (Faithfulness, AnswerRelevancy).
+    Synchronous Evaluation in a separate thread.
+    Uses metrics compatible with web search (Faithfulness, AnswerRelevancy).
     """
     triton_enabled = os.environ.get("USE_TRITON_BACKEND", "false").lower() == "true"
     backend_label = "Triton (deepseek-r1)" if triton_enabled else "Ollama (deepseek-r1:latest)"
@@ -62,9 +62,9 @@ def _evaluate_summary_sync(
         from deepeval.test_case import LLMTestCase
         
         # -----------------------------------------------------------------------
-        # MODELLO DI VALUTAZIONE: Custom DeepEval wrapper su get_llm
-        # Sfruttiamo il routing centralizzato (Triton/Ollama) bypassando il 
-        # vincolo stretto 'OPENAI_API_KEY' imposto dalla classe GPTModel nativa.
+        # EVALUATION MODEL: Custom DeepEval wrapper over get_llm
+        # We leverage centralized routing (Triton/Ollama) bypassing the
+        # strict 'OPENAI_API_KEY' constraint imposed by native GPTModel class.
         # -----------------------------------------------------------------------
         from src.assistant.utils import get_llm
         from deepeval.models import DeepEvalBaseLLM
@@ -88,7 +88,7 @@ def _evaluate_summary_sync(
                 import re
                 import json
                 
-                print(f"\n[DEEPEVAL RAW model]\n{text}\n[/DEEPEVAL RAW model]\n", flush=True) # per test
+                print(f"\n[DEEPEVAL RAW model]\n{text}\n[/DEEPEVAL RAW model]\n", flush=True) # for testing
                 
                 # 0. Normalize Python f-string double-braces {{ }} -> { }
                 # DeepSeek-R1 was trained on StackOverflow f-string examples and sometimes
@@ -106,7 +106,7 @@ def _evaluate_summary_sync(
                     candidate = match.group(1)
                     try:
                         json.loads(candidate)
-                        print(f"\n[DEEPEVAL EXTRACTED (Regex)]\n{candidate}\n[/DEEPEVAL EXTRACTED (Regex)]\n", flush=True) # per test
+                        print(f"\n[DEEPEVAL EXTRACTED (Regex)]\n{candidate}\n[/DEEPEVAL EXTRACTED (Regex)]\n", flush=True) # for testing
                         return candidate
                     except json.JSONDecodeError:
                         continue
@@ -120,12 +120,12 @@ def _evaluate_summary_sync(
                         candidate = cleaned[start_idx:end_idx+1]
                         try:
                             json.loads(candidate)
-                            print(f"\n[DEEPEVAL EXTRACTED (Fallback)]\n{candidate}\n[/DEEPEVAL EXTRACTED (Fallback)]\n", flush=True) # per test
+                            print(f"\n[DEEPEVAL EXTRACTED (Fallback)]\n{candidate}\n[/DEEPEVAL EXTRACTED (Fallback)]\n", flush=True) # for testing
                             return candidate
                         except json.JSONDecodeError:
                             end_idx = cleaned.rfind(end_char, 0, end_idx)
 
-                print(f"\n[DEEPEVAL FAILED TO FIND JSON]\n{cleaned}\n", flush=True)  # per test
+                print(f"\n[DEEPEVAL FAILED TO FIND JSON]\n{cleaned}\n", flush=True)  # for testing
                 # 4. Last resort: LLM returned plain prose (e.g. "The score is X because...")
                 # Wrap it in {"reason": "..."} so DeepEval can parse it without crashing.
                 return json.dumps({"reason": cleaned})
@@ -138,8 +138,8 @@ def _evaluate_summary_sync(
                 res = await self.llm.ainvoke(prompt)
                 return self._clean_json(res.content)
 
-        # Usiamo gpt-oss-20b: è il cod model più preciso sulle istruzioni strutturate
-        # brevi. Lo teniamo su prompt corti (retrieval_ctx troncato qui sotto).
+        # We use gpt-oss-20b: it's the most precise cod model on short structured
+        # instructions. We keep it on short prompts (retrieval_ctx truncated below).
         eval_model_name = "gpt-oss-20b" if triton_enabled else "gpt-oss-20b"
         eval_model = DeepEvalLangChainWrapper(model_name=eval_model_name, config=None)
 
@@ -147,7 +147,7 @@ def _evaluate_summary_sync(
         # Define metrics 
         faithfulness = FaithfulnessMetric(threshold=0.55, model=eval_model, async_mode=False) 
         relevancy = AnswerRelevancyMetric(threshold=0.55, model=eval_model, async_mode=False)
-        # ContextualRelevancy e Hallucination ORA ATTIVI
+        # ContextualRelevancy and Hallucination NOW ACTIVE
         contextual_relevancy = ContextualRelevancyMetric(threshold=0.55, model=eval_model, async_mode=False)
         hallucination = HallucinationMetric(threshold=0.55, model=eval_model, async_mode=False)
         
@@ -228,21 +228,21 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 
 class SearchClassification(BaseModel):
-    """Classificazione del tipo di ricerca richiesta"""
+    """Classification of the requested search type"""
     search_type: Literal[
         "ai_model",
         "board_selection",
         "optimization",
         "documentation",
         "none"
-    ] = Field(description="Tipo di ricerca richiesta dall'utente")
+    ] = Field(description="Type of search requested by the user")
     
     search_query: str = Field(
-        description="Query specifica da cercare online"
+        description="Specific query to search online"
     )
     
     reasoning: str = Field(
-        description="Spiegazione della classificazione"
+        description="Explanation of the classification"
     )
 
 
@@ -250,156 +250,156 @@ class SearchClassification(BaseModel):
 # EXTRACTION INSTRUCTIONS - WORKFLOW 4
 # ============================================================================
 
-search_classification_instructions = """Sei un classificatore di ricerche per un sistema STM32 + AI.
+search_classification_instructions = """You are a search classifier for an STM32 + AI system.
 
-Analizza la richiesta dell'utente e classifica il tipo di ricerca necessaria:
+Analyze the user's request and classify the type of search needed:
 
-1. **ai_model**: Cercare modelli di AI compatibili con STM32
-   - Esempi: "quali modelli CNN leggeri per STM32?", "MobileNet vs SqueezeNet per STM32"
-   - Keywords: modello, network, CNN, RNN, rete neurale, intelligenza artificiale
+1. **ai_model**: Search for AI models compatible with STM32
+   - Examples: "which lightweight CNN models for STM32?", "MobileNet vs SqueezeNet for STM32"
+   - Keywords: model, network, CNN, RNN, neural network, artificial intelligence
    
-2. **board_selection**: Aiutare a scegliere una board STM32
-   - Esempi: "quale STM32 per un progetto con AI?", "STM32H7 vs STM32F4"
-   - Keywords: board, scelta, quale, differenza, confronto, memoria, performance
+2. **board_selection**: Help choose an STM32 board
+   - Examples: "which STM32 for a project with AI?", "STM32H7 vs STM32F4"
+   - Keywords: board, choice, which, difference, comparison, memory, performance
    
-3. **optimization**: Ottimizzazione e compressione AI su STM32
-   - Esempi: "come comprimere il modello?", "quantizzazione su STM32"
-   - Keywords: ottimizzazione, quantizzazione, compressione, pruning, embedded
+3. **optimization**: AI optimization and compression on STM32
+   - Examples: "how to compress the model?", "quantization on STM32"
+   - Keywords: optimization, quantization, compression, pruning, embedded
    
-4. **documentation**: Documentazione generale, tutorial, best practices
-   - Esempi: "come compilare per STM32?", "guide STEdgeAI", "tutorial"
-   - Keywords: documentazione, tutorial, guide, come, best practice, risorse
+4. **documentation**: General documentation, tutorials, best practices
+   - Examples: "how to compile for STM32?", "STEdgeAI guides", "tutorial"
+   - Keywords: documentation, tutorial, guides, how to, best practice, resources
 
-5. **none**: Nessuno dei precedenti o richiesta non valida
-   - Esempi: "ciao", "non so", richieste completamente non correlate
+5. **none**: None of the above or invalid request
+   - Examples: "hello", "I don't know", completely unrelated requests
 
-Rispondi SEMPRE in formato JSON con tre campi:
-- "search_type": uno tra "ai_model", "board_selection", "optimization", "documentation", "none"
-- "search_query": la query da cercare online (in inglese, dettagliata e specifica)
-- "reasoning": spiegazione della classificazione (max 100 caratteri)
+ALWAYS respond in JSON format with three fields:
+- "search_type": one of "ai_model", "board_selection", "optimization", "documentation", "none"
+- "search_query": the query to search online (in English, detailed and specific)
+- "reasoning": explanation of the classification (max 100 characters)
 
-Se search_type è "none", puoi mettere search_query e reasoning come stringhe vuote.
+If search_type is "none", you can put search_query and reasoning as empty strings.
 
-Esempi:
+Examples:
 
-Input: "Quali modelli leggeri posso usare per la classificazione di immagini su STM32H7?"
+Input: "Which lightweight models can I use for image classification on STM32H7?"
 Output: {
   "search_type": "ai_model",
   "search_query": "lightweight image classification models STM32H7 embedded TensorFlow",
-  "reasoning": "Richiesta esplicita di modelli AI per STM32, task ben definito"
+  "reasoning": "Explicit request for AI models for STM32, well-defined task"
 }
 
-Input: "Confronta STM32F4 e STM32H7 per un progetto con inference AI"
+Input: "Compare STM32F4 and STM32H7 for a project with AI inference"
 Output: {
   "search_type": "board_selection",
   "search_query": "STM32F4 vs STM32H7 comparison memory performance AI inference",
-  "reasoning": "Confronto tra board STM32, focus su compatibilità AI"
+  "reasoning": "Comparison between STM32 boards, focus on AI compatibility"
 }
 
-Input: "Come quantizzare un modello TensorFlow per STM32?"
+Input: "How to quantize a TensorFlow model for STM32?"
 Output: {
   "search_type": "optimization",
   "search_query": "TensorFlow model quantization INT8 STM32 embedded optimization",
-  "reasoning": "Domanda su tecniche di ottimizzazione/compressione per embedded"
+  "reasoning": "Question about optimization/compression techniques for embedded"
 }
 
-Input: "Dove trovo la documentazione ufficiale di STEdgeAI?"
+Input: "Where can I find the official STEdgeAI documentation?"
 Output: {
   "search_type": "documentation",
   "search_query": "STEdgeAI official documentation tutorial guide STMicroelectronics",
-  "reasoning": "Richiesta di documentazione e risorse ufficiali"
+  "reasoning": "Request for official documentation and resources"
 }
 
-Input: "Ciao come stai?"
+Input: "Hello how are you?"
 Output: {
   "search_type": "none",
   "search_query": "",
-  "reasoning": "Richiesta non correlata al sistema STM32+AI"
+  "reasoning": "Request unrelated to the STM32+AI system"
 }
 """
 
 
 # ============================================================================
-# PROMPTS DINAMICI PER RICERCA
+# DYNAMIC PROMPTS FOR SEARCH
 # ============================================================================
 
 SEARCH_PROMPTS = {
     "ai_model": """
-Ricerca informazioni su modelli AI compatibili con STM32.
+Search for information about AI models compatible with STM32.
 Query: {search_query}
 
-Per ogni modello trovato, fornisci:
-1. Nome modello
+For each model found, provide:
+1. Model name
 2. Framework (TensorFlow, PyTorch, ONNX, etc.)
-3. Dimensione in KB
-4. Compatibilità STM32 (quali MCU?)
-5. Link alla documentazione
-6. Livello di quantizzazione consigliato
+3. Size in KB
+4. STM32 Compatibility (which MCUs?)
+5. Link to documentation
+6. Recommended quantization level
 7. Performance (inference time, accuracy)
-8. Casi d'uso tipici
+8. Typical use cases
 
-Sii conciso e pratico per sviluppatori embedded.
+Be concise and practical for embedded developers.
     """,
     
     "board_selection": """
-Ricerca informazioni su board STM32.
+Search for information about STM32 boards.
 Query: {search_query}
 
-Per ogni board trovata, fornisci:
-1. Nome board (es. STM32F4, STM32H7, STM32U5)
-2. Memoria FLASH (KB)
+For each board found, provide:
+1. Board name (e.g. STM32F4, STM32H7, STM32U5)
+2. FLASH Memory (KB)
 3. RAM (KB)
-4. Velocità clock (MHz)
-5. Periferiche principali (ADC, DAC, PWM, I2C, SPI, etc.)
-6. Prezzo approssimativo (USD)
-7. Casi d'uso consigliati
-8. Dove acquistarla (distributori principali)
+4. Clock speed (MHz)
+5. Main peripherals (ADC, DAC, PWM, I2C, SPI, etc.)
+6. Approximate price (USD)
+7. Recommended use cases
+8. Where to buy it (main distributors)
 
-Compara almeno 3 board se rilevante.
+Compare at least 3 boards if relevant.
     """,
     
     "optimization": """
-Ricerca tecniche di ottimizzazione AI su STM32.
+Search for AI optimization techniques on STM32.
 Query: {search_query}
 
-Fornisci:
-1. Tecniche di compressione disponibili (quantizzazione, pruning, distillazione)
-2. Livelli di quantizzazione (INT8, INT16, FP16, etc.) e impatto
-3. Trade-off accuratezza vs dimensione modello
-4. Tool di ottimizzazione (STEdgeAI, TensorFlow Lite, TVM, etc.)
-5. Benchmark di performance (latenza, throughput, memory)
-6. Best practices e checklist di ottimizzazione
-7. Link a risorse ufficiali e tutorial
+Provide:
+1. Available compression techniques (quantization, pruning, distillation)
+2. Quantization levels (INT8, INT16, FP16, etc.) and impact
+3. Accuracy vs model size trade-offs
+4. Optimization tools (STEdgeAI, TensorFlow Lite, TVM, etc.)
+5. Performance benchmarks (latency, throughput, memory)
+6. Best practices and optimization checklists
+7. Links to official resources and tutorials
 
-Includi metriche concrete (es. "da 5MB a 200KB con quantizzazione INT8").
+Include concrete metrics (e.g. "from 5MB to 200KB with INT8 quantization").
     """,
     
     "documentation": """
-Ricerca documentazione e guide STM32.
+Search for STM32 documentation and guides.
 Query: {search_query}
 
-Fornisci:
-1. Link a documentazione ufficiale STMicroelectronics
-2. Tutorial passo-passo per il tuo argomento
-3. Esempi di codice su GitHub
-4. FAQ comuni e problemi risolti
-5. Community forum e risorse (StackOverflow, ST Community, etc.)
-6. Video tutorial (YouTube, Udemy, Coursera, etc.)
-7. Libri consigliati se rilevante
+Provide:
+1. Links to official STMicroelectronics documentation
+2. Step-by-step tutorials for your topic
+3. Code examples on GitHub
+4. Common FAQs and solved problems
+5. Community forums and resources (StackOverflow, ST Community, etc.)
+6. Video tutorials (YouTube, Udemy, Coursera, etc.)
+7. Recommended books if relevant
 
-Prioritizza fonti ufficiali e recenti.
+Prioritize official and recent sources.
     """
 }
 
 
 # ============================================================================
-# WORKFLOW 4: WEB RESEARCH (OTTIMIZZATO CON PROMPT DINAMICO)
+# WORKFLOW 4: WEB RESEARCH (OPTIMIZED WITH DYNAMIC PROMPT)
 # ============================================================================
 
 def classify_search(state: MasterState, config: RunnableConfig = None) -> MasterState:
-    """Classifica il tipo di ricerca richiesta dall'utente."""
+    """Classifies the type of search requested by the user."""
     
-    logger.info(f"🔍 Classificazione ricerca: {state.message}")
+    logger.info(f"🔍 Search classification: {state.message}")
     
     try:
         cfg = Configuration.from_runnable_config(config)
@@ -412,22 +412,22 @@ def classify_search(state: MasterState, config: RunnableConfig = None) -> Master
         
         result = llm_classifier.invoke([
             SystemMessage(content=search_classification_instructions),
-            HumanMessage(content=f"Richiesta: {state.message}")
+            HumanMessage(content=f"Request: {state.message}")
         ])
         
         state.search_type = result.search_type
         state.search_query = result.search_query
         
-        logger.info(f"✓ Tipo ricerca: {state.search_type}")
+        logger.info(f"✓ Search type: {state.search_type}")
         logger.info(f"  Query: {state.search_query}")
         logger.info(f"  Reasoning: {result.reasoning}")
         
         if state.search_type == "none":
-            logger.warning("Nessun tipo di ricerca riconosciuto")
+            logger.warning("No search type recognized")
             state.route = "unknown"
         
     except Exception as e:
-        logger.error(f"❌ Errore classificazione ricerca: {str(e)}")
+        logger.error(f"❌ Search classification error: {str(e)}")
         logger.exception(e)
         state.route = "unknown"
     
@@ -435,24 +435,24 @@ def classify_search(state: MasterState, config: RunnableConfig = None) -> Master
 
 
 def search_type_decision(state: MasterState) -> Literal["execute_web_search", "clarify"]:
-    """Routing semplificato: se il tipo di ricerca è valido, vai a execute_web_search."""
+    """Simplified routing: if the search type is valid, go to execute_web_search."""
     if state.search_type in ["ai_model", "board_selection", "optimization", "documentation"]:
-        logger.info(f"→ Esecuzione ricerca: {state.search_type}")
+        logger.info(f"→ Executing search: {state.search_type}")
         return "execute_web_search"
     else:
-        logger.warning(f"⚠️  Tipo ricerca non valido: {state.search_type}")
+        logger.warning(f"⚠️  Invalid search type: {state.search_type}")
         return "clarify"
 
 
 def execute_web_search(state: MasterState, config: RunnableConfig = None) -> MasterState:
     """
-    Nodo unico di ricerca che adatta il prompt dinamicamente.
-    Usa duckduckgo_search direttamente (no agno Agent) e poi get_llm() per sintetizzare.
-    Questo approccio è compatibile sia con Triton che con Ollama senza richiedere
-    il tool-calling/function-calling del modello.
+    Single search node that adapts the prompt dynamically.
+    Uses duckduckgo_search directly (no agno Agent) and then get_llm() to synthesize.
+    This approach is compatible with both Triton and Ollama without requiring
+    model tool-calling/function-calling.
     """
     
-    logger.info(f"🔍 Ricerca web: tipo={state.search_type}, query={state.search_query}")
+    logger.info(f"🔍 Web search: type={state.search_type}, query={state.search_query}")
     
     try:
         from duckduckgo_search import DDGS
@@ -462,15 +462,15 @@ def execute_web_search(state: MasterState, config: RunnableConfig = None) -> Mas
         base_prompt = SEARCH_PROMPTS.get(state.search_type, SEARCH_PROMPTS["documentation"])
         search_prompt = base_prompt.format(search_query=state.search_query)
         
-        logger.info(f"📋 Prompt utilizzato per {state.search_type} (lunghezza: {len(search_prompt)} char)")
+        logger.info(f"📋 Prompt used for {state.search_type} (length: {len(search_prompt)} char)")
         
         # -----------------------------------------------------------------
-        # STEP 1: Ricerca DuckDuckGo diretta (no LLM, no tool calling)
-        # Usiamo la libreria duckduckgo_search direttamente. In questo modo
-        # evitiamo la dipendenza da agno Agent + function calling del modello,
-        # incompatibile con il backend Triton.
+        # STEP 1: Direct DuckDuckGo search (no LLM, no tool calling)
+        # We use the duckduckgo_search library directly. This way we
+        # avoid the dependency on agno Agent + model function calling,
+        # which is incompatible with the Triton backend.
         # -----------------------------------------------------------------
-        logger.info(f"🌐 Esecuzione ricerca DuckDuckGo diretta per: {state.search_query}")
+        logger.info(f"🌐 Executing direct DuckDuckGo search for: {state.search_query}")
         raw_results = []
         try:
             with DDGS() as ddgs:
@@ -478,31 +478,31 @@ def execute_web_search(state: MasterState, config: RunnableConfig = None) -> Mas
                 for r in results:
                     snippet = f"**{r.get('title', '')}**\n{r.get('body', '')}\nSource: {r.get('href', '')}"
                     raw_results.append(snippet)
-            logger.info(f"   ✓ DuckDuckGo: {len(raw_results)} risultati trovati")
+            logger.info(f"   ✓ DuckDuckGo: {len(raw_results)} results found")
         except Exception as search_err:
             logger.warning(f"⚠️ DuckDuckGo search error: {search_err}")
-            raw_results = [f"Nessun risultato per: {state.search_query}"]
+            raw_results = [f"No results for: {state.search_query}"]
         
         raw_text = "\n\n---\n\n".join(raw_results)
         
         # -----------------------------------------------------------------
-        # STEP 2: Sintesi con LLM (routato via get_llm → Triton o Ollama)
+        # STEP 2: Synthesis with LLM (routed via get_llm → Triton or Ollama)
         # -----------------------------------------------------------------
-        logger.info(f"🧠 Sintesi risultati con LLM...")
+        logger.info(f"🧠 Synthesizing results with LLM...")
         llm = get_llm(config=config)
         
         synthesis_messages = [
             SystemMessage(content=(
-                "Sei un assistente tecnico esperto in sistemi STM32 e AI embedded. "
-                "Ti vengono forniti estratti di ricerche web. Sintetizzali in una "
-                "risposta chiara e strutturata in italiano, mantenendo i link alle fonti. "
-                "Rispondi in modo conciso e tecnico."
+                "You are an expert technical assistant in STM32 and embedded AI systems. "
+                "You are provided with web research extracts. Synthesize them into a "
+                "clear and structured answer in English, keeping links to the sources. "
+                "Answer in a concise and technical way."
             )),
             HumanMessage(content=(
-                f"Query di ricerca: {state.search_query}\n\n"
-                f"Tipo di ricerca: {state.search_type}\n\n"
-                f"Estratti web:\n{raw_text}\n\n"
-                f"Prompt originale: {search_prompt}"
+                f"Search query: {state.search_query}\n\n"
+                f"Search type: {state.search_type}\n\n"
+                f"Web extracts:\n{raw_text}\n\n"
+                f"Original prompt: {search_prompt}"
             ))
         ]
         
@@ -511,7 +511,7 @@ def execute_web_search(state: MasterState, config: RunnableConfig = None) -> Mas
         
         state.search_results = synthesized
         
-        # Populate search_results_list for DeepEval (usa i raw chunk, più fedeli)
+        # Populate search_results_list for DeepEval (uses raw chunks, more faithful)
         state.search_results_list = [
             chunk.strip()
             for chunk in raw_results
@@ -519,12 +519,12 @@ def execute_web_search(state: MasterState, config: RunnableConfig = None) -> Mas
         ]
         
         state.web_research_success = True
-        logger.info(f"✓ Ricerca completata ({len(state.search_results)} caratteri, {len(state.search_results_list)} chunks)")
+        logger.info(f"✓ Search completed ({len(state.search_results)} chars, {len(state.search_results_list)} chunks)")
         
     except Exception as e:
-        logger.error(f"❌ Errore ricerca web: {str(e)}")
+        logger.error(f"❌ Web search error: {str(e)}")
         logger.exception(e)
-        state.search_results = f"Errore nella ricerca: {str(e)}"
+        state.search_results = f"Error in search: {str(e)}"
         state.search_results_list = []
         state.web_research_success = False
     
@@ -533,7 +533,7 @@ def execute_web_search(state: MasterState, config: RunnableConfig = None) -> Mas
 
 def summarize_search_results(state: MasterState, config: RunnableConfig = None) -> MasterState:
     """
-    Nodo che riassume i risultati della ricerca web.
+    Node that summarizes the web search results.
     Input: state.search_results (RAW text)
     Output: state.search_summary (Processed summary)
     """
@@ -575,29 +575,29 @@ def summarize_search_results(state: MasterState, config: RunnableConfig = None) 
         
         response = llm.invoke(summary_prompt)
         state.search_summary = response.content
-        logger.info(f"✓ Summary generato ({len(state.search_summary)} chars)")
+        logger.info(f"✓ Summary generated ({len(state.search_summary)} chars)")
         
     except Exception as e:
-        logger.error(f"❌ Errore summary: {e}")
-        state.search_summary = "Impossibile generare il riassunto. Consulta i risultati grezzi."
+        logger.error(f"❌ Summary error: {e}")
+        state.search_summary = "Unable to generate the summary. See raw results."
         
     return state
 
 
 def finalize_search(state: MasterState, config: RunnableConfig = None) -> MasterState:
-    """Nodo finale che presenta i risultati della ricerca (Riassunto + Eval)."""
+    """Final node that presents search results (Summary + Eval)."""
     
     if state.web_research_success:
         print("\n" + "="*70)
-        print(f"📊 RISULTATI RICERCA: {state.search_type.upper()}")
+        print(f"📊 SEARCH RESULTS: {state.search_type.upper()}")
         print("="*70)
-        # Mostra il riassunto, non i risultati grezzi
+        # Show summary, not raw results
         print(state.search_summary) 
         print("="*70 + "\n")
-        logger.info("✓ Ricerca completata con successo")
+        logger.info("✓ Search successfully completed")
     else:
-        print(f"\n❌ Errore durante la ricerca:\n{state.search_results}\n")
-        logger.error(f"Ricerca fallita: {state.search_results}")
+        print(f"\n❌ Error during search:\n{state.search_results}\n")
+        logger.error(f"Search failed: {state.search_results}")
     
     # ===== DEEPEVAL EVALUATION =====
     if state.web_research_success:
@@ -607,8 +607,8 @@ def finalize_search(state: MasterState, config: RunnableConfig = None) -> Master
             print("="*70)
             
             # Context Separation for DeepEval:
-            # Actual Output = Il riassunto generato (search_summary)
-            # Retrieval Context = LISTA dei chunks (search_results_list)
+            # Actual Output = The generated summary (search_summary)
+            # Retrieval Context = LIST of chunks (search_results_list)
             
             eval_result = asyncio.run(asyncio.to_thread(
                 _evaluate_summary_sync,
