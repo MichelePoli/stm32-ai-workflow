@@ -73,6 +73,24 @@ async def main():
     
     # Carica tutti i modelli richiesti sequenzialmente
     for model in models:
+        # Check if already loaded
+        index_url = f"{base_url}/v2/repository/index"
+        status = "UNAVAILABLE"
+        try:
+            req = urllib.request.Request(index_url, method="POST")
+            with urllib.request.urlopen(req, timeout=10) as response:
+                models_info = json.loads(response.read().decode())
+                for minfo in models_info:
+                    if minfo.get("name") == model:
+                        status = minfo.get("state", "UNAVAILABLE")
+                        break
+        except Exception:
+            pass
+            
+        if status == "READY":
+            print(f"✅ Modello '{model}' è già caricato in VRAM (saltato).")
+            continue
+            
         load_endpoint = f"{base_url}/v2/repository/models/{model}/load"
         print(f"⏳ Richiesta caricamento modello '{model}' in VRAM (potrebbe richiedere minuti)...")
         try:
@@ -99,7 +117,7 @@ async def main():
             tasks.append(infer(session, base_url, payload, i+1, assigned_model))
         
         # Aspetta che tutti finiscano
-        results = await asyncio.gather(*tasks)
+        results = await asyncio.gather(*tasks) # La funzione asyncio.gather(*tasks) in Python prende quei 10 "utenti" (le POST HTTP) e le fa partire in parallelo.
 
     end_total = time.time()
     total_duration = end_total - start_total

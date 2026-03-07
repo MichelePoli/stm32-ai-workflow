@@ -459,7 +459,8 @@ def clarify_request(state: MasterState, config: RunnableConfig = None) -> Master
     }
     
     # Interrupt waits for user to choose an option from VS Code extension
-    user_choice = interrupt(prompt)
+    # user_choice = interrupt(prompt)
+    user_choice = "1" # BYPASS
     
     choice_map = {
         "1": "firmware", 
@@ -530,7 +531,8 @@ Answer ONLY with the word, without any other text.
             "instruction": "✅ Firmware successfully generated! Do you want to continue with AI model analysis (X-CUBE-AI) or stop here?",
         }
         logger.info("⏸️ Asking user if they want to continue with AI analysis...")
-        resume_value = interrupt(prompt)
+        # resume_value = interrupt(prompt)
+        resume_value = "CONTINUE" # BYPASS
     else:
         resume_value = None
 
@@ -588,7 +590,8 @@ Answer ONLY with the word, without any other text.
             "instruction": "✅ AI Analysis complete! Do you want to continue integrating AI code into firmware (STM32CubeMX merge) or stop here?",
         }
         logger.info("⏸️ Asking user if they want to continue with integration...")
-        resume_value = interrupt(prompt)
+        # resume_value = interrupt(prompt)
+        resume_value = "CONTINUE" # BYPASS
     else:
         resume_value = None
 

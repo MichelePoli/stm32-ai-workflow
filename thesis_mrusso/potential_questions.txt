@@ -201,3 +201,15 @@ Hint: Running CubeMX fully headlessly (without a pre-existing .ioc file) trigger
 
 Q55. How does the NDJSON protocol work between the VS Code extension and the FastAPI backend?
 Hint: NDJSON (Newline-Delimited JSON) streams individual JSON objects separated by newlines over a persistent HTTP connection. The backend writes each agent step, tool call result, or message as a separate JSON line. The VS Code extension reads the response as a ReadableStream, parsing each line as it arrives to provide live updates in the chat panel without waiting for the full response.
+
+Q56. What happened during the concurrent stress test with LangGraph? Did the orchestrator crash?
+Hint: The FastAPI/LangGraph orchestrator itself handled the concurrent async requests perfectly without crashing, parking I/O bound states efficiently. The failure occurred at the OS level (OOM Killer) when 5 concurrent TensorFlow fine-tuning subprocesses tried to allocate GPU and RAM simultaneously, demonstrating that the bottleneck is the ML framework's memory management, not the agentic orchestrator.
+
+Q57. How do you distinguish between the computational load of the orchestration agent versus the inference engine?
+Hint: The orchestrator (FastAPI + LangGraph) is highly concurrent and lightweight, primarily handling I/O and state routing (consuming ~2GB RAM baseline). The heavy computational load and memory spikes (e.g., up to 15GB) are isolated to the external tools it invokes: Triton Inference Server for LLM generation, and temporary Python subprocesses for Keras model training and analysis.
+
+Q58. Why did you implement model training and analysis as isolated Python subprocesses instead of running them directly within the LangGraph nodes?
+Hint: Running TensorFlow/Keras directly within the FastAPI worker threads would lead to severe memory leaks, state pollution, and thread-blocking issues. By isolating them in short-lived subprocesses, the OS can reclaim memory immediately after the subprocess completes (or if it crashes, as seen in the OOM test), protecting the main orchestrator's stability.
+
+Q59. If 5 concurrent users cause an Out-Of-Memory error during fine-tuning, how would you scale this system for a production MLOps environment?
+Hint: The current architecture proves the logical flow. For production scalability, the heavy mathematical tasks (like NNI fine-tuning or Cube.AI conversion) should not be launched as local subprocesses on the orchestrator node. Instead, they should be offloaded to a distributed task queue (like Celery or RabbitMQ) running on a Kubernetes cluster where each job has strict resource quotas (CPU/RAM).

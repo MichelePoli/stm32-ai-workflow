@@ -119,7 +119,7 @@ async def lifespan(app: FastAPI):
             logger.info("✅ Graph compiled and Redis ready.")
             # Unload all Triton models to start from a clean VRAM state
             # await unload_all_triton_models() # only for debug, then comment this line 
-            break  # success -> exit loop
+            break  # success -> exit loop 
         except BusyLoadingError as e:
             if attempt < max_retries:
                 logger.warning(f"⏳ Redis is still loading, retrying in {retry_delay}s (attempt {attempt}/{max_retries})...")

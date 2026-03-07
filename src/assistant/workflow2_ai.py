@@ -347,7 +347,8 @@ Examples:
                 "suggestion": f"💡 Last time you worked on the **{last_series}** series. Do you want to continue with this one or change?"
             }
             logger.info("⏸️ Interrupting for AI analysis config with profile suggestion.")
-            resume_value = interrupt(dynamic_prompt)
+            # resume_value = interrupt(dynamic_prompt)
+            resume_value = "STM32H7A3ZI" # BYPASS
         
         # After resuming: use interrupt return value as priority
         if resume_value and str(resume_value).strip():
@@ -460,7 +461,8 @@ def choose_ai_task(state: MasterState, config: RunnableConfig = None) -> MasterS
     resume_value = None
     if not state.user_response or state.user_response.strip() == "":
         logger.info("⏸️ Interrupting for AI task selection.")
-        resume_value = interrupt({"instruction": prompt_text})
+        # resume_value = interrupt({"instruction": prompt_text})
+        resume_value = "1" # BYPASS
         # logger.info("⏭️  BYPASS: Automatic task selection -> '1' (Classification)")
         # user_text = "1"
     
@@ -562,7 +564,8 @@ def choose_ai_model(state: MasterState, config: RunnableConfig = None) -> Master
     resume_value = None
     if not state.user_response or state.user_response.strip() == "":
         logger.info("⏸️ Interrupting for AI model selection.")
-        resume_value = interrupt({"instruction": prompt_text})
+        # resume_value = interrupt({"instruction": prompt_text})
+        resume_value = "mobilenetv1" # BYPASS
         # logger.info("⏭️  BYPASS: Automatic model selection -> '2' (MobileNetV1)")
         # model_text = "2"
     
@@ -686,7 +689,8 @@ def search_recommendation_model(state: MasterState, config: RunnableConfig = Non
 - 'no': Continue searching for other models""",
         }
         
-        user_confirmation = interrupt(prompt)
+        # user_confirmation = interrupt(prompt)
+        user_confirmation = "yes" # BYPASS
         
         # Handle dict or string
         if isinstance(user_confirmation, dict):
@@ -758,7 +762,8 @@ def search_recommendation_model(state: MasterState, config: RunnableConfig = Non
 - 'no': Continue searching for other models""",
             }
             
-            user_confirmation = interrupt(prompt)
+            # user_confirmation = interrupt(prompt)
+            user_confirmation = "yes" # BYPASS
             
             if isinstance(user_confirmation, dict):
                 confirmation_text = str(user_confirmation.get("response", user_confirmation.get("input", ""))).lower().strip()
@@ -2320,7 +2325,8 @@ def handle_resource_failure(state: MasterState, config: RunnableConfig = None) -
         ]
     }
     
-    user_response = interrupt(prompt)
+    # user_response = interrupt(prompt)
+    user_response = "1" # BYPASS Change Model
     
     if isinstance(user_response, dict):
         user_text = user_response.get("response", user_response.get("input", str(user_response)))
@@ -2404,7 +2410,8 @@ Example:
         """
     }
     
-    user_response = interrupt(prompt)
+    # user_response = interrupt(prompt)
+    user_response = "mobilenetv1" # BYPASS
     if isinstance(user_response, dict):
         user_text = user_response.get("response", user_response.get("input", str(user_response)))
     else:

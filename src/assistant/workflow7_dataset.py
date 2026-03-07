@@ -179,7 +179,8 @@ What do you prefer? (1, 2 or 3)""",
             
         if not state.user_response:
             logger.info("⏸️ Interrupting for data source decision.")
-            resume_value = interrupt(prompt)
+            # resume_value = interrupt(prompt)
+            resume_value = "1" # BYPASS - Real Dataset
             user_text = str(resume_value).strip().lower() if resume_value else ""
         else:
             # After resuming: use interrupt return value as priority
@@ -230,10 +231,11 @@ Required format:
     from src.assistant.utils import extract_user_response
     resume_value = None
     if not state.user_response or state.user_response.strip() == "":
-        resume_value = interrupt({
-            "instruction": prompt_text,
-            "hint": "You can write in natural language, I will extract the data."
-        })
+        # resume_value = interrupt({
+        #     "instruction": prompt_text,
+        #     "hint": "You can write in natural language, I will extract the data."
+        # })
+        resume_value = "fruit_360" # BYPASS
     
     # Use interrupt return value as priority
     if resume_value and str(resume_value).strip():
@@ -451,7 +453,8 @@ def select_predefined_dataset(state: MasterState, config: RunnableConfig = None)
             
         if not state.user_response:
             logger.info("⏸️ Interrupting for dataset selection.")
-            resume_value = interrupt(prompt)
+            # resume_value = interrupt(prompt)
+            resume_value = "1" # BYPASS
             selection = str(resume_value).strip().lower() if resume_value else ""
         else:
             # Use interrupt return value as priority
