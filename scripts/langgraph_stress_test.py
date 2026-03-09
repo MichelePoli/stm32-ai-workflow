@@ -21,6 +21,14 @@ async def simulate_user_flow(session, base_url, user_id):
         "user_id": f"stress_user_{user_id:02d}",
         "session_id": "stress_session"
     }
+
+    # payload = {
+    #     "messages": [
+    #         {"role": "user", "content": "reset"}
+    #     ],
+    #     "user_id": f"stress_user_{user_id:02d}",
+    #     "session_id": "stress_session"
+    # } # solo se vuoi fare reset delle informazioni in redis commenta il payload di sopra e usa questa.
     
     print(f"[Utente {user_id:02d}] 🚀 Inizio esecuzione workflow...")
     try:

@@ -2429,7 +2429,7 @@ import sys
 
 model_path = r'{loaded_model_path}'
 modifications = {json.dumps(parsed_mods.get('modifications', []))}
-output_path = '/tmp/customized_model.h5'
+output_path = f'/tmp/customized_model_{state.thread_id}.h5'
 
 try:
     # ===== LOAD MODEL (keras3 first, tf.keras fallback) =====
@@ -2872,7 +2872,7 @@ def fine_tune_customized_model(state: MasterState, config: RunnableConfig = None
         state.python_path = cfg.get_python_path('stm32')
         logger.info(f"🔧 Resolved environment: {state.conda_env} -> {state.python_path}")
         
-        output_path = model_path.replace('.keras', '_finetuned.h5').replace('.h5', '_finetuned.h5')
+        output_path = model_path.replace('.keras', f'_{state.thread_id}_finetuned.h5').replace('.h5', f'_{state.thread_id}_finetuned.h5')
         
         # ===== PYTHON SCRIPT =====
         python_code = f"""
