@@ -2317,16 +2317,18 @@ def handle_resource_failure(state: MasterState, config: RunnableConfig = None) -
             f"but {target_str} only supports {format_bytes(ram_lim)} RAM / {format_bytes(flash_lim)} Flash.\n\n"
             "Change Board or Change Model?\n"
             "0 → Change Board (choose a more powerful MCU)\n"
-            "1 → Change Model (choose a lighter model)"
+            "1 → Change Model (choose a lighter model)\n"
+            "2 → Stop Execution (End Workflow)"
         ),
         "options": [
             "Change Microcontroller (Board)",
-            "Choose another AI model"
+            "Choose another AI model",
+            "Stop Execution"
         ]
     }
     
     # user_response = interrupt(prompt)
-    user_response = "1" # BYPASS Change Model
+    user_response = "2" # BYPASS End Workflow
     
     if isinstance(user_response, dict):
         user_text = user_response.get("response", user_response.get("input", str(user_response)))
@@ -2338,11 +2340,15 @@ def handle_resource_failure(state: MasterState, config: RunnableConfig = None) -
     # Robust keyword-based classification (does not depend on LLM)
     BOARD_KEYWORDS  = ["board", "scheda", "mcu", "micro", "microcontroller", "change board", "0"]
     MODEL_KEYWORDS  = ["model", "modello", "other model", "choose", "light", "lighter", "1"]
+    END_KEYWORDS    = ["end", "stop", "fine", "esci", "quit", "2"]
 
     board_score = sum(1 for kw in BOARD_KEYWORDS if kw in user_lower)
     model_score = sum(1 for kw in MODEL_KEYWORDS if kw in user_lower)
+    end_score = sum(1 for kw in END_KEYWORDS if kw in user_lower)
 
-    if board_score > model_score:
+    if end_score > 0:
+        decision = "end_workflow"
+    elif board_score > model_score:
         decision = "change_board"
     elif model_score > 0:
         decision = "change_model"
@@ -2350,10 +2356,11 @@ def handle_resource_failure(state: MasterState, config: RunnableConfig = None) -
         # Fallback to LLM only if keywords are not enough
         try:
             llm_extractor = get_llm(config, structured_schema=ResolutionExtraction)
-            analysis_prompt = f"""Analyze the response and choose between 'change_board' or 'change_model'.
+            analysis_prompt = f"""Analyze the response and choose between 'change_board' or 'change_model' or 'end_workflow'.
 User response: "{user_text}"
 Board keywords: board, scheda, mcu → change_board
-Model keywords: modello, model, lighter → change_model"""
+Model keywords: modello, model, lighter → change_model
+End keywords: stop, fine, end → end_workflow"""
             result = llm_extractor.invoke([
                 SystemMessage(content="You are a technical intent classifier."),
                 HumanMessage(content=analysis_prompt)
@@ -2371,7 +2378,7 @@ Model keywords: modello, model, lighter → change_model"""
         state.board_name = None
         state.mcu_series = ""
         logger.info("🧹 Reset board state for microcontroller change.")
-    else:
+    elif "model" in decision:
         state.route = "change_model"
         state.last_task = None
         state.selected_model = None
@@ -2379,6 +2386,9 @@ Model keywords: modello, model, lighter → change_model"""
         state.model_accepted = False
         state.search_iterations = 0
         logger.info("🧹 Reset AI selection state for model change.")
+    else:
+        state.route = "end_workflow"
+        logger.info("🛑 End workflow requested.")
 
     # IMPORTANT: reset resource_check_result to "resolved".
     # If LangGraph resumes from interrupt with a new VSCode session,

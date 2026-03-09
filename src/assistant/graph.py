@@ -876,7 +876,8 @@ def inject_ai_analysis_nodes(builder: StateGraph):
         lambda state: state.route,
         {
             "change_model": "choose_ai_task",
-            "change_board": "finalize_analysis" # Yield logic to inter-subgraph
+            "change_board": "finalize_analysis", # Yield logic to inter-subgraph
+            "end_workflow": END
         }
     )
     
