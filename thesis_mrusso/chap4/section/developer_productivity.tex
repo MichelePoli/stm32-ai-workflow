@@ -2,11 +2,11 @@
 \section{Developer Productivity Analysis}
 \label{sec:productivity}
 
-A primary metric for evaluating the framework is the reduction in development time compared to manual workflows. We present a comparative time analysis based on industry benchmarks and empirical observations.
+A primary metric for evaluating the framework is the reduction in development time compared to manual workflows. Data from industry benchmarks and empirical observations provide a direct comparative time analysis.
 
 \subsection{Methodology}
 
-We established the time estimates for manual workflows using an analytical evaluation methodology inspired by the \textbf{Keystroke-Level Model (KLM)} and \textbf{GOMS} frameworks \cite{card1980keystroke, baek2014evaluating}. We decomposed the manual development lifecycle (navigating the STM32CubeMX GUI, configuring peripheral clock trees, and manually porting Keras artifacts into the X-CUBE-AI generator) into discrete operative steps (pointing, clicking, mental preparation, and system response times) to create a baseline for a proficient user. We cross-referenced these estimates with three complementary sources to verify their accuracy:
+To establish accurate baselines, we applied an analytical evaluation methodology inspired by the \textbf{Keystroke-Level Model (KLM)} and \textbf{GOMS} frameworks \cite{card1980keystroke, baek2014evaluating}. The analysis breaks down the manual lifecycle (navigating the STM32CubeMX GUI, configuring peripheral clock trees, and manually porting Keras artifacts into the X-CUBE-AI generator) into discrete operative steps (pointing, clicking, mental preparation, and system response times). Cross-referencing these estimates with three complementary sources verified their accuracy:
 
 \begin{enumerate}
     \item \textbf{Official STMicroelectronics Documentation}: Tutorial completion times from STM32Cube.AI user manuals and CubeMX getting-started guides\cite{st_cubemx_manual}.
@@ -14,7 +14,7 @@ We established the time estimates for manual workflows using an analytical evalu
     \item \textbf{Development Log Analysis}: Timestamped conversations from the integration debugging process documented in project notes, reflecting real-world challenges such as Keras version conflicts and NNI API troubleshooting.
 \end{enumerate}
 
-We recorded the automated workflow timings as median execution times during test runs on a development workstation (Intel i7-12700K, 32GB RAM, NVIDIA RTX 3070), providing a direct comparison against the manual baseline.
+Test runs on a development workstation (Intel i7-12700K, 32GB RAM, NVIDIA RTX 3070) provided the automated workflow timings. These median execution times offer a direct comparison against the manual baseline.
 
 \subsection{Comparative Time Analysis}
 
@@ -54,7 +54,7 @@ Table~\ref{tab:productivity} presents a breakdown of the complete Edge AI deploy
 
 Recent studies on embedded ML CI/CD pipelines report improvements up to 70\% in deployment time \cite{embedded_ml_cicd_2025}. The NNI experiment generation in this framework exceeds that benchmark, transforming a 60-minute task into a 2-minute automated process (97\% savings).
 
-The framework improves operational efficiency by automating resource optimization, such as autonomous compression escalation and class mismatch rescues. This eliminates the iterative debugging cycles that typically consume hours of developer time.
+Autonomous resource optimization (such as autonomous compression escalation and class mismatch rescues) directly eliminates the iterative debugging cycles that typically consume hours of developer time.
 
 \subsubsection{Task-Level Insights}
 
@@ -72,26 +72,26 @@ Beyond raw time savings, the framework reduces cognitive load: developers specif
 
 \subsubsection{Limitations}
 
-The manual time estimates rely on official documentation and representative developer experiences; actual times vary based on individual expertise. These comparisons assume standard workflows. Organizations utilizing customized toolchains or proprietary CI/CD pipelines will likely experience different speedup ratios. We recorded the automated timings as median values during test runs; real-world performance will fluctuate due to network latency during model downloads, variable LLM inference speeds, and Redis I/O overhead.
+The manual time estimates rely on official documentation and representative developer experiences; actual times vary based on individual expertise. These comparisons assume standard workflows. Organizations utilizing customized toolchains or proprietary CI/CD pipelines will experience different speedup ratios. The automated timings represent median values during test runs. Real-world performance fluctuates due to network latency during model downloads, variable LLM inference speeds, and Redis I/O overhead.
 
-We excluded the hidden costs for the initial framework setup (configuring Docker containers and downloading STM32Cube packages) from these timings, as this overhead becomes negligible when amortized across multiple projects.
+The analysis omits the initial framework setup costs (configuring Docker containers and downloading STM32Cube packages), as this overhead becomes negligible when amortized across multiple projects.
 
 \subsection{Architectural Scalability and Deployment Scenarios}
 \label{sec:scalability_scenarios}
 
-An important outcome of the system design is its evolution from a local desktop tool to a scalable server architecture. The migration strategy was evaluated across three distinct deployment scenarios to benchmark efficiency and resource utilization:
+The system design evolved from a local desktop tool to a scalable server architecture. The migration strategy underwent evaluation across three distinct deployment scenarios to benchmark efficiency and resource utilization:
 
 \begin{enumerate}
     \item \textbf{Scenario 1: Local Deployment (Personal Computer)}\\
           In the initial phase, the entire framework (LangGraph agents, Ollama inference, and STEdgeAI tooling) was executed directly on the developer's local workstation. While this provided zero network latency, the performance was severely constrained by the physical hardware. Local executions of Mistral 7B monopolized the host CPU and RAM, frequently preventing multitasking and significantly degrading the speed of concurrent firmware compilations.
 
     \item \textbf{Scenario 2: Single-User Containerized Server (Ollama Bottleneck)}\\
-          We migrated the architecture to a high-performance research server using individual Docker containers per user. Each container embedded its own instance of Ollama to handle LLM requests. This offloaded processing from the local computer but introduced a severe infrastructure bottleneck: a single active user monopolized a dedicated GPU (e.g., an NVIDIA A4000) for the entire development session. This 1:1 mapping between user containers and GPU resources blocked multi-user concurrency and caused poor hardware utilization. We noticed the most critical failure when two simultaneous users attempted to run different models, such as Mistral and \texttt{gpt-oss-20b}. The 16~GB GPU could not store both models at once. This forced the system into a constant cycle of loading and unloading models to serve alternating requests. This extreme VRAM churn frequently triggered timing deadlocks and process crashes for at least one of the users.
+          This architecture migrated to a high-performance research server using individual Docker containers per user. Each container embedded its own instance of Ollama to handle LLM requests. This offloaded processing from the local computer but introduced a severe infrastructure bottleneck: a single active user monopolized a dedicated GPU (e.g., an NVIDIA A4000) for the entire development session. This 1:1 mapping between user containers and GPU resources blocked multi-user concurrency and caused poor hardware utilization. The most critical failure occurred when two simultaneous users attempted to run different models, such as Mistral and \texttt{gpt-oss-20b}. The 16~GB GPU could not store both models at once. This forced the system into a constant cycle of loading and unloading models to serve alternating requests. This extreme VRAM churn frequently triggered timing deadlocks and process crashes for at least one of the users.
 
     \item \textbf{Scenario 3: Scalable Cluster with Triton Inference Server (HPP Deployment)}\\
-          To fix the resource locking and local hardware constraints, we decoupled the multi-agent orchestration logic from the model inference engine. We moved the inference engine to the PoliTo \textbf{High Performance Platform (HPP)} cluster. User-specific LangGraph containers now run exclusively on local CPU and RAM. They delegate all LLM requests over the network to a centralized \textbf{NVIDIA Triton Inference Server} via standardized APIs \cite{nvidia_triton_docs}. 
+          To fix the resource locking and local hardware constraints, the multi-agent orchestration logic was decoupled from the model inference engine. The inference engine migrated to the PoliTo \textbf{High Performance Platform (HPP)} cluster. User-specific LangGraph containers now run exclusively on local CPU and RAM. They delegate all LLM requests over the network to a centralized \textbf{NVIDIA Triton Inference Server} via standardized APIs \cite{nvidia_triton_docs}. 
           
-          Hosting Triton on the HPP infrastructure gave us access to 40~GB GPUs. With this expanded capacity, the system keeps both Mistral and \texttt{gpt-oss-20b} resident in memory simultaneously. We solved the restrictive unloading cycles, allowing the server to handle concurrent requests from different users without VRAM-induced crashes. Decoupling the inference engine also frees the local orchestrator GPU from the constant VRAM occupation imposed by large language models. Developers can dedicate their local hardware entirely to memory-intensive TensorFlow fine-tuning tasks, preventing the Out-Of-Memory (OOM) crashes experienced in earlier deployment phases. Triton acts as an optimized proxy, handling concurrent request batching \cite{kwon2023efficientmemorymanagementlarge} and fractional GPU allocation.
+          Hosting Triton on the HPP infrastructure provided access to 40~GB GPUs. With this expanded capacity, the system keeps both Mistral and \texttt{gpt-oss-20b} resident in memory simultaneously. This resolved the restrictive unloading cycles, allowing the server to handle concurrent requests from different users without VRAM-induced crashes. Decoupling the inference engine also frees the local orchestrator GPU from the constant VRAM occupation imposed by large language models. Developers can dedicate their local hardware entirely to memory-intensive TensorFlow fine-tuning tasks, preventing the Out-Of-Memory (OOM) crashes experienced in earlier deployment phases. Triton acts as an optimized proxy, handling concurrent request batching \cite{kwon2023efficientmemorymanagementlarge} and fractional GPU allocation.
 \end{enumerate}
 
 Decoupling workflow agents from model inference and shifting to the HPP cluster eliminates the 1:1 GPU-per-user binding, raises concurrent throughput, and solves the memory saturation failures of the single-container architecture.
@@ -99,9 +99,9 @@ Decoupling workflow agents from model inference and shifting to the HPP cluster 
 \subsection{Concurrency and Stress Testing Evaluation}
 \label{sec:stress_testing}
 
-We subjected the decoupled architecture described in Section~\ref{sec:scalability_scenarios} to concurrency stress tests to measure its practical limits. Two experimental Python scripts, \texttt{langgraph\_stress\_test.py} and \texttt{triton\_stress\_test.py}, simulated $N$ developers interacting with the API simultaneously.
+The decoupled architecture described in Section~\ref{sec:scalability_scenarios} underwent concurrency stress tests to measure its practical limits. Two experimental Python scripts, \texttt{langgraph\_stress\_test.py} and \texttt{triton\_stress\_test.py}, simulated $N$ developers interacting with the API simultaneously.
 
-The evaluation assessed both the local LangGraph orchestrator and the remote Triton inference server. For the orchestrator, we verified that the centralized state machine managed isolation for all parallel users without race conditions. By continuously checkpointing to Redis, the system preserved the context of each conversational thread even when multiple users hit state-heavy nodes like \texttt{ai\_flow} or \texttt{firmware\_flow}. Furthermore, the explicit GPU VRAM partitioning in the TensorFlow subprocesses allowed simultaneous model customizations and inspections, keeping the host machine safe from OOM failures.
+Benchmarks evaluated both the local LangGraph orchestrator and the remote Triton inference server. For the orchestrator, tests verified that the centralized state machine managed isolation for all parallel users without race conditions. By continuously checkpointing to Redis, the system preserved the context of each conversational thread even when multiple users hit state-heavy nodes like \texttt{ai\_flow} or \texttt{firmware\_flow}. Furthermore, the explicit GPU VRAM partitioning in the TensorFlow subprocesses allowed simultaneous model customizations and inspections, keeping the host machine safe from OOM failures.
 
 For the inference backend, a dedicated load-testing utility pushed the remote HPP cluster to its limits. The test simulated 10 and 15 users requesting complex text generation (explaining a CNN architecture) simultaneously from two distinct models over a 1~Gbps network connection. The NVIDIA Triton instances remained stable throughout the experiment, collectively occupying about 37~GB of VRAM (80\% capacity). During parallel inference workloads, GPU computation stayed near 100\%. The vLLM server saturated the hardware efficiently, proving that the 1~Gbps network link did not act as a bottleneck for token streaming.
 
@@ -143,8 +143,8 @@ Table~\ref{tab:tool_comparison} contrasts the framework's automation coverage wi
     \end{tabular}
 \end{table}
 
-Several key differentiators emerge. Edge Impulse provides excellent GUI-based model training but requires manual firmware project setup and lacks programmatic hyperparameter optimization. Bare-metal libraries like TFLite Micro offer only the core inference runtime, leaving model selection, optimization, and integration steps completely manual. STM32Cube.AI excels at C-code generation but offers zero workflow orchestration, forcing developers to invoke CLI commands manually.
+Table~\ref{tab:tool_comparison} highlights several key differences. Edge Impulse provides excellent GUI-based model training but requires manual firmware project setup and lacks programmatic hyperparameter optimization. Bare-metal libraries like TFLite Micro offer only the core inference runtime, leaving model selection, optimization, and integration steps completely manual. STM32Cube.AI excels at C-code generation but offers zero workflow orchestration, forcing developers to invoke CLI commands manually.
 
 Although the NVIDIA TAO Toolkit delivers strong transfer learning automation, it targets Jetson/GPU architectures rather than constrained MCUs, and it lacks STM32-specific firmware generation capabilities.
 
-This framework provides end-to-end automation covering firmware initialization, model discovery, hyperparameter optimization code generation, and firmware-AI integration, orchestrated through conversational Human-in-the-Loop interfaces.
+Unlike these platforms, the proposed framework handles the entire chain from firmware initialization to AI integration, using a conversational interface to orchestrate the underlying CLI tools.
