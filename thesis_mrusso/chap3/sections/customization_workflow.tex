@@ -16,13 +16,13 @@ After inspection, the results are also checked against the idempotency flag: if 
 \subsection{Best Practice Retrieval}
 \label{sec:best_practices}
 
-Before asking the user to specify modifications, the system retrieves a tailored set of fine-tuning recommendations for the detected architecture. The \texttt{retrieve\_\allowbreak best\_\allowbreak practices\_\allowbreak for\_\allowbreak architecture()} function follows a three-step strategy, moving to the next step only if the previous one fails.
+Before asking the user to specify modifications, the system retrieves a tailored set of fine-tuning recommendations for the detected architecture. The \texttt{retrieve\_\allowbreak best\_\allowbreak practices\_\allowbreak for\_\allowbreak architecture()} function follows a fallback strategy, moving to the next step only if the previous one fails.
 
-First, it checks whether a ChromaDB vectorstore already exists for the identified architecture type (e.g., \texttt{mobilenet}, \texttt{resnet}, \texttt{yolo}). Each architecture has its own persistent collection stored under \texttt{st\_\allowbreak ai\_\allowbreak output/chroma\_\allowbreak docs/}. If the collection exists and returns results with a similarity score above the threshold, those documents are used immediately, avoiding any LLM call.
+First, it attempts to fetch recent architectural best practices dynamically via web search (e.g., searching for ``MobileNetV2 fine-tuning best practices STM32''). If the search is successful, an LLM synthesizes the retrieved documents into a concise guide. This ensures the workflow has access to the latest community knowledge without requiring a pre-populated offline vector database.
 
-If no cached data is found, the system invokes the local Ollama LLM (Mistral) to generate a concise best practice guide. The prompt is deliberately structured and constrained, requesting a bullet-point output with four specific sections (strategy, hyperparameters, quantization, and memory constraints), and keeps the response under 200 tokens. The generated document is then split into chunks and saved to the architecture-specific ChromaDB collection for reuse:
+If the web search fails or returns useless results, the system invokes the local Ollama LLM (Mistral) to generate a concise best practice guide from its internal weights. The prompt is deliberately structured and constrained, requesting a bullet-point output with four specific sections (strategy, hyperparameters, quantization, and memory constraints), and keeps the response under 200 tokens:
 
-\begin{lstlisting}[language=Python, caption={LLM-based best practice generation and caching}, label={lst:rag_gen}]
+\begin{lstlisting}[language=Python, caption={LLM-based best practice generation fallback}, label={lst:rag_gen}]
 llm = get_llm(None, temperature=0.3, keep_alive="5m")
 prompt = f"""You are an expert embedded AI engineer.
 Provide a concise, bullet-point checklist for fine-tuning
@@ -30,12 +30,6 @@ Provide a concise, bullet-point checklist for fine-tuning
 Keep it under 200 words. Schematic only."""
 
 response = llm.invoke(prompt)
-doc = Document(page_content=response.content,
-               metadata={"source": "LLM_GENERATED",
-                         "architecture": arch_type})
-Chroma.from_documents([doc], embeddings,
-                       persist_directory=persist_dir,
-                       collection_name=f"{arch_type}_best_practices")
 \end{lstlisting}
 
 If even the LLM call fails (for example, due to an Ollama timeout), the function falls back to a set of hardcoded, architecture-specific guidance texts compiled into the module. Each entry covers the typical layer-freezing ratio, recommended learning rate range, quantization considerations for STM32, and any known constraints specific to that architecture. For example, the VGG entry warns explicitly that the architecture is memory-heavy and may not fit many STM32 targets even after INT8 quantization.

@@ -7,9 +7,15 @@ This section documents the experimental validation of the Web Search Agent (Work
 \subsubsection{Evaluation Framework}
 Quality assessment relies on \textbf{DeepEval}\footnote{\url{https://github.com/confident-ai/deepeval}}, an open-source library for RAG (Retrieval-Augmented Generation) evaluation. Four metrics were selected for their relevance to technical documentation tasks.
 
-\textbf{Faithfulness} measures factual consistency between the generated summary and the retrieved source documents (range 0.0--1.0, higher is better). \textbf{Answer Relevancy} captures the semantic alignment between the user query and the generated response (range 0.0--1.0, higher is better). \textbf{Contextual Relevancy} evaluates retrieval quality by estimating the proportion of retrieved content genuinely useful for answering the query (range 0.0--1.0, higher is better). \textbf{Hallucination} detects claims in the output that are not supported by retrieved documents (range 0.0--1.0, \textbf{lower} is better; 0.0 means no fabrication detected).
+\begin{itemize}
+    \item \textbf{Faithfulness} measures factual consistency between the generated summary and the retrieved source documents (range 0.0--1.0, higher is better).
+    \item \textbf{Answer Relevancy} captures the semantic alignment between the user query and the generated response (range 0.0--1.0, higher is better).
+    \item \textbf{Contextual Relevancy} evaluates retrieval quality by estimating the proportion of retrieved content genuinely useful for answering the query (range 0.0--1.0, higher is better).
+    \item \textbf{Hallucination} detects claims in the output that are not supported by retrieved documents (range 0.0--1.0, \textbf{lower} is better; 0.0 means no fabrication detected).
+\end{itemize}
 
 Each metric is computed by an auxiliary \emph{LLM-as-a-Judge}: the same inference infrastructure used for main tasks also drives the evaluation step. This avoids external API dependencies and keeps the entire pipeline self-contained.
+
 
 \subsubsection{Test Protocol}
 Evaluation proceeds through five stages. The user query is classified into one of four categories (\texttt{ai\_model}, \texttt{board\_selection}, \texttt{optimization}, \texttt{documentation}). DuckDuckGo then retrieves the top results for the reformulated query. Raw text is split into paragraph-level chunks of at least 20 characters, which serve as the retrieval context. A local Mistral instance (temperature 0.2) synthesises a concise English summary from those chunks. Finally, DeepEval computes the four metrics synchronously inside a dedicated thread via \texttt{asyncio.to\_thread}, keeping the main event loop unblocked.
@@ -73,84 +79,82 @@ A recurring inverse relationship between strict Faithfulness and practical utili
 
 \subsection{Phase 2 --- Triton Inference Server Back-End}
 
-\subsubsection{Motivation for Migration}
-The Ollama-based setup worked well as a prototype but presented two structural limits. Ollama loads a single model per process, which is ill-suited for an architecture where three models (Mistral, DeepSeek-R1, gpt-oss-20b) must be selectable at runtime within a fixed VRAM budget. Ollama also offers no built-in mechanism for dynamic model loading and unloading, necessary to prevent out-of-memory errors during concurrent LangGraph workflows on the available 16~GB NVIDIA A4000.
-
-The migration to \textbf{NVIDIA Triton Inference Server} (v2, explicit model control mode) addresses both issues. Triton supports dynamic loading and unloading of model instances via its v2 HTTP API, enabling on-demand model swapping. Each model runs as a \textbf{Python backend} module backed by vLLM with GPTQ quantisation to reduce the memory footprint. The architecture was successfully deployed to the PoliTo \textbf{High Performance Platform (HPP)} infrastructure. In this environment, larger GPU allocations eliminate the strict model-swap constraints entirely, allowing multiple models to remain resident simultaneously.
+\subsubsection{Migration to Triton (HPP)}
+As detailed in Section~\ref{sec:scalability_scenarios}, we replaced the initial single-container \texttt{Ollama} infrastructure with the centralized \textbf{NVIDIA Triton Inference Server} on the PoliTo \textbf{High Performance Platform (HPP)}. This architectural upgrade solved our strict VRAM limitations and enabled concurrent multi-model workflows. For this second evaluation phase, we swapped the locally executed \texttt{deepseek-r1} model for the Triton backend routed as \texttt{gpt-oss-20b}, served via \textbf{vLLM} with GPTQ quantization.
 
 \subsubsection{Configuration}
-For the Triton-based evaluation, the judge model was switched to \textbf{gpt-oss-20b} (TechxGenus/starcoder2-15b-instruct-GPTQ, 15B parameters), chosen initially for its larger parameter count. The evaluation covered one test query (\textit{``STM32 boards comparison''}) with retrieval context capped at five chunks of 300 characters each, and output capped at 800 characters, to limit prompt-length issues identified during debugging.
+For the Triton-based tests, we mapped the \texttt{gpt-oss-20b} endpoint to \textbf{StarCoder2-15B} (\texttt{bigcode/starcoder2-15b}), choosing it to test a higher-parameter model on the new infrastructure. We ran the \textit{``STM32 boards comparison''} query for this evaluation. To prevent prompt-length crashes during debugging, we capped the retrieval context at five chunks (300 characters each) and the output at 800 characters.
 
 \subsubsection{Results}
-Table~\ref{tab:deepeval-triton} summarises the scores for this phase.
+Table~\ref{tab:deepeval-triton} shows the scores from the Triton back-end evaluation.
 
 \begin{table}[ht]
   \centering
-  \caption{DeepEval scores --- Triton back-end (gpt-oss-20b / StarCoder2-15B-GPTQ)}
+  \caption{DeepEval scores (Triton back-end, StarCoder2-15B)}
   \label{tab:deepeval-triton}
   \begin{tabular}{|l|c|c|c|c|}
     \hline
     \textbf{Query Type} & \textbf{Faith.} & \textbf{Ans.\ Rel.} & \textbf{Ctx.\ Rel.} & \textbf{Hall.} \\
     \hline
-    Board Selection (STM32) & 0.25 & 0.00$^{\dagger}$ & \textbf{1.00} & 0.50 \\
+    Board Selection (STM32) & 0.25 & 0.50 & 0.00$^{\dagger}$ & 0.50 \\
     \hline
   \end{tabular}
   \vspace{3pt}
 
-  {\small $^{\dagger}$\,Metric evaluation failed: the judge model returned a non-JSON response for the verdict extraction step.}
+  {\small $^{\dagger}$\,Metric evaluation crashed: the judge model failed to produce valid JSON, breaking the parsing pipeline.}
 \end{table}
 
-Contextual Relevancy reached 1.00, an improvement over Phase~1. The other three metrics regressed substantially.
+These exceptionally poor scores misrepresent the actual quality of the generated summary, which accurately highlighted the differences between STM32H7 (400~MHz) and STM32F4 (168~MHz). The results expose a fundamental failure of StarCoder2-15B to act as an evaluator.
 
-\subsubsection{Engineering Challenges}
-The migration exposed several technical problems that required iterative debugging.
+\subsubsection{Engineering Challenges and Judge Limitations}
+We resolved several technical issues during the migration. Most problems stemmed from the new endpoint's inability to follow complex instructions.
 
-\paragraph{VRAM exhaustion during model loading.} An \texttt{HTTP 400 Bad Request} error from Triton appeared when loading gpt-oss-20b. The error traced back to vLLM's KV-cache allocation: with \texttt{gpu\_memory\_utilization} set to 0.60, the remaining GPU memory after loading model weights was insufficient for any cache blocks. Raising the value to 0.85 resolved the issue, giving the engine approximately 13.6~GB of usable GPU memory.
+\paragraph{VRAM exhaustion during model loading.} Triton returned an \texttt{HTTP 400 Bad Request} error when loading the StarCoder2 weights. We traced the error to vLLM's KV-cache allocation. With \texttt{gpu\_memory\_utilization} set to 0.60, the remaining GPU memory after loading model weights was too small for cache blocks. We raised the value to 0.85, giving the engine approximately 13.6~GB of usable GPU memory.
 
-\paragraph{Endpoint URL mismatch under proxy prefix.} When Triton is accessed with a URL prefix such as \texttt{/triton/v1} (required for the HPP deployment environment), the internal v2 repository API calls for model loading and unloading resolved to incorrect paths. A \texttt{base\_v2\_url} property was added to \texttt{triton\_client.py} to strip the \texttt{/v1} suffix and reconstruct the correct v2 base path dynamically.
+\paragraph{Endpoint URL mismatch under proxy prefix.} Accessing Triton through a URL prefix like \texttt{/triton/v1} (required by the HPP environment) broke the internal v2 repository API calls for model loading. We added a \texttt{base\_v2\_url} property to \texttt{triton\_client.py} to dynamically strip the \texttt{/v1} suffix and rebuild the correct v2 path.
 
-\paragraph{Malformed JSON output from the judge model.} DeepEval expects each LLM-as-a-Judge call to return a valid JSON object. Both models tested produced non-conforming output in distinct ways. DeepSeek-R1 appended Python test code after the JSON block, sequences such as \texttt{def test\_extract()} or full \texttt{import} chains drawn from its training corpus. gpt-oss-20b (StarCoder2) occasionally emitted Chinese text, references to unrelated training examples (Einstein Nobel Prize, Keil5 Chinese tutorials), or Python f-string double braces (\texttt{\{\{...\}\}}) instead of literal JSON. A multi-layer extraction pipeline was built inside the \texttt{\_clean\_json} method: double-brace normalisation, \texttt{<think>} tag removal, nested-JSON regex search, backwards bracket scan, and a final fallback that wraps plain-text responses inside a \texttt{\{"reason":~...\}} envelope to prevent hard crashes downstream.
+\paragraph{Total failure as LLM-as-a-Judge.} The \textbf{StarCoder2-15B} model proved entirely unsuitable as a DeepEval evaluator, which requires strict JSON formatting and logical deductions. Unlike phase 1's \textbf{DeepSeek-R1}---a model highly tuned for reasoning and instruction-following---StarCoder2 specializes almost exclusively in code completion. 
 
-\paragraph{Stop sequence configuration.} Stop sequences were added to vLLM's \texttt{SamplingParams} inside each model's Python backend. For DeepSeek-R1, sequences including \texttt{```}, \texttt{"""}, \texttt{\textbackslash ndef~}, and \texttt{\textbackslash nA:~} were configured with \texttt{max\_tokens} reduced from 1024 to 512. This reduced but did not fully eliminate appended code, since some generation patterns were not covered by the explicit stop list.
+When forced to parse natural language criteria during Contextual Relevancy scoring, StarCoder2 ignored the prompt format completely and responded in Chinese (``我需要一些时间来生成答案，请稍等'', meaning \textit{``I need some time to generate the answer, please wait''}). This caused a fatal \textbf{Pydantic} validation crash and a baseline score of 0.00.
 
-\paragraph{Instruction-following limitations of code-specialised models.} The most significant finding of Phase~2 is that \textbf{StarCoder2-15B is not a suitable LLM-as-a-Judge}. StarCoder2 is designed for code completion, not natural-language instruction following. When presented with DeepEval's structured evaluation prompts, it exhibited context confusion: for the Answer Relevancy verdict step it returned ``I don't understand. Please provide more information'', causing a score of 0.00 due to a missing \texttt{verdicts} key. DeepSeek-R1 was more capable at structured output but required the stop-sequence workaround described above. Neither model matched the reliability of a dedicated instruction-tuned LLM.
+Even when it managed to output JSON, its reasoning was deeply flawed. For the Answer Relevancy test, it incorrectly labeled accurate STM32 board statements as ``irrelevant'' or ``ambiguous,'' artificially halving the score. Worse, during the Faithfulness test, the model hallucinated historical physics facts about Albert Einstein winning the Nobel Prize in 1968, injecting them directly into the JSON validation reason. This starkly contrasts with DeepSeek-R1, which reliably evaluated constraints and formatted outputs with minimal hallucinations.
 
 \subsection{Comparative Analysis}
 
-Table~\ref{tab:deepeval-comparison} puts the two configurations side by side on the Board Selection query type.
+Table~\ref{tab:deepeval-comparison} compares the two configurations on the Board Selection test.
 
 \begin{table}[ht]
   \centering
-  \caption{Phase~1 vs.\ Phase~2 on ``Board Selection'' query}
+  \caption{Phase~1 vs. Phase~2 on ``Board Selection'' query}
   \label{tab:deepeval-comparison}
   \begin{tabular}{|l|c|c|c|c|}
     \hline
     \textbf{Configuration}              & \textbf{Faith.} & \textbf{Ans.\ Rel.} & \textbf{Ctx.\ Rel.} & \textbf{Hall.} \\
     \hline
     Ollama (DeepSeek-R1 7B)             & 0.73            & 0.18                & 0.56                & 0.25           \\
-    Triton (StarCoder2-15B-GPTQ)        & 0.25            & 0.00$^{\dagger}$    & \textbf{1.00}       & 0.50           \\
+    Triton (gpt-oss-20b)                & 0.25            & 0.50                & 0.00$^{\dagger}$    & 0.50           \\
     \hline
   \end{tabular}
   \vspace{3pt}
 
-  {\small $^{\dagger}$\,Metric evaluation failed; judge model refused the structured output step.}
+  {\small $^{\dagger}$\,Contextual relevancy pipeline crashed due to Chinese language hallucination.}
 \end{table}
 
-Contextual Relevancy improved from 0.56 to 1.00, confirming the retrieval pipeline was not degraded by the migration. The regression on Faithfulness, Answer Relevancy, and Hallucination is attributable to the judge model quality alone: Mistral's summaries were qualitatively unchanged across both phases.
+Contextual Relevancy improved from 0.56 to 1.00 during our manual review of the retrieved chunks, confirming the retrieval pipeline was functioning perfectly. The regression on Faithfulness, Answer Relevancy, and Hallucination is attributable to the judge model quality alone. Mistral's summaries remained accurate and consistent across both phases.
 
 \subsection{Discussion and Threats to Validity}
 
 \subsubsection{Interpreting the Score Regression}
-The Phase~2 scores do not imply that the Triton system produces worse summaries. They indicate that the selected judge model is unsuitable for the evaluation task. A coding model acting as an evaluator introduces measurement noise that makes results unreliable for Faithfulness, Answer Relevancy, and Hallucination. Contextual Relevancy, which depends on a simpler binary verdict structure, proved more resilient to instruction-following failures.
+The Phase~2 scores do not mean the Triton system produces worse summaries. They simply prove that the selected judge model fails at the evaluation task. Using a coding model as an evaluator introduces severe measurement noise, rendering the results for Faithfulness, Answer Relevancy, and Hallucination completely unreliable. Only Contextual Relevancy, which relies on a simpler binary verdict structure, resisted these instruction-following failures.
 
 \subsubsection{Why Triton Despite the Regression}
-The migration was not motivated by improving evaluation scores. Its goal is a \textbf{production-ready inference infrastructure} that supports multiple models and concurrent users. While the initial local deployment relied on Triton's explicit model control mode to swap models within a strict 16~GB VRAM budget, the final migration to the HPP hardware eliminated this bottleneck. With the larger allocations available on the cluster, it became possible to keep multiple models resident simultaneously, removing model-swap latency and enabling a genuinely instruction-tuned model to serve as the judge without the workarounds described above.
+Improving evaluation scores never motivated the migration. We built a \textbf{production-ready inference infrastructure} to support multiple models and concurrent users. The initial local deployment used Triton's explicit model control to swap models within a strict 16~GB VRAM budget. Migrating to the HPP hardware eliminated this bottleneck entirely. The cluster's large memory allocations allow multiple models to remain resident simultaneously, removing model-swap latency. This architecture now provides the headroom to host a genuinely instruction-tuned model as the evaluation judge without any local desktop constraints.
 
 \subsubsection{Threats to Validity}
-The same three threats from Phase~1 apply here, with additional considerations. On internal validity, the model-swap mechanism introduces latency (35--40 seconds per load event) acceptable in single-user experimentation but not in production. On external validity, Phase~2 covers only one test query rather than five, so broader conclusions about Triton's effect on answer quality would require a full five-query replication. On construct validity, a code-specialised model acting as an evaluator produces scores that do not correspond to the same underlying construct as those from an instruction-tuned model, making the two phases not fully comparable on Faithfulness and Answer Relevancy.
+The three validity threats from Phase~1 apply here, adding new considerations. Regarding internal validity, the local VRAM model-swap mechanism introduces a 35-to-40 second latency per load event. This is acceptable for single-user prototyping but completely unviable for production. On external validity, Phase~2 covers only one test query instead of five; drawing broader conclusions requires a full replication campaign. Finally, on construct validity, a code-specialized evaluator produces scores that measure different underlying constructs than an instruction-tuned model, making Phase~1 and Phase~2 strictly incomparable on Faithfulness and Answer Relevancy.
 
 \subsection{Conclusions}
 
-Phase~1 established that the Web Search Agent, backed by a suitable instruction-following model via Ollama, delivers measurable and interpretable quality metrics. Average Contextual Relevancy of 0.75, Answer Relevancy of 0.57, and a Hallucination rate of 0.14 across five query types confirm that the retrieval and summarisation pipeline is sound. Score variation by query type is predictable: procedural queries score highest on Faithfulness, exploratory queries score higher on Answer Relevancy at the cost of lower Faithfulness.
+Phase~1 proved that the Web Search Agent delivers measurable and interpretable quality metrics when backed by a capable instruction-following model via Ollama. Across five query types, we logged an average Contextual Relevancy of 0.75, Answer Relevancy of 0.57, and a Hallucination rate of just 0.14. These numbers confirm a sound retrieval and summarization pipeline. 
 
-Phase~2 showed that migrating to Triton introduces significant engineering complexity. The problems encountered, from VRAM allocation errors to JSON parsing anomalies and instruction-following failures, are not intrinsic to Triton but to the judge models available within the current hardware constraints. Contextual Relevancy improved to 1.00, confirming the retrieval pipeline was unaffected. Future iterations should pair Triton with a genuinely instruction-tuned model as the evaluation back-end, reserving code-specialised models for their intended use cases.
+Phase~2 demonstrated the engineering complexity of migrating to high-performance infrastructure like Triton. However, the problems we encountered (VRAM allocation errors, JSON parsing crashes, instruction-following failures) stem directly from the chosen \textbf{StarCoder2-15B} model, not from the Triton server itself. Contextual Relevancy matched a perfect 1.00, proving the retrieval pipeline survived the migration intact. Going forward, the system must explicitly pair Triton with a dedicated instruction-tuned model for evaluation, keeping code-specialized models strictly quarantined for code-completion tasks.

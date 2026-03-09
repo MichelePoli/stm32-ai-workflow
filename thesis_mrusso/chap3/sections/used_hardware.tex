@@ -1,12 +1,14 @@
 \section{Used Hardware}
 \label{sec:used_hardware}
 
-The experiments were conducted on a workstation equipped with an \textbf{NVIDIA RTX A4000 GPU}, featuring a total of 16~GB of dedicated VRAM (GDDR6 with ECC). The GPU operated with driver version 575.57.08 and CUDA version 12.9, providing the necessary hardware acceleration for deep learning workloads.
+The development and evaluation of the Agentic Framework spanned two distinct hardware environments, reflecting the shift from local prototyping to scalable production deployment.
 
-\vspace{0.5cm}
+\subsection{Local Prototyping Environment}
+Initial development and unit testing were conducted on a workstation equipped with an \textbf{NVIDIA RTX A4000} GPU, featuring 16~GB of dedicated VRAM (GDDR6 with ECC), operating with driver version 575.57.08 and CUDA version 12.9.
 
-This hardware infrastructure was central to the development of the Agentic Framework. 
+The 16~GB VRAM buffer allowed us to deploy quantized Large Language Models (such as Mistral-7B and Qwen-7B via \texttt{Ollama}) directly on the developer's machine. Keeping execution strictly local reduced latency and avoided the privacy risks of cloud-based inference APIs. Local GPU acceleration also enabled rapid iterative testing of complex LangGraph agentic loops. Running these tests on a standard CPU-based environment would have been prohibitively slow. However, this setup proved insufficient for concurrent multi-model access due to severe VRAM limits.
 
-Specifically, the 16~GB VRAM buffer allowed for the local deployment of quantized Large Language Models (such as Mistral-7B and Qwen-7B via \texttt{Ollama}) directly on the server, reducing the latency and privacy concerns associated with cloud-based APIs. 
+\subsection{High Performance Platform (HPP) Cluster}
+To handle production workloads and multi-user stress testing, we migrated the core inference engine to the PoliTo \textbf{High Performance Platform (HPP)}. The HPP cluster gave us access to powerful GPUs with \textbf{40~GB} of VRAM capacity.
 
-In addition, the GPU acceleration significantly reduced the inference time for each node in the \textit{LangGraph} workflow, enabling rapid iterative testing of complex agentic loops, a process that would have been prohibitively slow on a standard CPU-based environment.
+This expanded hardware infrastructure was necessary to deploy the \textbf{NVIDIA Triton Inference Server}. The 40~GB capacity allowed multiple heavyweight models (such as Mistral and \texttt{gpt-oss-20b}) to remain resident in memory simultaneously without triggering destructive load/unload cycles. By delegating LLM execution over the network to the HPP hardware, we freed the local workstation CPU and RAM entirely for LangGraph orchestration logic and intensive memory-bound fine-tuning tasks.

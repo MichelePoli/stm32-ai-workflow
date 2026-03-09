@@ -20,18 +20,7 @@ DeepEval (\url{https://github.com/confident-ai/deepeval}) implements the LLM-as-
     \item \textbf{Hallucination}: $1 - \frac{\text{Contradicted/Unsupported Claims}}{\text{Total Claims}}$
 \end{enumerate}
 
-All four metrics are evaluated by a local \texttt{OllamaModel} backed by \texttt{deepseek-r1:latest}, keeping the evaluation pipeline fully offline. The threshold for all metrics is set to 0.55. Evaluation runs synchronously in a separate thread via \texttt{asyncio.to\_thread} to avoid blocking the main event loop.
-
-\subsection{ChromaDB for Vector Search}
-
-ChromaDB (\url{https://www.trychroma.com/}) stores embedded documentation for retrieval-augmented generation in Workflow 5. Two separate vectorstores are maintained:
-
-\begin{itemize}
-    \item \textbf{Architecture Best Practices}: transfer learning guides and optimization techniques
-    \item \textbf{STM32 Documentation}: hardware constraints and peripheral configurations
-\end{itemize}
-
-Embeddings are generated with \texttt{all-MiniLM-L6-v2} (384-dimensional vectors).
+All four metrics were initially evaluated by a local \texttt{OllamaModel} backed by \texttt{deepseek-r1:latest}, keeping the evaluation pipeline fully offline. Following the architectural migration to the HPP cluster (detailed in Section~\ref{sec:scalability_scenarios}), the evaluation was also performed using \texttt{gpt-oss-20b} served via the \textbf{NVIDIA Triton Inference Server}. The threshold for all metrics is set to 0.55. Evaluation runs synchronously in a separate thread via \texttt{asyncio.to\_thread} to avoid blocking the main event loop.
 
 \subsection{Ollama: Local Development and Benchmarking}
 
@@ -78,13 +67,13 @@ instance_group [{ kind: KIND_GPU, count: 1 }]
 
 \subsubsection{EXPLICIT Model Control and Model Swapping}
 
-Triton is configured with \texttt{model\_\allowbreak control\_\allowbreak mode: EXPLICIT}, which disables automatic model loading at boot time. Each model is loaded into VRAM on demand and can be unloaded via API when no longer needed. This is essential for hosting multiple 7B--20B models on a single 16~GB GPU: keeping all three resident simultaneously would exceed VRAM capacity.
+Triton is configured with \texttt{model\_\allowbreak control\_\allowbreak mode: EXPLICIT}, disabling automatic model loading at boot time. Each model loads into VRAM on demand and unloads via API when no longer needed. We added this feature specifically for constrained hardware, such as a single 16~GB GPU, where keeping multiple 7B--20B models resident simultaneously would cause immediate memory failure.
 
-The \texttt{ChatTriton} client class implements a \textbf{mutual exclusion swapping} algorithm in its \texttt{\_\allowbreak ensure\_\allowbreak model\_\allowbreak loaded()} method. Before loading the requested model, the method calls Triton's \texttt{/v2/repository/models/\{name\}/unload} endpoint for every other active LLM, then polls \texttt{/v2/repository/index} until each reaches the \texttt{UNAVAILABLE} state. A two-second sleep after each unload gives the Python backend time to release its CUDA context before the next load begins. Only one heavyweight LLM resides in VRAM at any point. The embedding model (\texttt{nomic-embed}) is exempt from this cycle: at a fraction of the size of the language models, it stays resident throughout all inference requests.
+The \texttt{ChatTriton} client class implements a \textbf{mutual exclusion swapping} algorithm in its \texttt{\_\allowbreak ensure\_\allowbreak model\_\allowbreak loaded()} method. Before loading the requested model, the method calls Triton's \texttt{/v2/repository/models/\{name\}/unload} endpoint for every other active LLM. It then polls \texttt{/v2/repository/index} until each reaches the \texttt{UNAVAILABLE} state. A two-second sleep after each unload gives the Python backend time to release its CUDA context before the next load begins. This guarantees only one heavyweight LLM resides in VRAM at any point to prevent Out-Of-Memory errors.
 
-If the requested model is already in the \texttt{READY} state, the method returns immediately without any unloading, keeping unnecessary VRAM churn to a minimum. Once the target model reports \texttt{READY} in the repository index, a lightweight probe confirms that the native inference endpoint (\texttt{/v2/models/\{name\}/infer}) is actually live before the request is forwarded, since CUDA graph capturing can complete after the status flag flips.
+If the requested model is already in the \texttt{READY} state, the method returns immediately without unloading, minimizing VRAM churn. This is the standard behavior in the target HPP deployment: the 40~GB GPU capacity easily allows both Mistral and \texttt{gpt-oss-20b} to remain resident. Once the target model reports \texttt{READY} in the repository index, a lightweight probe checks the native inference endpoint (\texttt{/v2/models/\{name\}/infer}) to confirm it is live before forwarding the request.
 
-This behavior differs from Ollama's single-process model. Ollama has no equivalent model lifecycle API: it loads one model at a time and exposes no mechanism for a caller to explicitly unload a model or queue a request behind an in-progress swap. Under concurrent multi-model workloads, Ollama either runs out of memory or serializes requests without signalling the delay to the caller. The Triton design makes the swap explicit, observable, and controllable.
+This architectural design solves the bottlenecks of Ollama's single-process model. Ollama lacks an equivalent model lifecycle API. It loads one model at a time and exposes no mechanism to explicitly unload a model or queue a pending request. Under concurrent multi-model workloads lacking sufficient VRAM, Ollama simply crashes under constant churn. The Triton client's explicit swap logic fixes this flaw, guaranteeing high availability on constrained local nodes while scaling seamlessly up to the robust HPP hardware.
 
 
 \subsubsection{vLLM and PagedAttention}
