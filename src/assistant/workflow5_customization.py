@@ -1533,7 +1533,7 @@ CURRENT MODEL:
 - Input shape: {input_shape}
 - Total parameters: {total_params:,}
 
-MODIFICATION TYPES:
+MODIFICATION TYPES ALLOWED (CHOOSE ONLY FROM THESE, DO NOT INVENT NEW ONES):
 1. freeze_layers → params: {{"num_frozen_layers": 5}}
 2. freeze_almost_all → params: {{"num_trainable_layers": 3}}
 3. change_output_layer → params: {{"new_classes": 100}}
@@ -1545,6 +1545,7 @@ MODIFICATION TYPES:
 CRITICAL RULES:
 - Each item in "modifications" is an OBJECT with "type", "description", "params" and "confidence" keys.
 - Do NOT list type names as string values in the array. Each item is a {{...}} object.
+- DO NOT invent new modification types. If the user mentions "load firmware", "integration" or other tasks, IGNORE THEM. They are not structural modifications. Only extract structural changes to the neural network.
 - Return ONLY JSON, no extra text.
 
 EXAMPLE OUTPUT for "change input to 128x128":
@@ -2245,6 +2246,19 @@ os.environ.pop('TF_USE_LEGACY_KERAS', None)
 import json
 import sys
 
+# GPU Memory Limit (Prevent OOM)
+import tensorflow as tf
+gpus = tf.config.list_physical_devices('GPU')
+if gpus:
+    try:
+        for gpu in gpus:
+            tf.config.experimental.set_virtual_device_configuration(
+                gpu,
+                [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=1024)]
+            )
+    except RuntimeError:
+        pass
+
 model_path = r'{model_path}'
 temp_output = f'/tmp/model_loaded_{state.thread_id}.h5'
 
@@ -2426,6 +2440,18 @@ from tensorflow.keras.layers import Input, Dropout, Dense, Resizing
 from tensorflow.keras.models import Model
 import json
 import sys
+
+# GPU Memory Growth (Prevent OOM)
+gpus = tf.config.list_physical_devices('GPU')
+if gpus:
+    try:
+        for gpu in gpus:
+            tf.config.experimental.set_virtual_device_configuration(
+                gpu,
+                [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=1024)]
+            )
+    except RuntimeError:
+        pass
 
 model_path = r'{loaded_model_path}'
 modifications = {json.dumps(parsed_mods.get('modifications', []))}
@@ -2888,14 +2914,20 @@ from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
 import numpy as np
 
 
-# GPU Memory Growth (Prevent OOM)
+# GPU Memory Management (Prevent Greedy Allocation)
+# By default, TF allocates nearly all VRAM. We limit it to allow parallel users.
 gpus = tf.config.list_physical_devices('GPU')
 if gpus:
     try:
         for gpu in gpus:
-            tf.config.experimental.set_memory_growth(gpu, True)
-        print(f"[Train] 🎮 GPU initialized: {{len(gpus)}} devices")
+            # Enforce 4096 MB limit to support ~4 concurrent users on 16GB VRAM
+            tf.config.experimental.set_virtual_device_configuration(
+                gpu,
+                [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=4096)]
+            )
+        print(f"[Train] 🎮 GPU initialized with 4096MB limit: {{len(gpus)}} devices")
     except RuntimeError as e:
+        print(e)
         print(e)
 
 model_path = r"{model_path}"
@@ -3741,6 +3773,18 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import tensorflow as tf
 import json
 
+# GPU Memory Limit (Prevent OOM)
+gpus = tf.config.list_physical_devices('GPU')
+if gpus:
+    try:
+        for gpu in gpus:
+            tf.config.experimental.set_virtual_device_configuration(
+                gpu,
+                [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=1024)]
+            )
+    except RuntimeError:
+        pass
+
 model_path = r'{model_path}'
 
 try:
@@ -3836,6 +3880,18 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 import tensorflow as tf
 import json
+
+# GPU Memory Limit (Prevent OOM)
+gpus = tf.config.list_physical_devices('GPU')
+if gpus:
+    try:
+        for gpu in gpus:
+            tf.config.experimental.set_virtual_device_configuration(
+                gpu,
+                [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=1024)]
+            )
+    except RuntimeError:
+        pass
 
 model_path = r'{final_path}'
 

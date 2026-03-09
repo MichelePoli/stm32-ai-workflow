@@ -1162,6 +1162,14 @@ If in doubt, choose the smallest and most stable model."""),
         import traceback
         logger.debug(traceback.format_exc())
         
+        # Smart fallback: prefer .h5/.keras, non-empty files, sorted by size ascending
+        valid_files = [f for f in h5_files if f.get('size', 0) > 1000]  # skip 0-byte/corrupt files
+        if valid_files:
+            keras_files = [f for f in valid_files if f['name'].endswith(('.h5', '.keras'))]
+            best = sorted(keras_files or valid_files, key=lambda x: x.get('size', 0))
+            logger.warning(f"→ Smart fallback: choosing '{best[0]['name']}' ({format_bytes(best[0].get('size', 0))})")
+            return best[0]
+        
         logger.warning(f"→ Fallback: choosing the first file")
         return h5_files[0] if h5_files else None
 
@@ -1510,6 +1518,18 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import tensorflow as tf
 import json
 import sys
+
+# GPU Memory Limit (Prevent OOM during inspection)
+gpus = tf.config.list_physical_devices('GPU')
+if gpus:
+    try:
+        for gpu in gpus:
+            tf.config.experimental.set_virtual_device_configuration(
+                gpu,
+                [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=1024)]
+            )
+    except RuntimeError:
+        pass
 
 try:
     model = tf.keras.models.load_model(r'{model_path}', compile=False)

@@ -16,7 +16,7 @@ async def simulate_user_flow(session, base_url, user_id):
     # Prompt generico che dovrebbe triggerare tutto il mega-workflow bypassato
     payload = {
         "messages": [
-            {"role": "user", "content": "Analizza il firmware e procedi con AI, Customization e Integration"}
+            {"role": "user", "content": "Genera firmware per STM32H7A3ZI"}
         ],
         "user_id": f"stress_user_{user_id:02d}",
         "session_id": "stress_session"

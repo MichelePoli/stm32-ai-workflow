@@ -111,8 +111,9 @@ def extract_mcu_series_from_board(board_name: str) -> Optional[str]:
     if not board_name:
         return None
     
-    # Pattern: STM32 + (Lettera)(Cifra) → serie
-    match = re.search(r'STM32([A-Z])([0-9])', board_name, re.IGNORECASE)
+    # Pattern robusto: (Opzionale STM32) + (Lettera)(Cifra)
+    # Esempi: "STM32H7A3ZI" -> "H7", "F401" -> "F4", "STM32 F4" -> "F4"
+    match = re.search(r'(?:STM32)?[\s-]*([A-Z])([0-9])', board_name, re.IGNORECASE)
     if match:
         letter = match.group(1).upper()
         digit = match.group(2)
@@ -184,11 +185,18 @@ Example: "Create project MyApp for STM32F401 with CubeIDE"
         """,
     }
     
-    # === LLM EXTRACTOR ===
     # === IDEMPOTENCY CHECK ===
-    # SKIP if board is already set, unless we are explicitly coming from a "change_board" route
+    # SKIP if board is already set, unless we are explicitly coming from a "change_board" route.
+    # IMPORTANT: Validate board_name is a real STM32 board, not a stale word like "AI" from profile.
     is_backtracking = state.route == "change_board"
-    if state.board_name and state.board_name != "STM32F401VCHx" and not state.user_response and not is_backtracking:
+    _INVALID_BOARD_NAMES = {"AI", "Custom", "Integration", "Customization", "Firmware", "Unknown"}
+    _board_is_valid = (
+        state.board_name
+        and state.board_name not in _INVALID_BOARD_NAMES
+        and state.board_name != "STM32F401VCHx"
+        and re.search(r'[0-9]', state.board_name)  # Must contain at least one digit
+    )
+    if _board_is_valid and not state.user_response and not is_backtracking:
         logger.info(f"⏭️  Idempotency: Board '{state.board_name}' already configured. Skipping interrupt.")
         return state
 
