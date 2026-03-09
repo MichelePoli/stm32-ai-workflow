@@ -84,6 +84,57 @@ Examples:
         ])
         # Handle both Pydantic models and raw dicts (Triton fallback)
         signal_val = res.get("signal_type") if isinstance(res, dict) else getattr(res, "signal_type", None)
+        
+        # Normalize LLM values to valid enum: 'Sinusoidal' → 'sine', 'Noise' → 'white_noise', etc.
+        _SIGNAL_NORMALIZE = {
+            "sinusoidal": "sine", "sinus": "sine", "sin": "sine",
+            "noise": "white_noise", "white": "white_noise", "whitenoise": "white_noise",
+            "pink": "pink_noise", "pinknoise": "pink_noise",
+            "sweep": "chirp", "frequency_sweep": "chirp",
+            "pulse": "impulse", "delta": "impulse",
+            "quiet": "silence", "zero": "silence",
+        }
+        if signal_val and isinstance(signal_val, str):
+            normalized = _SIGNAL_NORMALIZE.get(signal_val.lower().replace(" ", "_"), signal_val.lower())
+            if isinstance(res, dict):
+                res["signal_type"] = normalized
+            signal_val = normalized
+        
+        # Normalize numeric fields that LLM may return as strings with units (e.g. '2 kHz' → 2000.0)
+        def _parse_hz(val):
+            """Convert '2 kHz', '100 kHz', '16000' etc. to float."""
+            if val is None:
+                return None
+            if isinstance(val, (int, float)):
+                return float(val)
+            s = str(val).strip().lower().replace(",", "").replace(" ", "")
+            import re as _re
+            m = _re.match(r'^([0-9.]+)(k|m)?hz?$', s)
+            if m:
+                n = float(m.group(1))
+                if m.group(2) == 'k': n *= 1000
+                elif m.group(2) == 'm': n *= 1_000_000
+                return n
+            try:
+                return float(s)
+            except Exception:
+                return None
+        
+        if isinstance(res, dict):
+            if 'frequency' in res:
+                parsed_freq = _parse_hz(res['frequency'])
+                if parsed_freq is not None:
+                    res['frequency'] = parsed_freq
+            if 'sample_rate' in res:
+                parsed_sr = _parse_hz(res['sample_rate'])
+                if parsed_sr is not None:
+                    res['sample_rate'] = int(parsed_sr)
+            if 'duration_sec' in res and isinstance(res['duration_sec'], str):
+                try:
+                    res['duration_sec'] = float(res['duration_sec'].strip())
+                except Exception:
+                    res['duration_sec'] = 1.0
+        
         if signal_val:
             state.synthetic_request = res if isinstance(res, dict) else res.model_dump()
             initial_req_detected = True

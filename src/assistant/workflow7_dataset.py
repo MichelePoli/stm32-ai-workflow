@@ -142,7 +142,9 @@ Answer ONLY with one word: REAL, REGISTER, or SYNTHETIC. If unsure: null.
         msg_low = state.message.lower()
         # Explicit keywords for each source
         real_keywords    = ["real", "reale", "cifar", "mnist", "dataset", "predefined", "predefinit", "esistente", "existing"]
-        synth_keywords   = ["synthetic", "sintetico", "artificiale", "artificial", "genera", "generat"]
+        # NOTE: Do NOT use generic verbs like "genera"/"generat" here — they match "Genera firmware"!
+        # Only use specific synthetic-data terminology.
+        synth_keywords   = ["synthetic", "sintetico", "artificiale", "artificial", "dati sintetici", "synthetic data", "generate data", "genera dati"]
         register_keywords = ["register", "url", "http", "link", "registra", "aggiungi", "add"]
         
         if any(k in msg_low for k in synth_keywords):

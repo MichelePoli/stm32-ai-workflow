@@ -351,39 +351,90 @@ def inspect_model_architecture(state: MasterState, config: RunnableConfig = None
         return state
 
     try:
-        # ✅ First attempt: standard load_model
+        # ✅ Run inspection in a subprocess with GPU memory limit to avoid VRAM saturation
+        # (The main process has no GPU cap; running TF here would consume all VRAM)
         logger.info("   Attempt 1: standard load_model()...")
-        model = tf.keras.models.load_model(state.model_path, compile=False)
         
-        trainable_params = int(sum([tf.size(w).numpy() for w in model.trainable_weights]))
-        model_size_mb = os.path.getsize(state.model_path) / (1024*1024)
+        python_code = f"""
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+os.environ.pop('TF_USE_LEGACY_KERAS', None)
+
+import tensorflow as tf
+import json, io
+
+# GPU Memory Limit - prevent main-process VRAM saturation
+gpus = tf.config.list_physical_devices('GPU')
+if gpus:
+    try:
+        for gpu in gpus:
+            tf.config.experimental.set_virtual_device_configuration(
+                gpu, [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=1024)]
+            )
+    except RuntimeError:
+        pass
+
+try:
+    try:
+        import keras
+        model = keras.models.load_model(r'{state.model_path}', compile=False)
+    except Exception:
+        model = tf.keras.models.load_model(r'{state.model_path}', compile=False, safe_mode=False)
+    
+    trainable_params = int(sum([tf.size(w).numpy() for w in model.trainable_weights]))
+    model_size_mb = os.path.getsize(r'{state.model_path}') / (1024*1024)
+    
+    has_bn = any(type(l).__name__ == 'BatchNormalization' for l in model.layers)
+    has_drop = any(type(l).__name__ == 'Dropout' for l in model.layers)
+    
+    info = {{
+        'input_shape': str(model.input_shape),
+        'output_shape': str(model.output_shape),
+        'n_layers': len(model.layers),
+        'layer_types': [type(l).__name__ for l in model.layers],
+        'layer_names': [l.name for l in model.layers],
+        'total_params': int(model.count_params()),
+        'trainable_params': trainable_params,
+        'model_size_mb': round(model_size_mb, 2),
+        'has_batchnorm': has_bn,
+        'has_dropout': has_drop,
+        'output_classes': model.output_shape[-1] if len(model.output_shape) > 1 else 1,
+    }}
+    
+    summary_io = io.StringIO()
+    model.summary(print_fn=lambda x: summary_io.write(x + '\\n'))
+    
+    print('SUCCESS: ' + json.dumps(info))
+    print('SUMMARY: ' + summary_io.getvalue().replace('\\n', '|||'))
+
+except Exception as e:
+    print(f'ERROR: {{str(e)}}')
+    import traceback
+    traceback.print_exc()
+"""
+        result = execute_in_environment(python_code, state, timeout=120,
+                                        ignore_list=SUBPROCESS_NOISE_FILTER,
+                                        whitelist_patterns=SUBPROCESS_CLEAN_ALLOWLIST)
         
-        state.model_architecture = {
-            "input_shape": str(model.input_shape),
-            "output_shape": str(model.output_shape),
-            "n_layers": len(model.layers),
-            "layer_types": [layer.__class__.__name__ for layer in model.layers],
-            "layer_names": [layer.name for layer in model.layers],
-            "total_params": int(model.count_params()),
-            "trainable_params": trainable_params,
-            "model_size_mb": round(model_size_mb, 2),
-            "has_batchnorm": any(isinstance(l, tf.keras.layers.BatchNormalization) for l in model.layers),
-            "has_dropout": any(isinstance(l, tf.keras.layers.Dropout) for l in model.layers),
-            "output_classes": model.output_shape[-1] if len(model.output_shape) > 1 else 1,
-            "format": ext
-        }
-        
-        import io
-        stream = io.StringIO()
-        model.summary(print_fn=lambda x: stream.write(x + '\n'))
-        state.model_summary_text = stream.getvalue()
-        
-        logger.info(f"✓ Architecture analyzed (load_model):")
-        logger.info(f"  - Layers: {state.model_architecture['n_layers']}")
-        logger.info(f"  - Total params: {state.model_architecture['total_params']:,}")
-        logger.info(f"  - Model size: {state.model_architecture['model_size_mb']:.2f} MB")
-        
-        return state
+        if result['success'] and 'SUCCESS: ' in result['stdout']:
+            json_str = result['stdout'].split('SUCCESS: ')[1].split('\n')[0].strip()
+            info = json.loads(json_str)
+            ext = os.path.splitext(state.model_path)[1].lower()
+            info['format'] = ext
+            state.model_architecture = info
+            
+            if 'SUMMARY: ' in result['stdout']:
+                summary_str = result['stdout'].split('SUMMARY: ')[1].split('\n')[0]
+                state.model_summary_text = summary_str.replace('|||', '\n')
+            
+            logger.info(f"✓ Architecture analyzed (load_model):")
+            logger.info(f"  - Layers: {info['n_layers']}")
+            logger.info(f"  - Total params: {info['total_params']:,}")
+            logger.info(f"  - Model size: {info['model_size_mb']:.2f} MB")
+            
+            return state
+        else:
+            raise Exception(result.get('stderr', 'Subprocess inspection failed')[:200])
     
     except Exception as e:
         # ❌ load_model fails, try raw HDF5 fallback (only if .h5 or .keras)
@@ -3451,12 +3502,18 @@ except Exception as e:
             logger.error("❌ Training subprocess failed")
             logger.error(f"   • Return code: {result['returncode']}")
             logger.error(f"  Stderr:\n{stderr[:1000]}")
-            # Fix: Handle empty stderr
+            # Fix: extract actual error from stdout when stderr is empty
             error_msg = "Unknown error"
             if stderr:
                 stderr_lines = [line for line in stderr.split('\n') if line.strip()]
                 if stderr_lines:
                     error_msg = stderr_lines[-1]
+            elif stdout:
+                # TF often puts errors in stdout (e.g. [Train] ERROR, shape mismatch)
+                error_lines = [l for l in stdout.split('\n') if any(k in l for k in ('Error', 'error', 'Exception', 'exception', 'FAIL'))]
+                if error_lines:
+                    error_msg = error_lines[-1][:300]
+                    logger.error(f"  Stdout error hint: {error_msg}")
             raise Exception(f"Subprocess failed: {error_msg}")
         
         if "SUCCESS:" in stdout:
