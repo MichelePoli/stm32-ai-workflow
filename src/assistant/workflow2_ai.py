@@ -565,7 +565,7 @@ def choose_ai_model(state: MasterState, config: RunnableConfig = None) -> Master
     if not state.user_response or state.user_response.strip() == "":
         logger.info("⏸️ Interrupting for AI model selection.")
         # resume_value = interrupt({"instruction": prompt_text})
-        resume_value = "mobilenetv1" # BYPASS
+        resume_value = "mobilenetv2 128" # BYPASS
         # logger.info("⏭️  BYPASS: Automatic model selection -> '2' (MobileNetV1)")
         # model_text = "2"
     
@@ -588,7 +588,7 @@ def choose_ai_model(state: MasterState, config: RunnableConfig = None) -> Master
     
     model_result = llm_model_extractor.invoke([
         SystemMessage(content=model_selection_instructions),
-        HumanMessage(content=f"Available models: {len(available_models)}\nUser response: {model_text}")
+        HumanMessage(content=f"Available models:\n{models_list}\n\nUser response: {model_text}")
     ])
     
     logger.info(f"🤖 LLM Model Extraction: index={model_result.model_index}, accepted={model_result.model_accepted}, search_again={model_result.wants_another_search}")
