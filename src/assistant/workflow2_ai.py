@@ -963,6 +963,11 @@ def search_h5_file_in_repo_hybrid( # fundamental
                                 continue
                         
                         elif item.type == "file" and any(item.name.endswith(ext) for ext in [".h5", ".keras", ".onnx", ".tflite"]):
+                            # FIX FOR CUSTOMIZATION: If the user wants to customize the model, we MUST restrict the search to .h5 or .keras 
+                            # Otherwise workflow5 will crash trying to structural-edit an ONNX or TFLite model.
+                            # For simplicity we assume that if we are doing a repo search, it is safer to stick to native Keras models by default 
+                            # if we intend to apply some workflow on them later.
+                            # But since `state` isn't passed here, we'll just highly penalize non-Keras models in the LLM scoring later.
                             description = extract_description(item.name, item.path)
                             h5_files.append({
                                 'name': item.name,
@@ -1097,17 +1102,15 @@ AVAILABLE FILES IN REPO:
 ⚠️ CRITICAL INSTRUCTIONS:
 1. Analyze ALL models (.h5, .keras, .onnx, .tflite)
 2. Choose the BEST one for the task (consider: compatibility, size, architecture)
-3. Return ONLY the index number (1-{len(h5_files)})
-4. DO NOT add any other text
+3. Return a JSON object with the key "selected_index" containing the 1-based index (1-{len(h5_files)})
 
 SCORING:
 - Exact match task: +100
 - Known architecture (resnet, yolo, mobilenet, efficientnet): +50
+- Is .h5 or .keras file: +1000  (CRITICAL: Always prefer native Keras files over .onnx or .tflite to allow structural editing later)
 - Size < 10MB: +25
 - Size < 1MB: +50
-
-RESPONSE - JUST THE NUMBER:
-{1}"""
+"""
         
         logger.debug(f"LLM Prompt: {prompt[:350]}...")
         
@@ -1129,7 +1132,8 @@ RESPONSE - JUST THE NUMBER:
         
         selection = llm_selector.invoke([
             SystemMessage(content="""You are a model selection task.
-YOU MUST answer ONLY with a valid JSON in the specified format.
+YOU MUST answer ONLY with a valid JSON object.
+Example: {"selected_index": 5}
 No text, no explanations.
 If in doubt, choose the smallest and most stable model."""),
             HumanMessage(content=prompt)

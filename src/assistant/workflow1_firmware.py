@@ -275,9 +275,9 @@ Example: "Create project MyApp for STM32F401 with CubeIDE"
             state.mcu_series = extracted
             logger.info(f"📊 MCU series automatically extracted from board_name: {extracted}")
         else:
-            # Final fallback to F4
-            state.mcu_series = "F4"
-            logger.warning(f"⚠️  Unable to extract series, fallback to F4")
+            # Final fallback to H7
+            state.mcu_series = "H7"
+            logger.warning(f"⚠️  Unable to extract series, fallback to H7")
         
     state.project_name = state.project_name or "MySTM32Project"
     state.toolchain = state.toolchain or "STM32CubeIDE"
@@ -418,7 +418,7 @@ def search_and_install_stm32_package(state: MasterState, config: RunnableConfig 
     # === 4. CLONE FROM GITHUB ===
     
     # Temporary Paths
-    temp_clone_path = f"/tmp/STM32Cube{board_series}_{state.timestamp}"
+    temp_clone_path = f"/tmp/STM32Cube{board_series}_{state.thread_id}"
     
     try:
         logger.info(f"📥 Recursive clone in progress (timeout: 10 minutes)...")
@@ -629,7 +629,7 @@ def generate_cubemx_script(state: MasterState, config: RunnableConfig = None) ->
     ]
 
     state.firmware_script_content = "\n".join(lines)
-    state.firmware_script_path = f"/tmp/script_{state.timestamp}.scr"
+    state.firmware_script_path = f"/tmp/script_{state.thread_id}.scr"
     with open(state.firmware_script_path, "w") as f:
         f.write(state.firmware_script_content)
     
@@ -679,7 +679,7 @@ def execute_generation(state: MasterState, config: RunnableConfig = None) -> Mas
     import time
     
     # === 1. CREATE LOCAL TEMPORARY DIRECTORY ===
-    temp_project_path = f"/tmp/stm32_{state.timestamp}"
+    temp_project_path = f"/tmp/stm32_{state.thread_id}"
     os.makedirs(temp_project_path, exist_ok=True)
     logger.info(f"📂 Temporary directory created: {temp_project_path}")
     
@@ -695,7 +695,7 @@ def execute_generation(state: MasterState, config: RunnableConfig = None) -> Mas
     )
     
     # Write the modified script
-    temp_script_path = f"/tmp/script_temp_{state.timestamp}.scr"
+    temp_script_path = f"/tmp/script_temp_{state.thread_id}.scr"
     with open(temp_script_path, "w") as f:
         f.write(temp_script)
     

@@ -10,6 +10,9 @@ from pydantic import BaseModel, Field
 
 @dataclass
 class MasterState:
+    # === SYSTEM PARAMS ===
+    thread_id: str = "default_thread"
+
     # === INPUT MESSAGE ===
     message: str = ""
     route: str = ""

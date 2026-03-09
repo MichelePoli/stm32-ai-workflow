@@ -2246,7 +2246,7 @@ import json
 import sys
 
 model_path = r'{model_path}'
-temp_output = '/tmp/model_loaded_temp.h5'
+temp_output = f'/tmp/model_loaded_{state.thread_id}.h5'
 
 try:
     # Try keras3 (modern) first, fall back to tf.keras (legacy)
@@ -3112,7 +3112,7 @@ try:
             if 'real_num_classes' in locals():
                 dummy_num_classes = real_num_classes
             else:
-                dummy_num_classes = int(output_shape[-1])
+                dummy_num_classes = 10 # Default to 10 to avoid 1000 categories over-sparsing and mismatched Dense layers
             y = np.eye(dummy_num_classes)[np.random.randint(0, dummy_num_classes, len(X))]
     
     # ===== DETECT DATASET vs MODEL CLASS MISMATCH =====
@@ -3148,6 +3148,15 @@ try:
                     activation='softmax', 
                     name='predictions_finetuned'
                 )(dropout)
+                
+                # FIX: Also we must force the labels `y` to have `dataset_num_classes` size
+                # Sometimes `y` can be one-hot encoded to the OLD model output shape (e.g. 1000) 
+                # before we reach here due to dummy fallback logic. We truncate it safely:
+                if y is not None and len(y.shape) > 1 and y.shape[1] > dataset_num_classes:
+                    print(f"  🔧 Truncating one-hot labels from {{y.shape[1]}} to {{dataset_num_classes}} to match new output")
+                    y = y[:, :dataset_num_classes]
+                    if y_val is not None:
+                        y_val = y_val[:, :dataset_num_classes]
                 
                 # Create new model
                 model = tf.keras.Model(inputs=model.input, outputs=new_output)

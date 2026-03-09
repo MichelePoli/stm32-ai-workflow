@@ -204,6 +204,10 @@ def route_request(state: MasterState, config: RunnableConfig = None) -> MasterSt
     # across sessions (they would otherwise be re-emitted by server.py for every node).
     state.response = ""
 
+    # === EXTRACT THREAD ID ===
+    if config and "configurable" in config and "thread_id" in config["configurable"]:
+        state.thread_id = config["configurable"]["thread_id"]
+
     
     # === TOTAL RESET HANDLING ===
     msg_clean = state.message.lower().strip()
