@@ -36,7 +36,7 @@ Table~\ref{tab:productivity} presents a breakdown of the complete Edge AI deploy
         \hline
         \textbf{STEdgeAI Analysis}    & 15-20 min              & 2-3 min            & 7×                 & Manual CLI invocation + report parsing. Includes resource constraint checking and autonomous compression escalation.                                                 \\
         \hline
-        \textbf{NNI Experiment Setup} & 45-60 min              & 1-2 min            & 30×                & Writing \texttt{manager.py} + \texttt{trial.py} from scratch per NNI documentation\cite{nni_documentation}. LLM generates production-ready code with error handling. \\
+        \textbf{NNI Experiment Setup} & 45-60 min              & 1-2 min            & 30×                & Writing \texttt{manager.py} + \texttt{trial.py} from scratch per NNI documentation\cite{nni_documentation}. Template generator produces production-ready code with error handling. \\
         \hline
         \textbf{Model Fine-Tuning}    & 30-45 min              & 10-15 min          & 3×                 & Dataset loading, class mismatch resolution, hyperparameter tuning. Automated anti-overfitting heuristics (dropout injection, epoch capping).                         \\
         \hline
@@ -62,7 +62,7 @@ The framework improves operational efficiency by automating resource optimizatio
 
 \paragraph{Model Discovery (24× speedup):} Manual GitHub/Kaggle searches often require evaluating 10-15 repositories, reading READMEs, and verifying model formats. The two-tier hybrid search (curated task-based + LLM-ranked GitHub scan) achieves a 70\% first-attempt success rate, bypassing most exploratory searches.
 
-\paragraph{NNI Experiment Setup (30× speedup):} Writing NNI experiment code from scratch requires deep knowledge of the API (search space definition, trial job management, checkpoint handling). The LLM code generator produces production-ready scripts with edge case handling (class mismatch, memory subsetting, port conflicts) that would otherwise require multiple debug-fix iterations.
+\paragraph{NNI Experiment Setup (30× speedup):} Writing NNI experiment code from scratch requires deep knowledge of the API (search space definition, trial job management, checkpoint handling). The template-based code generator produces production-ready scripts with edge case handling (class mismatch, memory subsetting, port conflicts) that would otherwise require multiple debug-fix iterations.
 
 \paragraph{Firmware Integration (8× speedup):} Manual integration involves error-prone tasks: locating the correct \texttt{Core/Src/} and \texttt{Core/Inc/} directories, editing \texttt{CMakeLists.txt} with correct syntax, and modifying \texttt{main.c} without introducing syntax errors. Automation eliminates these failure points.
 
