@@ -12,6 +12,23 @@ This remote offloading is a critical enabler for the customization workflows des
 
 To operate within limited hardware constraints on the HPP node (such as the 16 GB VRAM capacity of the NVIDIA A4000 GPU used in testing), the system implements an \textbf{Explicit Model Control} strategy. Launching Triton with the \texttt{--model-control-mode=explicit} flag stops the orchestrator from automatically loading all LLMs at startup, avoiding immediate Out-of-Memory (OOM) errors.
 
+However, freeing VRAM for TensorFlow exposed a secondary concurrency bottleneck. TensorFlow defaults to aggressively pre-allocating all available GPU memory upon initialization. When multiple users attempted to trigger model inspection or fine-tuning workflows concurrently, the first subprocess monopolized the entire GPU. This caused subsequent user containers to crash with \texttt{Out-Of-Memory} (OOM) exceptions.
+
+To support true multi-user concurrency on a shared hardware accelerator, the framework enforces an explicit GPU VRAM partitioning strategy within the Python subprocesses. Before executing any Keras or TensorFlow operation, the orchestrator injects strict virtual device configurations:
+
+\begin{lstlisting}[language=Python, caption={Strict VRAM partitioning for concurrent TensorFlow subprocesses}, label={lst:vram_partitioning}]
+# Prevent greedy VRAM allocation by forcing a hard limit (e.g., 4096 MB for training)
+gpus = tf.config.experimental.list_physical_devices('GPU')
+if gpus:
+    for gpu in gpus:
+        tf.config.experimental.set_virtual_device_configuration(
+            gpu,
+            [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=4096)]
+        )
+\end{lstlisting}
+
+This partitioning limits fine-tuning tasks to 4~GB of VRAM and lightweight model inspection tasks to 1~GB. On a standard 16~GB research GPU, this configuration safely supports three to four simultaneous fine-tuning sessions or up to fifteen concurrent inspection operations.
+
 Instead, the custom \texttt{ChatTriton} client acts as a VRAM traffic controller, utilizing the Triton V2 Repository API (\texttt{/v2/repository/models/\{model\}/load} and \texttt{/unload}) to perform \textbf{Dynamic Model Swapping}. Before each inference task, the system unloads currently inactive models and verifies the available CUDA context, ensuring only one Large Language Model resides in VRAM at any given time while maintaining shared system-wide access.
 
 \subsection{Master Orchestrator and State Machine}
@@ -85,6 +102,16 @@ LangGraph automatically persists this state at every node transition through a c
 \end{enumerate}
 
 A detailed analysis of the underlying storage infrastructure and the dual-layer memory management logic is provided in Section \ref{sec:redis_architecture}.
+
+\subsubsection{Robustness in LLM-Driven Orchestration}
+
+Relying on Large Language Models for orchestration decisions introduces non-determinism. During stress testing with concurrent users, unconstrained LLM outputs occasionally caused validation crashes or incorrect routing. The framework solves this by enforcing three layers of input normalization before any LLM response modifies the \texttt{MasterState}.
+
+First, we implemented type coercion for numerical parameters. When extracting data like sample rates for synthetic data generation, LLMs frequently append human-readable units (e.g., \textit{``2 kHz''} instead of \texttt{2000}). The framework preemptively normalizes these strings into raw floating-point measurements before passing them to Pydantic, bypassing strict validation errors.
+
+Second, we introduced regex-based fallbacks for hardware identification. If the LLM extracts an imprecisely formatted identifier (hallucinating prefixes like \textit{``STM32 F401''} instead of \texttt{STM32F401}), a relaxed regular expression (such as \texttt{r'(?:STM32)?[\textbackslash{}s-]*([A-Z])([0-9])'}) guarantees the core MCU series letter and digit are captured correctly for the downstream ST toolchains.
+
+Finally, we adopted an enumerated prompt anchoring strategy. During model discovery, providing the LLM with only the total count of available models resulted in hallucinated index selections when users specified model names. Injecting the complete, enumerated list of model names directly into the extraction prompt creates a bounded decision space and enforces deterministic routing.
 
 \subsubsection{System Integrity and Transactional Registration}
 

@@ -96,6 +96,26 @@ An important outcome of the system design is its evolution from a local desktop 
 
 Decoupling workflow agents from model inference and shifting to the HPP cluster eliminates the 1:1 GPU-per-user binding, raises concurrent throughput, and solves the memory saturation failures of the single-container architecture.
 
+\subsection{Concurrency and Stress Testing Evaluation}
+\label{sec:stress_testing}
+
+We subjected the decoupled architecture described in Section~\ref{sec:scalability_scenarios} to concurrency stress tests to measure its practical limits. Two experimental Python scripts, \texttt{langgraph\_stress\_test.py} and \texttt{triton\_stress\_test.py}, simulated $N$ developers interacting with the API simultaneously.
+
+The evaluation assessed both the local LangGraph orchestrator and the remote Triton inference server. For the orchestrator, we verified that the centralized state machine managed isolation for all parallel users without race conditions. By continuously checkpointing to Redis, the system preserved the context of each conversational thread even when multiple users hit state-heavy nodes like \texttt{ai\_flow} or \texttt{firmware\_flow}. Furthermore, the explicit GPU VRAM partitioning in the TensorFlow subprocesses allowed simultaneous model customizations and inspections, keeping the host machine safe from OOM failures.
+
+For the inference backend, a dedicated load-testing utility pushed the remote HPP cluster to its limits. The test simulated 10 and 15 users requesting complex text generation (explaining a CNN architecture) simultaneously from two distinct models over a 1~Gbps network connection. The NVIDIA Triton instances remained stable throughout the experiment, collectively occupying about 37~GB of VRAM (80\% capacity). During parallel inference workloads, GPU computation stayed near 100\%. The vLLM server saturated the hardware efficiently, proving that the 1~Gbps network link did not act as a bottleneck for token streaming.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.32\textwidth]{chap4/figures/image1Triton.png}
+    \hfill
+    \includegraphics[width=0.32\textwidth]{chap4/figures/image2Triton.png}
+    \hfill
+    \includegraphics[width=0.32\textwidth]{chap4/figures/image3Triton.png}
+    \caption{Hardware utilization metrics during the Triton 10--15 user concurrency stress test. VRAM occupation remains stable around 37~GB (80\%), while GPU compute utilization stays consistently near 100\% without bottlenecks.}
+    \label{fig:triton_stress_metrics}
+\end{figure}
+
 \subsection{Comparison with Related Tools}
 
 Table~\ref{tab:tool_comparison} contrasts the framework's automation coverage with commercial and open-source alternatives.
