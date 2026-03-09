@@ -8,10 +8,10 @@ This section documents the experimental validation of the Web Search Agent (Work
 Quality assessment relies on \textbf{DeepEval}\footnote{\url{https://github.com/confident-ai/deepeval}}, an open-source library for RAG (Retrieval-Augmented Generation) evaluation. Four metrics were selected for their relevance to technical documentation tasks.
 
 \begin{itemize}
-    \item \textbf{Faithfulness} measures factual consistency between the generated summary and the retrieved source documents (range 0.0--1.0, higher is better).
-    \item \textbf{Answer Relevancy} captures the semantic alignment between the user query and the generated response (range 0.0--1.0, higher is better).
-    \item \textbf{Contextual Relevancy} evaluates retrieval quality by estimating the proportion of retrieved content genuinely useful for answering the query (range 0.0--1.0, higher is better).
-    \item \textbf{Hallucination} detects claims in the output that are not supported by retrieved documents (range 0.0--1.0, \textbf{lower} is better; 0.0 means no fabrication detected).
+  \item \textbf{Faithfulness} measures factual consistency between the generated summary and the retrieved source documents (range 0.0--1.0, higher is better).
+  \item \textbf{Answer Relevancy} captures the semantic alignment between the user query and the generated response (range 0.0--1.0, higher is better).
+  \item \textbf{Contextual Relevancy} evaluates retrieval quality by estimating the proportion of retrieved content genuinely useful for answering the query (range 0.0--1.0, higher is better).
+  \item \textbf{Hallucination} detects claims in the output that are not supported by retrieved documents (range 0.0--1.0, \textbf{lower} is better; 0.0 means no fabrication detected).
 \end{itemize}
 
 Each metric is computed by an auxiliary \emph{LLM-as-a-Judge}: the same inference infrastructure used for main tasks also drives the evaluation step. This avoids external API dependencies and keeps the entire pipeline self-contained.
@@ -94,9 +94,9 @@ Table~\ref{tab:deepeval-triton} shows the scores from the Triton back-end evalua
   \label{tab:deepeval-triton}
   \begin{tabular}{|l|c|c|c|c|}
     \hline
-    \textbf{Query Type} & \textbf{Faith.} & \textbf{Ans.\ Rel.} & \textbf{Ctx.\ Rel.} & \textbf{Hall.} \\
+    \textbf{Query Type}     & \textbf{Faith.} & \textbf{Ans.\ Rel.} & \textbf{Ctx.\ Rel.} & \textbf{Hall.} \\
     \hline
-    Board Selection (STM32) & 0.25 & 0.50 & 0.00$^{\dagger}$ & 0.50 \\
+    Board Selection (STM32) & 0.25            & 0.50                & 0.00$^{\dagger}$    & 0.50           \\
     \hline
   \end{tabular}
   \vspace{3pt}
@@ -113,9 +113,9 @@ We resolved several technical issues during the migration. Most problems stemmed
 
 \paragraph{Endpoint URL mismatch under proxy prefix.} Accessing Triton through a URL prefix like \texttt{/triton/v1} (required by the HPP environment) broke the internal v2 repository API calls for model loading. We added a \texttt{base\_v2\_url} property to \texttt{triton\_client.py} to dynamically strip the \texttt{/v1} suffix and rebuild the correct v2 path.
 
-\paragraph{Total failure as LLM-as-a-Judge.} The \textbf{StarCoder2-15B} model proved entirely unsuitable as a DeepEval evaluator, which requires strict JSON formatting and logical deductions. Unlike phase 1's \textbf{DeepSeek-R1}---a model highly tuned for reasoning and instruction-following---StarCoder2 specializes almost exclusively in code completion. 
+\paragraph{Total failure as LLM-as-a-Judge.} The \textbf{StarCoder2-15B} model proved entirely unsuitable as a DeepEval evaluator, which requires strict JSON formatting and logical deductions. Unlike phase 1's \textbf{DeepSeek-R1}---a model highly tuned for reasoning and instruction-following---StarCoder2 specializes almost exclusively in code completion.
 
-When forced to parse natural language criteria during Contextual Relevancy scoring, StarCoder2 ignored the prompt format completely and responded in Chinese (``我需要一些时间来生成答案，请稍等'', meaning \textit{``I need some time to generate the answer, please wait''}). This caused a fatal \textbf{Pydantic} validation crash and a baseline score of 0.00.
+When forced to parse natural language criteria during Contextual Relevancy scoring, StarCoder2 ignored the prompt format completely and responded in Chinese (meaning \textit{``I need some time to generate the answer, please wait''}). This caused a fatal \textbf{Pydantic} validation crash and a baseline score of 0.00.
 
 Even when it managed to output JSON, its reasoning was deeply flawed. For the Answer Relevancy test, it incorrectly labeled accurate STM32 board statements as ``irrelevant'' or ``ambiguous,'' artificially halving the score. Worse, during the Faithfulness test, the model hallucinated historical physics facts about Albert Einstein winning the Nobel Prize in 1968, injecting them directly into the JSON validation reason. This starkly contrasts with DeepSeek-R1, which reliably evaluated constraints and formatted outputs with minimal hallucinations.
 
@@ -129,10 +129,10 @@ Table~\ref{tab:deepeval-comparison} compares the two configurations on the Board
   \label{tab:deepeval-comparison}
   \begin{tabular}{|l|c|c|c|c|}
     \hline
-    \textbf{Configuration}              & \textbf{Faith.} & \textbf{Ans.\ Rel.} & \textbf{Ctx.\ Rel.} & \textbf{Hall.} \\
+    \textbf{Configuration}  & \textbf{Faith.} & \textbf{Ans.\ Rel.} & \textbf{Ctx.\ Rel.} & \textbf{Hall.} \\
     \hline
-    Ollama (DeepSeek-R1 7B)             & 0.73            & 0.18                & 0.56                & 0.25           \\
-    Triton (gpt-oss-20b)                & 0.25            & 0.50                & 0.00$^{\dagger}$    & 0.50           \\
+    Ollama (DeepSeek-R1 7B) & 0.73            & 0.18                & 0.56                & 0.25           \\
+    Triton (gpt-oss-20b)    & 0.25            & 0.50                & 0.00$^{\dagger}$    & 0.50           \\
     \hline
   \end{tabular}
   \vspace{3pt}
@@ -155,9 +155,9 @@ Table~\ref{tab:deepeval-mistral} lists the final metrics from Mistral as the LLM
   \label{tab:deepeval-mistral}
   \begin{tabular}{|l|c|c|c|c|}
     \hline
-    \textbf{Query Type} & \textbf{Faith.} & \textbf{Ans.\ Rel.} & \textbf{Ctx.\ Rel.} & \textbf{Hall.} \\
+    \textbf{Query Type}     & \textbf{Faith.} & \textbf{Ans.\ Rel.} & \textbf{Ctx.\ Rel.} & \textbf{Hall.} \\
     \hline
-    Board Selection (STM32) & 0.54 & \textbf{0.93} & \textbf{0.97} & 0.40 \\
+    Board Selection (STM32) & 0.54            & \textbf{0.93}       & \textbf{0.97}       & 0.40           \\
     \hline
   \end{tabular}
 \end{table}
@@ -187,6 +187,6 @@ Phase~1 proved the Web Search Agent delivers interpretable quality metrics when 
 
 Phase~2 highlighted the engineering complexity of migrating to Triton. The encountered problems (VRAM allocation errors, JSON parsing crashes, instruction-following failures) stemmed from the \textbf{StarCoder2-15B} model, not the Triton server.
 
-Phase~3 resolved these issues by deploying \textbf{Mistral-7B-Instruct} as the Triton evaluator, supported by a JSON reformatter. The model parsed every retrieval text, scoring 0.93 on Answer Relevancy and eliminating language hallucinations. 
+Phase~3 resolved these issues by deploying \textbf{Mistral-7B-Instruct} as the Triton evaluator, supported by a JSON reformatter. The model parsed every retrieval text, scoring 0.93 on Answer Relevancy and eliminating language hallucinations.
 
 The system must pair Triton with a dedicated instruction-tuned model for evaluation and reserve code-specialized models for code-completion tasks. The centralized architecture on HPP achieves the concurrent, multi-model workflows targeted at the start of the project.
