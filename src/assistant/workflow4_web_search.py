@@ -105,7 +105,20 @@ def _evaluate_summary_sync(
                 for match in matches:
                     candidate = match.group(1)
                     try:
-                        json.loads(candidate)
+                        parsed = json.loads(candidate)
+                        
+                        # FIX for Mistral: If it returns [{ "statements": [...] }] 
+                        # instead of { "statements": [...] }, unwrap it.
+                        if isinstance(parsed, list) and len(parsed) == 1 and isinstance(parsed[0], dict):
+                            parsed = parsed[0]
+                            candidate = json.dumps(parsed)
+                            
+                        # FIX for Mistral: If it returns [{ "verdict": "yes" }, ...] 
+                        # instead of { "verdicts": [{ "verdict": "yes" }, ...] }, wrap it.
+                        elif isinstance(parsed, list) and len(parsed) > 1 and all(isinstance(i, dict) for i in parsed):
+                            parsed = {"verdicts": parsed}
+                            candidate = json.dumps(parsed)
+                            
                         print(f"\n[DEEPEVAL EXTRACTED (Regex)]\n{candidate}\n[/DEEPEVAL EXTRACTED (Regex)]\n", flush=True) # for testing
                         return candidate
                     except json.JSONDecodeError:
@@ -138,9 +151,11 @@ def _evaluate_summary_sync(
                 res = await self.llm.ainvoke(prompt)
                 return self._clean_json(res.content)
 
-        # We use gpt-oss-20b: it's the most precise cod model on short structured
-        # instructions. We keep it on short prompts (retrieval_ctx truncated below).
-        eval_model_name = "gpt-oss-20b" if triton_enabled else "gpt-oss-20b"
+        # We use mistral since it is an instruction-tuned model, unlike
+        # gpt-oss-20b which is code-specialized and fails at JSON formatting.
+        eval_model_name = "mistral" if triton_enabled else "mistral"
+
+        # eval_model_name = "gpt-oss-20b" if triton_enabled else "gpt-oss-20b"
         eval_model = DeepEvalLangChainWrapper(model_name=eval_model_name, config=None)
 
         
