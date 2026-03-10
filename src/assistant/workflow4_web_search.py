@@ -602,6 +602,8 @@ def summarize_search_results(state: MasterState, config: RunnableConfig = None) 
 def finalize_search(state: MasterState, config: RunnableConfig = None) -> MasterState:
     """Final node that presents search results (Summary + Eval)."""
     
+    final_output = ""
+    
     if state.web_research_success:
         print("\n" + "="*70)
         print(f"📊 SEARCH RESULTS: {state.search_type.upper()}")
@@ -610,9 +612,13 @@ def finalize_search(state: MasterState, config: RunnableConfig = None) -> Master
         print(state.search_summary) 
         print("="*70 + "\n")
         logger.info("✓ Search successfully completed")
+        
+        final_output += f"### 📊 Search Results: {state.search_type.upper()}\n\n"
+        final_output += f"{state.search_summary}\n\n"
     else:
         print(f"\n❌ Error during search:\n{state.search_results}\n")
         logger.error(f"Search failed: {state.search_results}")
+        final_output += f"❌ **Error during search:**\n{state.search_results}\n\n"
     
     # ===== DEEPEVAL EVALUATION =====
     if state.web_research_success:
@@ -638,13 +644,23 @@ def finalize_search(state: MasterState, config: RunnableConfig = None) -> Master
                 print(f"✅ Answer Relevancy Score:    {metrics.get('answer_relevancy', 0):.2f}")
                 print(f"✅ Contextual Relevancy:      {metrics.get('contextual_relevancy', 0):.2f}")
                 print(f"✅ Hallucination Score:       {metrics.get('hallucination', 0):.2f}")
+                
+                final_output += "---\n**⚖️ Result Quality (DeepEval)**\n\n"
+                final_output += f"- **Faithfulness**: {metrics.get('faithfulness', 0):.2f}\n"
+                final_output += f"- **Answer Relevancy**: {metrics.get('answer_relevancy', 0):.2f}\n"
+                final_output += f"- **Contextual Relevancy**: {metrics.get('contextual_relevancy', 0):.2f}\n"
+                final_output += f"- **Hallucination**: {metrics.get('hallucination', 0):.2f}\n"
             else:
                 print(f"⚠️ Evaluation skipped: {eval_result.get('error')}")
+                final_output += f"\n⚠️ *Evaluation skipped: {eval_result.get('error')}*\n"
                 
             print("="*70 + "\n")
             
         except Exception as e:
             logger.warning(f"Evaluation failed: {e}")
+            final_output += f"\n⚠️ *Evaluation failed: {e}*\n"
 
+    # Set the response in the state so the FastAPI server streams it to VS Code
+    state.response = final_output
     return state
 
