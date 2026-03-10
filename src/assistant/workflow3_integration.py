@@ -142,8 +142,8 @@ Example response: "Integrate the code from ./ai_analysis/code_resnet into the fi
                 "suggestion": f"💡 I saw the last project was: **{last_fw}**. Do you want to use the same path or a new one?"
             }
             logger.info("⏸️ Interrupting for integration paths with profile suggestion.")
-            # resume_value = interrupt(dynamic_prompt)
-            resume_value = "yes" # BYPASS
+            resume_value = interrupt(dynamic_prompt)
+            # resume_value = "STM32H7A3ZI_Firmware" # BYPASS
         
         # After resume: use interrupt return value as priority
         if resume_value and str(resume_value).strip():

@@ -564,8 +564,8 @@ What do you prefer? (yes/no)""",
                 prompt["suggestion"] = "💡 Last time you customized the model. Do you want to do it again?"
             
             logger.info("⏸️ Interrupting for modification intent.")
-            # resume_value = interrupt(prompt)
-            resume_value = "yes" # BYPASS
+            resume_value = interrupt(prompt)
+            # resume_value = "yes" # BYPASS
             # user_text = "yes"
 
         # After resume
@@ -1543,8 +1543,8 @@ Examples:
             }
             
             logger.info("⏸️ Interrupting for customization details.")
-            # resume_value = interrupt(prompt)
-            resume_value = "freeze first 5 layers and add 0.4 dropout" # BYPASS
+            resume_value = interrupt(prompt)
+            # resume_value = "freeze first 5 layers and add 0.4 dropout" # BYPASS
 
             if resume_value and str(resume_value).strip():
                 user_modifications = str(resume_value).strip()
@@ -1977,8 +1977,8 @@ Training Recommendation:{train_text}
     resume_value = None
     if not state.user_response or state.user_response.strip() == "":
         logger.info("⏸️ Interrupting for modification confirmation.")
-        # resume_value = interrupt(confirmation_prompt)
-        resume_value = "yes" # BYPASS
+        resume_value = interrupt(confirmation_prompt)
+        # resume_value = "yes" # BYPASS
         user_response = str(resume_value).strip() if resume_value else ""
     else:
         # Uses the return value of interrupt() as priority (LangGraph Studio compatibility),
@@ -4047,8 +4047,8 @@ Quantized: {state.should_quantize}
     from src.assistant.utils import extract_user_response
     resume_value = None
     if not state.user_response or state.user_response.strip() == "":
-        # resume_value = interrupt(prompt)
-        resume_value = "yes" # BYPASS
+        resume_value = interrupt(prompt)
+        # resume_value = "yes" # BYPASS
     
     # Use interrupt return value as priority
     if resume_value and str(resume_value).strip():

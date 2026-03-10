@@ -239,10 +239,10 @@ Example: "Create project MyApp for STM32F401 with CubeIDE"
                 "suggestion": f" I noticed last time you used: **{last_board}**. Do you want to use the same one, or a new one?"
             }
         if not state.user_response:
-            # logger.info("⏸️ Interrupting: Requesting project info with profile suggestion.")
-            # resume_value = interrupt(dynamic_prompt)
-            logger.info("⏭️  BYPASS: Automatic board selection -> 'STM32H7A3ZI'")
-            user_text = "STM32H7A3ZI"
+            logger.info("⏸️ Interrupting: Requesting project info with profile suggestion.")
+            resume_value = interrupt(dynamic_prompt)
+            # logger.info("⏭️  BYPASS: Automatic board selection -> 'STM32H7A3ZI'")
+            # user_text = "STM32H7A3ZI"
         else:
             # After resume: use interrupt return value as priority
             if resume_value and str(resume_value).strip():
