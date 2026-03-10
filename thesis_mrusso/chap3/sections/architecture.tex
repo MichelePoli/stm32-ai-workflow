@@ -52,8 +52,8 @@ User requests are classified into four primary workflow categories:
 \clearpage
 \begin{figure}[p]
     \centering
-    \centerline{\includegraphics[height=0.9\textheight]{chap3/figures/PART1.png}}
-    \caption{Global system flowchart - Part 1: System initialization, routing, and AI/Firmware selection workflows.}
+    \centerline{\includegraphics[width=\textwidth]{chap3/figures/part1Graph.png}}
+    \caption{Global system flowchart -- Fig.~3.1: System initialization, request routing, and parallel entry workflows (Firmware Generation, AI Model Discovery, Web Search).}
     \label{fig:global_flowchart_part1}
 \end{figure}
 \clearpage
@@ -157,9 +157,18 @@ Each function encapsulates the node definitions and internal routing logic for i
 \clearpage
 \begin{figure}[p]
     \centering
-    \centerline{\includegraphics[height=0.9\textheight]{chap3/figures/PART2.png}}
-    \caption{Global system flowchart - Part 2: Model customization, STEdgeAI analysis, and firmware integration workflows.}
+    \centerline{\includegraphics[height=0.9\textheight]{chap3/figures/part2.png}}
+    \caption{Global system flowchart -- Fig.~3.2: Model customization workflow (Workflow~5), including architecture inspection, dataset acquisition, and hyperparameter optimization via NNI.}
     \label{fig:global_flowchart_part2}
+\end{figure}
+\clearpage
+
+\clearpage
+\begin{figure}[p]
+    \centering
+    \centerline{\includegraphics[height=0.9\textheight]{chap3/figures/part3.png}}
+    \caption{Global system flowchart -- Fig.~3.3: STEdgeAI analysis loop, C-code generation, and firmware integration workflow (Workflows~2 and~3).}
+    \label{fig:global_flowchart_part3}
 \end{figure}
 \clearpage
 
