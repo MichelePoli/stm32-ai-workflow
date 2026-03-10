@@ -2296,6 +2296,18 @@ def resource_check_routing(state: MasterState) -> Literal["run_analyze", "run_va
         # We handle it anyway for safety.
         return "choose_predefined_taskbased_model"
 
+    # ── CASE: handle_resource_failure is pending an interrupt response ───────────
+    # LangGraph re-executes routing functions from the last checkpoint on resume.
+    # If the user already chose "change_model" or "change_board" inside
+    # handle_resource_failure's interrupt, state.route is set but resource_check_result
+    # is still "critical" (it's only reset to "resolved" AFTER the interrupt returns).
+    # We detect this and short-circuit back to handle_resource_failure so LangGraph
+    # resumes the interrupted function correctly instead of replaying the error.
+    current_route = getattr(state, "route", "")
+    if res == "critical" and current_route in ("change_model", "change_board", "end_workflow"):
+        logger.info(f"✅ resource_check_routing: handle_resource_failure already pending (route='{current_route}'). Re-routing there.")
+        return "handle_resource_failure"
+
     # ✅ NEW: Check if we need to retry with higher compression
     if state.needs_compression_retry and res == "retry":
         logger.info(f"🔄 Routing back to analyze with compression: {state.compression}")
@@ -2351,15 +2363,24 @@ def handle_resource_failure(state: MasterState, config: RunnableConfig = None) -
         ]
     }
     
-    user_response = interrupt(prompt)
-    # user_response = "yes" # BYPASS
-    
-    if isinstance(user_response, dict):
-        user_text = user_response.get("response", user_response.get("input", str(user_response)))
+    resume_value = None
+    if not state.user_response or state.user_response.strip() == "":
+        resume_value = interrupt(prompt)
+
+    if resume_value and str(resume_value).strip():
+        user_text = str(resume_value).strip()
     else:
-        user_text = str(user_response)
+        user_text = str(state.user_response).strip() if state.user_response else ""
+    state.user_response = ""  # Clear after use
 
     user_lower = user_text.lower()
+    # Il meccanismo in pratica:
+    # 1. Prima richiesta → state.user_response è vuoto → interrupt() viene chiamato → il grafo si ferma e manda il prompt all'utente ⏸️
+    # 2. Utente risponde "change model" → il server aggiorna state.user_response = "change model" e riprende
+    # 3. Il nodo riprende dall'inizio (LangGraph riesegue sempre il nodo intero sul resume):
+    #    * Prima: interrupt() veniva chiamato di nuovo → ♾️ loop infinito
+    #    * Adesso: if not state.user_response → è False perché contiene "change model" → interrupt() NON viene chiamato → legge direttamente state.user_response e continua ✅
+
 
     # Robust keyword-based classification (does not depend on LLM)
     BOARD_KEYWORDS  = ["board", "scheda", "mcu", "micro", "microcontroller", "change board", "0"]
@@ -2420,6 +2441,7 @@ End keywords: stop, fine, end → end_workflow"""
     # was still "critical", it routes back to handle_resource_failure
     # creating an infinite loop. With "resolved" the routing doesn't go there.
     state.resource_check_result = "resolved"
+    state.user_response = ""
 
     return state
 

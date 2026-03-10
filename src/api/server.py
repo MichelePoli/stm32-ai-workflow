@@ -182,11 +182,21 @@ async def stream_chat(request: ChatRequest):
         # Queue to aggregate events from the graph and logs from subprocesses
         queue = asyncio.Queue()
         loop = asyncio.get_event_loop()
+        
+        composite_thread_id = f"{request.user_id}:{request.session_id}"
 
         # Handler to capture logs (e.g. training progress)
         class QueueHandler(logging.Handler):
+            def __init__(self, target_thread):
+                super().__init__()
+                self.target_thread = target_thread
+
             def emit(self, record):
                 try:
+                    # Filter strictly by thread_id if the log comes from a specific thread's subprocess
+                    if hasattr(record, "thread_id") and record.thread_id != self.target_thread:
+                        return
+                    
                     msg = self.format(record)
                     # We filter interesting logs for the user in real-time
                     if any(x in msg for x in ["[Train]", "Epoch ", "accuracy:", "loss:", "[Subprocess]"]):
@@ -196,7 +206,7 @@ async def stream_chat(request: ChatRequest):
                     pass
 
         # Connect the handler to the interested loggers
-        handler = QueueHandler()
+        handler = QueueHandler(target_thread=composite_thread_id)
         handler.setFormatter(logging.Formatter('%(message)s'))
         loggers_to_stream = [
             logging.getLogger("src.assistant.workflow5_customization"),
@@ -206,7 +216,6 @@ async def stream_chat(request: ChatRequest):
             l.addHandler(handler)
 
         try:
-            composite_thread_id = f"{request.user_id}:{request.session_id}"
             config = {"configurable": {"thread_id": composite_thread_id}}
 
             current_state = await graph.aget_state(config)

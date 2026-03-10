@@ -2239,7 +2239,8 @@ def execute_in_environment(python_code: str, state: MasterState, timeout: int = 
                 prefix="[Train]", 
                 timeout=timeout,
                 ignore_list=ignore_list,
-                whitelist_patterns=whitelist_patterns
+                whitelist_patterns=whitelist_patterns,
+                thread_id=getattr(state, 'thread_id', None)
             )
             
             return {
@@ -2346,7 +2347,7 @@ except Exception as e:
 """
     
     # ===== EXECUTE USING NEW FUNCTION =====
-    logger.info(f"  [Subprocess] Execution...")
+    logger.info(f"  [Process] Execution...")
     
     try:
         result = execute_in_environment(
@@ -3434,7 +3435,7 @@ except Exception as e:
     sys.exit(1)
 """
         
-        logger.info(f"  [Subprocess] Executing fine-tuning...")
+        logger.info(f"  [Process] Executing fine-tuning...")
         
         # -----------------------------------------------------------------------
         # VRAM MANAGEMENT: Commented out (HPP Triton has enough VRAM)
@@ -3584,8 +3585,8 @@ def ask_optimization_preference(state: MasterState, config: RunnableConfig = Non
     resume_value = None
     if not state.user_response or state.user_response.strip() == "":
         logger.info("⏸️ Interrupting for optimization preference.")
-        # resume_value = interrupt(prompt)
-        resume_value = "standard" # BYPASS user choice
+        resume_value = interrupt(prompt)
+        # resume_value = "standard" # BYPASS user choice
         response = str(resume_value).strip() if resume_value else ""
     else:
         # Use interrupt return value as priority

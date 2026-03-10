@@ -426,7 +426,8 @@ def run_subprocess_streaming(
     prefix: str = "[Subprocess]",
     timeout: int = 600,
     ignore_list: list = None,
-    whitelist_patterns: list = None
+    whitelist_patterns: list = None,
+    thread_id: str = None
 ) -> dict:
     """
     Run a subprocess and stream its output to a logger in real-time.
@@ -447,6 +448,9 @@ def run_subprocess_streaming(
     
     # Truncate command log if too long to avoid "wall of code"
     full_cmd = ' '.join(cmd)
+    
+    extra_log = {"thread_id": thread_id} if thread_id else {}
+
     if len(full_cmd) > 100:
         if '-c' in cmd:
             idx = cmd.index('-c')
@@ -455,13 +459,13 @@ def run_subprocess_streaming(
                 first_line = script.strip().split('\n')[0][:60]
                 num_lines = len(script.strip().split('\n'))
                 summary = f"{cmd[0]} -c \"{first_line}...\" ({num_lines} lines)"
-                logger_instance.info(f"🚀 Running: {summary}")
+                logger_instance.info(f"🚀 Running: {summary}", extra=extra_log)
             else:
-                logger_instance.info(f"🚀 Running: {full_cmd[:100]}...")
+                logger_instance.info(f"🚀 Running: {full_cmd[:100]}...", extra=extra_log)
         else:
-            logger_instance.info(f"🚀 Running: {full_cmd[:100]}...")
+            logger_instance.info(f"🚀 Running: {full_cmd[:100]}...", extra=extra_log)
     else:
-        logger_instance.info(f"🚀 Running: {full_cmd}")
+        logger_instance.info(f"🚀 Running: {full_cmd}", extra=extra_log)
     
     stdout_lines = []
     try:
@@ -503,14 +507,14 @@ def run_subprocess_streaming(
                         # Choose the appropriate emoji
                         icon = "🔄" if "Epoch" in clean_line else "📌"
                         # Log without the standard [Train] prefix so the HTTP server sends it bare
-                        logger_instance.info(f"* *{icon} {clean_line}*")
+                        logger_instance.info(f"* *{icon} {clean_line}*", extra=extra_log)
                     elif clean_line.startswith("[Saving]"):
-                        logger_instance.info(f"* *💾 Saving in progress...*")
+                        logger_instance.info(f"* *💾 Saving in progress...*", extra=extra_log)
                     elif "SUCCESS:" in clean_line:
                         # Do not log the raw JSON output of SUCCESS, it is only for internal parsing
                         pass
                     else:
-                        logger_instance.info(f"  {prefix} {clean_line}")
+                        logger_instance.info(f"  {prefix} {clean_line}", extra=extra_log)
             
             # Manual timeout check
             if time.time() - start_time > timeout:
