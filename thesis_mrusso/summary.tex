@@ -1,0 +1,60 @@
+\documentclass[11pt]{article}
+\usepackage{amsmath, amssymb, amscd, amsthm, amsfonts}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{subcaption}
+\usepackage{url}
+
+\oddsidemargin 0pt
+\evensidemargin 0pt
+\marginparwidth 40pt
+\marginparsep 10pt
+\topmargin -20pt
+\headsep 10pt
+\textheight 8.7in
+\textwidth 6.65in
+\linespread{1.2}
+
+\title{\textbf{From IDE to Edge: A Cloud-Native Multi-Agent Framework for Automated Edge AI Deployment on STM32}}
+\author{\textbf{Supervisors}\\Prof. Gianvito Urgese  \\ Andrea Pignata \\ Giuseppe Fanuli \and \textbf{Candidate} \\ Michele \textsc{Russo}}
+\date{March, 2026\\Politecnico di Torino}
+
+\begin{document}
+
+\maketitle
+
+\section*{Summary}\label{section:summary}
+
+\subsection*{Background}
+
+Deploying AI models to constrained embedded systems remains a multi-step, error-prone process that demands expertise in both machine learning and embedded systems engineering. On STM32 microcontrollers, a practitioner must configure the peripheral hardware with STM32CubeMX, quantize and validate the model with STEdgeAI, fine-tune or compress the model to fit within strict Flash and RAM budgets, and then manually patch the generated C code to integrate the inference engine into the firmware project. Each step is handled by a separate tool with its own CLI, configuration format, and failure mode. Connecting them together is typically done by hand-crafted shell scripts or manual copy-paste operations. This friction causes long iteration cycles and raises the barrier to entry for developers who are not simultaneously deep experts in TensorFlow, embedded C, and ARM toolchains.
+
+Large Language Models (LLMs) offer a natural interface for this kind of orchestration: they can parse free-text intent, select parameters, invoke tools, and interpret error messages. However, a single LLM call is not reliable enough for multi-step engineering tasks. Isolated queries to a chat interface do not maintain state across tool invocations, cannot route to different expertise levels for different subtasks, and offer no mechanism for a human engineer to review or override intermediate decisions before they cascade into irreversible states.
+
+The emerging multi-agent paradigm addresses these limitations by decomposing the pipeline into a directed graph of specialized nodes, each responsible for one phase of the lifecycle. State is passed explicitly between nodes via a typed schema, enabling conditional routing, checkpointing, and supervised handoffs to a human operator at defined decision points. Applied to Edge AI development for STM32, this paradigm enables a system that can take a high-level natural language request (e.g., \textit{``Deploy a gesture classifier on STM32H7 with high compression''}) and produce a verified, compilable firmware project with minimal manual intervention.
+
+\subsection*{Thesis Objectives and Contributions}
+
+This thesis designs, implements, and evaluates a multi-agent MLOps orchestration framework for automating the full Edge AI deployment cycle on STM32 microcontrollers. The system is built on \textbf{LangGraph} and manages seven specialized workflows as subgraphs connected through a shared typed state and a \textbf{Redis}-backed checkpointing layer. Human-in-the-Loop (HITL) gates, implemented via LangGraph's \texttt{interrupt()} primitive, allow engineers to approve decisions, redirect searches, or override model choices at defined breakpoints without losing execution context.
+
+The inference backend evolved from local \textbf{Ollama} instances to a centralized \textbf{NVIDIA Triton Inference Server} hosted on the \textbf{inNuCE Lab Heterogeneous Prototyping Platform (HPP)} cluster (NVIDIA A40, 45~GB VRAM), which eliminated the VRAM saturation crashes that occurred when multiple users loaded different models concurrently on a 16~GB development GPU.
+
+\bigskip
+
+The contributions of this thesis are as follows:
+
+\begin{enumerate}
+
+    \item A \textbf{multi-agent Edge AI orchestration framework} built on LangGraph that manages the complete STM32 deployment pipeline, from CubeMX firmware project generation and CMSIS-NN model analysis to fine-tuning, NNI hyperparameter optimization, and binary integration. The system uses a headless CubeMX automation strategy (\texttt{xvfb-run} virtual framebuffer) to bypass the GUI bottleneck in non-interactive environments.
+
+    \item A \textbf{hardware-aware model customization pipeline} that applies heuristic anti-overfitting rules (layer freezing, dropout injection, epoch capping) on a fast path and a deterministic NNI template generator on the optimization path. A class-mismatch rescue mechanism automatically replaces the final classification layer when the pre-trained model output dimension conflicts with the target dataset.
+
+    \item A \textbf{scalable inference architecture} progressing through three deployment scenarios (local workstation, per-user Docker containers with Ollama, centralized Triton on HPP) with quantitative stress tests at 5, 10, and 15 concurrent users. At 15 users, Triton remained stable at 80\% VRAM occupancy with GPU compute near 100\%, demonstrating that the 1~Gbps network connection was not a throughput bottleneck.
+
+    \item A \textbf{developer productivity evaluation} based on KLM task decomposition, measuring a median 9$\times$ end-to-end speedup across six deployment tasks (with peaks of 40$\times$ for CubeMX project setup and 30$\times$ for NNI experiment generation) compared to equivalent manual procedures on official documentation baselines.
+
+    \item A \textbf{RAG quality assessment} using DeepEval's LLM-as-Judge framework across five representative queries, measuring Faithfulness, Contextual Relevancy, Hallucination, and Answer Relevancy. Results show an average Contextual Relevancy of 0.75 and a Hallucination rate of 0.14, with a clearly measurable Faithfulness-Utility trade-off between procedural and exploratory query types.
+
+\end{enumerate}
+
+\end{document}
