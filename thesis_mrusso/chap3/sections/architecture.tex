@@ -4,7 +4,7 @@
 The implemented framework follows a modular, graph-based architecture where autonomous agents orchestrate the entire MLOps pipeline through a stateful execution model. Unlike traditional linear scripts, the system utilizes \textbf{LangGraph} to define workflows as directed graphs with conditional routing, enabling complex multi-step processes with human oversight at decision points.
 
 \subsection{Containerized Deployment and GPU Decoupling}
-To ensure scalability and efficient resource management in a multi-user environment, we containerized the entire architecture using Docker. A major architectural shift from early development was the transition from local per-container inference engines (such as Ollama) to a centralized \textbf{NVIDIA Triton Inference Server} hosted on the remote \textbf{High Performance Platform (HPP)} cluster.
+To ensure scalability and efficient resource management in a multi-user environment, we containerized the entire architecture using Docker. A major architectural shift from early development was the transition from local per-container inference engines (such as Ollama) to a centralized \textbf{NVIDIA Triton Inference Server} hosted on the remote \textbf{inNuCE Lab Heterogeneous Prototyping Platform (HPP)} cluster.
 
 Running individual Ollama instances required locking a specific local GPU for a single user throughout their session, preventing resource sharing. By decoupling the multi-agent pipeline from the inference engine and migrating inference to the HPP, the user's local LangGraph container requires only CPU and RAM. The remote Triton server acts as a centralized backend that receives requests via standardized APIs over the network and manages its own GPU dynamically. 
 
