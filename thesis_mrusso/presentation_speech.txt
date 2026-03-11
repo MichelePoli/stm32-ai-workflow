@@ -25,6 +25,9 @@ Furthermore, if the user asks for hyperparameter optimization, the system fully 
 
 # Nota: Forse potresti alleggerire o fondere la slide 7 sulla customizzazione NNI. Spiegare trial, file JSON, ecc., porta via tempo. Potrei dire semplicemente: "Il sistema analizza i dataset e genera automaticamente persino gli esperimenti di hyperparameter optimization tramite Microsoft NNI, che normalmente richiedono ore di configurazione manuale."
 
+[Slide 7b: Live Demo — Multi-User Concurrent Execution]
+Let me show you the system running live. On the left, a developer is fine-tuning a MobileNet — you can see the epochs progressing in the terminal. On the right, simultaneously, a second user is requesting a hardware comparison between STM32N6 and Raspberry Pi. Two heavy operations, one server, zero interference. This is what multi-user concurrent execution looks like in practice.
+
 [Slide 8: Benchmarks & Productivity Gains]
 A developer tool only matters if it actually saves time, so I benchmarked the automated workflow against experienced developers. The results matter.
 The end-to-end AI deployment dropped from about 4 hours to just 20 to 30 minutes. That is a 9x speed increase.
