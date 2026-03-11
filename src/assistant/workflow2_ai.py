@@ -165,22 +165,25 @@ ALWAYS reply in valid JSON format.
 
 # Dynamically extracted instructions
 
-model_selection_instructions = """Analyze the user's response regarding the specific model selection.
-The user is choosing a model from a numbered list.
+model_selection_instructions = """Analyze the user's response regarding model selection from a numbered list.
 
 CRITICAL RULES:
-1. If the response is a number (e.g. "1", "2"), strictly map it to that index (model_index).
-2. "model_accepted" must be true if the user chooses a model from the list.
+1. If the response is a NUMBER (e.g. "3"), set model_index to EXACTLY that number. If user says "3", model_index=3. If user says "1", model_index=1. NEVER change this number.
+2. "model_accepted" must be true if the user chooses any model by number from the list (even if it shows ❌).
 3. If the user rejects all or writes "no" / "none", set wants_another_search: true and model_accepted: false.
-4. If the user wants to use a default or doesn't know, set model_accepted: false and wants_another_search: false.
+4. If the user wants a default or doesn't know, set model_accepted: false and wants_another_search: false.
+
+Example: user says "3" → model_index MUST be 3, never 2 or 1.
+Example: user says "1" → model_index MUST be 1.
 
 ALWAYS reply with a valid JSON object with this exact structure:
 {
-  "model_index": 1,
+  "model_index": 3,
   "model_accepted": true,
   "wants_another_search": false
 }
 """
+
 
 model_feedback_extraction_instructions = """Analyze the user's feedback on the proposed model.
 
@@ -575,16 +578,34 @@ def choose_ai_model(state: MasterState, config: RunnableConfig = None) -> Master
     else:
         model_text = extract_user_response(state.user_response).strip()
     state.user_response = "" # Clear after use
-    
-    # === CHOICE EXTRACTION ===
+    logger.info(f"📥 User response for model: '{model_text}'")
+
+    # === FAST PATH: numeric selection (skip LLM entirely) ===
+    import re
+    num_match = re.match(r'^\s*(\d+)\s*$', model_text)
+    if num_match:
+        chosen_num = int(num_match.group(1))
+        extra_option = len(available_models) + 1  # "None of these"
+        if 1 <= chosen_num <= len(available_models):
+            state.selected_model = available_models[chosen_num - 1]
+            state.model_accepted = True
+            logger.info(f"✓ Chosen model (direct): {state.selected_model['name']} (option {chosen_num})")
+        elif chosen_num == extra_option:
+            state.model_discovery_method = "search"
+            state.search_iterations = 0
+            logger.info("🔍 User wants online search.")
+        else:
+            logger.warning(f"⚠️  Number {chosen_num} out of range, defaulting to search.")
+            state.model_discovery_method = "search"
+        return state
+
+    # === SLOW PATH: text-based response → LLM extraction ===
     cfg = Configuration.from_runnable_config(config)
     llm_model_extractor = get_llm(
         config=config,
         structured_schema=ModelSelectionExtraction,
         temperature=0
     )
-    
-    logger.info(f"📥 User response for model: '{model_text}'")
     
     model_result = llm_model_extractor.invoke([
         SystemMessage(content=model_selection_instructions),
@@ -610,6 +631,7 @@ def choose_ai_model(state: MasterState, config: RunnableConfig = None) -> Master
             state.selected_model = fallback_model
             state.model_accepted = True
         else:
+
             state.model_discovery_method = "default"
 
     return state

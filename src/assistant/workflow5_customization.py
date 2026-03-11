@@ -2212,7 +2212,19 @@ def execute_in_environment(python_code: str, state: MasterState, timeout: int = 
     
     python_path = state.python_path
     if not python_path:
-        return {'success': False, 'stdout': "", 'stderr': "No Python path available", 'returncode': 1}
+        # Auto-resolve from config as fallback (state.python_path may be unset
+        # when returning from handle_resource_failure without re-running collect_analysis_info)
+        try:
+            from src.assistant.configuration import Configuration
+            cfg_temp = Configuration()
+            python_path = cfg_temp.get_python_path('stm32')
+            if python_path and "NOT_FOUND" not in python_path:
+                logger.info(f"⚡ python_path auto-resolved from config: {python_path}")
+                state.python_path = python_path
+            else:
+                return {'success': False, 'stdout': "", 'stderr': "No Python path available", 'returncode': 1}
+        except Exception as e:
+            return {'success': False, 'stdout': "", 'stderr': f"No Python path available: {e}", 'returncode': 1}
     
     logger.info("🔧 Starting training subprocess...")
     logger.info(f"   • Environment: {state.conda_env}")
