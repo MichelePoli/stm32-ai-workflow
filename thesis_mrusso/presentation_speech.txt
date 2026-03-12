@@ -2,7 +2,10 @@
 Good morning everyone. I'm Michele Russo and today I present my thesis: "From IDE to Edge: A Cloud-Native Multi-Agent Framework for Automated Edge AI Deployment on STM32".
 
 [Slide 2: The Core Problem]
-Right now, a profound disconnect exists in the tech industry. AI engineers write Python, deploy cloud servers, and train large neural networks. Meanwhile, embedded systems engineers write C, fight strict memory limits, and program bare-metal STM32 hardware. Bringing an AI model from the cloud down to a microcontroller is called Edge AI deployment. And right now, it hurts. Developers must master a fragmented toolchain: STM32CubeMX for hardware, STEdgeAI for model conversion, custom Python scripts for hyperparameter optimization, and manual C-code integration. My tests show this manual pipeline takes an expert over 4 hours. Most of that time is wasted navigating dense GUIs, searching datasheets, writing repetitive code, and debugging tiny misconfigurations.
+Right now, a profound disconnect exists in the tech industry. AI engineers write Python, deploy cloud servers, and train LARGE neural networks. Meanwhile, embedded systems engineers write C, fight strict memory limits, and program bare-metal STM32 hardware. 
+Pushing neural networks to run locally on these resource-constrained microcontrollers is known as Edge AI. 
+And right now, it is a highly inefficient process. Developers must master a fragmented toolchain: STM32CubeMX for hardware, STEdgeAI for model conversion, custom Python scripts for hyperparameter optimization, and manual C-code integration. 
+My tests show this manual pipeline takes an expert over 4 hours. Most of that time is wasted navigating dense GUIs, searching datasheets, writing repetitive code, and debugging tiny misconfigurations.
 
 [Slide 3: The Multi-Agent Solution]
 My thesis asks: what if an AI assistant could handle this tedious toolchain instead? To answer this, I built an end-to-end, multi-agent framework. Instead of clicking through interfaces, the developer just talks to their IDE. They can say: "Generate an STM32H7 project, find a small MobileNet model, optimize it, and put it in my C code."
@@ -11,7 +14,7 @@ My thesis asks: what if an AI assistant could handle this tedious toolchain inst
 The system relies on Multi-Agent Orchestration using LangGraph. I designed it as a directed graph divided into specialized branches. One branch handles Firmware Generation by controlling the STM32CubeMX CLI without a GUI. 
 Another Customization branch writes Python scripts to fine-tune networks or run hyperparameter searches. 
 A Web Search branch reads current documentation straight from the internet.
-To keep things fast and scalable, I split the agent logic from the heavy LLM inference. All LLM requests go to a centralized NVIDIA Triton Inference Server. Triton handles dynamic model swapping and shares GPU memory across users. This decoupling lays the groundwork for a fully scalable Kubernetes deployment, allowing multiple developers to share the same hardware without bottlenecking.
+To ensure low latency and horizontal scalability, I split the agent logic from the heavy LLM inference. All LLM requests go to a centralized NVIDIA Triton Inference Server. Triton handles dynamic model swapping and shares GPU memory across users. This decoupling lays the groundwork for a fully scalable Kubernetes deployment, allowing multiple developers to share the same hardware without bottlenecking.
 
 [Slide 5: IDE Integration & Human-in-the-Loop]
 We also didn't force developers into a web app. I built a custom Visual Studio Code Extension. The assistant sits right inside the editor. It uses asynchronous streaming so the IDE never freezes during heavy tasks. At critical moments, like right before flashing a physical board or starting a long training job, the system stops and asks the user for permission in the chat. So the developer stays in control.
@@ -47,7 +50,7 @@ Finally, I evaluated the web search agents using the DeepEval framework to measu
 To conclude, this framework proves that multi-agent orchestration works for embedded development. We successfully combined headless CubeMX generation, Triton-backed LLMs, and NNI optimization into a single IDE extension. 
 Looking ahead, because we deliberately decoupled the agent logic from the Triton servers, the next logical step is migrating this architecture to Kubernetes. 
 This will allow enterprise teams to share hardware resources efficiently.
-But looking at what we have right now, shrinking a 4-hour deployment down to 30 minutes proves a clear point: deploying AI on microcontrollers no longer needs to be a painful, manual process. The framework makes Edge AI fast, scalable, and most importantly automated.
+But looking at the current data, shrinking a 4-hour deployment down to 30 minutes demonstrates that deploying AI on microcontrollers no longer requires a rigid, manual process. The framework provides a faster, scalable, and highly automated alternative.
 
 Thank you for your attention. I welcome any questions or comments from the committee.
 
