@@ -16,8 +16,9 @@ However, typical LangChain implementations act as Directed Acyclic Graphs (DAGs)
 \subsection{LangGraph: Cyclic and Stateful Orchestration}
 To address the limitations of linear execution, LangGraph extends the ecosystem by introducing a graph-theoretic approach to orchestration. Unlike the rigid sequences of its predecessor, LangGraph models agentic processes as stateful graphs, where \textbf{nodes} represent computational units (functions or model calls) and \textbf{edges} define the control flow logic \cite{wang2024agentailanggraphmodular, hong2024workflowllm}.
 
-The core innovation of this framework lies in its support for \textbf{cycles}, enabling the definition of iterative loops available for complex tasks.
-For example, in the "Neural Network Customization" workflow, the system orchestrates an iterative refinement process where the model is optimized (e.g., using the internal search loops of NNI) and validated against constraints until a viable configuration is selected. This "test-and-revise" capability, which may also involve Human-in-the-Loop feedback, is difficult to implement in linear chains but natural in a graph structure. LangGraph treats the agent's execution as a state machine, where decisions govern the transitions between states, allowing for dynamic branching and error recovery.
+The core innovation of this framework lies in its support for \textbf{cycles}, enabling the definition of iterative loops for complex tasks. This architectural difference between linear and cyclic flows is visualized in Fig. \ref{fig:langgraph_cycle}.
+
+For example, in the "Neural Network Customization" workflow, the system orchestrates an iterative refinement process. The assistant uses \textbf{NNI} (Neural Network Intelligence) \cite{nni_documentation}, an open-source AutoML toolkit by Microsoft, to perform internal search loops and hyperparameter optimization. The agent validates the resulting models against hardware constraints until it selects a viable configuration. This "test-and-revise" capability, which may also involve Human-in-the-Loop (HITL) feedback, is difficult to implement in linear chains but natural in a graph structure. LangGraph treats the agent's execution as a state machine, where decisions govern transitions between states, allowing for dynamic branching and error recovery.
 
 \begin{figure}[ht]
     \centering
