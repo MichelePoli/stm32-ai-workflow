@@ -4,7 +4,7 @@
 The implemented framework follows a modular, graph-based architecture where autonomous agents orchestrate the entire MLOps pipeline through a stateful execution model. Unlike traditional linear scripts, the system utilizes \textbf{LangGraph} to define workflows as directed graphs with conditional routing, enabling complex multi-step processes with human oversight at decision points.
 
 \subsection{Containerized Deployment and GPU Decoupling}
-To ensure scalability and efficient resource management in a multi-user environment, we containerized the entire architecture using Docker. A major architectural shift from early development was the transition from local per-container inference engines (such as Ollama) to a centralized \textbf{NVIDIA Triton Inference Server} hosted on the remote \textbf{inNuCE Lab Heterogeneous Prototyping Platform (HPP)} cluster.
+To ensure scalability and efficient resource management in a multi-user environment, I containerized the entire architecture using Docker. A major architectural shift from early development was the transition from local per-container inference engines (such as Ollama) to a centralized \textbf{NVIDIA Triton Inference Server} hosted on the remote \textbf{inNuCE Lab Heterogeneous Prototyping Platform (HPP)} cluster \cite{innuce_website}.
 
 Running individual Ollama instances required locking a specific local GPU for a single user throughout their session, preventing resource sharing. By decoupling the multi-agent pipeline from the inference engine and migrating inference to the HPP, the user's local LangGraph container requires only CPU and RAM. The remote Triton server acts as a centralized backend that receives requests via standardized APIs over the network and manages its own GPU dynamically. 
 
@@ -107,11 +107,11 @@ A detailed analysis of the underlying storage infrastructure and the dual-layer 
 
 Relying on Large Language Models for orchestration decisions introduces non-determinism. During stress testing with concurrent users, unconstrained LLM outputs occasionally caused validation crashes or incorrect routing. The framework solves this by enforcing three layers of input normalization before any LLM response modifies the \texttt{MasterState}.
 
-First, we implemented type coercion for numerical parameters. When extracting data like sample rates for synthetic data generation, LLMs frequently append human-readable units (e.g., \textit{``2 kHz''} instead of \texttt{2000}). The framework preemptively normalizes these strings into raw floating-point measurements before passing them to Pydantic, bypassing strict validation errors.
+First, I implemented type coercion for numerical parameters. When extracting data like sample rates for synthetic data generation, LLMs frequently append human-readable units (e.g., \textit{``2 kHz''} instead of \texttt{2000}). The framework preemptively normalizes these strings into raw floating-point measurements before passing them to Pydantic, bypassing strict validation errors.
 
-Second, we introduced regex-based fallbacks for hardware identification. If the LLM extracts an imprecisely formatted identifier (hallucinating prefixes like \textit{``STM32 F401''} instead of \texttt{STM32F401}), a relaxed regular expression (such as \texttt{r'(?:STM32)?[\textbackslash{}s-]*([A-Z])([0-9])'}) guarantees the core MCU series letter and digit are captured correctly for the downstream ST toolchains.
+Second, I introduced regex-based fallbacks for hardware identification. If the LLM extracts an imprecisely formatted identifier (hallucinating prefixes like \textit{``STM32 F401''} instead of \texttt{STM32F401}), a relaxed regular expression (such as \texttt{r'(?:STM32)?[\textbackslash{}s-]*([A-Z])([0-9])'}) guarantees the core MCU series letter and digit are captured correctly for the downstream ST toolchains.
 
-Finally, we adopted an enumerated prompt anchoring strategy. During model discovery, providing the LLM with only the total count of available models resulted in hallucinated index selections when users specified model names. Injecting the complete, enumerated list of model names directly into the extraction prompt creates a bounded decision space and enforces deterministic routing.
+Finally, I adopted an enumerated prompt anchoring strategy. During model discovery, providing the LLM with only the total count of available models resulted in hallucinated index selections when users specified model names. Injecting the complete, enumerated list of model names directly into the extraction prompt creates a bounded decision space and enforces deterministic routing.
 
 \subsubsection{System Integrity and Transactional Registration}
 
