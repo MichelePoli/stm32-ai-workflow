@@ -6,7 +6,7 @@ To overcome these limitations, the field shifted toward \gls{ml} in the 1980s. T
 \subsection{The Perceptron: The Fundamental Building Block}
 The structural foundation of modern neural networks is the perceptron, a computational model inspired by the biological neuron. A perceptron processes input signals by calculating a weighted sum and applying a step function to produce a binary classification \cite{Gabrie2023}:
 \begin{equation}
-    y = \text{sign}(\mathbf{w}^\top \mathbf{x} + b)
+    y = \text{step}(\mathbf{w}^\top \mathbf{x} + b)
 \end{equation}
 where $\mathbf{w}$ represents the weight vector, $\mathbf{x}$ the input, and $b$ the bias. While a single perceptron is limited to linearly separable tasks, stacking multiple neurons into layers, forming a Multilayer Perceptron (MLP), allows for the approximation of highly non-linear functions, as illustrated in Fig. \ref{fig:perceptron} \cite{Schmid2025, NNWork2025}.
 

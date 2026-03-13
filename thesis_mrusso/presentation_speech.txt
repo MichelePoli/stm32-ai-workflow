@@ -17,7 +17,9 @@ A Web Search branch reads current documentation straight from the internet.
 To ensure low latency and horizontal scalability, I split the agent logic from the heavy LLM inference. All LLM requests go to a centralized NVIDIA Triton Inference Server. Triton handles dynamic model swapping and shares GPU memory across users. This decoupling lays the groundwork for a fully scalable Kubernetes deployment, allowing multiple developers to share the same hardware without bottlenecking.
 
 [Slide 5: IDE Integration & Human-in-the-Loop]
-We also didn't force developers into a web app. I built a custom Visual Studio Code Extension. The assistant sits right inside the editor. It uses asynchronous streaming so the IDE never freezes during heavy tasks. At critical moments, like right before flashing a physical board or starting a long training job, the system stops and asks the user for permission in the chat. So the developer stays in control.
+We also didn't force developers into a web app. I built a custom Visual Studio Code Extension. The assistant sits right inside the editor. It uses asynchronous streaming so the IDE never freezes during heavy tasks. At critical moments, like right before starting a long training job or running the automated EdgeAI compiler, the system stops and asks the user for permission in the chat. So the developer stays in control.
+
+(4 minuti e 30/ 5 min circa fin qui)
 
 [Slide 6: Automated Workflows in Action]
 Let's look at how the framework actually performs.
