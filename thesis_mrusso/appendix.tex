@@ -5,7 +5,19 @@
 
 This appendix provides a comprehensive reference for model-board compatibility across the STM32 family, including both uncompressed (FP32) and quantized (INT8) resource requirements. This matrix was developed to guide the automated resource constraint checking system implemented in the AI Model Discovery workflow.
 
-\section{Board Specifications}
+\section{STM32 Families Overview}
+
+This section details the primary STM32 microcontroller families referenced in the compatibility matrix, highlighting their typical use cases, frequency ranges, and memory capacities.
+
+\begin{itemize}
+    \item \textbf{STM32F4 (Foundation Family)}: Operating at frequencies up to 84 MHz (in entry-level lines) or 180 MHz (in advanced lines), this family features RAM capacities typically between 64 KB and 384 KB, and Flash memory from 256 KB up to 2 MB. The primary use cases include baseline TinyML applications, audio processing, and advanced sensor data analysis. 
+    
+    \item \textbf{STM32L4 (Low Power Family)}: Designed for energy efficiency, these MCUs operate at frequencies up to 80 MHz (with L4+ variants reaching 120 MHz). They offer RAM from 128 KB up to 640 KB and Flash from 256 KB to 2 MB. They are highly suitable for battery-powered devices requiring continuous monitoring or low-power vision. 
+    
+    \item \textbf{STM32H7 (High Performance Family)}: Representing the upper echelon of the STM32 Cortex-M lineup, the H7 family operates at frequencies up to 480 MHz (and 600 MHz in newer revisions), often featuring a dual-core architecture (Cortex-M7 + Cortex-M4). Memory capacities are substantial, with RAM reaching 1.4 MB and Flash up to 2 MB. This makes them the primary target for complex Edge AI tasks, including object detection and high frame-rate computer vision. 
+    
+    \item \textbf{STM32N6 (Neural Processing Unit Family)}: The N6 family integrates a dedicated Neural Processing Unit (NPU) to accelerate AI workloads natively. Operating at frequencies up to 800 MHz on the main Cortex-M55 core, these specialized SoCs provide integrated memory configurations up to 5 MB of SRAM and 4 MB of Flash (or execute-in-place external memory capabilities). They target advanced AI applications and high-resolution computer vision workflows that exceed the capabilities of standard Cortex-M cores.
+\end{itemize}
 
 \begin{table}[H]
     \centering

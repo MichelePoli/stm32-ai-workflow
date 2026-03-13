@@ -1,19 +1,70 @@
-\section{Edge AI and the STM32 Ecosystem}
+\section{Edge AI and TinyML Systems}
 \label{sec:edge-ai-stm32}
 
-Edge Artificial Intelligence (Edge AI) refers to the deployment of machine learning models directly on embedded devices, such as microcontrollers (MCUs) and digital signal processors (DSPs), rather than on centralized cloud servers. This paradigm shift is driven by the need for low latency, reduced bandwidth consumption, data privacy, and improved energy efficiency \cite{warden2019tinyml}. However, deploying sophisticated AI on resource-constrained hardware like the STM32 family presents significant technical challenges.
+Edge Artificial Intelligence (Edge AI) refers to the deployment of machine learning models directly on embedded devices, such as microcontrollers (MCUs) and digital signal processors (DSPs), rather than on centralized cloud servers. This shift originates from the demand for low latency, reduced bandwidth consumption, data privacy, and improved energy efficiency \cite{warden2019tinyml}. However, deploying sophisticated AI on resource-constrained hardware like the STM32 family presents precise technical challenges.
 
 \subsection{Challenges of TinyML}
 The field of Tiny Machine Learning (TinyML) focuses on enabling inference on devices with power consumption typically in the milliwatt range \cite{warden2019tinyml}. The primary constraints include:
 
 \begin{itemize}
-    \item \textbf{Memory Limitations}: MCUs often have limited RAM (typically hundreds of KB) and Flash memory (a few MB). This necessitates aggressive model compression techniques such as quantization and pruning \cite{st_cubeai_docs}.
-    \item \textbf{Computational Power}: Without the benefit of high-end GPUs, models must be optimized for execution on ARM Cortex-M cores, sometimes using hardware accelerators like the STM32 NPU where available.
-    \item \textbf{Energy Efficiency}: Many Edge AI applications are battery-powered, requiring architectures that minimize active clock cycles and maximize sleep states.
+    \item \textbf{Memory Limitations}: MCUs generally have restricted RAM (hundreds of KB) and Flash memory (a few MB). This structural limit requires hardware-aware model compression techniques like quantization and pruning \cite{st_cubeai_docs}.
+    \item \textbf{Computational Power}: Without high-end GPUs, models must be explicitly optimized for execution on ARM Cortex-M cores or dedicated hardware accelerators, such as the STM32 NPU.
+    \item \textbf{Energy Efficiency}: Many embedded applications are battery-powered, demanding architectures that minimize active clock cycles and maximize sleep states.
+\end{itemize}
+
+\subsection{TinyMLOps: MLOps for Resource-Constrained Devices}
+
+The rapid expansion of Artificial Intelligence on embedded systems forced the adaptation of traditional Machine Learning Operations (MLOps) principles to the specific constraints of micro-controllers. This domain, known as \textbf{TinyMLOps}, addresses the lifecycle management of AI models in environments where memory, compute, and power are severely limited \cite{warden2019tinyml}. TinyMLOps provides the methods and the tooling necessary to face the challenges outlined above.
+
+\subsubsection{Distinction from Cloud-Scale MLOps}
+
+While traditional MLOps manages model deployment across cloud clusters, massive datasets, and microservices, TinyMLOps prioritizes strict hardware awareness. The main differences are summarized in Table~\ref{tab:mlops_vs_tinymlops}.
+
+\begin{table}[h]
+    \centering
+    \caption{Comparison between traditional Cloud MLOps and TinyMLOps \cite{mlops_productivity_2024}.}
+    \label{tab:mlops_vs_tinymlops}
+    \begin{tabular}{|l|l|l|}
+        \hline
+        \textbf{Feature} & \textbf{Cloud MLOps}        & \textbf{TinyMLOps}              \\
+        \hline
+        Target Hardware  & GPU Clusters / Data Centers & MCUs (KB-scale RAM)             \\
+        Optimization     & Throughput / Latency        & Memory / Energy Efficiency      \\
+        Deployment Unit  & Docker Containers / APIs    & Firmware Binary Images          \\
+        Connectivity     & Persistent / High-bandwidth & Intermittent or Offline         \\
+        Metric Priority  & Prediction Accuracy         & Accuracy vs. Resource Footprint \\
+        \hline
+    \end{tabular}
+\end{table}
+
+\subsubsection{Core Pillars of TinyMLOps}
+
+A systematic TinyMLOps framework typically implements three fundamental pillars:
+
+\begin{itemize}
+    \item \textbf{Hardware-Aware Optimization}: Unlike cloud models that scale easily with more VRAM, embedded models undergo structural transformations (e.g., quantization, pruning, and "neural surgery") to fit into specific MCU memory profiles.
+
+    \item \textbf{Integrated Automation ("Plumbing")}: TinyMLOps requires the direct integration of traditionally disjoint toolchains. It connects Python-based training environments, C-based firmware generators (like STM32Cube), and binary flashing utilities.
+
+    \item \textbf{Reproducibility}: Defining the end-to-end workflow as a declarative graph (e.g., via LangGraph) ensures that engineers can reconstruct and verify an optimized model consistently across different hardware revisions \cite{wang2024agentailanggraphmodular}.
+\end{itemize}
+
+Adopting a TinyMLOps approach transitions the development of embedded AI from an expert-intensive manual process to an automated engineering discipline.
+
+\subsection{STM32 Microcontrollers Overview}
+
+To fully appreciate the scope of TinyMLOps, it is important to define the target hardware ecosystem. The STM32 portfolio, built upon ARM Cortex-M processors (such as Cortex-M4, Cortex-M33, and Cortex-M7), is divided into specific families designed for different application domains. Maggiori informazioni su tutte le famiglie sono riportate nell'appendice A.
+
+The main categories relevant to Edge AI deployment include:
+
+\begin{itemize}
+    \item \textbf{Foundation Family (e.g., STM32F4)}: These general-purpose microcontrollers feature RAM between 96 and 128 KB and Flash memory of approximately 500 to 512 KB. They power applications involving basic audio processing or simple sensor data analysis.
+    \item \textbf{Low Power Family (e.g., STM32L4)}: Destined for applications where energy consumption is critical, this family offers extended resources, with RAM scaling up to 640 KB and Flash reaching 2 MB. They are highly suitable for low-power vision or continuous monitoring tasks.
+    \item \textbf{High Performance Family (e.g., STM32H7)}: When the application relies strictly on the core's high performance, the H7 family delivers. With RAM capacities up to 1.4 MB, it hosts heavier models, including complex object detection computer vision architectures.
 \end{itemize}
 
 \subsection{Model-Hardware Compatibility Matrix}
-To provide concrete guidance on model selection for resource-constrained devices, Table~\ref{tab:model_board_compat_summary} presents a condensed compatibility analysis of representative vision models from the STM32 Model Zoo across common MCU families. These models are primarily designed for \textbf{image classification} and \textbf{pattern recognition} tasks, ranging from simple digit recognition (ST MNIST) to complex object categorization (MobileNet and ResNet variants). The analysis considers both uncompressed (FP32) and INT8-quantized versions, demonstrating the critical role of compression in enabling the deployment of such computer vision applications on lower-tier devices.
+To provide concrete guidance on model selection for these resource-constrained devices, Table~\ref{tab:model_board_compat_summary} presents a condensed compatibility analysis of vision models from the STM32 Model Zoo across common MCU families. These models target \textbf{image classification} and \textbf{pattern recognition} tasks, ranging from simple digit recognition (ST MNIST) to object categorization (MobileNet and ResNet variants). The analysis considers both uncompressed (FP32) and INT8-quantized versions, demonstrating the effect of compression in enabling computer vision applications on lower-tier devices.
 
 \begin{table}[h!]
     \centering
@@ -40,21 +91,21 @@ To provide concrete guidance on model selection for resource-constrained devices
     \end{flushleft}
 \end{table}
 
-Key observations from this analysis:
+We derived key observations from this analysis:
 \begin{itemize}
-    \item \textbf{INT8 Quantization Impact}: Compression reduces model footprint by approximately 4× compared to FP32, enabling deployment of models like MobileNet V2 0.35 on mid-tier MCUs (L476) that would otherwise be infeasible \cite{st_cubeai_docs}.
-    \item \textbf{Vision Models on F401}: Standard image classification architectures remain incompatible with the STM32F401 (64KB RAM) even with aggressive quantization, limiting this platform to audio-based TinyML or custom ultra-lightweight CNNs.
-    \item \textbf{H7 Family as Sweet Spot}: The STM32H743/H747 (1MB RAM) emerge as optimal targets for production-grade vision AI, supporting MobileNet variants at 224×224 resolution with acceptable inference latency.
+    \item \textbf{INT8 Quantization Impact}: Compression reduces the model footprint by approximately 4$\times$ compared to FP32. It enables the deployment of models like MobileNet V2 0.35 on mid-tier MCUs (L476) that would otherwise exceed hardware limits \cite{st_cubeai_docs}.
+    \item \textbf{Vision Models on F401}: Standard image classification architectures remain incompatible with the STM32F401 (64KB RAM) even with extreme quantization, limiting this platform to audio-based inference or ultra-lightweight custom Neural Networks.
+    \item \textbf{H7 Family as Sweet Spot}: The STM32H743/H747 (1MB RAM) emerges as the optimal target for production-grade vision AI, executing MobileNet variants at 224$\times$224 resolution with adequate latency.
 \end{itemize}
 
-The complete compatibility matrix, including FP32 resource requirements and additional model families (EfficientNet, SqueezeNet, ResNet50), is available in Appendix~\ref{app:model_compat_full}.
+The complete compatibility matrix, including FP32 resource requirements and additional model architectures (EfficientNet, SqueezeNet, ResNet50), is available in Appendix~\ref{app:model_compat_full}.
 
 \subsection{The STM32 Developer Toolchain}
-STMicroelectronics provides a mature ecosystem for managing the transition from high-level AI models to optimized C code. The core tools utilized and orchestrated in this work include:
+STMicroelectronics maintains an ecosystem for migrating high-level AI models to optimized C code. The core tools integrated within our workflow include:
 
 \begin{itemize}
-    \item \textbf{STM32CubeMX}: A graphical tool for configuring MCU peripherals and generating initialization code. In an automated MLOps workflow, this tool provides the "hardware context" (e.g., pinout, clock settings) necessary for integration.
-    \item \textbf{STEdgeAI / X-CUBE-AI}: This specialized expansion pack converts pre-trained models (from TensorFlow Lite, Keras, or ONNX) into optimized C code for STM32. It provides critical feedback on memory footprint (RAM/Flash) and estimated cycles for inference, acting as the primary bridge between the AI and embedded domains \cite{st_cubeai_docs}.
+    \item \textbf{STM32CubeMX}: A graphical tool for configuring MCU peripherals and generating initialization code. In an automated MLOps workflow, this tool provides the "hardware context" (e.g., pinout, clock settings) necessary for firmware integration.
+    \item \textbf{STEdgeAI / X-CUBE-AI}: This specialized utility converts pre-trained models (from TensorFlow Lite, Keras, or ONNX) into optimized C code for STM32. It yields critical feedback on memory footprint (RAM/Flash) and execution cycles, acting as the interface between the AI and the embedded domains \cite{st_cubeai_docs}.
 \end{itemize}
 
-The orchestration of these tools is traditionally a manual, iterative process. Developers must repeatedly adjust model parameters in Python, re-run the conversion tool, and verify hardware compatibility. In addition, the "GUI-centric" nature of tools like STM32CubeMX represents a significant bottleneck for industrial MLOps integration, as it prevents the easy application of version control and automated CI/CD pipelines to the firmware generation phase. To address this, my research proposes to automate this "plumbing" via headless agentic workflows.
+The orchestration of these tools typically forces engineers into iterative manual cycles. Developers repeatedly adjust model parameters in Python, execute the conversion tool, and supervise hardware compatibility. The "GUI-centric" operation of tools like STM32CubeMX acts as a bottleneck for industrial MLOps pipelines because it prevents version control and automation within continuous integration systems. To resolve this, the framework introduced in this thesis automates the "plumbing" of the pipeline via headless agentic workflows.
