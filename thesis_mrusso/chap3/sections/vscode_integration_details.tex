@@ -8,7 +8,7 @@ To connect between the backend LangGraph orchestrator and the developer's daily 
 
 \subsection{Architecture Overview}
 
-Before standardizing on the VS Code extension, we used \textbf{LangSmith} and \textbf{LangGraph Studio} to trace the graph execution during the initial development and debugging phases. These platforms provided a visual, node-by-node representation of the workflow. This visualization enabled direct inspection of the state object at each step and helped tune the LLM routing prompts. Once we stabilized the orchestration logic, we shifted focus entirely to the native IDE integration.
+Before standardizing on the VS Code extension, I used \textbf{LangSmith} and \textbf{LangGraph Studio} to trace the graph execution during the initial development and debugging phases. These platforms provided a visual, node-by-node representation of the workflow. This visualization enabled direct inspection of the state object at each step and helped tune the LLM routing prompts. Once I stabilized the orchestration logic, I shifted focus entirely to the native IDE integration.
 
 The integration follows a client-server architecture where the VS Code extension (TypeScript frontend) communicates with the FastAPI backend (Python) via HTTP streaming. This design provides several distinct advantages. Primarily, it enforces a clean separation of technologies: the complex LangGraph orchestration is executed in a dedicated Python environment, while the user interface uses VS Code's native TypeScript APIs.
 

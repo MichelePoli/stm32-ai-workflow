@@ -1,7 +1,7 @@
 \subsection{Web Research Workflow for Technical Guidance}
 \label{sec:web_research}
 
-Workflow 4 provides technical research on demand. It queries the web and synthesizes the results into a structured summary. We avoided routing requests through a static knowledge base. Instead, the workflow runs live DuckDuckGo searches across four distinct domains and evaluates the summary quality using DeepEval.
+Workflow 4 provides technical research on demand. It queries the web and synthesizes the results into a structured summary. I avoided routing requests through a static knowledge base. Instead, the workflow runs live DuckDuckGo searches across four distinct domains and evaluates the summary quality using DeepEval.
 
 \subsection{Request Classification}
 
@@ -15,7 +15,7 @@ The routing node \texttt{search\_\allowbreak type\_\allowbreak decision()} confi
 
 Each prompt template instructs the agent on the specific fields to retrieve. For AI model searches, for instance, the template asks for model name, framework, size in KB, compatible STM32 targets, quantization level, and inference benchmarks. For board comparisons it requests flash, RAM, clock speed, peripheral sets, and price.
 
-The native Python \texttt{duckduckgo-search} library executes the search. It fetches up to six webpage snippets, extracting titles, bodies, and source URLs. We deliberately removed complex function-calling wrappers to maintain compatibility with Triton. The backend now handles standard inference requests without needing native tool-calling integrations.
+The native Python \texttt{duckduckgo-search} library executes the search. It fetches up to six webpage snippets, extracting titles, bodies, and source URLs. I deliberately removed complex function-calling wrappers to maintain compatibility with Triton. The backend now handles standard inference requests without needing native tool-calling integrations.
 
 \begin{lstlisting}[language=Python, caption={Direct DuckDuckGo search execution without tool-calling overhead}]
 from duckduckgo_search import DDGS
