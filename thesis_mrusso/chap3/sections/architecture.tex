@@ -10,7 +10,7 @@
 
     \item \textbf{Firmware-AI Integration} (\texttt{integration\_flow}): Merges generated C inference code into the STM32 project structure and verifies build compatibility.
 
-    \item \textbf{Web Research} (\texttt{search\_flow}): Provides technical guidance through RAG-improved web search with quality evaluation metrics.
+    \item \textbf{Web Research} (\texttt{search\_flow}): Provides technical guidance through dynamic web search with DeepEval quality evaluation metrics.
 \end{enumerate}
 
 \clearpage
@@ -67,7 +67,7 @@ LangGraph automatically persists this state at every node transition through a c
 
 A detailed analysis of the underlying storage infrastructure and the dual-layer memory management logic is provided in Section \ref{sec:redis_architecture}.
 
-\subsubsection{Robustness in LLM-Driven Orchestration}
+\subsubsection{Reliability in LLM-Driven Orchestration}
 
 Relying on Large Language Models for orchestration decisions introduces non-determinism. During stress testing with concurrent users, unconstrained LLM outputs occasionally caused validation crashes or incorrect routing. The framework solves this by enforcing three layers of input normalization before any LLM response modifies the \texttt{MasterState}.
 
@@ -113,7 +113,7 @@ The graph construction logic resides in four primary "injection" functions:
     \item \texttt{inject\_\allowbreak firmware\_\allowbreak nodes()}: Firmware workflow (Workflow 1)
     \item \texttt{inject\_\allowbreak ai\_\allowbreak analysis\_\allowbreak nodes()}: AI discovery, customization, and data management (Workflows 2, 5, 6, 7)
     \item \texttt{inject\_\allowbreak integration\_\allowbreak nodes()}: Firmware-AI integration and verification (Workflow 3)
-    \item \texttt{inject\_\allowbreak web\_\allowbreak search\_\allowbreak nodes()}: Web research and RAG support (Workflow 4)
+    \item \texttt{inject\_\allowbreak web\_\allowbreak search\_\allowbreak nodes()}: Web research and evaluation support (Workflow 4)
 \end{itemize}
 
 Each function encapsulates the node definitions and internal routing logic for its respective domain, adding them to the master \texttt{StateGraph} builder.

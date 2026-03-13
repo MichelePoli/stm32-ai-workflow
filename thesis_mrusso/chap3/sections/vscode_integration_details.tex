@@ -1,10 +1,14 @@
 % Section added for thesis enhancement (Feb 2026)
-\section{The User Interface and API Layer}
-\label{sec:vscode_extension}
+\section{User Interaction and Tooling}
+
+\subsection{IDE Integration and Asynchronous Feedback}
+\label{sec:vscode_integration}
 
 To connect between the backend LangGraph orchestrator and the developer's daily workflow, a custom Visual Studio Code extension was developed. This extension transforms the framework from a command-line tool into a real-time, context-aware assistant embedded directly in the Integrated Development Environment (IDE).
 
 \subsection{Architecture Overview}
+
+Before standardizing on the VS Code extension, we used \textbf{LangSmith} and \textbf{LangGraph Studio} to trace the graph execution during the initial development and debugging phases. These platforms provided a visual, node-by-node representation of the workflow. This visualization enabled direct inspection of the state object at each step and helped tune the LLM routing prompts. Once we stabilized the orchestration logic, we shifted focus entirely to the native IDE integration.
 
 The integration follows a client-server architecture where the VS Code extension (TypeScript frontend) communicates with the FastAPI backend (Python) via HTTP streaming. This design provides several distinct advantages. Primarily, it enforces a clean separation of technologies: the complex LangGraph orchestration is executed in a dedicated Python environment, while the user interface uses VS Code's native TypeScript APIs.
 
@@ -108,7 +112,7 @@ vscode.chat.createChatParticipant('stm32-ai.assistant', handler);
 
 \textbf{Implementation Details:}
 
-The handler implementation incorporates several critical functionalities to ensure robustness and a smooth user experience.
+The handler implementation incorporates several critical functionalities to manage errors and provide a fluid user experience.
 
 First, it implements graceful cancellation handling via the \texttt{CancellationToken}; this allows users to abort long-running requests simply by closing the chat window or clicking a stop button, which in turn drops the HTTP connection and signals the backend to terminate the LangGraph execution.
 

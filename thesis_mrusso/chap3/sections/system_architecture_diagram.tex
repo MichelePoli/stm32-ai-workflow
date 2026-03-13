@@ -25,7 +25,7 @@
         \node[box, below=1.5cm of langgraph, xshift=-4.8cm, fill=cyan!15, text width=2.8cm] (fw_agent) {Firmware\\Agent};
         \node[box, right=0.4cm of fw_agent, fill=cyan!15, text width=3.2cm] (ai_agent) {AI Discovery \&\\Customization Agent};
         \node[box, right=0.4cm of ai_agent, fill=cyan!15, text width=2.8cm] (int_agent) {Integration\\Agent};
-        \node[box, right=0.4cm of int_agent, fill=cyan!15, text width=2.8cm] (web_agent) {Web Research\\Agent (RAG)};
+        \node[box, right=0.4cm of int_agent, fill=cyan!15, text width=2.8cm] (web_agent) {Web Research\\Agent};
 
         % --- LAYER 5: Compute & Inference Backend ---
         \node[box, below=2cm of ai_agent, minimum width=8cm, fill=red!15] (triton) {\textbf{NVIDIA Triton Inference Server}\\(Remote HPP Cluster - GPU Computing)};

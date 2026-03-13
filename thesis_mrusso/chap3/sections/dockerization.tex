@@ -1,0 +1,12 @@
+\section{Dockerization and Portability}
+\label{sec:dockerization}
+
+We containerized the entire architecture using Docker to isolate the framework from the host operating system and simplify deployment across different environments. The orchestration relies on a \texttt{docker-compose.yml} file that defines an internal virtual network, allowing the microservices to communicate securely. We structured the system around three primary services.
+
+The \textbf{LangGraph Application Server} (\texttt{langgraph-app}) is the core container executing the Python backend, FastAPI event streaming, and the LangGraph orchestrator. We built it using a custom \texttt{Dockerfile} based on Ubuntu 22.04. An important configuration choice was the explicit mapping of the User ID (\texttt{UID 1002}) to match the host machine. This prevents permission conflicts when the container mounts local volumes to generate STM32CubeMX projects or compile C code. Instead of installing massive embedded toolchains inside the container, the \texttt{docker-compose.yml} configuration uses read-only bind mounts. These mounts map the host's existing STM32CubeMX and STEdgeAI installations directly into the container's path, drastically reducing the image footprint.
+
+The \textbf{Redis Checkpointer} (\texttt{redis}) container runs \texttt{redis-stack-server} and provides the high-speed in-memory datastore required by LangGraph for state persistence and context chaining. We attached a dedicated volume (\texttt{redis\_data}) to ensure that long-term user profiles and workflow checkpoints survive container restarts.
+
+The \textbf{Triton Inference Server} (\texttt{triton-server}), as analyzed in Section \ref{sec:inference_infrastructure}, decouples the orchestration logic from the heavy LLM computation. While the initial architecture relied on a local \texttt{ollama} container, we migrated the inference backend to a dedicated NVIDIA Triton Inference Server to achieve horizontal scalability. The custom \texttt{Dockerfile.triton} extends the official NVIDIA image by injecting the \texttt{vLLM} engine and \texttt{sentence-transformers}. This configuration provides high-throughput token generation for models like Mistral and DeepSeek.
+
+Decoupling the agent logic from the Triton inference server creates a cloud-native topology. Developers can deploy the lightweight LangGraph container on an edge node or a local laptop, routing point-to-point HTTP/gRPC requests to a centralized, high-performance computing cluster hosting Triton.
