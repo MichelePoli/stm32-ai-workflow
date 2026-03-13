@@ -11,10 +11,12 @@ My tests show this manual pipeline takes an expert over 4 hours. Most of that ti
 My thesis asks: what if an AI assistant could handle this tedious toolchain instead? To answer this, I built an end-to-end, multi-agent framework. Instead of clicking through interfaces, the developer just talks to their IDE. They can say: "Generate an STM32H7 project, find a small MobileNet model, optimize it, and put it in my C code."
 
 [Slide 4: Architecture & Orchestration]
-The system relies on Multi-Agent Orchestration using LangGraph. I designed it as a directed graph divided into specialized branches. One branch handles Firmware Generation by controlling the STM32CubeMX CLI without a GUI. 
-Another Customization branch writes Python scripts to fine-tune networks or run hyperparameter searches. 
-A Web Search branch reads current documentation straight from the internet.
-To ensure low latency and horizontal scalability, I split the agent logic from the heavy LLM inference. All LLM requests go to a centralized NVIDIA Triton Inference Server. Triton handles dynamic model swapping and shares GPU memory across users. This decoupling lays the groundwork for a fully scalable Kubernetes deployment, allowing multiple developers to share the same hardware without bottlenecking.
+As shown in this Top-Down System Architecture diagram, the framework is divided into five operational layers. 
+At the top, we have the Presentation and API layers, where the user interacts via a custom VS Code extension. 
+Below that is the core Orchestration Layer, where LangGraph manages state and routing, communicating with a Redis memory backend.
+From there, the master orchestrator delegates tasks to the fourth layer: the Agentic Workflows. We have specialized agents for Firmware Generation, AI Customization, Integration, and Web Research. 
+Finally, at the bottom, we have the Inference and Compute Layer. To ensure low latency and horizontal scalability, I extracted the heavy LLM inference out of the local containers. All LLM requests go to a centralized NVIDIA Triton Server on an external cluster. This decoupling allows multiple developers to share the same hardware GPU without bottlenecks.
+(here insert image of the architecture)
 
 [Slide 5: IDE Integration & Human-in-the-Loop]
 We also didn't force developers into a web app. I built a custom Visual Studio Code Extension. The assistant sits right inside the editor. It uses asynchronous streaming so the IDE never freezes during heavy tasks. At critical moments, like right before starting a long training job or running the automated EdgeAI compiler, the system stops and asks the user for permission in the chat. So the developer stays in control.
@@ -29,6 +31,7 @@ Second, Firmware Generation. A developer usually navigates around 15 manual conf
 [Slide 7: Neural Network Customization & NNI]
 Third is Neural Network Customization. Pre-trained models are rarely ready for production out-of-the-box. Instead of writing tedious setup code, the developer can simply ask the assistant to modify the network's architecture in plain English. The agent analyzes the user's intent and automatically rewrites the Keras code to apply one or more among these five main categories of modifications: freezing specific segments of the backbone, adjusting the final output layer for a custom number of classes, injecting dropout layers to prevent overfitting, setting custom learning rates, and even appending new dense layers. 
 Furthermore, if the user asks for hyperparameter optimization, the system fully integrates with Microsoft's Neural Network Intelligence, or NNI. Setting up NNI manually is notoriously complex. You have to write a custom trial script, define a search space in JSON, and configure a manager. Instead of forcing the developer to do this, my Customization Agent dynamically writes the entire NNI experiment from scratch. It generates the `trial.py` file, defines the search boundary for learning rates and batch sizes, and launches the tuning job automatically. The developer simply asks for "optimization" and waits for the best model to emerge.
+
 Finally, after a model is optimized, the system runs an automated hardware validation using the STM32EdgeAI compiler. It analyzes the network's exact RAM and Flash requirements against the physical limits of the target microcontroller. If the model is too large, the agent autonomously attempts to escalate the compression level. If it still exceeds the hardware limits, the orchestrator interrupts the workflow, warns the developer, and offers two choices: downgrade to a lighter model, or swap the underlying hardware for a more powerful STM32 board. This ensures the workflow never produces a project that is mathematically impossible to compile.
 
 
