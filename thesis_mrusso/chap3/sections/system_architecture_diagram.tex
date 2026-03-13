@@ -22,10 +22,10 @@
     \node[box, right=1.5cm of langgraph, minimum width=4cm, fill=yellow!20] (redis) {Redis Checkpointer\\(Short \& Long-Term Memory)};
 
     % --- LAYER 4: Agentic Workflows ---
-    \node[box, below=1.5cm of langgraph, xshift=-4.5cm, fill=cyan!15, text width=3cm] (fw_agent) {Firmware\\Agent};
-    \node[box, right=0.3cm of fw_agent, fill=cyan!15, text width=3.2cm] (ai_agent) {AI Discovery \&\\Customization Agent};
-    \node[box, right=0.3cm of ai_agent, fill=cyan!15, text width=3cm] (int_agent) {Integration\\Agent};
-    \node[box, right=0.3cm of int_agent, fill=cyan!15, text width=3cm] (web_agent) {Web Research\\Agent (RAG)};
+    \node[box, below=1.5cm of langgraph, xshift=-4.8cm, fill=cyan!15, text width=2.8cm] (fw_agent) {Firmware\\Agent};
+    \node[box, right=0.4cm of fw_agent, fill=cyan!15, text width=3.2cm] (ai_agent) {AI Discovery \&\\Customization Agent};
+    \node[box, right=0.4cm of ai_agent, fill=cyan!15, text width=2.8cm] (int_agent) {Integration\\Agent};
+    \node[box, right=0.4cm of int_agent, fill=cyan!15, text width=2.8cm] (web_agent) {Web Research\\Agent (RAG)};
 
     % --- LAYER 5: Compute & Inference Backend ---
     \node[box, below=2cm of ai_agent, minimum width=8cm, fill=red!15] (triton) {\textbf{NVIDIA Triton Inference Server}\\(Remote HPP Cluster - GPU Computing)};
@@ -33,15 +33,21 @@
     % --- Connections ---
     \draw[arrow, <->] (vscode) -- node[right] {HTTP / REST} (fastapi);
     \draw[arrow, <->] (fastapi) -- (langgraph);
-    \draw[arrow, <->] (langgraph) -- (redis);
     
-    \draw[arrow] (langgraph) -| (fw_agent);
-    \draw[arrow] (langgraph) -- (ai_agent);
-    \draw[arrow] (langgraph) -| (int_agent);
-    \draw[arrow] (langgraph) -| (web_agent);
+    % Redis connection (Shifted up to not conflict with downward arrows)
+    \draw[arrow, <->] (langgraph.east) -- (redis.west);
+    
+    % Downward arrows to agents
+    \draw[arrow] (langgraph.south) -| (fw_agent.north);
+    \draw[arrow] (langgraph.south) -- (ai_agent.north);
+    \draw[arrow] (langgraph.south) -| (int_agent.north);
+    
+    % Redis to Web Research Agent
+    \draw[arrow] (redis.south) -- (web_agent.north);
 
-    \draw[arrow, <->, dashed] (ai_agent) -- node[left] {LLM/AI Inference} (triton -| ai_agent);
-    \draw[arrow, <->, dashed] (langgraph.south east) -- node[right, near end, xshift=0.3cm] {Routing Inference} (triton.north east);
+    % Inference dashed lines (Shifted to not hit integration agent)
+    \draw[arrow, <->, dashed] (ai_agent.south) -- node[left] {LLM/AI Inference} (triton.north -| ai_agent.south);
+    \draw[arrow, <->, dashed] (langgraph.east |- langgraph.south) ++(-0.5cm, 0) -- node[right, near end, xshift=0.1cm] {Routing Inference} (triton.north -| int_agent.south);
 
     \end{tikzpicture}
     \caption{Top-Down System Architecture. The framework is separated into five operational layers, spanning from the VS Code user interface down to the centralized GPU inference backend.}
