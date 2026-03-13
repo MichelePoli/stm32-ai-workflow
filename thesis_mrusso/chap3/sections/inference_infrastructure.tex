@@ -1,0 +1,30 @@
+\section{Inference Infrastructure and GPU Management}
+\label{sec:inference_infrastructure}
+
+\subsection{Containerized Deployment and GPU Decoupling}
+To ensure scalability and efficient resource management in a multi-user environment, I containerized the entire architecture using Docker. A major architectural shift from early development was the transition from local per-container inference engines (such as Ollama) to a centralized \textbf{NVIDIA Triton Inference Server} hosted on the remote \textbf{inNuCE Lab Heterogeneous Prototyping Platform (HPP)} cluster \cite{innuce_website}.
+
+Running individual Ollama instances required locking a specific local GPU for a single user throughout their session, preventing resource sharing. By decoupling the multi-agent pipeline from the inference engine and migrating inference to the HPP, the user's local LangGraph container requires only CPU and RAM. The remote Triton server acts as a centralized backend that receives requests via standardized APIs over the network and manages its own GPU dynamically. 
+
+This remote offloading is a critical enabler for the customization workflows described in Section~\ref{sec:customization}: it liberates the local hardware from the burden of hosting heavy language models, reserving the entire local VRAM capacity for TensorFlow's computationally expensive training and fine-tuning operations.
+
+To operate within limited hardware constraints on the HPP node (such as the 16 GB VRAM capacity of the NVIDIA A4000 GPU used in testing), the system implements an \textbf{Explicit Model Control} strategy. Launching Triton with the \texttt{--model-control-mode=explicit} flag stops the orchestrator from automatically loading all LLMs at startup, avoiding immediate Out-of-Memory (OOM) errors.
+
+However, freeing VRAM for TensorFlow exposed a secondary concurrency bottleneck. TensorFlow defaults to aggressively pre-allocating all available GPU memory upon initialization. When multiple users attempted to trigger model inspection or fine-tuning workflows concurrently, the first subprocess monopolized the entire GPU. This caused subsequent user containers to crash with \texttt{Out-Of-Memory} (OOM) exceptions.
+
+To support true multi-user concurrency on a shared hardware accelerator, the framework enforces an explicit GPU VRAM partitioning strategy within the Python subprocesses. Before executing any Keras or TensorFlow operation, the orchestrator injects strict virtual device configurations:
+
+\begin{lstlisting}[language=Python, caption={Strict VRAM partitioning for concurrent TensorFlow subprocesses}, label={lst:vram_partitioning}]
+# Prevent greedy VRAM allocation by forcing a hard limit (e.g., 4096 MB for training)
+gpus = tf.config.experimental.list_physical_devices('GPU')
+if gpus:
+    for gpu in gpus:
+        tf.config.experimental.set_virtual_device_configuration(
+            gpu,
+            [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=4096)]
+        )
+\end{lstlisting}
+
+This partitioning limits fine-tuning tasks to 4~GB of VRAM and lightweight model inspection tasks to 1~GB. On a standard 16~GB research GPU, this configuration safely supports three to four simultaneous fine-tuning sessions or up to fifteen concurrent inspection operations.
+
+Instead, the custom \texttt{ChatTriton} client acts as a VRAM traffic controller, utilizing the Triton V2 Repository API (\texttt{/v2/repository/models/\{model\}/load} and \texttt{/unload}) to perform \textbf{Dynamic Model Swapping}. Before each inference task, the system unloads currently inactive models and verifies the available CUDA context, ensuring only one Large Language Model resides in VRAM at any given time while maintaining shared system-wide access.

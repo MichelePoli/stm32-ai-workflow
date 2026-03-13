@@ -1,4 +1,4 @@
-\section{Neural Network Customization Workflow}
+\subsection{Neural Network Customization Workflow}
 \label{sec:customization}
 
 Once a base model has been discovered and profiled, the user may need to adapt its architecture to meet specific hardware constraints, retarget its output to a new set of classes, or improve its accuracy on a domain-specific dataset. Workflow 5 implements a customization pipeline that breaks this process into five stages: model inspection, best practice retrieval, interactive modification planning, architecture patching, and fine-tuning. The implementation is contained in \texttt{workflow5\_customization.py} and runs as a LangGraph graph with conditional routing between nodes.
