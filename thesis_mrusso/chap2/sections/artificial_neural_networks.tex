@@ -1,12 +1,12 @@
 \section{Artificial Neural Networks}
 The scientific quest to create machines capable of emulating human intelligence, formally recognized as \gls{ai}, began in the mid-20th century. While early efforts focused on symbolic AI, where expert knowledge was translated into rigid, rule-based logic, these systems often struggled with the ambiguity and complexity of real-world data environments \cite{Zhang2023AI70Years}.
 
-To overcome these limitations, the field shifted toward \gls{ml} in the 1980s. This paradigm emphasized data-driven learning, where algorithms improve their performance through experience rather than explicit programming \cite{Finley2024ClassicalML}. By the 2010s, the advent of \gls{dl} revolutionized the industry. By utilizing multi-layered neural networks, deep learning enabled the automatic extraction of hierarchical features from raw data, leading to unprecedented breakthroughs in computer vision and natural language processing \cite{Azizov2024DecadeDeepLearning}.
+To address these limitations, researchers shifted toward \gls{ml} in the 1980s. This approach relies on data-driven learning: algorithms improve their performance through experience rather than explicit programming \cite{Finley2024ClassicalML}. In the 2010s, \gls{dl} gained prominence. Multi-layered neural networks enabled the automatic extraction of hierarchical features from raw data, significantly improving performance in computer vision and natural language processing \cite{Azizov2024DecadeDeepLearning}.
 
 \subsection{The Perceptron: The Fundamental Building Block}
 The structural foundation of modern neural networks is the perceptron, a computational model inspired by the biological neuron. A perceptron processes input signals by calculating a weighted sum and applying a step function to produce a binary classification \cite{Gabrie2023}:
 \begin{equation}
-    y = \text{sign}(\mathbf{w}^\top \mathbf{x} + b)
+    y = \text{step}(\mathbf{w}^\top \mathbf{x} + b)
 \end{equation}
 where $\mathbf{w}$ represents the weight vector, $\mathbf{x}$ the input, and $b$ the bias. While a single perceptron is limited to linearly separable tasks, stacking multiple neurons into layers, forming a Multilayer Perceptron (MLP), allows for the approximation of highly non-linear functions, as illustrated in Fig. \ref{fig:perceptron} \cite{Schmid2025, NNWork2025}.
 
@@ -18,21 +18,17 @@ where $\mathbf{w}$ represents the weight vector, $\mathbf{x}$ the input, and $b$
 \end{figure}
 
 \subsection{Optimization and Training}
-Training a neural network is essentially an optimization problem: finding the parameter set $\boldsymbol{\theta}$ that minimizes a cost function $J(\boldsymbol{\theta})$. For regression, a standard metric is the Mean Squared Error (MSE):
-\begin{equation}
-    J(\boldsymbol{\theta}) = \frac{1}{n} \sum_{i=1}^{n} (y_i - \hat{y}_i)^2
-\end{equation}
-where $y_i$ is the target and $\hat{y}_i$ is the model's prediction \cite{Gabrie2023}.
+Training a neural network means solving an optimization problem: finding the parameter set $\boldsymbol{\theta}$ that minimizes a cost function $J(\boldsymbol{\theta})$ \cite{Gabrie2023}.
 
-Minimization is typically achieved via Gradient Descent, where weights are updated iteratively in the direction of the steepest descent:
+We typically minimize this cost using Gradient Descent. The gradient of $J(\boldsymbol{\theta})$ points in the direction of steepest ascent. By taking small iterative steps in the exact opposite direction (the negative gradient), the algorithm descends the high-dimensional loss landscape to reach a minimum. The weight update rule is:
 \begin{equation}
     \theta_{t+1} = \theta_t - \alpha \nabla J(\theta_t)
 \end{equation}
-The learning rate $\alpha$ is a critical hyperparameter that determines the step size. To handle large-scale datasets efficiently, researchers employ Stochastic Gradient Descent (SGD) and its variants, which estimate gradients using small batches of data. While SGD is effective, it can struggle with local minima and saddle points. To address this, \textbf{Momentum} was introduced to accelerate gradients in the right direction, thus leading to faster converging.
+The learning rate $\alpha$ determines the step size. Since computing the full gradient over large datasets is computationally expensive, practitioners use Stochastic Gradient Descent (SGD). SGD estimates gradients using small data batches. Although effective, it often struggles to escape local minima or saddle points. Adding \textbf{Momentum} solves this issue by accumulating past gradients to accelerate the optimization in the correct direction.
 
-However, the current standard for training deep neural networks is \textbf{Adam (Adaptive Moment Estimation)} \cite{kingma2014adam}. Adam combines the advantages of two other extensions of stochastic gradient descent: Adaptive Gradient Algorithm (AdaGrad) and Root Mean Square Propagation (RMSProp). It computes adaptive learning rates for each parameter by maintaining exponentially decaying averages of past gradients ($m_t$, first moment) and squared gradients ($v_t$, second moment). This allows the algorithm to handle sparse gradients on noisy problems, making it highly suitable for large-scale data and parameter-heavy models like LLMs.
+Today, \textbf{Adam (Adaptive Moment Estimation)} is the default choice for training deep networks \cite{kingma2014adam}. It merges the benefits of the Adaptive Gradient Algorithm (AdaGrad) and Root Mean Square Propagation (RMSProp). Adam computes individual adaptive learning rates for each parameter. To do this, it maintains an exponentially decaying average of both past gradients ($m_t$, first moment) and squared gradients ($v_t$, second moment). This mechanism handles sparse gradients efficiently, which is particularly useful for parameter-heavy models like Large Language Models.
 
-The efficiency of this process relies on the backpropagation algorithm (Fig. \ref{fig:back}), which uses the chain rule of calculus to propagate errors from the output layer back to the input, enabling automated weight updates in complex computational graphs \cite{NNWork2025}.
+To compute these gradients, we rely on the backpropagation algorithm (Fig. \ref{fig:back}). Backpropagation applies the chain rule of calculus to propagate the error backward from the output layer to the input. This method systematically calculates the derivative of the loss with respect to every weight in complex computational graphs \cite{NNWork2025}.
 
 \begin{figure}[ht]
     \centering
@@ -42,17 +38,17 @@ The efficiency of this process relies on the backpropagation algorithm (Fig. \re
 \end{figure}
 
 \subsection{Specialized Architectures: CNNs and RNNs}
-Different data types require specialized neural architectures to capture relevant patterns efficiently.
+Different data structures benefit from tailored neural architectures.
 
-\textbf{Convolutional Neural Networks (CNNs):} Optimized for spatial data (e.g., images), CNNs use convolutional kernels to detect local features like edges and textures \cite{Li2020}. By sharing weights across the spatial domain, CNNs achieve translation invariance and significantly reduce the total number of parameters compared to fully connected layers.
+\textbf{Convolutional Neural Networks (CNNs):} These networks are built for spatial data, such as images. They apply convolutional kernels to detect local features like edges and shapes \cite{Li2020}. Sharing weights across the spatial domain provides translation invariance and drastically reduces the parameter count compared to dense layers.
 
 Mathematically, for a two-dimensional input image $I$ and a filter kernel $K$ of dimensions $k_1 \times k_2$, the discrete convolution operation at position $(i, j)$ is defined as:
 \begin{equation}
     (I * K)(i, j) = \sum_{m=0}^{k_1-1} \sum_{n=0}^{k_2-1} I(i-m, j-n) K(m, n)
 \end{equation}
-This sliding window operation computes the dot product between the kernel weights and local input regions, building feature maps that highlight spatial hierarchies.
+This sliding window computes the dot product between the kernel weights and local input regions, allowing the aforementioned weight sharing and consequently building feature maps that highlight spatial hierarchies.
 
-This is often followed by activation functions like ReLU and pooling layers to downsample feature maps (Fig. \ref{fig:conv}) \cite{OShea2015}.
+Network designers typically follow this operation with non-linear activations like ReLU and pooling layers to downsample the maps (Fig. \ref{fig:conv}) \cite{OShea2015}.
 
 \begin{figure}[ht]
     \centering
@@ -61,11 +57,11 @@ This is often followed by activation functions like ReLU and pooling layers to d
     \label{fig:conv}
 \end{figure}
 
-\textbf{Recurrent Neural Networks (RNNs):} Tailored for sequential data where the current output depends on previous inputs, RNNs maintain a "hidden state" that acts as a memory trace \cite{Schmidt2019}. The hidden state $h_t$ at time step $t$ is updated based on the previous hidden state $h_{t-1}$ and the current input $x_t$ via a non-linear activation function (typically $\tanh$ or ReLU):
+\textbf{Recurrent Neural Networks (RNNs):} RNNs process sequential data. Because the current output depends on previous inputs, they maintain a hidden state that models a memory trace \cite{Schmidt2019}. The network updates the hidden state $h_t$ at time step $t$ using the previous state $h_{t-1}$ and the new input $x_t$ through a non-linear activation:
 \begin{equation}
     h_t = \sigma(W_h h_{t-1} + W_x x_t + b)
 \end{equation}
-Despite their utility, vanilla RNNs struggle with long sequences due to the \textbf{vanishing gradient problem}, where gradients diminish exponentially during Backpropagation Through Time (BPTT).
+Standard RNNs fail on long sequences because of the \textbf{vanishing gradient problem}: gradients shrink exponentially during Backpropagation Through Time (BPTT).
 
 To mitigate this, \textbf{Long Short-Term Memory (LSTM)} networks introduce a more complex memory cell to regulate information flow \cite{Salehinejad2018}. An LSTM unit maintains a cell state $C_t$ controlled by three gating mechanisms: the forget gate ($f_t$), input gate ($i_t$), and output gate ($o_t$). The formal transition equations are:
 \begin{align}
@@ -76,7 +72,7 @@ To mitigate this, \textbf{Long Short-Term Memory (LSTM)} networks introduce a mo
     o_t         & = \sigma(W_o \cdot [h_{t-1}, x_t] + b_o)    \\
     h_t         & = o_t \odot \tanh(C_t)
 \end{align}
-where $\odot$ denotes element-wise multiplication. This architecture allows the network to effectively learn long-term dependencies (Fig. \ref{fig:rnn}) \cite{Lipton2015}.
+where $\odot$ denotes element-wise multiplication. These gating mechanisms enable the network to retain or discard information over long intervals (Fig. \ref{fig:rnn}) \cite{Lipton2015}.
 
 \begin{figure}[ht]
     \centering
@@ -85,4 +81,4 @@ where $\odot$ denotes element-wise multiplication. This architecture allows the 
     \label{fig:rnn}
 \end{figure}
 
-For Edge AI deployment, traditional "black-box" training is often insufficient. Deploying models on microcontrollers requires a detailed understanding of the network's architecture. \textit{Neural Network Surgery} or decomposition refers to isolating, modifying, or replacing specific layers within a pre-trained model. This technique is necessary for domain adaptation, such as replacing the final classification head for a new task, and for hardware optimization, where specific non-linearities or layer types can be replaced with hardware-friendly equivalents (e.g., replacing complex activations with lookup tables or simpler functions). Chapter~\ref{chap:framework} details how these manipulations are automated by the agentic orchestrator, with architecture compatibility verified at each step of the MLOps pipeline.
+Deploying models on constrained microcontrollers requires modifying the internal network architecture. \textit{Neural Network Surgery} involves isolating or replacing specific layers within a pre-trained model. We use this technique to adapt a network to a new domain---for example, changing the final classification head---and to optimize it for the hardware by swapping heavy activations with simpler approximations. Chapter~\ref{chap:framework} explains how the orchestrator automates these structural modifications.
