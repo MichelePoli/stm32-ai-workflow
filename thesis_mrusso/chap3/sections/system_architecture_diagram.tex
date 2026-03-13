@@ -4,7 +4,7 @@
     \begin{tikzpicture}[
         node distance=1.5cm and 2cm,
         every node/.style={font=\sffamily\small},
-        box/.style={draw, rounded corners, minimum width=3.5cm, minimum height=1cm, align=center, fill=blue!10, text=black},
+        box/.style={draw, rounded corners, minimum width=3.5cm, minimum height=1.2cm, align=center, fill=blue!10, text=black, inner sep=0.2cm},
         layerbox/.style={draw, dashed, rounded corners, inner sep=0.3cm, fill=gray!5},
         arrow/.style={->, thick, >=stealth}
     ]
@@ -15,17 +15,17 @@
     \draw[arrow] (user) -- (vscode);
 
     % --- LAYER 2: API & Comm ---
-    \node[box, below=of vscode, fill=orange!15] (fastapi) {FastAPI Server\\(Event Streaming / NDJSON)};
+    \node[box, below=1cm of vscode, fill=orange!15] (fastapi) {FastAPI Server\\(Event Streaming / NDJSON)};
 
     % --- LAYER 3: Orchestration ---
-    \node[box, below=of fastapi, minimum width=6cm, fill=purple!15] (langgraph) {\textbf{LangGraph Orchestrator}\\(Master State \& Routing)};
-    \node[box, right=of langgraph, fill=yellow!20] (redis) {Redis Checkpointer\\(Short \& Long-Term Memory)};
+    \node[box, below=1cm of fastapi, minimum width=7cm, fill=purple!15] (langgraph) {\textbf{LangGraph Orchestrator}\\(Master State \& Routing)};
+    \node[box, right=1.5cm of langgraph, minimum width=4cm, fill=yellow!20] (redis) {Redis Checkpointer\\(Short \& Long-Term Memory)};
 
     % --- LAYER 4: Agentic Workflows ---
-    \node[box, below left=1.5cm and -1cm of langgraph, fill=cyan!15] (fw_agent) {Firmware\\Agent};
-    \node[box, right=0.3cm of fw_agent, fill=cyan!15] (ai_agent) {AI Discovery \&\\Customization Agent};
-    \node[box, right=0.3cm of ai_agent, fill=cyan!15] (int_agent) {Integration\\Agent};
-    \node[box, right=0.3cm of int_agent, fill=cyan!15] (web_agent) {Web Research\\Agent (RAG)};
+    \node[box, below=1.5cm of langgraph, xshift=-4.5cm, fill=cyan!15, text width=3cm] (fw_agent) {Firmware\\Agent};
+    \node[box, right=0.3cm of fw_agent, fill=cyan!15, text width=3.2cm] (ai_agent) {AI Discovery \&\\Customization Agent};
+    \node[box, right=0.3cm of ai_agent, fill=cyan!15, text width=3cm] (int_agent) {Integration\\Agent};
+    \node[box, right=0.3cm of int_agent, fill=cyan!15, text width=3cm] (web_agent) {Web Research\\Agent (RAG)};
 
     % --- LAYER 5: Compute & Inference Backend ---
     \node[box, below=2cm of ai_agent, minimum width=8cm, fill=red!15] (triton) {\textbf{NVIDIA Triton Inference Server}\\(Remote HPP Cluster - GPU Computing)};
@@ -40,8 +40,8 @@
     \draw[arrow] (langgraph) -| (int_agent);
     \draw[arrow] (langgraph) -| (web_agent);
 
-    \draw[arrow, <->, dashed] (ai_agent) -- node[left] {LLM/AI Inference} (triton);
-    \draw[arrow, <->, dashed] (langgraph.south east) -- node[right, near end] {Routing Inference} (triton.north east);
+    \draw[arrow, <->, dashed] (ai_agent) -- node[left] {LLM/AI Inference} (triton -| ai_agent);
+    \draw[arrow, <->, dashed] (langgraph.south east) -- node[right, near end, xshift=0.3cm] {Routing Inference} (triton.north east);
 
     \end{tikzpicture}
     \caption{Top-Down System Architecture. The framework is separated into five operational layers, spanning from the VS Code user interface down to the centralized GPU inference backend.}
