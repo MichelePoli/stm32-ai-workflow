@@ -28,7 +28,7 @@ Let's look at how the framework actually performs.
 First, Information Retrieval. LLMs are notorious for hallucinating technical specifications. To fix this, I built a live web search agent using DuckDuckGo. When the user asks a technical question, the agent autonomously queries the internet, extracts the content from the actual result pages, and constructs an answer grounded in the retrieved documents. To objectively measure its reliability, these answers are evaluated programmatically using the DeepEval framework to calculate hallucination rates and faithfulness to the source material.
 Second, Firmware Generation. A developer usually navigates around 15 manual configuration steps in CubeMX to set up clock trees and peripherals. My framework uses pre-seeded templates to skip the GUI entirely. It translates the user's plain English into the correct headless command, building the C project in the background.
 
-[Slide 7: Neural Network Customization & NNI]
+[Slide 7: Neural Network Customization & NNI + Hardware Validation]
 Third is Neural Network Customization. Pre-trained models are rarely ready for production out-of-the-box. Instead of writing tedious setup code, the developer can simply ask the assistant to modify the network's architecture in plain English. The agent analyzes the user's intent and automatically rewrites the Keras code to apply one or more among these five main categories of modifications: freezing specific segments of the backbone, adjusting the final output layer for a custom number of classes, injecting dropout layers to prevent overfitting, setting custom learning rates, and even appending new dense layers. 
 Furthermore, if the user asks for hyperparameter optimization, the system fully integrates with Microsoft's Neural Network Intelligence, or NNI. Setting up NNI manually is notoriously complex. You have to write a custom trial script, define a search space in JSON, and configure a manager. Instead of forcing the developer to do this, my Customization Agent dynamically writes the entire NNI experiment from scratch. It generates the `trial.py` file, defines the search boundary for learning rates and batch sizes, and launches the tuning job automatically. The developer simply asks for "optimization" and waits for the best model to emerge.
 
@@ -47,9 +47,9 @@ Model Discovery showed a 24x speedup, replacing hours of GitHub searching with a
 And that NNI Experiment Setup we just talked about? It usually takes nearly an hour of writing configs and scripts. The agents did it in 1 to 2 minutes—a 30x speedup.
 
 [Slide 9: Validation & Reliability]
-I also tested the generated code itself. In a test run fine-tuning MobileNetV1 for a custom 132-class dataset, the agent accurately translated the user's high-level request for anti-overfitting measures into functional Keras code, correctly injecting dynamic dropout and freezing layers. 
-The resulting model hit 98.1% validation accuracy on a set of 5,000 images.
-Finally, I evaluated the web search agents using the DeepEval framework to measure reliability. Across multiple queries, the system scored an average Contextual Relevancy of 75% and kept hallucination rates remarkably low, between 4% and 14% depending on the task. When given strict procedural tasks, the agent scored a perfect 1.0 on Faithfulness, meaning it stuck entirely to the retrieved technical manuals.
+Of course, speed is useless if the outputs are wrong. So, I also validated the generated systems. 
+First, the code quality: the agent successfully rewrote a MobileNet for a custom 132-class dataset. The training script worked flawlessly, yielding a 98.1% validation accuracy on a set of 5,000 images.
+Second, the Web Search reliability: using DeepEval, we measured an average hallucination rate as low as 4%, and a perfect 1.0 score for faithfulness when restricted to technical manuals.
 
 [Slide 10: Conclusion & Future Works]
 To conclude, this framework proves that multi-agent orchestration works for embedded development. We successfully combined headless CubeMX generation, Triton-backed LLMs, and NNI optimization into a single IDE extension. 
