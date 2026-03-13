@@ -41,9 +41,7 @@
     \draw[arrow] (langgraph.south) -| (fw_agent.north);
     \draw[arrow] (langgraph.south) -- (ai_agent.north);
     \draw[arrow] (langgraph.south) -| (int_agent.north);
-    
-    % Redis to Web Research Agent
-    \draw[arrow] (redis.south) -- (web_agent.north);
+    \draw[arrow] (langgraph.south) -| (web_agent.north);
 
     % Inference dashed lines (Shifted to not hit integration agent)
     \draw[arrow, <->, dashed] (ai_agent.south) -- node[left] {LLM/AI Inference} (triton.north -| ai_agent.south);
