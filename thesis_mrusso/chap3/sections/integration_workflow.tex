@@ -1,7 +1,14 @@
 \subsection{Firmware-AI Integration Workflow}
 \label{sec:integration_flow}
 
-Once the neural network code is ready (Workflow 2) and the firmware scaffolding is in place (Workflow 1), Workflow 3 merges the two outputs into a single deployable project. The workflow handles path collection, firmware layout detection, AI file transfer, \texttt{main.c} patching, and a final consistency check, all without manual intervention.
+Once the neural network code is ready (Workflow 2) and the firmware scaffolding is in place (Workflow 1), Workflow 3 merges the two outputs into a single deployable project, as illustrated in Figure~\ref{fig:detailed_flowchart_part3}. The workflow handles path collection, firmware layout detection, AI file transfer, \texttt{main.c} patching, and a final consistency check, all without manual intervention.
+
+\begin{figure}[htbp]
+    \centering
+    \centerline{\includegraphics[width=\textwidth,height=0.85\textheight,keepaspectratio]{chap3/figures/part3.png}}
+    \caption{Detailed Workflow Diagram -- Firmware integration workflow (Workflow~3), merging generated C-code into the STM32 project structure.}
+    \label{fig:detailed_flowchart_part3}
+\end{figure}
 
 The implementation resides in \texttt{workflow3\_integration.py} and runs five LangGraph nodes in sequence: \texttt{collect\_\allowbreak integration\_\allowbreak info}, \texttt{scan\_ai\_files}, \texttt{copy\_ai\_files}, \texttt{modify\_main\_c}, and \texttt{verify\_integration}.
 

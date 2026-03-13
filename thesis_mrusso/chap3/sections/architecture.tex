@@ -1,26 +1,16 @@
 \section{Introduction and System Architecture Overview}
 \label{sec:architecture}
 
+The framework is designed as a multi-layered, cloud-native architecture that bridges the gap between high-performance artificial intelligence models and resource-constrained embedded systems. As illustrated in Figure~\ref{fig:top_down_architecture}, the system is structured vertically across five operational layers, extending from the developer's local Integrated Development Environment (IDE) interface down to a centralized GPU computing cluster for heavy inference tasks.
 
+At the core of this architecture is a stateful orchestration engine that coordinates four parallel agentic workflows. These workflows manage the entire development lifecycle:
 
 \begin{enumerate}
     \item \textbf{Firmware Generation} (\texttt{firmware\_flow}): Automates STM32CubeMX project initialization, package installation, and code generation via CLI scripting.
-
-    \item \textbf{AI Model Discovery and Optimization} (\texttt{ai\_flow}): Implements a two-tier model discovery system (curated task-based models + iterative web search), followed by neural network customization and hyperparameter optimization with NNI.
-
+    \item \textbf{AI Model Discovery and Optimization} (\texttt{ai\_flow}): Implements a two-tier model discovery system (curated task-based models plus iterative web search), followed by neural network customization and hyperparameter optimization with NNI.
     \item \textbf{Firmware-AI Integration} (\texttt{integration\_flow}): Merges generated C inference code into the STM32 project structure and verifies build compatibility.
-
     \item \textbf{Web Research} (\texttt{search\_flow}): Provides technical guidance through dynamic web search with DeepEval quality evaluation metrics.
 \end{enumerate}
-
-\clearpage
-\begin{figure}[p]
-    \centering
-    \centerline{\includegraphics[width=\textwidth]{chap3/figures/part1Graph.png}}
-    \caption{Global system flowchart -- Fig.~3.1: System initialization, request routing, and parallel entry workflows (Firmware Generation, AI Model Discovery, Web Search).}
-    \label{fig:global_flowchart_part1}
-\end{figure}
-\clearpage
 
 The routing decision is performed by an LLM-based classifier that analyzes the user's natural language input and returns a structured decision object:
 
@@ -118,23 +108,7 @@ The graph construction logic resides in four primary "injection" functions:
 
 Each function encapsulates the node definitions and internal routing logic for its respective domain, adding them to the master \texttt{StateGraph} builder.
 
-\clearpage
-\begin{figure}[p]
-    \centering
-    \centerline{\includegraphics[height=0.9\textheight]{chap3/figures/part2.png}}
-    \caption{Global system flowchart -- Fig.~3.2: Model customization workflow (Workflow~5), including architecture inspection, dataset acquisition, and hyperparameter optimization via NNI.}
-    \label{fig:global_flowchart_part2}
-\end{figure}
-\clearpage
 
-\clearpage
-\begin{figure}[p]
-    \centering
-    \centerline{\includegraphics[height=0.9\textheight]{chap3/figures/part3.png}}
-    \caption{Global system flowchart -- Fig.~3.3: STEdgeAI analysis loop, C-code generation, and firmware integration workflow (Workflows~2 and~3).}
-    \label{fig:global_flowchart_part3}
-\end{figure}
-\clearpage
 
 \subsection{Logging and Observability}
 

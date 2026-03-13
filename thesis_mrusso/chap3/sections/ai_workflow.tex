@@ -3,7 +3,14 @@
 \subsection{AI Model Discovery and Validation Workflow}
 \label{sec:ai_flow}
 
-Workflow 2 handles the selection, profiling, and C code generation of pre-trained neural networks for STM32 microcontrollers. Embedded AI differs from conventional MLOps in one fundamental respect: raw accuracy is only one metric among several. RAM, Flash, and MACC budgets set hard physical limits that constrain every design choice. The workflow addresses this by combining a curated local registry with iterative web search and delegating quantization decisions to the STEdgeAI toolchain.
+Workflow 2 handles the selection, profiling, and C code generation of pre-trained neural networks for STM32 microcontrollers (see Figure~\ref{fig:detailed_flowchart_part1} for the entry routing logic). Embedded AI differs from conventional MLOps in one fundamental respect: raw accuracy is only one metric among several. RAM, Flash, and MACC budgets set hard physical limits that constrain every design choice. The workflow addresses this by combining a curated local registry with iterative web search and delegating quantization decisions to the STEdgeAI toolchain.
+
+\begin{figure}[htbp]
+    \centering
+    \centerline{\includegraphics[width=\textwidth]{chap3/figures/part1Graph.png}}
+    \caption{Detailed Workflow Diagram -- System initialization, request routing, and parallel entry workflows (Firmware Generation, AI Model Discovery, Web Search).}
+    \label{fig:detailed_flowchart_part1}
+\end{figure}
 
 \subsection{Analysis Parameters Collection}
 
