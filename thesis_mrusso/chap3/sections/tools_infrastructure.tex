@@ -5,9 +5,9 @@ The framework combines several specialized open-source tools to cover inference,
 
 \subsection{DuckDuckGo Search Integration}
 
-Workflow 4 uses the \texttt{duckduckgo-search} (\url{https://pypi.org/project/duckduckgo-search/}) Python library to execute web queries. Early prototypes relied on agentic frameworks like Agno, which required LLM-specific function calling to extract parameters and invoke the search engine. 
+Workflow 4 uses the \texttt{duckduckgo-search} (\url{https://pypi.org/project/duckduckgo-search/}) Python library to execute web queries. Early prototypes relied on agentic frameworks like Agno, which required LLM-specific function calling to extract parameters and invoke the search engine.
 
-To ensure compatibility with the centralized Triton Inference Server (which proxies raw token streams and lacks native support for complex tool-calling schemas), we transitioned to a decoupled approach. The LangGraph orchestrator now extracts search queries via structured output prompts. It then executes the search directly using the Python library, bypassing the LLM's function-calling layer entirely.
+To ensure compatibility with the centralized Triton Inference Server (which proxies raw token streams and lacks native support for complex tool-calling schemas), I transitioned to a decoupled approach. The LangGraph orchestrator now extracts search queries via structured output prompts. It then executes the search directly using the Python library, bypassing the LLM's function-calling layer entirely.
 
 \subsection{DeepEval for RAG Quality Assessment}
 
@@ -67,7 +67,7 @@ instance_group [{ kind: KIND_GPU, count: 1 }]
 
 \subsubsection{EXPLICIT Model Control and Model Swapping}
 
-Triton is configured with \texttt{model\_\allowbreak control\_\allowbreak mode: EXPLICIT}, disabling automatic model loading at boot time. Each model loads into VRAM on demand and unloads via API when no longer needed. We added this feature specifically for constrained hardware, such as a single 16~GB GPU, where keeping multiple 7B--20B models resident simultaneously would cause immediate memory failure.
+Triton is configured with \texttt{model\_\allowbreak control\_\allowbreak mode: EXPLICIT}, disabling automatic model loading at boot time. Each model loads into VRAM on demand and unloads via API when no longer needed. I added this feature specifically for constrained hardware, such as a single 16~GB GPU, where keeping multiple 7B--20B models resident simultaneously would cause immediate memory failure.
 
 The \texttt{ChatTriton} client class implements a \textbf{mutual exclusion swapping} algorithm in its \texttt{\_\allowbreak ensure\_\allowbreak model\_\allowbreak loaded()} method. Before loading the requested model, the method calls Triton's \texttt{/v2/repository/models/\{name\}/unload} endpoint for every other active LLM. It then polls \texttt{/v2/repository/index} until each reaches the \texttt{UNAVAILABLE} state. A two-second sleep after each unload gives the Python backend time to release its CUDA context before the next load begins. This guarantees only one heavyweight LLM resides in VRAM at any point to prevent Out-Of-Memory errors.
 

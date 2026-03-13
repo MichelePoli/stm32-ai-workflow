@@ -91,7 +91,7 @@ To provide concrete guidance on model selection for these resource-constrained d
     \end{flushleft}
 \end{table}
 
-We derived key observations from this analysis:
+I derived key observations from this analysis:
 \begin{itemize}
     \item \textbf{INT8 Quantization Impact}: Compression reduces the model footprint by approximately 4$\times$ compared to FP32. It enables the deployment of models like MobileNet V2 0.35 on mid-tier MCUs (L476) that would otherwise exceed hardware limits \cite{st_cubeai_docs}.
     \item \textbf{Vision Models on F401}: Standard image classification architectures remain incompatible with the STM32F401 (64KB RAM) even with extreme quantization, limiting this platform to audio-based inference or ultra-lightweight custom Neural Networks.
