@@ -2,50 +2,55 @@
 \begin{figure}[htbp]
     \centering
     \begin{tikzpicture}[
-        node distance=1.5cm and 2cm,
-        every node/.style={font=\sffamily\small},
-        box/.style={draw, rounded corners, minimum width=3.5cm, minimum height=1.2cm, align=center, fill=blue!10, text=black, inner sep=0.2cm},
-        layerbox/.style={draw, dashed, rounded corners, inner sep=0.3cm, fill=gray!5},
-        arrow/.style={->, thick, >=stealth}
-    ]
+            node distance=1.5cm and 2cm,
+            every node/.style={font=\sffamily\small},
+            box/.style={draw, rounded corners, minimum width=3.5cm, minimum height=1.2cm, align=center, fill=blue!10, text=black, inner sep=0.2cm},
+            layerbox/.style={draw, dashed, rounded corners, inner sep=0.3cm, fill=gray!5},
+            arrow/.style={->, thick, >=stealth}
+        ]
 
-    % --- LAYER 1: Presentation ---
-    \node[box, fill=green!15] (vscode) {VS Code Extension\\(User Interface)};
-    \node[left=0.5cm of vscode, align=center, text width=2.5cm] (user) {Developer\\Commands/Chat};
-    \draw[arrow] (user) -- (vscode);
+        % --- LAYER 1: Presentation ---
+        \node[box, fill=green!15] (vscode) {VS Code Extension\\(User Interface)};
+        \node[left=0.5cm of vscode, align=center, text width=2.5cm] (user) {Developer\\Commands/Chat};
+        \draw[arrow] (user) -- (vscode);
 
-    % --- LAYER 2: API & Comm ---
-    \node[box, below=1cm of vscode, fill=orange!15] (fastapi) {FastAPI Server\\(Event Streaming / NDJSON)};
+        % --- LAYER 2: API & Comm ---
+        \node[box, below=1cm of vscode, fill=orange!15] (fastapi) {FastAPI Server\\(Event Streaming / NDJSON)};
 
-    % --- LAYER 3: Orchestration ---
-    \node[box, below=1cm of fastapi, minimum width=7cm, fill=purple!15] (langgraph) {\textbf{LangGraph Orchestrator}\\(Master State \& Routing)};
-    \node[box, right=1.5cm of langgraph, minimum width=4cm, fill=yellow!20] (redis) {Redis Checkpointer\\(Short \& Long-Term Memory)};
+        % --- LAYER 3: Orchestration ---
+        \node[box, below=1cm of fastapi, minimum width=7cm, fill=purple!15] (langgraph) {\textbf{LangGraph Orchestrator}\\(Master State \& Routing)};
+        \node[box, right=1.5cm of langgraph, minimum width=4cm, fill=yellow!20] (redis) {Redis Checkpointer\\(Short \& Long-Term Memory)};
 
-    % --- LAYER 4: Agentic Workflows ---
-    \node[box, below=1.5cm of langgraph, xshift=-4.8cm, fill=cyan!15, text width=2.8cm] (fw_agent) {Firmware\\Agent};
-    \node[box, right=0.4cm of fw_agent, fill=cyan!15, text width=3.2cm] (ai_agent) {AI Discovery \&\\Customization Agent};
-    \node[box, right=0.4cm of ai_agent, fill=cyan!15, text width=2.8cm] (int_agent) {Integration\\Agent};
-    \node[box, right=0.4cm of int_agent, fill=cyan!15, text width=2.8cm] (web_agent) {Web Research\\Agent (RAG)};
+        % --- LAYER 4: Agentic Workflows ---
+        \node[box, below=1.5cm of langgraph, xshift=-4.8cm, fill=cyan!15, text width=2.8cm] (fw_agent) {Firmware\\Agent};
+        \node[box, right=0.4cm of fw_agent, fill=cyan!15, text width=3.2cm] (ai_agent) {AI Discovery \&\\Customization Agent};
+        \node[box, right=0.4cm of ai_agent, fill=cyan!15, text width=2.8cm] (int_agent) {Integration\\Agent};
+        \node[box, right=0.4cm of int_agent, fill=cyan!15, text width=2.8cm] (web_agent) {Web Research\\Agent (RAG)};
 
-    % --- LAYER 5: Compute & Inference Backend ---
-    \node[box, below=2cm of ai_agent, minimum width=8cm, fill=red!15] (triton) {\textbf{NVIDIA Triton Inference Server}\\(Remote HPP Cluster - GPU Computing)};
+        % --- LAYER 5: Compute & Inference Backend ---
+        \node[box, below=2cm of ai_agent, minimum width=8cm, fill=red!15] (triton) {\textbf{NVIDIA Triton Inference Server}\\(Remote HPP Cluster - GPU Computing)};
 
-    % --- Connections ---
-    \draw[arrow, <->] (vscode) -- node[right] {HTTP / REST} (fastapi);
-    \draw[arrow, <->] (fastapi) -- (langgraph);
-    
-    % Redis connection (Shifted up to not conflict with downward arrows)
-    \draw[arrow, <->] (langgraph.east) -- (redis.west);
-    
-    % Downward arrows to agents
-    \draw[arrow] (langgraph.south) -| (fw_agent.north);
-    \draw[arrow] (langgraph.south) -- (ai_agent.north);
-    \draw[arrow] (langgraph.south) -| (int_agent.north);
-    \draw[arrow] (langgraph.south) -| (web_agent.north);
+        % --- Connections ---
+        \draw[arrow, <->] (vscode) -- node[right] {HTTP / REST} (fastapi);
+        \draw[arrow, <->] (fastapi) -- (langgraph);
 
-    % Inference dashed lines (Shifted to not hit integration agent)
-    \draw[arrow, <->, dashed] (ai_agent.south) -- node[left] {LLM/AI Inference} (triton.north -| ai_agent.south);
-    \draw[arrow, <->, dashed] (langgraph.east |- langgraph.south) ++(-0.5cm, 0) -- node[right, near end, xshift=0.1cm] {Routing Inference} (triton.north -| int_agent.south);
+        % Redis connection (Shifted up to not conflict with downward arrows)
+        \draw[arrow, <->] (langgraph.east) -- (redis.west);
+
+        % Downward arrows to agents
+        \draw[arrow] (langgraph.south) -| (fw_agent.north);
+        \draw[arrow] (langgraph.south) -| (ai_agent.north);
+        \draw[arrow] (langgraph.south) -| (int_agent.north);
+        \draw[arrow] (langgraph.south) -| (web_agent.north);
+
+        % Inference dashed lines (Shifted to pass between AI and Integration agents)
+        \draw[arrow, <->, dashed] (ai_agent.south) -- node[left] {LLM/AI Inference} (triton.north -| ai_agent.south);
+
+        % Calculate the midpoint between AI Discovery and Integration Agent for the routing inference arrow
+        \path (ai_agent.east) -- (int_agent.west) coordinate[midway] (mid_ai_int);
+
+        % Draw the dashed line for Routing Inference passing through the calculated midpoint
+        \draw[arrow, <->, dashed] (langgraph.south) -| (mid_ai_int) -- node[right, near end] {Routing Inference} (triton.north -| mid_ai_int);
 
     \end{tikzpicture}
     \caption{Top-Down System Architecture. The framework is separated into five operational layers, spanning from the VS Code user interface down to the centralized GPU inference backend.}
