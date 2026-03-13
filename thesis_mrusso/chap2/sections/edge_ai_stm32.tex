@@ -13,7 +13,7 @@ The field of Tiny Machine Learning (TinyML) focuses on enabling inference on dev
 \end{itemize}
 
 \subsection{Model-Hardware Compatibility Matrix}
-To provide concrete guidance on model selection for resource-constrained devices, Table~\ref{tab:model_board_compat_summary} presents a condensed compatibility analysis of representative models from the STM32 Model Zoo across common MCU families. The analysis considers both uncompressed (FP32) and INT8-quantized variants, demonstrating the critical role of compression in enabling deployment on lower-tier devices.
+To provide concrete guidance on model selection for resource-constrained devices, Table~\ref{tab:model_board_compat_summary} presents a condensed compatibility analysis of representative vision models from the STM32 Model Zoo across common MCU families. These models are primarily designed for \textbf{image classification} and \textbf{pattern recognition} tasks, ranging from simple digit recognition (ST MNIST) to complex object categorization (MobileNet and ResNet variants). The analysis considers both uncompressed (FP32) and INT8-quantized versions, demonstrating the critical role of compression in enabling the deployment of such computer vision applications on lower-tier devices.
 
 \begin{table}[h!]
     \centering
