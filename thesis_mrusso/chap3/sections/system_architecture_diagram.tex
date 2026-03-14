@@ -2,11 +2,13 @@
 \begin{figure}[htbp]
     \centering
     \begin{tikzpicture}[
-            node distance=1.5cm and 2cm,
+            scale=0.88, transform shape,
+            node distance=1.5cm and 1.8cm,
             every node/.style={font=\sffamily\small},
-            box/.style={draw, rounded corners, minimum width=3.5cm, minimum height=1.2cm, align=center, fill=blue!10, text=black, inner sep=0.2cm},
+            box/.style={draw, rounded corners, minimum width=3cm, minimum height=1.2cm, align=center, fill=blue!10, text=black, inner sep=0.2cm},
             layerbox/.style={draw, dashed, rounded corners, inner sep=0.3cm, fill=gray!5},
-            arrow/.style={->, thick, >=stealth}
+            arrow/.style={->, thick, >=stealth},
+            layerlabel/.style={font=\sffamily\footnotesize\bfseries, text=gray!60, align=center}
         ]
 
         % --- LAYER 1: Presentation ---
@@ -18,41 +20,56 @@
         \node[box, below=1cm of vscode, fill=orange!15] (fastapi) {FastAPI Server\\(Event Streaming / NDJSON)};
 
         % --- LAYER 3: Orchestration ---
-        \node[box, below=1cm of fastapi, minimum width=7cm, fill=purple!15] (langgraph) {\textbf{LangGraph Orchestrator}\\(Master State \& Routing)};
-        \node[box, right=1.5cm of langgraph, minimum width=4cm, fill=yellow!20] (redis) {Redis Checkpointer\\(Short \& Long-Term Memory)};
+        \node[box, below=1cm of fastapi, minimum width=6cm, fill=purple!15] (langgraph) {\textbf{LangGraph Orchestrator}\\(Master State \& Routing)};
 
-        % --- LAYER 4: Agentic Workflows ---
-        \node[box, below=1.5cm of langgraph, xshift=-4.8cm, fill=cyan!15, text width=2.8cm] (fw_agent) {Firmware\\Agent};
-        \node[box, right=0.4cm of fw_agent, fill=cyan!15, text width=3.2cm] (ai_agent) {AI Discovery \&\\Customization Agent};
-        \node[box, right=0.4cm of ai_agent, fill=cyan!15, text width=2.8cm] (int_agent) {Integration\\Agent};
-        \node[box, right=0.4cm of int_agent, fill=cyan!15, text width=2.8cm] (web_agent) {Web Research\\Agent};
+        % --- LAYER 4: State & Memory ---
+        \node[box, right=1cm of langgraph, minimum width=3.5cm, fill=yellow!20] (redis) {Redis Checkpointer\\(Short \& Long-Term\\Memory)};
+
+        % --- Agentic Workflows (part of Orchestration Layer) ---
+        \node[box, below=1.5cm of langgraph, xshift=-4cm, fill=cyan!15, text width=2.4cm] (fw_agent) {Firmware\\Agent};
+        \node[box, right=0.3cm of fw_agent, fill=cyan!15, text width=2.8cm] (ai_agent) {AI Discovery \&\\Customization\\Agent};
+        \node[box, right=0.3cm of ai_agent, fill=cyan!15, text width=2.4cm] (int_agent) {Integration\\Agent};
+        \node[box, right=0.3cm of int_agent, fill=cyan!15, text width=2.4cm] (web_agent) {Web Research\\Agent};
 
         % --- LAYER 5: Compute & Inference Backend ---
-        \node[box, below=2cm of ai_agent, minimum width=8cm, fill=red!15] (triton) {\textbf{NVIDIA Triton Inference Server}\\(Remote HPP Cluster - GPU Computing)};
+        \node[box, below=2.5cm of ai_agent, minimum width=7cm, fill=red!15] (triton) {\textbf{NVIDIA Triton Inference Server}\\(Remote HPP Cluster - GPU Computing)};
 
         % --- Connections ---
         \draw[arrow, <->] (vscode) -- node[right] {HTTP / REST} (fastapi);
         \draw[arrow, <->] (fastapi) -- (langgraph);
 
-        % Redis connection (Shifted up to not conflict with downward arrows)
+        % Redis connection
         \draw[arrow, <->] (langgraph.east) -- (redis.west);
 
-        % Downward arrows to agents
-        \draw[arrow] (langgraph.south) -| (fw_agent.north);
-        \draw[arrow] (langgraph.south) -| (ai_agent.north);
-        \draw[arrow] (langgraph.south) -| (int_agent.north);
-        \draw[arrow] (langgraph.south) -| (web_agent.north);
+        % Downward arrow to horizontal bus, then fan-out to agents
+        \coordinate (bus) at ([yshift=-0.75cm]langgraph.south);
+        \draw[arrow] (langgraph.south) -- (bus);
+        \draw[thick] (fw_agent.north |- bus) -- (web_agent.north |- bus);
+        \draw[arrow] (bus -| fw_agent.north) -- (fw_agent.north);
+        \draw[arrow] (bus -| ai_agent.north) -- (ai_agent.north);
+        \draw[arrow] (bus -| int_agent.north) -- (int_agent.north);
+        \draw[arrow] (bus -| web_agent.north) -- (web_agent.north);
 
-        % Inference dashed lines (Shifted to pass between AI and Integration agents)
+        % Inference dashed lines
         \draw[arrow, <->, dashed] (ai_agent.south) -- node[left] {LLM/AI Inference} (triton.north -| ai_agent.south);
 
-        % Calculate the midpoint between AI Discovery and Integration Agent for the routing inference arrow
+        % Routing Inference: straight line between AI Discovery and Integration Agent
         \path (ai_agent.east) -- (int_agent.west) coordinate[midway] (mid_ai_int);
+        \draw[arrow, <->, dashed] (langgraph.south -| mid_ai_int) -- node[right, near end] {Routing Inference} (triton.north -| mid_ai_int);
 
-        % Draw the dashed line for Routing Inference passing through the calculated midpoint
-        \draw[arrow, <->, dashed] (langgraph.south) -| (mid_ai_int) -- node[right, near end] {Routing Inference} (triton.north -| mid_ai_int);
+        % === LAYER LABELS ===
+        % L1: above VS Code to avoid overlap with Developer node
+        \node[layerlabel, above=0.1cm of vscode] {L1: IDE Layer};
+        % L2: right of FastAPI
+        \node[layerlabel, right=0.3cm of fastapi] {L2: API Gateway};
+        % L3: left of LangGraph (further out to avoid overlap)
+        \node[layerlabel, left=1cm of langgraph] {L3: Orchestration};
+        % L4: right of Redis
+        \node[layerlabel, anchor=west] at ([xshift=0.3cm]redis.east) {L4: State\\\& Memory};
+        % L5: left of Triton
+        \node[layerlabel, left=0.5cm of triton] {L5: Inference};
 
     \end{tikzpicture}
-    \caption{Top-Down System Architecture. The framework is separated into five operational layers, spanning from the VS Code user interface down to the centralized GPU inference backend.}
+    \caption{Top-Down System Architecture. The framework is organized into five operational layers, spanning from the VS Code user interface down to the centralized GPU inference backend.}
     \label{fig:top_down_architecture}
 \end{figure}

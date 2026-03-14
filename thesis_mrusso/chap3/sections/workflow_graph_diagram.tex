@@ -1,0 +1,86 @@
+% Five Primary Workflows — Interconnected Graph Diagram
+\begin{figure}[htbp]
+    \centering
+    \begin{tikzpicture}[
+            node distance=1.4cm and 2.2cm,
+            every node/.style={font=\sffamily\small},
+            wf/.style={draw, rounded corners, minimum width=3.4cm, minimum height=1cm, align=center, text=black, inner sep=0.15cm},
+            decision/.style={draw, diamond, fill=gray!10, minimum width=1.2cm, minimum height=0.8cm, align=center, inner sep=1pt, aspect=2.2, font=\sffamily\scriptsize},
+            arrow/.style={->, thick, >=stealth},
+            cycle/.style={->, thick, >=stealth, dashed, bend left=25},
+            label/.style={font=\sffamily\scriptsize, text=black}
+        ]
+
+        % === ROW 1 (left to right): Router → Firmware ===
+        \node[wf, fill=gray!15] (router) {\textbf{LLM Router}\\(Request Classification)};
+        \node[wf, fill=green!15, right=2.5cm of router] (firmware) {\textbf{1. Firmware Generation}\\(\texttt{firmware\_flow})};
+
+        % === ROW 2 (right to left): AI Discovery ← Decision ===
+        \node[decision, below=1.2cm of firmware] (d1) {Continue\\to AI?};
+        \node[wf, fill=blue!12, left=2.5cm of d1] (ai) {\textbf{2. AI Model Discovery}\\(\texttt{ai\_flow})};
+
+        % === ROW 3 (left to right): Customization ===
+        \node[wf, fill=purple!12, below=1.2cm of ai] (custom) {\textbf{3. Customization}\\(\texttt{customization\_flow})};
+        \node[decision, right=2.5cm of custom] (d2) {Continue to\\Integration?};
+
+        % === ROW 4 (right to left): Integration ===
+        \node[wf, fill=cyan!15, below=1.2cm of d2] (integration) {\textbf{4. Integration}\\(\texttt{integration\_flow})};
+
+        % === Web Search (independent branch, left side) ===
+        \node[wf, fill=orange!15, below=1.2cm of router] (search) {\textbf{5. Web Research}\\(\texttt{search\_flow})};
+
+        % === END node ===
+        \node[draw, rounded corners, fill=red!10, minimum width=1.5cm, minimum height=0.6cm, left=2.5cm of integration] (endnode) {\textbf{END}};
+
+        % ============================================================
+        % MAIN FLOW ARROWS
+        % ============================================================
+
+        % Router dispatches
+        \draw[arrow] (router) -- node[label, above] {route: firmware} (firmware);
+        \draw[arrow] (router) -- node[label, left] {route: search} (search);
+        \draw[arrow] (router.south) -- ++(0,-0.4) -| node[label, near start, right] {route: ai} (ai.north);
+
+        % Firmware → Decision 1
+        \draw[arrow] (firmware) -- (d1);
+
+        % Decision 1 branches
+        \draw[arrow] (d1) -- node[label, above] {Yes} (ai);
+        \draw[arrow] (d1.east) -- ++(0.8,0) node[label, right] {No → END};
+
+        % AI → Customization
+        \draw[arrow] (ai) -- (custom);
+
+        % Customization → Decision 2
+        \draw[arrow] (custom) -- (d2);
+
+        % Decision 2 branches
+        \draw[arrow] (d2) -- node[label, right] {Yes} (integration);
+        \draw[arrow] (d2.east) -- ++(0.8,0) node[label, right] {No → END};
+
+        % Integration → END
+        \draw[arrow] (integration) -- (endnode);
+
+        % Search → END
+        \draw[arrow] (search.south) -- ++(0,-0.4) -| (endnode.north);
+
+        % ============================================================
+        % CYCLES (graph nature, not tree)
+        % ============================================================
+
+        % Resource failure: AI Analysis → back to AI Discovery (retry model)
+        \draw[cycle, color=red!60] (custom.west) -- ++(-1.2,0) |- node[label, left, near start, text=red!60] {\scriptsize model too large} (ai.west);
+
+        % Resource failure: change board → back to Firmware
+        \draw[cycle, color=red!60] (ai.north) -- ++(0, 0.5) -| node[label, above, near start, text=red!60] {\scriptsize change board} (firmware.north);
+
+        % Router can also dispatch directly to Integration
+        \draw[arrow, dotted, color=gray!70] (router.south) -- ++(0,-0.4) -| (integration.west);
+
+        % Human decision after customization can loop back for more modifications
+        \draw[cycle, color=blue!50] (custom.south) -- ++(0,-0.4) -- ++(-2.2,0) -- ++(0,1.8) -- node[label, left, text=blue!50] {\scriptsize re-modify} (custom.north west);
+
+    \end{tikzpicture}
+    \caption{Interconnected graph of the five primary workflows. Solid arrows represent the main execution pipeline, dashed arrows denote feedback cycles triggered by resource constraint violations or user-driven re-modifications. Dotted arrows indicate direct routing alternatives (bypassing upstream workflows).}
+    \label{fig:workflow_graph}
+\end{figure}
