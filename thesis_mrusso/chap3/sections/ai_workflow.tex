@@ -12,7 +12,7 @@ Workflow 2 handles the selection, profiling, and C code generation of pre-traine
     \label{fig:detailed_flowchart_part1}
 \end{figure}
 
-\subsection{Analysis Parameters Collection}
+\subsubsection{Analysis Parameters Collection}
 
 \texttt{collect\_\allowbreak analysis\_\allowbreak info()} extracts the target MCU and the desired compression level from the user's message. The node scans the initial prompt for known MCU series tokens (e.g., \texttt{h7}, \texttt{u5}, \texttt{f4}). If nothing is found, it issues an interrupt and surfaces the last used series from the persistent context as a suggestion. When Workflow 1 has already set \texttt{state.target} from the selected board, the interrupt is skipped entirely. Inference is delegated to \texttt{get\_llm()}, which routes requests to the NVIDIA Triton Inference Server when \texttt{USE\_\allowbreak TRITON\_\allowbreak BACKEND} is set, falling back to a local Ollama instance otherwise:
 
@@ -35,7 +35,7 @@ result = llm_extractor.invoke([
 
 Both values are stored in \texttt{MasterState} and reused across model selection, profiling, and code generation without being re-parsed.
 
-\subsection{Three-Tier Model Discovery Architecture}
+\subsubsection{Three-Tier Model Discovery Architecture}
 
 Model discovery follows a three-tier hierarchy. The first tier covers locally curated catalogs, the second runs automated web searches, and the third allows users to register their own models. Each tier is tried in order, and the process terminates as soon as the user confirms a candidate.
 
@@ -80,7 +80,7 @@ A rejection resets \texttt{state.model\_\allowbreak discovery\_\allowbreak metho
 
 Users can also register their own local or remote models through \texttt{add\_\allowbreak custom\_\allowbreak model\_\allowbreak procedure()}, providing a category, a name, and a direct download URL. The entry is written to \texttt{predefined\_models.json} only after \texttt{stedgeai analyze} confirms the model is structurally valid for the target runtime.
 
-\subsection{Model Download and Inspection}
+\subsubsection{Model Download and Inspection}
 
 \texttt{download\_\allowbreak model\_\allowbreak to\_\allowbreak cache()} saves the selected model to \texttt{\textasciitilde/.stm32\_\allowbreak ai\_\allowbreak models/}. A cached copy, if present, is reused without re-downloading. For fresh downloads, data streams in 8~KB chunks with progress logged every 20\%. The file size is checked after saving, and if the model entry carries an optional \texttt{sha256} field, the hash is verified before proceeding.
 
@@ -109,7 +109,7 @@ res = execute_in_environment(script, python_path, timeout=30)
 
 If the subprocess fails, a second pass opens the file with \texttt{h5py} and reads the raw HDF5 metadata without loading any weights. The extracted metadata is stored in \texttt{state.model\_architecture} for use by Workflow 5.
 
-\subsection{STEdgeAI CLI Integration}
+\subsubsection{STEdgeAI CLI Integration}
 
 With a model in hand, the workflow runs a three-phase profiling and code generation cycle using the STEdgeAI toolchain. An optional fine-tuning and customization step may precede this phase; it is described separately in Section~\ref{sec:customization}.
 
@@ -146,7 +146,7 @@ stedgeai generate --model <model.h5> --target <stm32h743>
 
 Output includes \texttt{network.c/h} (fixed-point neural network implementation), \texttt{network\_data.c} (quantized weights as const arrays), and \texttt{network\_config.h} (MCU-specific memory layout and hardware acceleration flags). Quantization is applied here via \texttt{--compression}, not during training. This lets the framework evaluate models in full-precision FP32 and defer bit-width decisions until the exact MCU constraints are known from Phase 1.
 
-\subsection{Legacy Model Handling with Dual-Environment Strategy}
+\subsubsection{Legacy Model Handling with Dual-Environment Strategy}
 
 Modern Keras 3.x, required by LangGraph and NNI, is incompatible with the Keras 2.x models widespread in STModelZoo and academic repositories. Rather than forcing a single environment, the framework maintains two separate conda installations:
 

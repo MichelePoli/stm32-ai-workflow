@@ -3,13 +3,13 @@
 
 Workflow 4 provides technical research on demand. It queries the web and synthesizes the results into a structured summary. I avoided routing requests through a static knowledge base. Instead, the workflow runs live DuckDuckGo searches across four distinct domains and evaluates the summary quality using DeepEval.
 
-\subsection{Request Classification}
+\subsubsection{Request Classification}
 
 Before any search is issued, the \texttt{classify\_search()} node determines what kind of information the user needs. A structured LLM call using \texttt{get\_llm()} classifies the request into one of four categories: \texttt{ai\_model} (finding neural network models compatible with STM32), \texttt{board\_selection} (comparing MCU families), \texttt{optimization} (quantization and compression techniques), and \texttt{documentation} (tutorials, guides, official references). Requests that fall outside these categories are labelled \texttt{none} and routed to a clarification step instead.
 
 From the user's natural language message the node extracts both the category and a refined English search query, which is constructed to be specific enough for a web search engine. A reasoning field explains the classification decision and is logged for debugging.
 
-\subsection{Dynamic Search Execution}
+\subsubsection{Dynamic Search Execution}
 
 The routing node \texttt{search\_\allowbreak type\_\allowbreak decision()} confirms the category is valid, then passes control to \texttt{execute\_\allowbreak web\_\allowbreak search()}, a single node that handles all four domains. The choice of a unified node rather than four separate ones keeps the graph compact: the appropriate prompt template is selected at runtime from the \texttt{SEARCH\_PROMPTS} dictionary by indexing on \texttt{state.search\_type}.
 
@@ -29,11 +29,11 @@ with DDGS() as ddgs:
 
 The raw aggregated text is stored in \texttt{state.search\_results}. It is then split into paragraph-level chunks (filtered to at least 20 characters) and saved to \texttt{state.search\_\allowbreak results\_\allowbreak list}, which feeds the evaluation stage.
 
-\subsection{Summarization}
+\subsubsection{Summarization}
 
 After the search, \texttt{summarize\_\allowbreak search\_\allowbreak results()} condenses the raw content into a structured answer. A single LLM call (via \texttt{get\_llm()}, temperature 0.2) is given the original query and up to 10,000 characters of web results. The prompt instructs the model to produce a technically focused answer in English, use bullet points for readability, cite source URLs where present, and explicitly state when the retrieved content is not relevant to the query. The resulting summary is stored in \texttt{state.search\_summary} and displayed to the user by the final \texttt{finalize\_search()} node.
 
-\subsection{Quality Evaluation with DeepEval}
+\subsubsection{Quality Evaluation with DeepEval}
 
 Once the summary is ready, the \texttt{finalize\_search()} node runs an automated quality assessment using the \textbf{DeepEval} framework. Evaluation runs synchronously in a separate thread (via \texttt{asyncio.to\_thread}) to avoid blocking the event loop. All four metrics run on a local \texttt{OllamaModel} backed by \texttt{deepseek-r1:latest}, keeping evaluation fully offline. The 0.55 threshold serves exclusively as an observability and logging baseline calibrated for local model capabilities. It does not act as a blocking filter; instead, if a metric falls below this threshold, the framework simply records a "Fail" status for offline analysis without discarding any sources or interrupting the runtime:
 

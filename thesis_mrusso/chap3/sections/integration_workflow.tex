@@ -12,7 +12,7 @@ Once the neural network code is ready (Workflow 2) and the firmware scaffolding 
 
 The implementation resides in \texttt{workflow3\_integration.py} and runs five LangGraph nodes in sequence: \texttt{collect\_\allowbreak integration\_\allowbreak info}, \texttt{scan\_ai\_files}, \texttt{copy\_ai\_files}, \texttt{modify\_main\_c}, and \texttt{verify\_integration}.
 
-\subsection{Project Path Collection and Idempotency}
+\subsubsection{Project Path Collection and Idempotency}
 
 The \texttt{collect\_\allowbreak integration\_\allowbreak info()} node determines two key paths: the firmware project directory and the folder containing the AI-generated code. When the workflow is triggered directly by the user (not as part of a sequential WF1→WF2→WF3 chain), these paths are extracted from a natural language message using a Pydantic schema (\texttt{IntegrationInfoExtraction}) with structured LLM output.
 
@@ -31,7 +31,7 @@ resume_value = interrupt(dynamic_prompt)
 
 If the user's reply contains a word like ``yes'', ``previous'', or ``profile'', the path from the persistent context is applied directly, with no further LLM extraction.
 
-\subsection{Filesystem Validation and Layout Detection}
+\subsubsection{Filesystem Validation and Layout Detection}
 
 Before any file operation begins, the internal helper \texttt{\_\allowbreak validate\_\allowbreak and\_\allowbreak detect\_\allowbreak structure()} expands relative and home-directory references (e.g., \texttt{\textasciitilde/} or \texttt{./}) using \texttt{os.path.expanduser()} and checks that both paths exist on disk. Path expansion happens before any scan so that downstream functions always work with absolute paths.
 
@@ -39,11 +39,11 @@ The node then detects which of the two common STM32 project layouts is in use. T
 
 The node also handles the case where the project root contains a single subdirectory: in that case, the subdirectory is treated as the real project root, which is common when a CubeMX project is zipped and extracted into a wrapper folder.
 
-\subsection{AI File Scanning}
+\subsubsection{AI File Scanning}
 
 The \texttt{scan\_\allowbreak ai\_\allowbreak files()} node lists the contents of the AI code directory and splits the files into two groups: \texttt{.c} sources (stored in \texttt{state.ai\_\allowbreak src\_\allowbreak files}) and \texttt{.h} headers (stored in \texttt{state.ai\_\allowbreak header\_\allowbreak files}). If both groups are empty, the workflow raises an error rather than producing a silent, broken integration.
 
-\subsection{File Placement and X-CUBE-AI Runtime Headers}
+\subsubsection{File Placement and X-CUBE-AI Runtime Headers}
 \label{sec:copy_ai_files}
 
 The \texttt{copy\_\allowbreak ai\_\allowbreak files()} node copies the scanned files into the firmware directories identified earlier: \texttt{.c} files go to \texttt{firmware\_\allowbreak src\_\allowbreak dir} and \texttt{.h} files go to \texttt{firmware\_\allowbreak inc\_\allowbreak dir}.
@@ -68,7 +68,7 @@ else:
 
 If the directory is absent, a warning is logged and the user is advised to add the component through CubeMX. This check prevents the common compile-time error caused by a missing \texttt{ai\_platform.h}.
 
-\subsection{Automated \texttt{main.c} Modification}
+\subsubsection{Automated \texttt{main.c} Modification}
 \label{sec:main_c_injection}
 
 The \texttt{modify\_\allowbreak main\_\allowbreak c()} node is the most involved step. It reads the existing \texttt{main.c} and injects AI initialization and inference code into the STM32CubeMX user-code comment blocks (\texttt{USER CODE BEGIN}). Since CubeMX regenerates only its own auto-generated regions, code placed inside these blocks is preserved across future regenerations.
@@ -119,7 +119,7 @@ if (ai_network_run(network, &ai_input[0], &ai_output[0]) != 1) {
 
 The network name comes from \texttt{state.network\_name}, so the injection works across different model names. If \texttt{modify\_main} is set to \texttt{False} in the state, the step is skipped cleanly.
 
-\subsection{Verification and Persistent Context Update}
+\subsubsection{Verification and Persistent Context Update}
 
 The \texttt{verify\_integration()} node checks that every copied file is present at its destination and that the \texttt{main.c} patch was recorded as successful. If all checks pass, the workflow saves the used paths to Redis (see Section~\ref{sec:redis_architecture}):
 

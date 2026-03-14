@@ -1,10 +1,10 @@
 % Section added for thesis enhancement (Feb 2026)
-\section{The Core Orchestrator (LangGraph and State Management)}
+\subsection{State Management and Checkpointing (Redis)}
 \label{sec:redis_architecture}
 
 The framework utilizes a dual-layer memory system built on Redis, providing both transient workflow state persistence and long-term user context retention. This architecture is necessary for supporting Human-in-the-Loop workflows and multi-session context chaining.
 
-\subsection{Architectural Overview}
+\subsubsection{Architectural Overview}
 
 Unlike traditional stateless APIs, the framework maintains two levels of memory:
 
@@ -15,11 +15,11 @@ Unlike traditional stateless APIs, the framework maintains two levels of memory:
 
 This dual-layer design enables \textbf{Context Chaining}, where outputs from previous sessions (e.g., the specific MCU target selected during \texttt{firmware\_flow}) automatically pre-populate input context for future workflows (e.g., \texttt{ai\_flow}), eliminating redundant user data entry.
 
-\subsection{Redis Key Structure Design}
+\subsubsection{Redis Key Structure Design}
 
 The framework uses a hierarchical key naming convention to organize data in Redis, ensuring clear separation between transient checkpoints and persistent profiles.
 
-\subsubsection{Short-Term Memory (LangGraph Checkpoints)}
+\paragraph{Short-Term Memory (LangGraph Checkpoints)}
 
 LangGraph checkpoints are stored using a composite key structure:
 \begin{verbatim}
@@ -36,9 +36,9 @@ checkpoint:john:cli-session:1707575500000
 \end{verbatim}
 
 
-This hierarchical organization ensures strict User Isolation, preventining different users from sharing or accessing each other's checkpoints. Furthermore, it supports Session Multiplexing, allowing a single user to run multiple independent workflows simultaneously across different clients like VS Code and CLI. Since checkpoint IDs are timestamped, the system also maintains a clear temporal ordering, which enables critical features like time-travel debugging.
+This hierarchical organization ensures strict User Isolation, preventing different users from sharing or accessing each other's checkpoints. It also supports Session Multiplexing, allowing a single user to run multiple independent workflows simultaneously across different clients like VS Code and CLI. Since checkpoint IDs are timestamped, the system also maintains a clear temporal ordering, which enables critical features like time-travel debugging.
 
-\subsubsection{Long-Term Memory (User Profiles)}
+\paragraph{Long-Term Memory (User Profiles)}
 
 User profiles follow a simpler key structure for direct access:
 \begin{verbatim}
@@ -70,11 +70,11 @@ The profile value is a JSON-serialized dictionary containing persistent user pre
   \item \texttt{timestamp}: Timestamp of the last successful workflow completion
 \end{itemize}
 
-\subsection{LangGraph Integration: \texttt{AsyncRedisSaver}}
+\subsubsection{LangGraph Integration: \texttt{AsyncRedisSaver}}
 
 The short-term memory layer is implemented using LangGraph's \texttt{AsyncRedisSaver} class, which abstracts Redis I/O operations.
 
-\subsubsection{Initialization (\texttt{server.py})}
+\paragraph{Initialization (\texttt{server.py})}
 
 The checkpointer is initialized during FastAPI server startup:
 
@@ -101,7 +101,7 @@ graph = builder.compile(checkpointer=memory)
 
 The \texttt{memory.setup()} call creates internal Redis indexes used by RedisVL for efficient checkpoint retrieval and time-travel queries.
 
-\subsubsection{Checkpoint Serialization}
+\paragraph{Checkpoint Serialization}
 
 Each time a graph node completes execution, LangGraph automatically persists the \texttt{MasterState} to Redis. The checkpoint payload is a MessagePack or JSON-serialized structure:
 
@@ -127,11 +127,11 @@ Each time a graph node completes execution, LangGraph automatically persists the
 
 where \textbf{key fields} are \texttt{channel\_values} which contains the complete \texttt{MasterState} object with all 50+ attributes, \texttt{parent\_config} which is the reference to the previous checkpoint (for time-travel) and \texttt{ts} which is the timestamp for ordering checkpoints.
 
-\subsection{Server-Side Profile Management}
+\subsubsection{Server-Side Profile Management}
 
 The long-term memory layer is manually managed in \texttt{server.py}.
 
-\subsubsection{Profile Loading}
+\paragraph{Profile Loading}
 
 Before executing the graph, the server loads the user profile from Redis and injects it into the \texttt{initial\_state}:
 
@@ -153,7 +153,7 @@ initial_state = {
 
 The \texttt{persistent\_context} field is accessible to all graph nodes, enabling context-aware decisions.
 
-\subsubsection{Profile Saving}
+\paragraph{Profile Saving}
 
 After workflow completion (or critical state mutations), the profile is updated:
 
@@ -178,11 +178,11 @@ await redis_client.set(user_profile_key, json.dumps(updated_profile))
 
 The \texttt{ex} (expiration) parameter prevents indefinite accumulation of inactive user profiles.
 
-\subsection{Context Chaining Across Sessions}
+\subsubsection{Context Chaining Across Sessions}
 
 The dual-memory architecture enables powerful cross-session workflows:
 
-\subsubsection{Example: Multi-Day NNI Experiment}
+\paragraph{Example: Multi-Day NNI Experiment}
 
 \textbf{Day 1 - Session 1 (VS Code):}
 \begin{enumerate}
@@ -201,7 +201,7 @@ The dual-memory architecture enables powerful cross-session workflows:
   \item NNI results are retrieved from disk, best model is saved, and integration proceeds
 \end{enumerate}
 
-\subsubsection{Example: Board Preference Pre-Fill}
+\paragraph{Example: Board Preference Pre-Fill}
 
 \textbf{Session A (Firmware Generation):}
 \begin{enumerate}
@@ -217,11 +217,11 @@ The dual-memory architecture enables powerful cross-session workflows:
   \item No need for user to re-specify hardware → \textbf{Eliminated 1 clarification roundtrip}
 \end{enumerate}
 
-\subsection{HITL Resume Logic}
+\subsubsection{HITL Resume Logic}
 
 The short-term memory checkpoint enables continuous Human-in-the-Loop workflows:
 
-\subsubsection{Interrupt Flow}
+\paragraph{Interrupt Flow}
 
 \begin{enumerate}
   \item Node calls \texttt{interrupt(\{type: "decision\_request", message: "Proceed to AI?"\})}
@@ -230,7 +230,7 @@ The short-term memory checkpoint enables continuous Human-in-the-Loop workflows:
   \item User sees: ``Firmware generated. Continue with AI model selection? [Yes/No]''
 \end{enumerate}
 
-\subsubsection{Resume Flow}
+\paragraph{Resume Flow}
 
 \begin{enumerate}
   \item User types: ``Yes, use high compression''
@@ -240,13 +240,13 @@ The short-term memory checkpoint enables continuous Human-in-the-Loop workflows:
   \item Graph resumes from \texttt{decide\_\allowbreak continue\_\allowbreak to\_\allowbreak ai} node, which parses the response via LLM and routes accordingly
 \end{enumerate}
 
-\subsection{Performance Considerations}
+\subsubsection{Performance Considerations}
 
-\subsubsection{Redis I/O Overhead}
+\paragraph{Redis I/O Overhead}
 
-Checkpoint writes inherently add latency to the execution pipeline, typically in the range of 5 to 20 milliseconds per node transition. To mitigate this overhead, the framework employs several strategies, such as the use of non-blocking asynchronous I/O operations in the \texttt{AsyncRedisSaver} to prevent main event loop stalls. Furthermore, network transit latency is minimized during development by defaulting to a local \texttt{redis://localhost} connection. LangGraph further optimizes this process by consolidating multiple internal state updates from a single node's execution context into a single write operation before transitioning to the next stage of the graph.
+Checkpoint writes inherently add latency to the execution pipeline, typically in the range of 5 to 20 milliseconds per node transition. To mitigate this overhead, the framework employs several strategies, such as the use of non-blocking asynchronous I/O operations in the \texttt{AsyncRedisSaver} to prevent main event loop stalls. Network transit latency is minimized during development by defaulting to a local \texttt{redis://localhost} connection. LangGraph further optimizes this process by consolidating multiple internal state updates from a single node's execution context into a single write operation before transitioning to the next stage of the graph.
 
-\subsubsection{Memory Footprint and Evolution of Data Persistence}
+\paragraph{Memory Footprint and Evolution of Data Persistence}
 
 During early development, the system attempted to store large artifacts (such as generated firmware zips, serialized models, and base64 images) directly within the Redis state. However, this approach presented technical bottlenecks, as Redis string size limits and synchronization overhead slowed down the orchestration loop.
 
@@ -254,7 +254,7 @@ To resolve this, the architectural design evolved toward a hybrid persistence mo
 
 Redis is now strictly limited to maintaining the lightweight conversational checkpointing of the LangGraph execution thread, while the storage of project files is handled natively by the file system. This simplifies the architecture, improves I/O performance, and guarantees environment isolation without relying on database abstractions.
 
-\subsection{Security Considerations}
+\subsubsection{Security Considerations}
 
 Given that user profiles may store sensitive information, such as STMicroelectronics developer credentials required for STEdgeAI cloud authentication, the framework must adhere to strict security practices. In production deployments, it is imperative to encrypt sensitive fields using solid algorithms like AES-256 before persisting them in the Redis data store.
 

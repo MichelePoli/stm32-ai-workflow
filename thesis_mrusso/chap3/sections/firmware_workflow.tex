@@ -1,10 +1,11 @@
-\section{Firmware and STM32 Environment}
+\section{The Core Orchestrator (LangGraph \& Agentic Workflows)}
+\label{sec:core_orchestrator}
 
-\subsection{Headless Firmware Generation}
+\subsection{Firmware Generation Workflow}
 \label{sec:firmware_flow}
 Workflow 1 automates the initialization of STM32CubeMX projects through CLI-driven scripting, removing the need for manual GUI interaction and producing a reproducible firmware project structure.
 
-\subsection{Project Information Collection}
+\subsubsection{Project Information Collection}
 
 The \texttt{collect\_\allowbreak project\_\allowbreak info()} node extracts hardware specifications from the user's natural language input. Parsing is delegated to \texttt{get\_llm()}, a centralized utility in \texttt{utils.py} that routes inference requests to the NVIDIA Triton Inference Server when the \texttt{USE\_\allowbreak TRITON\_\allowbreak BACKEND} environment variable is set, and falls back to a local Ollama instance otherwise. The utility is configured with the \texttt{ProjectInfoExtraction} Pydantic schema for structured output:
 
@@ -27,7 +28,7 @@ The schema includes a \texttt{peripheral\_config} field containing CubeMX comman
 
 The node also handles two edge cases before issuing the interrupt. If \texttt{board\_name} is already set in the graph state from a previous session, the node skips the interrupt and reuses the existing value. If the user responds with a phrase such as ``use the one from yesterday'' or ``same as before'', the LLM maps the input to the token \texttt{USE\_PROFILE}, which triggers a lookup of the last used board and MCU series from the Redis persistent context.
 
-\subsection{Automated MCU Package Management}
+\subsubsection{Automated MCU Package Management}
 
 The \texttt{search\_\allowbreak and\_\allowbreak install\_\allowbreak stm32\_\allowbreak package()} function handles the download of STM32Cube firmware packages from GitHub. Without this step, the CubeMX CLI fails silently with a ``Project loading error'' when a required MCU package is absent from the local repository. This is a practical difference from the GUI, which offers an interactive download prompt.
 
@@ -41,7 +42,7 @@ git clone --recursive --branch v1.28.1 --depth 1 \
 
 After cloning, it verifies that \texttt{Drivers/}, \texttt{Middlewares/}, and \texttt{Projects/} are present, reads the version from \texttt{Release\_Notes.html}, and moves the repository to the final path under \texttt{STM32Cube/Repository/}. If the clone fails or times out, the error is stored in \texttt{state.package\_\allowbreak error\_\allowbreak message} and the routing node short-circuits to \texttt{finalize\_project}, skipping script generation.
 
-\subsection{Headless Generation and CLI Scripting}
+\subsubsection{Headless Generation and CLI Scripting}
 
 STM32CubeMX supports headless operation via the \texttt{-q} flag. The \texttt{generate\_\allowbreak cubemx\_\allowbreak script()} node builds a \texttt{.scr} file in three steps.
 
@@ -61,21 +62,21 @@ xvfb-run -a <cubemx_path> -q <script_file.scr>
 
 \textbf{Note on headless licensing:} CubeMX CLI requires a one-time GUI acceptance of the license agreement before it can run headlessly. If this step is skipped, the process hangs indefinitely. The workflow assumes the license has already been accepted on the host.
 
-\subsection{Two-Stage Generation with Temporary Directory}
+\subsubsection{Two-Stage Generation with Temporary Directory}
 \label{subsec:two_stage_gen}
 
 CubeMX writes its output to a local temporary directory at \texttt{/tmp/stm32\_\textless timestamp\textgreater/} rather than to the final project destination. The \texttt{project path} directive in the script is patched dynamically just before execution to point to this interim path. This avoids filesystem locking on NFS-mounted output directories.
 
 After the process exits with return code 0, the node polls the temporary directory up to 10 times at one-second intervals, waiting for \texttt{Src/} and \texttt{Inc/} to appear. Once confirmed, the project tree is moved to the final path with \texttt{shutil.move()}. If the process is interrupted mid-generation, the output folder on the target filesystem remains clean.
 
-\subsection{Overcoming GUI Dependencies: The Pre-seeded IOC Strategy}
+\subsubsection{Overcoming GUI Dependencies: The Pre-seeded IOC Strategy}
 \label{subsec:preseeded_ioc}
 
 For known chip families, the firmware workflow uses a \textbf{pre-seeded IOC strategy} to avoid the interactive pop-ups described above. A set of pre-validated \texttt{.ioc} templates, one per supported MCU family (e.g., \texttt{STM32H7A3ZITx.ioc}, \texttt{STM32U585AIIxQ.ioc}), is maintained in the \texttt{templates/ioc\_files/} directory. Each file is configured manually once in the GUI to answer all the recommendation wizards, including MPU regions and TrustZone context.
 
 At runtime, \texttt{get\_\allowbreak template\_\allowbreak ioc\_\allowbreak path()} tries an exact board-name match first, then a series-level match via the \texttt{SERIES\_MAP} dictionary. The chosen template is loaded with \texttt{config load "template.ioc"}, and the \texttt{project name} and \texttt{project path} directives re-target it to the user's directory, producing a fresh project that inherits the silent configuration.
 
-\subsection{Error Recovery and Workflow Handoff}
+\subsubsection{Error Recovery and Workflow Handoff}
 
 When the first CubeMX attempt returns a non-zero exit code or times out, \texttt{recover\_\allowbreak with\_\allowbreak ioc\_\allowbreak fallback()} takes over. It selects the best matching IOC template for the detected board or series, rewrites the \texttt{.scr} script to use \texttt{config load} instead of the generic board directive, and relaunches CubeMX with a 600-second timeout. The two-stage temporary directory strategy described in Section~\ref{subsec:two_stage_gen} applies unchanged to this retry. On completion, the output tree contains \texttt{main.c}, \texttt{stm32xxxx\_\allowbreak hal\_\allowbreak msp.c}, the linker script, and the IDE project files.
 
