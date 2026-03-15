@@ -17,7 +17,7 @@ Decoupling the agent logic from the Triton inference server creates a cloud-nati
 \begin{tikzpicture}[
   %% Styles
   box/.style={draw, rounded corners=4pt, thick, fill=#1, text=black,
-              font=\sffamily\small, minimum width=5.2cm, minimum height=1.1cm,
+              font=\sffamily\small, minimum width=5.5cm, minimum height=1.1cm,
               align=center},
   box/.default=white,
   tagbox/.style={draw, rounded corners=2pt, fill=#1, font=\sffamily\tiny,
@@ -37,18 +37,16 @@ Decoupling the agent logic from the Triton inference server creates a cloud-nati
 
 %% ── DOCKER NETWORK (dashed box) ───────────────────────────────────────────
 %% langgraph-app
-\node[box=blue!12]    (LG)    at (-3.8, -3.2) {\textbf{langgraph-app} \\
+\node[box=blue!12]    (LG)    at (-4.6, -3.2) {\textbf{langgraph-app} \\
                                                 \texttt{FastAPI + LangGraph}\vspace{1pt}\\
                                                 \texttt{port 8000}};
-\node[tagbox=orange!40, above right=-1mm and -1mm of LG.north east,
-      anchor=north east] {Ubuntu 22.04 · UID 1002};
+\node[tagbox=orange!40, above left=0.5mm and 2mm of LG.north east, anchor=south east] {Ubuntu 22.04 $\cdot$ UID 1002};
 
 %% redis
-\node[box=red!12]     (RD)    at ( 3.8, -3.2) {\textbf{redis} \\
+\node[box=red!12]     (RD)    at ( 4.6, -3.2) {\textbf{redis} \\
                                                 \texttt{redis-stack-server}\vspace{1pt} \\
                                                 \texttt{volume: redis\_data}};
-\node[tagbox=red!30, above right=-1mm and -1mm of RD.north east,
-      anchor=north east] {port 6379};
+\node[tagbox=red!30, above left=0.5mm and 2mm of RD.north east, anchor=south east] {port 6379};
 
 %% Virtual docker network background
 \begin{scope}[on background layer]
@@ -60,7 +58,7 @@ Decoupling the agent logic from the Triton inference server creates a cloud-nati
 %% ── HOST BIND MOUNTS (left) ───────────────────────────────────────────────
 \node[draw, rounded corners=3pt, fill=gray!15, align=left,
       font=\sffamily\tiny, inner sep=6pt]
-     (MNT) at (-9.0, -3.2) {
+     (MNT) at (-11.2, -3.2) {
        \textbf{Host Bind Mounts (read-only)}\\[2pt]
        \texttt{STM32CubeMX}\\
        \texttt{STEdgeAI CLI}\\
@@ -72,11 +70,10 @@ Decoupling the agent logic from the Triton inference server creates a cloud-nati
      };
 
 %% ── TRITON (bottom, external) ─────────────────────────────────────────────
-\node[box=green!15, minimum width=7cm, minimum height=1.3cm]
+\node[box=green!15, minimum width=7.5cm, minimum height=1.3cm]
      (TR)    at (0, -6.8) {\textbf{Triton Inference Server} (remote) \\
-                           \texttt{vLLM · Mistral · DeepSeek · Embeddings}};
-\node[tagbox=green!50, above right=-1mm and -1mm of TR.north east,
-      anchor=north east] {NVIDIA GPU · HPP cluster};
+                           \texttt{vLLM $\cdot$ Mistral $\cdot$ DeepSeek $\cdot$ Embeddings}};
+\node[tagbox=green!50, above left=0.5mm and 2mm of TR.north east, anchor=south east] {NVIDIA GPU};
 \begin{scope}[on background layer]
   \node[gpu, fit=(TR),
         label={[font=\sffamily\footnotesize\bfseries, text=green!60!black]
@@ -85,8 +82,8 @@ Decoupling the agent logic from the Triton inference server creates a cloud-nati
 
 %% ── ARROWS ────────────────────────────────────────────────────────────────
 %% User <-> langgraph-app
-\draw[ar] (USER.south west) -- ++(0,-0.5) -| (LG.north)
-          node[midway, left, lbl]{HTTP / WebSocket};
+\draw[ar] (USER.south) -- ++(0,-0.6) -| (LG.north)
+          node[pos=0.75, left, lbl]{HTTP / WebSocket};
 
 %% langgraph-app <-> redis
 \draw[ar, <->] (LG.east) -- node[above, lbl]{TCP 6379} (RD.west);
@@ -96,8 +93,8 @@ Decoupling the agent logic from the Triton inference server creates a cloud-nati
 
 %% langgraph-app -> Triton (external)
 \draw[ar] (LG.south) -- ++(0,-0.6) -|
-          node[near start, right, lbl]{HTTP/gRPC}
-          (TR.north west);
+          node[pos=0.75, left, lbl]{HTTP/gRPC}
+          ([xshift=-2cm]TR.north);
 
 \end{tikzpicture}%
 }

@@ -82,6 +82,46 @@ The graph construction logic resides in four primary ``injection'' functions:
 
 Each function encapsulates the node definitions and internal routing logic for its respective domain, adding them to the master \texttt{StateGraph} builder.
 
+\subsection{Human-in-the-Loop Interaction}
+\label{sec:hitl_interaction}
+
+The framework places humans at critical decision points using LangGraph's \texttt{interrupt()} primitive. This mechanism pauses execution and returns control to the API server until the user provides feedback.
+
+\subsubsection{Interrupt and Resume Mechanism}
+
+LangGraph snapshots the full graph state after every node transition. When a node calls \texttt{interrupt()}, the runtime suspends the flow and surfaces a payload to the client. The code below illustrates an approval gate between the firmware and AI workflows:
+
+\begin{lstlisting}[language=Python, caption={Interrupt-based approval gate}]
+# From workflow1_firmware.py
+def decide_continue_to_ai(state, config):
+    # Suspend execution and request user feedback
+    user_response = interrupt({
+        "type": "decision_request",
+        "message": "Firmware generated. Continue with AI selection?",
+        "options": ["yes", "no", "skip"]
+    })
+    
+    # Analyze response via LLM
+    llm_parser = get_llm(config, structured_schema=DecisionExtraction, temperature=0)
+    result = llm_parser.invoke([
+        SystemMessage(content=instructions),
+        HumanMessage(content=user_response)
+    ])
+    
+    state.route = "ai_flow" if result.continue_to_ai else "END"
+    return state
+\end{lstlisting}
+
+When the user replies, the graph resumes from the exact checkpoint. Since Redis handles the underlying state storage (as detailed in Section \ref{sec:redis_architecture}), even multi-hour pauses do not affect system stability.
+
+\subsubsection{Interaction Patterns}
+
+We categorize human interventions into two patterns. **Approval Gates** handle high-risk transitions, such as confirming hardware parameters or accepting a candidate model during iterative search. **Natural Language Steering** instead allows the user to redirect the agent mid-stream. For example, a user might state, \textit{``I actually need a smaller model''}, triggering a transition back to the search node with updated constraints.
+
+\subsubsection{Actionable Reporting}
+
+To prevent information overload, the orchestrator parses raw logs from tools like CubeMX or STEdgeAI. Instead of displaying hundreds of lines, the system extracts a one-line summary, such as \textit{``Project generated: STM32H7, 4 peripherals enabled''} or \textit{``Memory Warning: Flash limit exceeded''}. These summaries populate the context-aware prompts at interrupt points, ensuring the user makes informed decisions without reviewing verbose technical output.
+
 \subsection{Logging and Observability}
 
 The system implements a multi-tier observability strategy, combining structured backend logging with real-time progress streaming. Technical logs are managed via the standard Python \texttt{logging} library with distinct severity levels.
