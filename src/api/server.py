@@ -98,7 +98,12 @@ async def unload_all_triton_models() -> None:
     logger.info("🧹 [Startup] VRAM reset complete.")
 
 
-# Graph Initialization & Redis Checkpointer (lifespan)
+# =============================================================================
+# STARTUP LOGIC (lifespan)
+# The graph and Redis checkpointer must be initialized inside the async event
+# loop (not at import time). Redis may still be loading its RDB snapshot at
+# boot (~18s for 1M keys), so we retry with backoff before giving up.
+# =============================================================================
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initializes the graph and Redis checkpointer on startup (inside the event loop)."""
@@ -140,7 +145,7 @@ app = FastAPI(title="STM32 AI Assistant API", lifespan=lifespan)
 def health_check():
     return {"status": "ok", "service": "STM32 AI Assistant"}
 
-@app.post("/stream")
+@app.post("/stream") # Tutta la comunicazione passa da un unico endpoint. Non ci sono rotte REST separate per firmware, AI, ecc. — è il grafo interno che decide cosa fare. Questo semplifica l'interfaccia con l'extension.
 
 # @app.post("/stream", dependencies=[Depends(verify_api_key)]) # nel caso in cui vuoi implementare API KEY (al momento no). 
 async def stream_chat(request: ChatRequest):
@@ -150,7 +155,11 @@ async def stream_chat(request: ChatRequest):
     """
     logger.info(f"Received chat request: {len(request.messages)} messages")
     
-    # last user message is the main input for the graph
+    # -------------------------------------------------------------------------
+    # 1. EXTRACT LAST USER MESSAGE
+    # The request carries the full chat history from the VS Code extension.
+    # Only the most recent user message is passed as the graph's active input.
+    # -------------------------------------------------------------------------
     last_user_message = next((m.content for m in reversed(request.messages) if m.role == 'user'), "")
     
     # -------------------------------------------------------------------------
@@ -165,7 +174,12 @@ async def stream_chat(request: ChatRequest):
         logger.warning(f"⚠️ Unable to load user profile: {e}")
         user_profile = {}
 
-    # 3. Define the initial state
+    # -------------------------------------------------------------------------
+    # 3. BUILD INITIAL GRAPH STATE
+    # This dict seeds the MasterState for a fresh graph execution.
+    # 'persistent_context' carries the user's long-term profile (board, model,
+    # last project path) so the graph can skip redundant data-collection steps.
+    # -------------------------------------------------------------------------
     initial_state = {
         "message": last_user_message,
         "persistent_context": user_profile,
@@ -218,6 +232,13 @@ async def stream_chat(request: ChatRequest):
         try:
             config = {"configurable": {"thread_id": composite_thread_id}}
 
+            # -----------------------------------------------------------------
+            # HITL RESUME LOGIC
+            # If the graph was suspended at a Human-in-the-Loop interrupt
+            # (current_state.next is non-empty), and the user's message is NOT
+            # a new workflow trigger, we RESUME from the checkpoint by injecting
+            # the user's reply into 'user_response'. Otherwise, we start fresh.
+            # -----------------------------------------------------------------
             current_state = await graph.aget_state(config)
             
             msg_clean = last_user_message.lower().strip()
@@ -239,10 +260,10 @@ async def stream_chat(request: ChatRequest):
                     "reset_profile": False,
                     "response": ""
                 }) 
-                stream_input = None
+                stream_input = None  # Resume: do not re-seed state
             else:
                 initial_state["user_response"] = ""
-                stream_input = initial_state
+                stream_input = initial_state  # Fresh start
 
             # Execute the graph in a separate task
             async def run_graph_task():
@@ -257,16 +278,25 @@ async def stream_chat(request: ChatRequest):
 
             asyncio.create_task(run_graph_task())
 
-            # Consume from the queue with heartbeat
+            # -----------------------------------------------------------------
+            # NDJSON STREAMING CONSUMER
+            # The queue is consumed here and each item is serialized as a JSON
+            # line (NDJSON). Each line has a 'type' field:
+            #   'progress' → node name shown as a progress bar label in VS Code
+            #   'markdown' → textual response rendered in the chat UI
+            #   'log'      → subprocess logs (training progress, NNI epochs)
+            #   'status'   → 'completed' or 'waiting' (for HITL interrupts)
+            #   'error'    → runtime errors forwarded to the UI
+            # A 15s heartbeat keeps the HTTP connection alive during slow nodes.
+            # -----------------------------------------------------------------
             while True:
                 try:
-                    # 15s timeout for heartbeat
                     item = await asyncio.wait_for(queue.get(), timeout=15)
                     if item is None:
                         break
 
                     if item["type"] == "log":
-                        # Stream the log to the UI
+                        # Subprocess/training log: show in italics in the chat
                         yield json.dumps({"type": "markdown", "content": f"_{item['content']}_\n"}) + "\n"
                     
                     elif item["type"] == "error":
@@ -382,7 +412,14 @@ async def stream_chat(request: ChatRequest):
                     # Heartbeat: send an empty packet or a silent progress
                     yield json.dumps({"type": "progress", "content": "..."}) + "\n"
 
-            # Final profile save logic (after queue ends)
+            # -----------------------------------------------------------------
+            # PROFILE PERSISTENCE
+            # After the graph finishes (or suspends at an interrupt), extract
+            # the fields that should persist across sessions (board, MCU, last
+            # model, project path) and write them back to Redis. New values
+            # win over old ones via dict merge. If 'reset_profile' was set
+            # (e.g. user said 'restart'), the profile is wiped entirely.
+            # -----------------------------------------------------------------
             try:
                 final_snapshot = await graph.aget_state(config)
                 state = final_snapshot.values
