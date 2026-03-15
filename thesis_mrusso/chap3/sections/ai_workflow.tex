@@ -3,13 +3,6 @@
 
 Workflow 2 handles the selection, profiling, and C code generation of pre-trained neural networks for STM32 microcontrollers (see Figure~\ref{fig:detailed_flowchart_part1} for the entry routing logic). Embedded AI differs from conventional MLOps in one fundamental respect: raw accuracy is only one metric among several. RAM, Flash, and MACC budgets set hard physical limits that constrain every design choice. The workflow addresses this by combining a curated local registry with iterative web search and delegating quantization decisions to the STEdgeAI toolchain.
 
-\begin{figure}[htbp]
-    \centering
-    \centerline{\includegraphics[width=\textwidth]{chap3/figures/part1Graph.png}}
-    \caption{Detailed Workflow Diagram -- System initialization, request routing, and parallel entry workflows (Firmware Generation, AI Model Discovery, Web Search).}
-    \label{fig:detailed_flowchart_part1}
-\end{figure}
-
 \subsubsection{Analysis Parameters Collection}
 
 \texttt{collect\_\allowbreak analysis\_\allowbreak info()} extracts the target MCU and the desired compression level from the user's message. The node scans the initial prompt for known MCU series tokens (e.g., \texttt{h7}, \texttt{u5}, \texttt{f4}). If nothing is found, it issues an interrupt and surfaces the last used series from the persistent context as a suggestion. When Workflow 1 has already set \texttt{state.target} from the selected board, the interrupt is skipped entirely. Inference is delegated to \texttt{get\_llm()}, which routes requests to the NVIDIA Triton Inference Server when \texttt{USE\_\allowbreak TRITON\_\allowbreak BACKEND} is set, falling back to a local Ollama instance otherwise:
@@ -35,33 +28,21 @@ Both values are stored in \texttt{MasterState} and reused across model selection
 
 \subsubsection{Three-Tier Model Discovery Architecture}
 
-Model discovery follows a three-tier hierarchy. The first tier covers locally curated catalogs, the second runs automated web searches, and the third allows users to register their own models. Each tier is tried in order, and the process terminates as soon as the user confirms a candidate.
+Model discovery follows a three-tier hierarchy, tried in order until the user confirms a candidate.
 
-\subsubsection{Tier 1: Curated Task-Based Models (Two-Node Pipeline)}
+\begin{description}[leftmargin=0pt, itemsep=10pt]
 
-The first tier runs across two separate nodes. \texttt{choose\_\allowbreak ai\_\allowbreak task()} presents a menu of all task categories in \texttt{predefined\_models.json}, a JSON registry decoupled from the discovery logic so it can be updated without touching any source code. The menu covers standard embedded tasks (image classification, object detection, human activity recognition) and also exposes two shortcut options: ``Register your own model'' and ``Online search''. An LLM classifier maps the user's free-text response to the appropriate category key.
+    \item[\textbf{Tier 1 - Curated Task-Based Models.}]
+    The first tier runs across two nodes. \texttt{choose\_\allowbreak ai\_\allowbreak task()} presents all task categories defined in \texttt{predefined\_models.json}, a JSON registry decoupled from the discovery logic so it can be updated without touching any source code. The menu covers standard embedded tasks (image classification, object detection, human activity recognition) and exposes two shortcuts: ``Register your own model'' and ``Online search''. An LLM classifier maps the user's free-text response to the appropriate category key.
 
-\texttt{choose\_\allowbreak ai\_\allowbreak model()} then handles selection within the chosen category. Before showing the list, it computes a compatibility estimate for each model by comparing its stated file size against the flash limit returned by \texttt{get\_\allowbreak mcu\_\allowbreak limits(state.target)}:
+    \texttt{choose\_\allowbreak ai\_\allowbreak model()} then handles selection within the chosen category. Before displaying the list, it computes a hardware compatibility estimate for each entry by comparing the stated file size against the flash limit returned by \texttt{get\_\allowbreak mcu\_\allowbreak limits(state.target)}. Models fitting natively are marked \textbf{Fits} ($\checkmark$), models that can be compressed to fit are labeled \textbf{Compressible} with the size ratio shown, and models too large even at maximum compression are flagged \textbf{Too Large} ($\times$). This information is surfaced before any download or conversion is attempted.
 
-\begin{itemize}[noitemsep, topsep=4pt]
-    \item Models fitting within flash limits natively are marked \textbf{Fits} ($\checkmark$)
-    \item Models that can be compressed to fit are marked \textbf{Compressible} with the size ratio shown
-    \item Models too large even at maximum compression are flagged \textbf{Too Large} ($\times$)
-\end{itemize}
+    \item[\textbf{Tier 2 - Iterative Web Search with Hybrid Retrieval.}]
+    When no curated model satisfies the request, the system enters \texttt{search\_\allowbreak recommendation\_\allowbreak model()}, a loop capped at three iterations. Each iteration tries two backends in sequence. The primary backend scans the \texttt{STMicroelectronics/stm32ai-modelzoo} GitHub repository via the PyGitHub API, recursively traversing the task-specific subfolder (depth limit: 5, early exit at 20 files) and collecting files with extensions \texttt{.h5}, \texttt{.keras}, \texttt{.onnx}, or \texttt{.tflite}. An LLM then scores each candidate on task relevance, architecture recognition, and file size; the top result is validated with a lightweight HTTP HEAD check before being shown to the user. The secondary backend is a DuckDuckGo-based web search, tried only if GitHub yields nothing. It does not consume an iteration, so a failed GitHub scan followed by a successful web result leaves the full three-iteration budget intact.
 
-The user sees this information upfront, before any download or conversion is attempted.
+    After either backend finds a candidate, the node issues a LangGraph interrupt for explicit user approval:
 
-\subsubsection{Tier 2: Iterative Web Search with Hybrid Retrieval}
-
-When no curated model satisfies the request, the system enters \texttt{search\_\allowbreak recommendation\_\allowbreak model()}, a loop capped at three iterations. Each iteration tries two backends in sequence.
-
-The primary backend scans the \texttt{STMicroelectronics/stm32ai-modelzoo} GitHub repository via the PyGitHub API. It recursively traverses the task-specific subfolder (depth limit: 5, early exit at 20 files) and collects files with extensions \texttt{.h5}, \texttt{.keras}, \texttt{.onnx}, or \texttt{.tflite}. An LLM then scores each candidate on task relevance, architecture recognition, and file size, and the top result is validated with a lightweight HTTP HEAD check before being shown to the user.
-
-The secondary backend is a DuckDuckGo-based web search, tried only if GitHub yields nothing. Importantly, it does not consume an iteration, so a failed GitHub scan followed by a successful web result leaves the full three-iteration budget intact.
-
-After either backend finds a candidate, the node issues a LangGraph interrupt for explicit user approval:
-
-\begin{lstlisting}[language=python, caption={User confirmation interrupt after each candidate}, label={lst:search_confirm}]
+    \begin{lstlisting}[language=python, caption={User confirmation interrupt after each candidate}, label={lst:search_confirm}]
 user_confirmation = interrupt({
     "instruction": f"""Model found: {model_name} ({ext}, {size})
 URL: {url_raw}
@@ -70,13 +51,14 @@ Accept this model? (yes/no)
 - 'yes': Proceed to download
 - 'no': Continue searching"""
 })
-\end{lstlisting}
+    \end{lstlisting}
 
-A rejection resets \texttt{state.model\_\allowbreak discovery\_\allowbreak method} to \texttt{"search"} and the routing node re-enters the loop. After three failed iterations, the system selects a task-based fallback from the local registry and presents it with one final confirmation interrupt before starting the download.
+    A rejection resets \texttt{state.model\_\allowbreak discovery\_\allowbreak method} to \texttt{"search"} and the routing node re-enters the loop. After three failed iterations, the system selects a task-based fallback from the local registry and presents it with one final confirmation interrupt before starting the download.
 
-\subsubsection{Tier 3: User Model Registration}
+    \item[\textbf{Tier 3 - User Model Registration.}]
+    Users can register their own local or remote models through \texttt{add\_\allowbreak custom\_\allowbreak model\_\allowbreak procedure()}, providing a category, a name, and a direct download URL. The entry is written to \texttt{predefined\_models.json} only after \texttt{stedgeai analyze} confirms the model is structurally valid for the target runtime.
 
-Users can also register their own local or remote models through \texttt{add\_\allowbreak custom\_\allowbreak model\_\allowbreak procedure()}, providing a category, a name, and a direct download URL. The entry is written to \texttt{predefined\_models.json} only after \texttt{stedgeai analyze} confirms the model is structurally valid for the target runtime.
+\end{description}
 
 \subsubsection{Model Download and Inspection}
 
@@ -107,42 +89,43 @@ res = execute_in_environment(script, python_path, timeout=30)
 
 If the subprocess fails, a second pass opens the file with \texttt{h5py} and reads the raw HDF5 metadata without loading any weights. The extracted metadata is stored in \texttt{state.model\_architecture} for use by Workflow 5.
 
-\subsubsection{STEdgeAI CLI Integration}
+\subsubsection{STEdgeAI Three-Phase Profiling and Code Generation}
 
-With a model in hand, the workflow runs a three-phase profiling and code generation cycle using the STEdgeAI toolchain. An optional fine-tuning and customization step may precede this phase; it is described separately in Section~\ref{sec:customization}.
+With a model in hand, the workflow runs a sequential three-phase cycle using the STEdgeAI toolchain. An optional fine-tuning and customization step may precede this phase; it is described separately in Section~\ref{sec:customization}.
 
-\subsubsection{Phase 1: Model Analysis}
+\begin{description}[leftmargin=0pt, itemsep=10pt]
 
-\texttt{run\_analyze()} calls the STEdgeAI analysis engine to estimate resource consumption on the target MCU:
+    \item[\textbf{Phase 1 - Model Analysis.}]
+    \texttt{run\_analyze()} calls the STEdgeAI analysis engine to estimate resource consumption on the target MCU:
 
-\begin{verbatim}
+    \begin{verbatim}
 stedgeai analyze --model <model.h5> --target <stm32h743>
                  --output ./analisiAI/report_analyze
-\end{verbatim}
+    \end{verbatim}
 
-The resulting report covers RAM usage (tensor buffers, activation memory, working memory), Flash usage after quantization (Flash is the non-volatile program memory that stores the quantized model weights and the generated C inference code), MACC count per inference (number of multiply-accumulate operations, the standard metric for neural network computational cost), and estimated latency at typical clock speeds. If RAM or Flash limits are exceeded, the node automatically increments the quantization aggressiveness from \texttt{medium} to \texttt{high} and repeats the command, continuing until the model fits or the maximum compression level is reached.
+    The resulting report covers RAM usage (tensor buffers, activation memory, working memory), Flash usage after quantization, MACC count per inference (the standard metric for neural network computational cost), and estimated latency at typical clock speeds. If RAM or Flash limits are exceeded, the node automatically increments the quantization aggressiveness from \texttt{medium} to \texttt{high} and repeats the command, continuing until the model fits or the maximum compression level is reached.
 
-\subsubsection{Phase 2: On-Target Validation}
+    \item[\textbf{Phase 2 - On-Target Validation.}]
+    \texttt{run\_validate()} produces a validation report for the target architecture:
 
-\texttt{run\_validate()} produces a validation report for the target architecture:
-
-\begin{verbatim}
+    \begin{verbatim}
 stedgeai validate --model <model.h5> --target <stm32h743>
                   --output ./analisiAI/network_validate_report.txt
-\end{verbatim}
+    \end{verbatim}
 
-The report confirms model integrity, that activation buffers fit within target RAM, and that all operators are supported on the specific MCU series.
+    The report confirms model integrity, that activation buffers fit within target RAM, and that all operators are supported on the specific MCU series.
 
-\subsubsection{Phase 3: C Code Generation}
+    \item[\textbf{Phase 3 - C Code Generation.}]
+    \texttt{run\_generate()} produces the final inference artifacts:
 
-\texttt{run\_generate()} produces the final inference artifacts:
-
-\begin{verbatim}
+    \begin{verbatim}
 stedgeai generate --model <model.h5> --target <stm32h743>
                   --compression <high> --output ./analisiAI/code_resnet
-\end{verbatim}
+    \end{verbatim}
 
-Output includes \texttt{network.c/h} (fixed-point neural network implementation), \texttt{network\_data.c} (quantized weights as const arrays), and \texttt{network\_config.h} (MCU-specific memory layout and hardware acceleration flags). Quantization is applied here via \texttt{--compression}, not during training. This lets the framework evaluate models in full-precision FP32 and defer bit-width decisions until the exact MCU constraints are known from Phase 1.
+    Output includes \texttt{network.c/h} (fixed-point neural network implementation), \texttt{network\_data.c} (quantized weights as const arrays), and \texttt{network\_config.h} (MCU-specific memory layout and hardware acceleration flags). Quantization is applied here via \texttt{--compression}, not during training, so the framework can evaluate models in full-precision FP32 and defer bit-width decisions until the exact MCU constraints are known from Phase 1.
+
+\end{description}
 
 \subsubsection{Legacy Model Handling with Dual-Environment Strategy}
 

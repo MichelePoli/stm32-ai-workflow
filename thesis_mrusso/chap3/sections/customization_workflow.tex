@@ -3,13 +3,6 @@
 
 Once a base model has been discovered and profiled, the user may need to adapt its architecture to meet specific hardware constraints, retarget its output to a new set of classes, or improve its accuracy on a domain-specific dataset. Workflow 5 implements a customization pipeline that breaks this process into five stages: model inspection, best practice retrieval, interactive modification planning, architecture patching, and fine-tuning (detailed in Figure~\ref{fig:detailed_flowchart_part2}). The implementation is contained in \texttt{workflow5\_customization.py} and runs as a LangGraph graph with conditional routing between nodes.
 
-\begin{figure}[htbp]
-    \centering
-    \centerline{\includegraphics[width=\textwidth,height=0.85\textheight,keepaspectratio]{chap3/figures/part2.png}}
-    \caption{Detailed Workflow Diagram -- Model customization workflow (Workflow~5), including architecture inspection, dataset acquisition, and hyperparameter optimization via NNI.}
-    \label{fig:detailed_flowchart_part2}
-\end{figure}
-
 \subsubsection{Model Architecture Inspection}
 
 The workflow begins with the \texttt{inspect\_\allowbreak model\_\allowbreak architecture()} node, which analyses the downloaded model file and populates the graph state with the architectural metadata needed by all subsequent steps. The extracted data includes layer types (Conv2D, Dense, Dropout), output shapes, the total parameter count, and whether the model contains BatchNormalization or Dropout layers. This profile feeds directly into the best practice retrieval and modification planning steps.
