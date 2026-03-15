@@ -1,9 +1,9 @@
-\subsubsection{Supporting Workflows}
+\subsection{Supporting Workflows}
 \label{sec:supporting}
 
 Beyond the five primary pipelines, the framework includes two auxiliary workflows that handle data needs for the fine-tuning stage.
 
-\subsubsection{Synthetic Data Generation}
+\subsubsection{Synthetic Data Generation Auxiliary Workflow}
 
 The \textit{Synthetic Data Generation} sub-workflow generates time-series and audio waveforms programmatically for two distinct purposes. First, it acts as a training pipeline validator: before committing to a full fine-tuning run on an external dataset, generating a small batch of mathematically exact signals (pure sine waves, silence, impulses) lets the system verify that the training loop is numerically sound and that the model can learn basic patterns at all. Second, it provides controlled sensor simulation. For embedded applications involving accelerometers or microphones, synthetic chirps, drift signals, and noise bursts are often more reliable test cases than scarce real-world anomaly recordings.
 
@@ -11,7 +11,7 @@ Signal parameters are extracted from the user's natural language request through
 
 Generation is handled by NumPy vectorized operations inside \texttt{generate\_\allowbreak synthetic\_\allowbreak samples()}. Each sample is saved individually as a \texttt{.npy} file in \texttt{\textless base\_dir\textgreater/data/synthetic/}. The node then confirms generation parameters with one final interrupt before handing the dataset path to the \textit{Model Customization} workflow (Section~\ref{sec:customization}) via \texttt{state.synthetic\_\allowbreak data\_\allowbreak path}.
 
-\subsubsection{Dataset Selection and Format Conversion}
+\subsubsection{Dataset Selection Auxiliary Workflow}
 
 The \textit{Dataset Selection} sub-workflow manages the selection, download, and formatting of publicly available datasets for use in the fine-tuning stage. It supports four task categories: vision, audio, object detection, and human activity recognition.
 
