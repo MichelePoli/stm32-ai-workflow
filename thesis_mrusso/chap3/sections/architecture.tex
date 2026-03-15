@@ -29,6 +29,8 @@ The \textbf{Orchestration Layer} (L3) coordinates five agentic workflows, each m
     \item \textbf{Web Research} (\texttt{search\_flow}): Provides technical guidance through dynamic web search with DeepEval quality evaluation metrics.
 \end{enumerate}
 
+Two auxiliary sub-workflows support the customization stage: \textit{Synthetic Data Generation}, which produces controlled time-series and audio signals for pipeline validation, and \textit{Dataset Selection}, which handles the download and format conversion of public datasets. Both are described in Section~\ref{sec:supporting}.
+
 When a new message arrives, the orchestrator routes it through an LLM-based classifier. The classifier analyzes the user's natural language input, assigns a confidence score, and selects the target workflow. If confidence falls below $0.6$, the system asks the user to choose explicitly from a structured menu. Figure~\ref{fig:routing_flowchart} illustrates this decision process.
 
 \begin{figure}[ht]

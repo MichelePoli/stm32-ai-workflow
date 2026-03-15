@@ -1,11 +1,11 @@
 \subsection{AI Model Discovery and Validation Workflow}
 \label{sec:ai_flow}
 
-Workflow 2 handles the selection, profiling, and C code generation of pre-trained neural networks for STM32 microcontrollers (see Figure~\ref{fig:detailed_flowchart_part1} for the entry routing logic). Embedded AI differs from conventional MLOps in one fundamental respect: raw accuracy is only one metric among several. RAM, Flash, and MACC budgets set hard physical limits that constrain every design choice. The workflow addresses this by combining a curated local registry with iterative web search and delegating quantization decisions to the STEdgeAI toolchain.
+The \textit{AI Model Discovery} workflow handles the selection, profiling, and C code generation of pre-trained neural networks for STM32 microcontrollers (see Figure~\ref{fig:detailed_flowchart_part1} for the entry routing logic). Embedded AI differs from conventional MLOps in one fundamental respect: raw accuracy is only one metric among several. RAM, Flash, and MACC budgets set hard physical limits that constrain every design choice. The workflow addresses this by combining a curated local registry with iterative web search and delegating quantization decisions to the STEdgeAI toolchain.
 
 \subsubsection{Analysis Parameters Collection}
 
-\texttt{collect\_\allowbreak analysis\_\allowbreak info()} extracts the target MCU and the desired compression level from the user's message. The node scans the initial prompt for known MCU series tokens (e.g., \texttt{h7}, \texttt{u5}, \texttt{f4}). If nothing is found, it issues an interrupt and surfaces the last used series from the persistent context as a suggestion. When Workflow 1 has already set \texttt{state.target} from the selected board, the interrupt is skipped entirely. Inference is delegated to \texttt{get\_llm()}, which routes requests to the NVIDIA Triton Inference Server when \texttt{USE\_\allowbreak TRITON\_\allowbreak BACKEND} is set, falling back to a local Ollama instance otherwise:
+\texttt{collect\_\allowbreak analysis\_\allowbreak info()} extracts the target MCU and the desired compression level from the user's message. The node scans the initial prompt for known MCU series tokens (e.g., \texttt{h7}, \texttt{u5}, \texttt{f4}). If nothing is found, it issues an interrupt and surfaces the last used series from the persistent context as a suggestion. When the \textit{Firmware Generation} workflow (Section~\ref{sec:firmware_flow}) has already set \texttt{state.target} from the selected board, the interrupt is skipped entirely. Inference is delegated to \texttt{get\_llm()}, which routes requests to the NVIDIA Triton Inference Server when \texttt{USE\_\allowbreak TRITON\_\allowbreak BACKEND} is set, falling back to a local Ollama instance otherwise:
 
 \begin{lstlisting}[language=python, caption={Parameter extraction from user input}, label={lst:param_extraction}]
 # User: "I need a model for image classification on STM32H7 with high compression"
@@ -87,7 +87,7 @@ except Exception as e:
 res = execute_in_environment(script, python_path, timeout=30)
 \end{lstlisting}
 
-If the subprocess fails, a second pass opens the file with \texttt{h5py} and reads the raw HDF5 metadata without loading any weights. The extracted metadata is stored in \texttt{state.model\_architecture} for use by Workflow 5.
+If the subprocess fails, a second pass opens the file with \texttt{h5py} and reads the raw HDF5 metadata without loading any weights. The extracted metadata is stored in \texttt{state.model\_architecture} for use by the \textit{Model Customization} workflow (Section~\ref{sec:customization}).
 
 \subsubsection{STEdgeAI Three-Phase Profiling and Code Generation}
 

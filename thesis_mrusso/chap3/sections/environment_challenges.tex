@@ -29,7 +29,7 @@ To smoothly overcome this limitation without demanding manual model conversion f
 This bridge "flattens" the model architecture into standard TFLite operators, which the ST toolchain interprets correctly, thus restoring the autonomous flow for the latest state-of-the-art models.
 
 \subsection{Architectural Constraints on Model Customization}
-While the discovery and profiling workflow (Workflow 2) achieves format-agnostic interoperability, successfully processing \texttt{.h5}, \texttt{.keras}, \texttt{.onnx}, and \texttt{.tflite} artifacts for resource estimation and firmware generation, the structural customization workflow (Workflow 5) introduces a strict dependency on native Keras formats.
+While the \textit{AI Model Discovery} workflow (Section~\ref{sec:ai_flow}) achieves format-agnostic interoperability, successfully processing \texttt{.h5}, \texttt{.keras}, \texttt{.onnx}, and \texttt{.tflite} artifacts for resource estimation and firmware generation, the \textit{Model Customization} workflow (Section~\ref{sec:customization}) introduces a strict dependency on native Keras formats.
 
 This critical distinction arises directly from the technical requirements of surgical neural network operations. Advanced features such as dynamic layer freezing, appending Dense or Dropout regularization layers, and modifying custom activation functions inherently require the orchestrator to load the architecture as a live, fully instantiable Keras \texttt{Model} object.
 
@@ -40,7 +40,7 @@ A common question in edge AI orchestration is whether these deployment formats c
 
 Consequently, the framework adopts the best practice of requiring the original "source" formats for customization, treating deployment artifacts as a terminal stage in the MLOps pipeline.
 
-To maintain system stability, a format-based validation gate was implemented in the customization node, ensuring that only native Keras artifacts enter the optimization pipeline, while guiding users towards Workflow 2 for non-editable binary formats.
+To maintain system stability, a format-based validation gate was implemented in the customization node, ensuring that only native Keras artifacts enter the optimization pipeline, while guiding users towards the \textit{AI Model Discovery} workflow (Section~\ref{sec:ai_flow}) for non-editable binary formats.
 
 \subsection{GUI-Locked Architectural Features: The Automation Barrier}
 \label{subsec:gui_locked_features}
@@ -81,6 +81,6 @@ The shift to Apple Silicon required a specialized dependency management strategy
 
 To address this, I developed a clean environment strategy via a dedicated \texttt{environment\_clean.yaml} specification. This configuration aggressively utilizes the \texttt{conda-forge} channel to securely provide consistent, native ARM64 builds for modern Python libraries like LangGraph and FastAPI, while strictly isolating all required legacy x86\_64 toolchains within completely separate sub-environments.
 
-Also, for local development on macOS, the system was explicitly configured to detect and integrate specialized acceleration adapters (\texttt{tensorflow-macos} and \texttt{tensorflow-metal}). This strategic integration smoothly enables hardware acceleration directly on the Mac's integrated GPU via Metal Performance Shaders during the intensive model customization phase (Workflow 5), successfully providing a high-performance local alternative to expensive GPU-equipped Linux servers for rapid initial prototyping.
+Also, for local development on macOS, the system was explicitly configured to detect and integrate specialized acceleration adapters (\texttt{tensorflow-macos} and \texttt{tensorflow-metal}). This strategic integration smoothly enables hardware acceleration directly on the Mac's integrated GPU via Metal Performance Shaders during the intensive model customization phase (\textit{Model Customization}, Section~\ref{sec:customization}), successfully providing a high-performance local alternative to expensive GPU-equipped Linux servers for rapid initial prototyping.
 
 These adaptations ensure that the MLOps pipeline is truly "environment-agnostic", supporting both industrial Linux servers for heavy optimization and local macOS laptops for rapid UI development and testing within the VS Code integration.

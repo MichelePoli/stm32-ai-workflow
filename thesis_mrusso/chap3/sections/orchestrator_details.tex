@@ -74,10 +74,10 @@ This multi-stage pipeline mirrors the typical embedded AI development lifecycle:
 The graph construction logic resides in four primary ``injection'' functions:
 
 \begin{itemize}
-    \item \texttt{inject\_\allowbreak firmware\_\allowbreak nodes()}: Firmware workflow (Workflow 1)
-    \item \texttt{inject\_\allowbreak ai\_\allowbreak analysis\_\allowbreak nodes()}: AI discovery, customization, and data management (Workflows 2, 5, 6, 7)
-    \item \texttt{inject\_\allowbreak integration\_\allowbreak nodes()}: Firmware-AI integration and verification (Workflow 3)
-    \item \texttt{inject\_\allowbreak web\_\allowbreak search\_\allowbreak nodes()}: Web research and evaluation support (Workflow 4)
+    \item \texttt{inject\_\allowbreak firmware\_\allowbreak nodes()}: \textit{Firmware Generation} workflow
+    \item \texttt{inject\_\allowbreak ai\_\allowbreak analysis\_\allowbreak nodes()}: \textit{AI Model Discovery}, \textit{Model Customization}, and data management workflows
+    \item \texttt{inject\_\allowbreak integration\_\allowbreak nodes()}: \textit{Firmware-AI Integration} workflow
+    \item \texttt{inject\_\allowbreak web\_\allowbreak search\_\allowbreak nodes()}: \textit{Web Research} workflow
 \end{itemize}
 
 Each function encapsulates the node definitions and internal routing logic for its respective domain, adding them to the master \texttt{StateGraph} builder.

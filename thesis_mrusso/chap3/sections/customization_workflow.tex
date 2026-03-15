@@ -1,7 +1,7 @@
 \subsection{Neural Network Customization Workflow}
 \label{sec:customization}
 
-Once a base model has been discovered and profiled, the user may need to adapt its architecture to meet specific hardware constraints, retarget its output to a new set of classes, or improve its accuracy on a domain-specific dataset. Workflow 5 implements a customization pipeline that breaks this process into five stages: model inspection, best practice retrieval, interactive modification planning, architecture patching, and fine-tuning (detailed in Figure~\ref{fig:detailed_flowchart_part2}). The implementation is contained in \texttt{workflow5\_customization.py} and runs as a LangGraph graph with conditional routing between nodes.
+Once a base model has been discovered and profiled, the user may need to adapt its architecture to meet specific hardware constraints, retarget its output to a new set of classes, or improve its accuracy on a domain-specific dataset. The \textit{Model Customization} workflow implements a customization pipeline that breaks this process into five stages: model inspection, best practice retrieval, interactive modification planning, architecture patching, and fine-tuning (detailed in Figure~\ref{fig:detailed_flowchart_part2}). The implementation is contained in \texttt{workflow5\_customization.py} and runs as a LangGraph graph with conditional routing between nodes.
 
 \subsubsection{Model Architecture Inspection}
 
@@ -11,7 +11,7 @@ Model loading is not a trivial operation: the same file can fail with a standard
 
 Files in \texttt{.onnx} or \texttt{.tflite} format are handled separately. Since these formats do not expose a Keras layer graph, the node sets a generic metadata block and sets the format field accordingly. The user is informed that structural customization (layer editing and fine-tuning) is not available for these formats; the workflow then routes them directly to the STEdgeAI analysis step.
 
-After inspection, the results are also checked against the idempotency flag: if the architecture data is already present from a previous Workflow 2 run, the node skips the loading step entirely.
+After inspection, the results are also checked against the idempotency flag: if the architecture data is already present from a previous \textit{AI Model Discovery} run (Section~\ref{sec:ai_flow}), the node skips the loading step entirely.
 
 \subsubsection{Best Practice Retrieval}
 \label{sec:best_practices}
@@ -131,7 +131,7 @@ Images are also resized in batches of 500 if the loaded data shape does not matc
 
 A key requirement of this step is producing complete, correct NNI experiment code tailored to the specific model and dataset in use. The generated scripts must handle non-trivial edge cases: sparse versus categorical label formats, input shape mismatches that require dynamic resizing, and class count discrepancies between the model head and the target dataset. They also need to cap memory usage, resolve port conflicts for the NNI Web UI, and avoid API calls that changed across NNI versions.
 
-An initial implementation delegated code synthesis to the hosted LLM via a structured prompt. Testing on the HPP deployment revealed a hard limitation: the prompt, which must embed model metadata, dataset paths, and reference code templates, exceeded the 2048-token context window configured for \texttt{gpt-oss-20b} under GPTQ quantization. When the input exceeds \texttt{max\_model\_len}, vLLM silently returns an empty string, making the failure non-obvious. Increasing the context window would have required reducing \texttt{gpu\_memory\_utilization} further, leaving insufficient headroom for other concurrent models on the HPP GPU.
+An initial implementation delegated code synthesis to the hosted LLM via a structured prompt. Testing on the remote GPU deployment revealed a hard limitation: the prompt, which must embed model metadata, dataset paths, and reference code templates, exceeded the 2048-token context window configured for \texttt{gpt-oss-20b} under GPTQ quantization. When the input exceeds \texttt{max\_model\_len}, vLLM silently returns an empty string, making the failure non-obvious. Increasing the context window would have required reducing \texttt{gpu\_memory\_utilization} further, leaving insufficient headroom for other concurrent models on the shared GPU.
 
 Since the structure of \texttt{manager.py} and \texttt{trial.py} is fully determined by the dataset path, the model path, and a fixed search space, a template-based strategy was adopted. The \texttt{generate\_\allowbreak nni\_\allowbreak experiment()} function in \texttt{nni\_optimization/generator.py} now writes both files through Python f-strings with direct variable injection, as illustrated below:
 

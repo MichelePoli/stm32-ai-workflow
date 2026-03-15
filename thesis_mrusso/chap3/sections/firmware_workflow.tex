@@ -9,7 +9,7 @@ The orchestration logic splits into several interrelated agentic workflows. They
 
 \subsection{Firmware Generation Workflow}
 \label{sec:firmware_flow}
-Workflow 1 automates the initialization of STM32CubeMX projects through CLI-driven scripting, removing the need for manual GUI interaction and producing a reproducible firmware project structure.
+The \textit{Firmware Generation} workflow automates the initialization of STM32CubeMX projects through CLI-driven scripting, removing the need for manual GUI interaction and producing a reproducible firmware project structure.
 
 \subsubsection{Project Information Collection}
 
@@ -86,4 +86,4 @@ At runtime, \texttt{get\_\allowbreak template\_\allowbreak ioc\_\allowbreak path
 
 When the first CubeMX attempt returns a non-zero exit code or times out, \texttt{recover\_\allowbreak with\_\allowbreak ioc\_\allowbreak fallback()} takes over. It selects the best matching IOC template for the detected board or series, rewrites the \texttt{.scr} script to use \texttt{config load} instead of the generic board directive, and relaunches CubeMX with a 600-second timeout. The two-stage temporary directory strategy described in Section~\ref{subsec:two_stage_gen} applies unchanged to this retry. On completion, the output tree contains \texttt{main.c}, \texttt{stm32xxxx\_\allowbreak hal\_\allowbreak msp.c}, the linker script, and the IDE project files.
 
-Once generation succeeds, \texttt{finalize\_project()} stores the firmware project path in the graph state and yields control back to the orchestrator. The user is asked whether to proceed to AI model selection: confirming routes to Workflow 2, while declining closes the session.
+Once generation succeeds, \texttt{finalize\_project()} stores the firmware project path in the graph state and yields control back to the orchestrator. The user is asked whether to proceed to AI model selection: confirming routes to the \textit{AI Model Discovery} workflow (Section~\ref{sec:ai_flow}), while declining closes the session.

@@ -5,13 +5,13 @@ The framework combines several specialized open-source tools to cover inference,
 
 \subsection{DuckDuckGo Search Integration}
 
-Workflow 4 uses the \texttt{duckduckgo-search} (\url{https://pypi.org/project/duckduckgo-search/}) Python library to execute web queries. Early prototypes relied on agentic frameworks like Agno, which required LLM-specific function calling to extract parameters and invoke the search engine.
+The \textit{Web Research} workflow (Section~\ref{sec:web_research}) uses the \texttt{duckduckgo-search} (\url{https://pypi.org/project/duckduckgo-search/}) Python library to execute web queries. Early prototypes relied on agentic frameworks like Agno, which required LLM-specific function calling to extract parameters and invoke the search engine.
 
 To ensure compatibility with the centralized Triton Inference Server (which proxies raw token streams and lacks native support for complex tool-calling schemas), I transitioned to a decoupled approach. The LangGraph orchestrator now extracts search queries via structured output prompts. It then executes the search directly using the Python library, bypassing the LLM's function-calling layer entirely.
 
 \subsection{DeepEval for RAG Quality Assessment}
 
-DeepEval (\url{https://github.com/confident-ai/deepeval}) implements the LLM-as-a-Judge paradigm for automated output evaluation. After Workflow 4 generates a summary, four metrics are computed against the retrieved documents:
+DeepEval (\url{https://github.com/confident-ai/deepeval}) implements the LLM-as-a-Judge paradigm for automated output evaluation. After the \textit{Web Research} workflow generates a summary, four metrics are computed against the retrieved documents:
 
 \begin{enumerate}
     \item \textbf{Faithfulness}: $\frac{\text{Grounded Claims}}{\text{Total Claims}}$
@@ -91,10 +91,10 @@ stedgeai validate --model <model.h5> --target <stm32h743>
 stedgeai generate --model <model.h5> --compression <high>
 \end{verbatim}
 
-The toolchain converts Keras or TFLite models into optimized C code compatible with the X-CUBE-AI runtime library (v9.x). The three commands are called in sequence by Workflow 2: \texttt{analyze} profiles resource usage, \texttt{validate} confirms operator support on the target MCU, and \texttt{generate} produces the final inference artifacts.
+The toolchain converts Keras or TFLite models into optimized C code compatible with the X-CUBE-AI runtime library (v9.x). The three commands are called in sequence by the \textit{AI Model Discovery} workflow (Section~\ref{sec:ai_flow}): \texttt{analyze} profiles resource usage, \texttt{validate} confirms operator support on the target MCU, and \texttt{generate} produces the final inference artifacts.
 
 \subsection{NNI: Neural Network Intelligence}
 
-Microsoft's NNI framework (\url{https://nni.readthedocs.io}) handles hyperparameter search in Workflow 5. Rather than using NNI's static YAML configuration files, the framework generates experiment code programmatically at runtime. This lets the search space be constructed dynamically from the actual Keras model architecture under optimization, with custom trial logic for memory footprint control and adaptive layer replacement embedded directly in the generated scripts. Best-trial extraction and retraining are also triggered programmatically at the end of each experiment.
+Microsoft's NNI framework (\url{https://nni.readthedocs.io}) handles hyperparameter search in the \textit{Model Customization} workflow (Section~\ref{sec:customization}). Rather than using NNI's static YAML configuration files, the framework generates experiment code programmatically at runtime. This lets the search space be constructed dynamically from the actual Keras model architecture under optimization, with custom trial logic for memory footprint control and adaptive layer replacement embedded directly in the generated scripts. Best-trial extraction and retraining are also triggered programmatically at the end of each experiment.
 
 Supported tuners include TPE (Tree-structured Parzen Estimator), Random Search, Grid Search, and SMAC.
