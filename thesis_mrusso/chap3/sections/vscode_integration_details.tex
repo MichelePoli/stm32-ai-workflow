@@ -1,10 +1,10 @@
 % Section added for thesis enhancement (Feb 2026)
-\section{User Interaction and Tooling}
+\section{The User Interface Layer}
+
+To connect the backend LangGraph orchestrator to the developer's daily workflow, a custom Visual Studio Code extension was developed. This extension transforms the framework from a command-line tool into a real-time, context-aware assistant embedded directly in the Integrated Development Environment (IDE).
 
 \subsection{IDE Integration and Asynchronous Feedback}
 \label{sec:vscode_integration}
-
-To connect between the backend LangGraph orchestrator and the developer's daily workflow, a custom Visual Studio Code extension was developed. This extension transforms the framework from a command-line tool into a real-time, context-aware assistant embedded directly in the Integrated Development Environment (IDE).
 
 \subsection{Architecture Overview}
 
@@ -16,7 +16,7 @@ Also, the use of asynchronous execution ensures that long-running workflows, suc
 
 Finally, this decoupled approach inherently supports multi-client architecture, allowing the same backend to simultaneously serve the VS Code extension, command-line interfaces, and potential future web dashboards.
 
-\subsection{Extension Configuration (\texttt{package.json})}
+\subsection{VS Code Extension Configuration (\texttt{package.json})}
 
 The extension manifest registers a Chat Participant using VS Code's native chat interface API (introduced in VS Code 1.85+).
 
@@ -110,9 +110,7 @@ const handler: vscode.ChatRequestHandler = async (
 vscode.chat.createChatParticipant('stm32-ai.assistant', handler);
 \end{lstlisting}
 
-\textbf{Implementation Details:}
-
-The handler implementation incorporates several critical functionalities to manage errors and provide a fluid user experience.
+\paragraph{Implementation Details.}
 
 First, it implements graceful cancellation handling via the \texttt{CancellationToken}; this allows users to abort long-running requests simply by closing the chat window or clicking a stop button, which in turn drops the HTTP connection and signals the backend to terminate the LangGraph execution.
 
@@ -120,7 +118,7 @@ Then, to handle the unreliability of network streams where chunks might contain 
 
 Finally, the handler processes typed responses dynamically; the server emits distinct event types (such as \texttt{markdown}, \texttt{progress}, or \texttt{error}), and the frontend routing logic renders each type using the appropriate UI components within the VS Code chat view.
 
-\subsection{FastAPI Backend: Server-Side Streaming}
+\subsection{The Backend Communication Layer: FastAPI Streaming}
 
 The backend implements the \texttt{/stream} endpoint using FastAPI's \texttt{StreamingResponse}.
 
@@ -196,6 +194,12 @@ Then, the assistant facilitates inline documentation by embedding clickable file
 
 \subsection{Deployment and Testing}
 
-The development workflow for the extension involves three main steps. First, the compilation process uses \texttt{npm run compile} to transpile TypeScript source code into executable JavaScript in the \texttt{./out/extension.js} directory. Then, a debug session is initiated using \texttt{F5}, which opens an Extension Development Host environment where the \texttt{@stm32ai} handle becomes available. Finally, before beginning any tests, the FastAPI backend must be launched via the \texttt{python -m src.api.server} command.
+The development workflow for the extension involves three main steps:
+
+\begin{itemize}
+    \item \textbf{Compilation}: \texttt{npm run compile} transpiles the TypeScript source into executable JavaScript in the \texttt{./out/extension.js} directory.
+    \item \textbf{Debug session}: pressing \texttt{F5} opens an Extension Development Host environment where the \texttt{@stm32ai} handle becomes available.
+    \item \textbf{Backend prerequisite}: the FastAPI server must be running (\texttt{python -m src.api.server}) before starting any test.
+\end{itemize}
 
 To verify the correct operation of the system, several testing scenarios were executed. These included firmware generation requests (e.g., ``@stm32ai create a project for STM32H743 with STM32CubeIDE''), model analysis commands (e.g., ``@stm32ai analyze MobileNetV2 for STM32F4 with high compression''), and NNI optimization triggers. A specific test was also performed to verify that closing the chat window correctly triggers the \texttt{CancellationToken}, resulting in the graceful termination of long-running tasks.

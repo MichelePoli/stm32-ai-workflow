@@ -20,7 +20,7 @@ DeepEval (\url{https://github.com/confident-ai/deepeval}) implements the LLM-as-
     \item \textbf{Hallucination}: $1 - \frac{\text{Contradicted/Unsupported Claims}}{\text{Total Claims}}$
 \end{enumerate}
 
-All four metrics were initially evaluated by a local \texttt{OllamaModel} backed by \texttt{deepseek-r1:latest}, keeping the evaluation pipeline fully offline. Following the architectural migration to the HPP cluster (detailed in Section~\ref{sec:scalability_scenarios}), the evaluation was also performed using \texttt{gpt-oss-20b} served via the \textbf{NVIDIA Triton Inference Server}. The threshold for all metrics is set to 0.55. Evaluation runs synchronously in a separate thread via \texttt{asyncio.to\_thread} to avoid blocking the main event loop.
+All four metrics were initially evaluated by a local \texttt{OllamaModel} backed by \texttt{deepseek-r1:latest}, keeping the evaluation pipeline fully offline. Following the architectural migration to the centralized Triton backend (detailed in Section~\ref{sec:inference_infrastructure}), the evaluation was also performed using \texttt{gpt-oss-20b} served via the \textbf{NVIDIA Triton Inference Server}. The threshold for all metrics is set to 0.55. Evaluation runs synchronously in a separate thread via \texttt{asyncio.to\_thread} to avoid blocking the main event loop.
 
 \subsection{Ollama: Local Development and Benchmarking}
 
