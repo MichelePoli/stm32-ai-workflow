@@ -29,7 +29,7 @@
 \node[dec]  (ROUTE)  at (0,    -3.3)  {Route User \\ Request};
 
 %% --- Web exit (left) ---
-\node[co]   (WSOUT)  at (-5.5, -3.5)  {TO \\ FIG.\,3.3};
+\node[co]   (WSOUT)  at (-5.5, -3.5)  {TO \\ Web Research};
 
 %% --- AI Discovery (centre) — shifted down for label readability ---
 \node[dec]  (AISEL)  at ( 0.0, -6.0)  {Model Selection \\ Method?};
@@ -37,7 +37,7 @@
 \node[proc] (AIURL)  at ( 0.0, -8.0)  {Register \\ Custom Model URL};
 \node[proc] (AIWS)   at ( 3.8, -8.0)  {Iterative Search \\ HuggingFace / GitHub};
 \node[proc] (AIDL)   at ( 0.0,-10.0)  {Download \\ Model from Hub};
-\node[co]   (OUTAI)  at ( 0.0,-11.6)  {TO \\ FIG.\,3.2};
+\node[co]   (OUTAI)  at ( 0.0,-11.6)  {TO \\ Customize \\ Model?};
 
 %% --- Firmware (right) ---
 \node[proc] (FWA)    at (9.0, -4.5)  {Collect Project Info \\ MCU, Peripherals, Configs};
@@ -109,12 +109,12 @@
   ar/.style={->, thick, >=Stealth}]
 
 %% ---- COLUMN 1 (x=0, top-down) ----
-\node[co]   (FRA)  at ( 0,    0)   {FROM \\ FIG.\,3.1 \\ AI};
+\node[co]   (FRA)  at ( 0,    0)   {FROM \\ Download \\ Model};
 \node[dec]  (CUST) at ( 0,  -1.7) {Customize \\ Model?};
-\node[co]   (SKA)  at ( 3.8,-1.7) {TO \\ FIG.\,3.3};
+\node[co]   (SKA)  at ( 3.8,-1.7) {TO \\ Run STEdgeAI};
 \node[proc] (CUA)  at ( 0,  -3.4) {Inspect Model Architecture \\ Layer-by-layer Analysis};
 \node[dec]  (CINT) at ( 0,  -5.1) {User Wants \\ Modifications?};
-\node[co]   (SKB)  at ( 3.8,-5.1) {TO \\ FIG.\,3.3};
+\node[co]   (SKB)  at ( 3.8,-5.1) {TO \\ Run STEdgeAI};
 \node[proc] (CUB)  at ( 0,  -6.8) {Ask User for Modifications \\ Freeze, Dropout, Output, etc.};
 \node[proc] (CUC)  at ( 0,  -8.5) {Apply Customizations \\ Modify Architecture};
 
@@ -128,7 +128,7 @@
 \node[proc] (CVAL) at (8.0,-15.7)  {Validate Custom Model \\ Accuracy / Loss};
 \node[proc] (CSAV) at (8.0,-17.2)  {Save Final Model \\ .h5 + metadata};
 \node[dec]  (CCON) at (8.0,-18.9)  {Continue to \\ STEdgeAI Analysis?};
-\node[co]   (OUY)  at (5.8,-20.5)  {TO \\ FIG.\,3.3};
+\node[co]   (OUY)  at (5.8,-20.5)  {TO \\ Run STEdgeAI};
 \node[se]   (ENDB) at (10.2,-20.5) {END};
 
 %% --- Arrows col 1 ---
@@ -160,7 +160,7 @@
 %% --- Bounding box ---
 \begin{scope}[on background layer]
   \node[wb, fit=(CUA)(CINT)(CUB)(CUC)(CDS)(DREA)(DSYN)(COPT)(CNNI)(CSTD)(CVAL)(CSAV)(CCON)(OUY)(ENDB),
-        label={[font=\sffamily\tiny\bfseries,text=gray!60, yshift=-0.5mm,xshift=+2mm]above:Model Customization Workflow}]{};
+        label={[font=\sffamily\tiny\bfseries,text=gray!60, yshift=-0.5mm,xshift=+40mm]above:Model Customization Workflow}]{};
 \end{scope}
 \end{tikzpicture}}
 \caption{Detailed Workflow Diagram - Model customization workflow (Workflow~5). Left column: architecture inspection and modification. Right column: dataset acquisition, hyperparameter optimization via NNI, and model validation.}
@@ -187,8 +187,8 @@
   ar/.style={->, thick, >=Stealth}]
 
 %% --- FROM connectors ---
-\node[co]   (F3A)  at (-2.9,  0)   {FROM \\ FIG.\,3.2 \\ Custom.};
-\node[co]   (F3B)  at (-0.1,  0)   {FROM \\ FIG.\,3.2 \\ Skip};
+\node[co]   (F3A)  at (-2.9,  0)   {FROM \\ Customize \\ Model};
+\node[co]   (F3B)  at (-0.1,  0)   {FROM \\ Customize \\ Skip};
 
 %% --- STEdgeAI (WF2B) - x shifted -1.5 ---
 \node[proc] (ANA)  at (-1.5, -2.4)  {Run STEdgeAI Analyze \\ Memory \& cycle estimates};
@@ -208,7 +208,7 @@
 \node[se]   (ENDL) at (-1.5,-22.6) {END};
 
 %% --- Web Search (WF4, right column, shifted down) ---
-\node[co]   (F3C)  at ( 7.5, -1.0) {FROM \\ FIG.\,3.1 \\ Web};
+\node[co]   (F3C)  at ( 7.5, -1.0) {FROM \\ Route User \\ Request};
 \node[proc] (WSA)  at ( 7.5, -3.2) {Classify Search Intent \\ LLM Classification};
 \node[proc] (WSB)  at ( 7.5, -5.6) {Execute Search \\ DuckDuckGo API};
 \node[proc] (WSC)  at ( 7.5, -8.0) {Summarize Results \\ LLM Synthesis};
