@@ -1,53 +1,27 @@
-% Section added for thesis enhancement (Feb 2026)
-\subsection{State Management and Checkpointing (Redis)}
+\subsection{The Auxiliary Persistence Layer (Redis)}
 \label{sec:redis_architecture}
 
-The framework utilizes a dual-layer memory system built on Redis, providing both transient workflow state persistence and long-term user context retention. This architecture is necessary for supporting Human-in-the-Loop workflows and multi-session context chaining.
+LangGraph's built-in checkpointing writes a snapshot of the graph state after every node transition, which is enough for fault tolerance within a single session. It does not, however, retain user preferences or project context across separate sessions: once a thread terminates, all accumulated knowledge, such as the last used MCU board or the preferred compression level, is lost.
 
-\subsubsection{Architectural Overview}
+To fill this gap, I introduced an auxiliary persistence layer built on Redis. It operates on two levels. The first, \textit{short-term memory}, is the session state managed by LangGraph's \texttt{AsyncRedisSaver}. It stores the transient graph snapshot that enables HITL interrupt/resume and time-travel debugging. The second, \textit{long-term memory}, is a custom storage layer keyed by \texttt{user\_id}. It survives across sessions and retains context such as preferred hardware boards, last used models, and past project paths.
 
-Unlike traditional stateless APIs, the framework maintains two levels of memory:
+Together these two layers enable \textit{context chaining}: outputs from a previous session (e.g., the MCU target selected during \texttt{firmware\_flow}) automatically pre-populate the input context of future workflows (e.g., \texttt{ai\_flow}), eliminating redundant data entry.
 
-\begin{enumerate}
-  \item \textbf{Short-Term Memory (Session State)}: Managed by LangGraph's checkpointing system via \texttt{AsyncRedisSaver}. Stores the transient state of the active workflow graph, enabling fault tolerance and HITL interrupt/resume.
-  \item \textbf{Long-Term Memory (User Profile)}: A custom persistent storage layer keyed by \texttt{user\_id}. Survives across sessions and retains context such as preferred hardware boards, code generation style, and past project paths.
-\end{enumerate}
+\subsubsection{Short-Term Memory (LangGraph Checkpoints)}
 
-This dual-layer design enables \textbf{Context Chaining}, where outputs from previous sessions (e.g., the specific MCU target selected during \texttt{firmware\_flow}) automatically pre-populate input context for future workflows (e.g., \texttt{ai\_flow}), eliminating redundant user data entry.
+LangGraph checkpoints are stored using a composite key built from the \texttt{user\_id}, the \texttt{session\_id} (identifying the client instance), and a timestamp-based \texttt{checkpoint\_id} managed automatically by LangGraph, as in the following example:
 
-\subsubsection{Redis Key Structure Design}
-
-The framework uses a hierarchical key naming convention to organize data in Redis, ensuring clear separation between transient checkpoints and persistent profiles.
-
-\paragraph{Short-Term Memory (LangGraph Checkpoints)}
-
-LangGraph checkpoints are stored using a composite key structure:
-\begin{verbatim}
-checkpoint:{user_id}:{session_id}:{checkpoint_id}
-\end{verbatim}
-
-The key is composed of three primary elements: the \texttt{user\_id} (e.g., ``michele''), which serves as the unique identifier for the user; the \texttt{session\_id} (e.g., ``vscode-session''), which identifies the specific interface or session instance; and the \texttt{checkpoint\_id}, a timestamp-based unique ID managed automatically by LangGraph for each state snapshot.
-
-\textbf{Example Keys:}
 \begin{verbatim}
 checkpoint:michele:vscode-session:1707575432123
 checkpoint:michele:vscode-session:1707575455789
 checkpoint:john:cli-session:1707575500000
 \end{verbatim}
 
+This hierarchical naming enforces strict user isolation: different users can never access each other's checkpoints. It also supports session multiplexing, so a single user can run independent workflows from VS Code and CLI at the same time. Because each checkpoint ID contains a timestamp, the system preserves a clear temporal ordering that enables time-travel debugging.
 
-This hierarchical organization ensures strict User Isolation, preventing different users from sharing or accessing each other's checkpoints. It also supports Session Multiplexing, allowing a single user to run multiple independent workflows simultaneously across different clients like VS Code and CLI. Since checkpoint IDs are timestamped, the system also maintains a clear temporal ordering, which enables critical features like time-travel debugging.
+\subsubsection{Long-Term Memory (User Profiles)}
 
-\paragraph{Long-Term Memory (User Profiles)}
-
-User profiles follow a simpler key structure for direct access:
-\begin{verbatim}
-user:{user_id}:profile
-\end{verbatim}
-Example keys for this layer include \texttt{user:michele:profile} and \texttt{user:john:profile}.
-
-\textbf{Profile Schema:}
-The profile value is a JSON-serialized dictionary containing persistent user preferences:
+User profiles follow a simpler key structure for direct access (e.g., \texttt{user:michele:profile}). Each profile is a JSON-serialized dictionary that captures the user's most recent working context, as shown in Listing~\ref{lst:profile_schema}.
 
 \begin{lstlisting}[language=json, caption={User profile schema stored in Redis}, label={lst:profile_schema}]
 {
@@ -60,23 +34,11 @@ The profile value is a JSON-serialized dictionary containing persistent user pre
 }
 \end{lstlisting}
 
-\textbf{Profile Fields:}
-\begin{itemize}
-  \item \texttt{board\_name}: The most recently used STM32 board (e.g., ``NUCLEO-H743ZI''), used to pre-fill firmware generation requests
-  \item \texttt{mcu\_series}: The series of the target MCU (e.g., ``STM32H7'')
-  \item \texttt{last\_model}: The last AI model selected for optimization or integration
-  \item \texttt{last\_project\_path}: Path of the most recently generated or targeted firmware project directory
-  \item \texttt{last\_workflow}: The last executed workflow route (e.g., ``firmware'', ``ai\_analysis'')
-  \item \texttt{timestamp}: Timestamp of the last successful workflow completion
-\end{itemize}
+The schema records the most recently used STM32 board and MCU series (for pre-filling firmware generation requests), the last AI model selected for optimization, and the path of the latest firmware project directory. It also stores the last executed workflow route and a timestamp marking the most recent successful completion. When a new session starts, these fields allow the orchestrator to skip redundant questions and resume from a familiar context.
 
-\subsubsection{LangGraph Integration: \texttt{AsyncRedisSaver}}
+\subsubsection{Redis Integration and Implementation}
 
-The short-term memory layer is implemented using LangGraph's \texttt{AsyncRedisSaver} class, which abstracts Redis I/O operations.
-
-\paragraph{Initialization (\texttt{server.py})}
-
-The checkpointer is initialized during FastAPI server startup:
+The persistence layer is initialized during FastAPI server startup. An asynchronous Redis client connects to the local \texttt{redis://localhost:6379} instance and is wrapped by LangGraph's \texttt{AsyncRedisSaver}, which handles all checkpoint I/O transparently:
 
 \begin{lstlisting}[language=Python, caption={Redis checkpointer initialization in server.py}, label={lst:redis_init}]
 from langgraph.checkpoint.redis.aio import AsyncRedisSaver
@@ -99,11 +61,7 @@ await memory.setup()
 graph = builder.compile(checkpointer=memory)
 \end{lstlisting}
 
-The \texttt{memory.setup()} call creates internal Redis indexes used by RedisVL for efficient checkpoint retrieval and time-travel queries.
-
-\paragraph{Checkpoint Serialization}
-
-Each time a graph node completes execution, LangGraph automatically persists the \texttt{MasterState} to Redis. The checkpoint payload is a MessagePack or JSON-serialized structure:
+The \texttt{memory.setup()} call creates internal Redis indexes used by RedisVL for efficient checkpoint retrieval and time-travel queries. Each time a graph node completes, LangGraph automatically persists the \texttt{MasterState} to Redis as a MessagePack or JSON-serialized payload:
 
 \begin{verbatim}
 {
@@ -125,15 +83,9 @@ Each time a graph node completes execution, LangGraph automatically persists the
 }
 \end{verbatim}
 
-where \textbf{key fields} are \texttt{channel\_values} which contains the complete \texttt{MasterState} object with all 50+ attributes, \texttt{parent\_config} which is the reference to the previous checkpoint (for time-travel) and \texttt{ts} which is the timestamp for ordering checkpoints.
+The \texttt{channel\_values} field contains the complete \texttt{MasterState} with all 50+ attributes, \texttt{parent\_config} holds the reference to the previous checkpoint (for time-travel), and \texttt{ts} provides the timestamp for ordering.
 
-\subsubsection{Server-Side Profile Management}
-
-The long-term memory layer is manually managed in \texttt{server.py}.
-
-\paragraph{Profile Loading}
-
-Before executing the graph, the server loads the user profile from Redis and injects it into the \texttt{initial\_state}:
+The long-term memory layer is managed directly in \texttt{server.py}. Before graph execution, the server loads the user profile from Redis and injects it into the initial state:
 
 \begin{lstlisting}[language=Python, caption={User profile loading in server.py}, label={lst:profile_load}]
 # 1. Construct profile key
@@ -151,11 +103,7 @@ initial_state = {
 }
 \end{lstlisting}
 
-The \texttt{persistent\_context} field is accessible to all graph nodes, enabling context-aware decisions.
-
-\paragraph{Profile Saving}
-
-After workflow completion (or critical state mutations), the profile is updated:
+The \texttt{persistent\_context} field is then accessible to all graph nodes for context-aware decisions. After workflow completion or critical state mutations, the profile is updated with the latest values and written back:
 
 \begin{lstlisting}[language=Python, caption={User profile saving in server.py}, label={lst:profile_save}]
 # 1. Extract current values from state
@@ -176,69 +124,31 @@ updated_profile = {**user_profile, **new_profile}
 await redis_client.set(user_profile_key, json.dumps(updated_profile))
 \end{lstlisting}
 
-The \texttt{ex} (expiration) parameter prevents indefinite accumulation of inactive user profiles.
+\subsubsection{System Interaction Scenarios}
 
-\subsubsection{Context Chaining Across Sessions}
+The following scenarios illustrate how the dual-memory architecture supports real-world usage patterns.
 
-The dual-memory architecture enables powerful cross-session workflows:
+\paragraph{Scenario 1: Multi-Day NNI Experiment}
 
-\paragraph{Example: Multi-Day NNI Experiment}
+\textbf{Day 1, Session 1 (VS Code):}\newline
+The user requests an NNI experiment on MobileNetV2 for the Fruit-360 dataset. The framework launches 20 NNI trials, estimated to take 12 hours. After 2 hours the user closes VS Code. The short-term memory saves the checkpoint with \texttt{route = "nni\_optimization"} and \texttt{nni\_status = "running"}, while the long-term memory records \texttt{last\_board = "STM32H7"}.
 
-\textbf{Day 1 - Session 1 (VS Code):}
-\begin{enumerate}
-  \item User: ``@stm32ai run NNI experiment on MobileNetV2 for Fruit-360''
-  \item Framework launches NNI (20 trials, estimated 12 hours)
-  \item After 2 hours, user closes VS Code
-  \item \textbf{Short-Term Memory} saves checkpoint: \texttt{route = "nni\_optimization"}, \texttt{nni\_status = "running"}
-  \item \textbf{Long-Term Memory} saves: \texttt{last\_board = "STM32H7"}, \texttt{session\_count++}
-\end{enumerate}
+\textbf{Day 2, Session 2 (CLI):}\newline
+The user reconnects via CLI using the same \texttt{user\_id} and \texttt{session\_id}. The server calls \texttt{graph.aget\_state(config)}, retrieves the Day 1 checkpoint, and detects \texttt{current\_\allowbreak state.next = ["check\_\allowbreak nni\_\allowbreak status"]}. The graph resumes automatically: NNI results are retrieved from disk, the best model is saved, and integration proceeds.
 
-\textbf{Day 2 - Session 2 (CLI):}
-\begin{enumerate}
-  \item User reconnects via CLI with same \texttt{user\_\allowbreak id + session\_\allowbreak id}
-  \item \texttt{graph.aget\_state(config)} retrieves the checkpoint from Day 1
-  \item \textbf{Automatic Resume}: The graph detects \texttt{current\_\allowbreak state.next = ["check\_\allowbreak nni\_\allowbreak status"]} and resumes execution
-  \item NNI results are retrieved from disk, best model is saved, and integration proceeds
-\end{enumerate}
+\paragraph{Scenario 2: Board Preference Pre-Fill}
 
-\paragraph{Example: Board Preference Pre-Fill}
+\textbf{Session A (Firmware Generation):}\newline
+The user creates a project for STM32H743. Once firmware is generated, the profile is updated with \texttt{last\_board = "STM32H743ZI"}.
 
-\textbf{Session A (Firmware Generation):}
-\begin{enumerate}
-  \item User: ``Create project for STM32H743''
-  \item Firmware generated successfully
-  \item Profile updated: \texttt{last\_board = "STM32H743ZI"}
-\end{enumerate}
+\textbf{Session B (AI Model Selection, one week later):}\newline
+The user requests ``Analyze MobileNetV2'' without specifying hardware. The \texttt{collect\_\allowbreak analysis\_\allowbreak info()} node reads \texttt{state.last\_board} from the persistent context and auto-populates \texttt{target\_mcu = "stm32h743"}, eliminating one clarification roundtrip.
 
-\textbf{Session B (AI Model Selection, 1 week later):}
-\begin{enumerate}
-  \item User: ``Analyze MobileNetV2''
-  \item \textbf{Context Chaining}: The \texttt{collect\_\allowbreak analysis\_\allowbreak info()} node checks \texttt{state.last\_board} and auto-populates \texttt{target\_mcu = "stm32h743"}
-  \item No need for user to re-specify hardware → \textbf{Eliminated 1 clarification roundtrip}
-\end{enumerate}
+\paragraph{Scenario 3: HITL Interrupt and Resume}
 
-\subsubsection{HITL Resume Logic}
+During execution, a workflow node calls \texttt{interrupt(\{type: "decision\_request", message: "Proceed to AI?"\})}. LangGraph suspends and saves a checkpoint with \texttt{next = ["decide\_\allowbreak continue\_\allowbreak to\_\allowbreak ai"]}. The API server forwards a JSON event to VS Code, where the user sees: ``Firmware generated. Continue with AI model selection?''
 
-The short-term memory checkpoint enables continuous Human-in-the-Loop workflows:
-
-\paragraph{Interrupt Flow}
-
-\begin{enumerate}
-  \item Node calls \texttt{interrupt(\{type: "decision\_request", message: "Proceed to AI?"\})}
-  \item LangGraph suspends execution and saves checkpoint with \texttt{next = ["decide\_\allowbreak continue\_\allowbreak to\_\allowbreak ai"]}
-  \item Control returns to API server, which sends a JSON event to VS Code
-  \item User sees: ``Firmware generated. Continue with AI model selection? [Yes/No]''
-\end{enumerate}
-
-\paragraph{Resume Flow}
-
-\begin{enumerate}
-  \item User types: ``Yes, use high compression''
-  \item VS Code sends \texttt{POST /stream} with \texttt{messages: [\{role: "user", content: "Yes, use high compression"\}]}
-  \item Server calls \texttt{graph.aget\_state(config)} and detects \texttt{current\_\allowbreak state.next = ["decide\_\allowbreak continue\_\allowbreak to\_\allowbreak ai"]}
-  \item Server injects user response: \texttt{await graph.aupdate\_\allowbreak state(config, \{"user\_\allowbreak response": "Yes, use high compression"\})}
-  \item Graph resumes from \texttt{decide\_\allowbreak continue\_\allowbreak to\_\allowbreak ai} node, which parses the response via LLM and routes accordingly
-\end{enumerate}
+When the user replies (e.g., ``Yes, use high compression''), VS Code sends a \texttt{POST /stream} request. The server retrieves the latest checkpoint, injects the user response via \texttt{graph.aupdate\_state()}, and the graph resumes from the exact node that issued the interrupt, parsing the reply through an LLM and routing accordingly.
 
 \subsubsection{Performance Considerations}
 
