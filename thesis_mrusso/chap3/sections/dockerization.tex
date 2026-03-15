@@ -9,4 +9,99 @@ The \textbf{Redis Checkpointer} (\texttt{redis}) container runs \texttt{redis-st
 
 The \textbf{Triton Inference Server} (\texttt{triton-server}), as analyzed in Section \ref{sec:inference_infrastructure}, decouples the orchestration logic from the heavy LLM computation. While the initial architecture relied on a local \texttt{ollama} container, I migrated the inference backend to a dedicated NVIDIA Triton Inference Server to achieve horizontal scalability. The custom \texttt{Dockerfile.triton} extends the official NVIDIA image by injecting the \texttt{vLLM} engine and \texttt{sentence-transformers}. This configuration provides high-throughput token generation for models like Mistral and DeepSeek.
 
-Decoupling the agent logic from the Triton inference server creates a cloud-native topology. Developers can deploy the lightweight LangGraph container on an edge node or a local laptop, routing point-to-point HTTP/gRPC requests to a centralized, high-performance computing cluster hosting Triton.
+Decoupling the agent logic from the Triton inference server creates a cloud-native topology. Developers can deploy the lightweight LangGraph container on an edge node or a local laptop, routing point-to-point HTTP/gRPC requests to a centralized, high-performance computing cluster hosting Triton. Figure~\ref{fig:docker_architecture} summarizes this topology.
+
+\begin{figure}[htbp]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[
+  %% Styles
+  box/.style={draw, rounded corners=4pt, thick, fill=#1, text=black,
+              font=\sffamily\small, minimum width=5.2cm, minimum height=1.1cm,
+              align=center},
+  box/.default=white,
+  tagbox/.style={draw, rounded corners=2pt, fill=#1, font=\sffamily\tiny,
+                 inner sep=2pt, text=black},
+  tagbox/.default=gray!30,
+  lbl/.style={font=\sffamily\tiny, text=gray!60},
+  mnt/.style={->, dashed, thick, >=Stealth, gray!70},
+  ar/.style={->, thick, >=Stealth},
+  wb/.style={draw=gray!40, dashed, rounded corners=6pt, fill=yellow!6,
+             inner sep=10pt},
+  gpu/.style={draw=green!60!black, rounded corners=6pt, thick,
+              fill=green!8, inner sep=10pt},
+]
+
+%% ── USER (top centre) ─────────────────────────────────────────────────────
+\node[box=pink!40]    (USER)  at (0,  0)   {Developer / User \\ \texttt{VS Code Extension :8000}};
+
+%% ── DOCKER NETWORK (dashed box) ───────────────────────────────────────────
+%% langgraph-app
+\node[box=blue!12]    (LG)    at (-3.8, -3.2) {\textbf{langgraph-app} \\
+                                                \texttt{FastAPI + LangGraph}\vspace{1pt}\\
+                                                \texttt{port 8000}};
+\node[tagbox=orange!40, above right=-1mm and -1mm of LG.north east,
+      anchor=north east] {Ubuntu 22.04 · UID 1002};
+
+%% redis
+\node[box=red!12]     (RD)    at ( 3.8, -3.2) {\textbf{redis} \\
+                                                \texttt{redis-stack-server}\vspace{1pt} \\
+                                                \texttt{volume: redis\_data}};
+\node[tagbox=red!30, above right=-1mm and -1mm of RD.north east,
+      anchor=north east] {port 6379};
+
+%% Virtual docker network background
+\begin{scope}[on background layer]
+  \node[wb, fit=(LG)(RD),
+        label={[font=\sffamily\small\bfseries, text=blue!60!black]above:
+               Docker Internal Network (\texttt{docker-compose})}] (NET) {};
+\end{scope}
+
+%% ── HOST BIND MOUNTS (left) ───────────────────────────────────────────────
+\node[draw, rounded corners=3pt, fill=gray!15, align=left,
+      font=\sffamily\tiny, inner sep=6pt]
+     (MNT) at (-9.0, -3.2) {
+       \textbf{Host Bind Mounts (read-only)}\\[2pt]
+       \texttt{STM32CubeMX}\\
+       \texttt{STEdgeAI CLI}\\
+       \texttt{Miniconda envs}\\[4pt]
+       \textbf{Volumes (read-write)}\\[2pt]
+       \texttt{AI models}\\
+       \texttt{Firmware output}\\
+       \texttt{STEdgeAI workspace}
+     };
+
+%% ── TRITON (bottom, external) ─────────────────────────────────────────────
+\node[box=green!15, minimum width=7cm, minimum height=1.3cm]
+     (TR)    at (0, -6.8) {\textbf{Triton Inference Server} (remote) \\
+                           \texttt{vLLM · Mistral · DeepSeek · Embeddings}};
+\node[tagbox=green!50, above right=-1mm and -1mm of TR.north east,
+      anchor=north east] {NVIDIA GPU · HPP cluster};
+\begin{scope}[on background layer]
+  \node[gpu, fit=(TR),
+        label={[font=\sffamily\footnotesize\bfseries, text=green!60!black]
+               above:Remote GPU Server (HPP)}] {};
+\end{scope}
+
+%% ── ARROWS ────────────────────────────────────────────────────────────────
+%% User <-> langgraph-app
+\draw[ar] (USER.south west) -- ++(0,-0.5) -| (LG.north)
+          node[midway, left, lbl]{HTTP / WebSocket};
+
+%% langgraph-app <-> redis
+\draw[ar, <->] (LG.east) -- node[above, lbl]{TCP 6379} (RD.west);
+
+%% bind mounts -> langgraph-app
+\draw[mnt] (MNT.east) -- node[above, lbl]{bind mount} (LG.west);
+
+%% langgraph-app -> Triton (external)
+\draw[ar] (LG.south) -- ++(0,-0.6) -|
+          node[near start, right, lbl]{HTTP/gRPC}
+          (TR.north west);
+
+\end{tikzpicture}%
+}
+\caption{Docker deployment topology. The \texttt{langgraph-app} and \texttt{redis} containers share an internal virtual network. Host tools (STM32CubeMX, STEdgeAI, Miniconda) are injected as read-only bind mounts. The NVIDIA Triton Inference Server runs on a remote GPU cluster and is reached over HTTP/gRPC.}
+\label{fig:docker_architecture}
+\end{figure}
+
