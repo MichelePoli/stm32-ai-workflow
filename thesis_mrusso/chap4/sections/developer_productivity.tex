@@ -1,5 +1,4 @@
-% Section added for thesis enhancement (Feb 2026)
-\section{Developer Productivity: Workflow-Level Time Analysis}
+\section{Automation Impact Analysis}
 \label{sec:productivity}
 
 A primary metric for evaluating the framework is the reduction in development time compared to manual workflows. Data from industry benchmarks and empirical observations provide a direct comparative time analysis.
@@ -14,7 +13,7 @@ To establish accurate baselines, I applied an analytical evaluation methodology 
     \item \textbf{Development Log Analysis}: Timestamped conversations from the integration debugging process documented in project notes, reflecting real-world challenges such as Keras version conflicts and NNI API troubleshooting.
 \end{enumerate}
 
-Test runs on a development workstation (Intel i7-12700K, 32GB RAM, NVIDIA RTX 3070) provided the automated workflow timings. These median execution times offer a direct comparison against the manual baseline.
+The automated workflow timings are conservative theoretical estimates. I derived them by combining known API latencies (STEdgeAI execution, Docker overhead, LLM token streaming) with the elimination of human pointing and clicking phases modeled in the GOMS framework. These time bounds provide a direct mathematical comparison against the manual baseline.
 
 \subsection{Comparative Time Analysis}
 
@@ -71,7 +70,7 @@ Beyond raw time savings, the framework reduces cognitive load: developers specif
 
 \subsubsection{Limitations}
 
-The manual time estimates rely on official documentation and representative developer experiences; actual times vary based on individual expertise. These comparisons assume standard workflows. Organizations utilizing customized toolchains or proprietary CI/CD pipelines will experience different speedup ratios. The automated timings represent median values during test runs. Real-world performance fluctuates due to network latency during model downloads, variable LLM inference speeds, and Redis I/O overhead.
+The manual time estimates rely on official documentation and representative developer experiences; actual times vary based on individual expertise. These comparisons assume standard workflows. Organizations utilizing customized toolchains or proprietary CI/CD pipelines will experience different speedup ratios. The automated timings represent a theoretical baseline. Real-world performance for the autonomous system fluctuates based on network latency during model downloads, token generation speed on the inference cluster, and Redis I/O overhead.
 
 The analysis omits the initial framework setup costs (configuring Docker containers and downloading STM32Cube packages), as this overhead becomes negligible when amortized across multiple projects.
 

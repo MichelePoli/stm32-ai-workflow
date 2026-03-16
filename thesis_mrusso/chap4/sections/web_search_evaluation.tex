@@ -50,9 +50,9 @@ Table~\ref{tab:deepeval-ollama} reports the metric scores for each test case.
 
 \textbf{Test 1 -- AI Model Search}: \textit{``Lightweight AI models for image classification on STM32H7''}. Contextual Relevancy reached 0.90, the highest single score in this campaign, confirming that the retriever consistently surfaced authoritative sources, including TensorFlow documentation and arXiv pre-prints. The Faithfulness score of 0.60 reflects the model's tendency to enrich retrieved content with general domain knowledge, for instance citing typical MobileNet use cases not found verbatim in the retrieved pages. Zero hallucination confirms no fabricated facts were introduced.
 
-\textbf{Test 2 -- Board Selection}: \textit{``Qual è la migliore board STM32 per un progetto di audio recognition?''}. Answer Relevancy fell to 0.18 because the query asked for a single best board while the response listed three options. The model also introduced pricing estimates absent from the retrieved snippets, triggering a hallucination score of 0.25. This episode illustrates a recurring pattern: a richer answer is more useful to the developer but scores lower against strict faithfulness criteria.
+\textbf{Test 2 -- Board Selection}: \textit{``What is the best STM32 board for an audio recognition project?''}. Answer Relevancy fell to 0.18 because the query asked for a single best board while the response listed three options. The model also introduced pricing estimates absent from the retrieved snippets, triggering a hallucination score of 0.25. This episode illustrates a recurring pattern: a richer answer is more useful to the developer but scores lower against strict faithfulness criteria.
 
-\textbf{Test 3 -- Optimization Guide}: \textit{``Come converto un modello PyTorch in ONNX per STM32?''}. \textbf{Faithfulness reached 1.00}, meaning every claim in the summary was traceable to a retrieved document. Step-by-step guides and tool comparisons (STEdgeAI, TensorFlow Lite, TVM) were reproduced accurately. Figure~\ref{fig:pytorch-onnx} shows the visual output.
+\textbf{Test 3 -- Optimization Guide}: \textit{``How do I convert a PyTorch model to ONNX for STM32?''}. \textbf{Faithfulness reached 1.00}, meaning every claim in the summary was traceable to a retrieved document. Step-by-step guides and tool comparisons (STEdgeAI, TensorFlow Lite, TVM) were reproduced accurately. Figure~\ref{fig:pytorch-onnx} shows the visual output.
 
 \begin{figure}[ht]
     \centering
@@ -61,7 +61,7 @@ Table~\ref{tab:deepeval-ollama} reports the metric scores for each test case.
     \label{fig:pytorch-onnx}
 \end{figure}
 
-\textbf{Test 4 -- Theoretical Comparison}: \textit{``TinyML vs Edge AI: differenze principali''}. This query produced the best combined scores (Answer Relevancy 0.88, Contextual Relevancy 0.86). Conceptual queries align naturally with well-structured academic sources; DuckDuckGo returned STMicroelectronics white papers and datasheets, giving the summariser solid factual material. Figure~\ref{fig:tinyml-edgeai} shows the output.
+\textbf{Test 4 -- Theoretical Comparison}: \textit{``TinyML vs Edge AI: main differences''}. This query produced the best combined scores (Answer Relevancy 0.88, Contextual Relevancy 0.86). Conceptual queries align naturally with well-structured academic sources; DuckDuckGo returned STMicroelectronics white papers and datasheets, giving the summariser solid factual material. Figure~\ref{fig:tinyml-edgeai} shows the output.
 
 \begin{figure}[ht]
     \centering
@@ -70,7 +70,7 @@ Table~\ref{tab:deepeval-ollama} reports the metric scores for each test case.
     \label{fig:tinyml-edgeai}
 \end{figure}
 
-\textbf{Test 5 -- Hardware Comparison}: \textit{``Confronta STM32H7 e STM32N6 per performance AI''}. Faithfulness fell to 0.44: the summary included exact part numbers and bulk pricing absent from the retrieved snippets, drawn from the model's pre-training data. DeepEval correctly flagged this (Hallucination 0.33). The answer was practically useful, yet technically unsupported by retrieval.
+\textbf{Test 5 -- Hardware Comparison}: \textit{``Compare STM32H7 and STM32N6 for AI performance''}. Faithfulness fell to 0.44: the summary included exact part numbers and bulk pricing absent from the retrieved snippets, drawn from the model's pre-training data. DeepEval correctly flagged this (Hallucination 0.33). The answer was practically useful, yet technically unsupported by retrieval.
 
 \subsubsection{Aggregate Analysis}
 Contextual Relevancy is the most stable indicator across Phase~1 (mean 0.75, $\sigma$ 0.16), confirming that DuckDuckGo combined with paragraph-level chunking reliably surfaces relevant content. Faithfulness varies more ($\sigma$ 0.22): procedural queries score near 1.00 while exploratory queries drop when the model supplements retrieval with prior knowledge. The Hallucination mean of 0.14 confirms that outright fabrication is infrequent; non-zero cases correspond to hardware prices and part numbers absent from the retrieved context.
