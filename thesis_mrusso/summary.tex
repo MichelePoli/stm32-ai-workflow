@@ -6,25 +6,18 @@
 \usepackage{url}
 \usepackage{microtype}
 
-\oddsidemargin 0pt
-\evensidemargin 0pt
-\marginparwidth 40pt
-\marginparsep 10pt
-\topmargin -20pt
-\headsep 10pt
-\textheight 8.7in
-\textwidth 6.65in
-\linespread{1.2}
-
-\title{\textbf{From IDE to Edge: A Cloud-Native Multi-Agent Framework for Automated Edge AI Deployment on STM32}}
-\author{\textbf{Supervisors}\\Prof. Gianvito Urgese  \\ Andrea Pignata \\ Giuseppe Fanuli \and \textbf{Candidate} \\ Michele \textsc{Russo}}
-\date{March, 2026\\Politecnico di Torino}
+\usepackage[margin=1.5cm]{geometry}
+\linespread{1.1}
 
 \begin{document}
 
-\maketitle
+\begin{center}
+    {\Large \textbf{From IDE to Edge: A Cloud-Native Multi-Agent Framework for Automated Edge AI Deployment on STM32}}\\[0.2cm]
+    {\normalsize Michele Russo}
+\end{center}
 
-\section*{Summary}\label{section:summary}
+\vspace{0.3cm}
+\textbf{Summary}
 
 Deploying a neural network on a resource-constrained STM32 microcontroller is a multi-stage process that requires expertise in both machine learning and embedded systems. In a typical manual workflow, an engineer configures the peripheral hardware with STM32CubeMX, converts and quantizes the model with STEdgeAI, fine-tunes or compresses the network to satisfy Flash and RAM budgets, and finally patches the generated C code to integrate the inference engine into the firmware project. Each step involves a separate tool with its own command-line interface, configuration format, and failure mode. Engineers usually connect these steps through hand-crafted shell scripts or manual copy-paste operations. This fragmented approach pushes iteration cycles beyond four hours, even for experienced developers. The friction raises the barrier to entry, as practitioners must be fluent in TensorFlow, embedded C, and ARM toolchains simultaneously.
 
@@ -67,6 +60,6 @@ I also evaluated the Web Search workflow using a DeepEval LLM-as-a-Judge paradig
 
 Concurrency stress tests pushed the Triton back-end to 15 simultaneous users requesting complex text generation across two models over a 1~Gbps network connection. VRAM occupation stabilized at approximately 37~GB (80\% of A40 capacity) while GPU compute stayed near 100\%, demonstrating that the network link was not a throughput bottleneck.
 
-The architecture is already prepared for the next scale step. Because the orchestration containers are GPU-free, migrating from Docker Compose to Kubernetes requires only replacing the compose manifest with a deployment specification. A horizontal pod autoscaler can then scale the LangGraph layer independently from the Triton server, enabling enterprise teams to share the GPU cluster without constraining the agent layer.
+The architecture is already prepared for the next scale step. Because the orchestration containers are GPU-free, migrating from Docker Compose to Kubernetes requires only replacing the compose manifest with a deployment specification.
 
 \end{document}
