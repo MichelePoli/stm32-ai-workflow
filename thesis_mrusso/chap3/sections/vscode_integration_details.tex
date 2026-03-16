@@ -112,6 +112,8 @@ vscode.chat.createChatParticipant('stm32-ai.assistant', handler);
 
 \paragraph{Implementation Details.}
 
+The handler implementation incorporates several critical functionalities to manage errors and provide a fluid user experience.
+
 First, it implements graceful cancellation handling via the \texttt{CancellationToken}; this allows users to abort long-running requests simply by closing the chat window or clicking a stop button, which in turn drops the HTTP connection and signals the backend to terminate the LangGraph execution.
 
 Then, to handle the unreliability of network streams where chunks might contain partial JSON objects, the extension utilizes NDJSON buffering. A \texttt{buffer} string accumulates incoming data until a complete, newline-delimited JSON object is successfully parsed.

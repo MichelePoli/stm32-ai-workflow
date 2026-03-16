@@ -1,7 +1,7 @@
 \section{The Inference Layer}
 \label{sec:inference_infrastructure}
 
-Every workflow node that requires natural-language reasoning delegates its request to a centralized inference abstraction. The utility function \texttt{get\_llm()} in \texttt{utils.py} serves as the single entry point: it receives a model name and optional parameters, then decides at runtime whether to route the request to a local Ollama instance or to a remote NVIDIA Triton Inference Server. A single environment variable, \texttt{USE\_TRITON\_BACKEND}, controls the switch. The workflow code stays completely agnostic to the serving backend; changing engines requires toggling one flag and nothing else.
+Every workflow node that requires natural-language reasoning delegates its request to a centralized inference abstraction. The utility function \texttt{get\_llm()} in \texttt{utils.py} serves as the single entry point: it receives a model name and optional parameters, then decides at runtime whether to route the request to a local Ollama instance or to a remote NVIDIA Triton Inference Server. This decision is based on a global \texttt{USE\_TRITON\_BACKEND} flag and the compatibility of the requested model with the Triton repository. The workflow code stays completely agnostic to the serving backend; changing engines requires toggling one flag and nothing else.
 
 \subsection{Serving with Ollama}
 
@@ -39,7 +39,7 @@ To support concurrent access, the framework injects strict virtual device config
 
 \begin{lstlisting}[language=Python, caption={Strict VRAM partitioning for concurrent TensorFlow subprocesses}, label={lst:vram_partitioning}]
 # Prevent greedy VRAM allocation by forcing a hard limit
-gpus = tf.config.experimental.list_physical_devices('GPU')
+gpus = tf.config.list_physical_devices('GPU')
 if gpus:
     for gpu in gpus:
         tf.config.experimental.set_virtual_device_configuration(
