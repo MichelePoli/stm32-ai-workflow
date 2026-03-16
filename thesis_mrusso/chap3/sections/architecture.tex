@@ -16,7 +16,7 @@ Each layer has a well-defined responsibility and communicates with the adjacent 
 
     \item \textbf{State \& Memory Layer.} A dedicated \textbf{Redis} container serves two distinct roles. First, it acts as the LangGraph checkpointer, persisting the full \texttt{MasterState} at every node transition to support fault-tolerant resumption and Human-in-the-Loop (HITL) interrupts. Second, it stores per-user long-term profiles (preferred board, last model, project paths) that survive across sessions.
 
-    \item \textbf{Inference Layer.} All LLM calls are forwarded over the network to a centralized \textbf{NVIDIA Triton Inference Server} deployed on the inNuCE Lab Heterogeneous Prototyping Platform (HPP) \cite{innuce_website}, which mounts an NVIDIA A40 with 45~GB of VRAM. Triton handles dynamic model loading and GPU memory sharing across concurrent users, keeping the local orchestration containers free of any GPU dependency.
+    \item \textbf{Inference Layer.} All LLM calls are forwarded over the network to a centralized \textbf{NVIDIA Triton Inference Server}. Triton handles dynamic model loading and GPU memory sharing across concurrent users, keeping the local orchestration containers free of any GPU dependency.
 \end{enumerate}
 
 The \textbf{Orchestration Layer} (L3) coordinates five agentic workflows, each mapping to a specific phase of the Edge AI development lifecycle:

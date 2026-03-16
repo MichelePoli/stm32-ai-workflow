@@ -2,13 +2,14 @@
 Good morning everyone. I'm Michele Russo and today I present my thesis: "From IDE to Edge: A Cloud-Native Multi-Agent Framework for Automated Edge AI Deployment on STM32".
 
 [Slide 2: The Core Problem]
-Right now, a real disconnect exists in embedded development. AI engineers write Python and train large neural networks. Embedded engineers write C, fight strict memory limits, and program bare-metal STM32 hardware.
-Bridging those two worlds — pushing a neural network onto a microcontroller — is called Edge AI. And right now, it is a highly manual process. Developers must master a fragmented toolchain: STM32CubeMX for hardware configuration, STEdgeAI for model conversion, custom Python scripts for hyperparameter tuning, and manual C-code integration.
-My tests show this pipeline takes an expert over 4 hours. Most of that time is wasted navigating dense GUIs, reading datasheets, writing repetitive boilerplate, and debugging tiny misconfigurations.
+Right now, a real disconnect exists in embedded development. AI engineers write Python and train large neural networks. Embedded engineers write C, fight strict memory limits and write low-level firmware directly on STM32 hardware.
+Connecting those two worlds and pushing a neural network onto a microcontroller is called Edge AI. 
+And right now, it is a highly manual process. Developers must master a fragmented toolchain, for example: STM32CubeMX for hardware configuration, STEdgeAI for model conversion, custom Python scripts for hyperparameter tuning, and manual C-code integration.
+My tests show this pipeline takes an expert over 4 hours. Most of that time is wasted navigating dense GUIs, reading datasheets, writing repetitive code, and debugging tiny misconfigurations.
 The answer I propose is to replace that tedious toolchain with a multi-agent AI framework and, instead of clicking through interfaces, the developer write a simple prompt to their IDE like: "Generate an STM32H7 project, find a small MobileNet and integrate it into my C code."
 
 [Slide 3: Architecture — The Five Layers]
-(~2.5 minuti fin qui)
+(~2 minuti fin qui)
 
 As shown in this diagram, the framework is structured across five distinct layers, each with a well-defined responsibility.
 
