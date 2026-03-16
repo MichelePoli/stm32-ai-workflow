@@ -12,7 +12,7 @@
         ]
 
         % === LEFT COLUMN ===
-        \node[wf, fill=orange!15] (search) at (-5.8, -0.6) {\textbf{5. Web Research}\\(\texttt{search\_flow})};
+        \node[wf, fill=orange!15] (search) at (-5.8, -1.0) {\textbf{5. Web Research}\\(\texttt{search\_flow})};
         \node[wf, fill=purple!12] (custom) at (-5.0, -3.6) {\textbf{3. Customization}\\(\texttt{customization\_flow})};
 
         % === CENTER COLUMN (x = 0) ===
@@ -34,7 +34,7 @@
 
         % Router dispatches
         \draw[arrow] (router) -- node[label, below, align=center, pos=0.5] {route:\\firmware} (firmware);
-        % Route to search: exits from WEST. Drops straight to search.
+        % Route to search: orizzontale da router.west, poi verticale giù a search.north
         \draw[arrow] (router.west) -| node[label, above, pos=0.3] {route: search} (search.north);
         \draw[arrow] (router) -- node[label, right] {route: ai} (ai);
 
@@ -43,7 +43,6 @@
 
         % Decision 1 branches
         \draw[arrow] (d1) -- node[label, above] {Yes} (ai);
-        % Line "No -> END" extreme right
         \draw[arrow] (d1.east) -- (7.5, -1.8) |- (endnode.east) node[near start, right] {No};
 
         % AI → Customize Decision
@@ -54,7 +53,6 @@
         \draw[arrow] (d_cust) -- node[label, right] {No} (stedgeai);
 
         % Customization → STEdgeAI
-        % Starts from the bottom (.south) of Customization, drops down and right, connects to STEdgeAI
         \draw[arrow] (custom.south) |- (stedgeai.west);
 
         % STEdgeAI → Decision 2
@@ -65,17 +63,10 @@
         \draw[arrow] (d2) -- node[label, above] {No} (endnode);
 
         % Integration → END
-        % Passes extreme right (x=7.5) and drops down to END
-        \draw[arrow] (integration.east) -- (7.5, -9.0) |- (endnode.south);
+        \draw[arrow] (integration.east) -| (endnode.south);
 
         % Search → END
-        % Exits left from the block, drops well below the Integration block, goes right past the center, then up to the bottom of END
-        \draw[arrow] (search.west) -- (-7.8, -0.6) |- (-7.8, -10.8) -| (endnode.south);
-
-        % ============================================================
-        % CYCLES (graph nature, not tree)
-        % ============================================================
-        % (All cycles have been removed to preserve a clean sequence overview)
+        \draw[arrow] (search.west) -- (-7.8, -1.0) -- (-7.8, -10.8) -| (endnode.south);
 
     \end{tikzpicture}
     \caption{Interconnected graph of the five primary workflows. Solid arrows represent the main execution pipeline.}
