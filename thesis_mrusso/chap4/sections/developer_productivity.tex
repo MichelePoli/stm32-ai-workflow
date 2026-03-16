@@ -103,6 +103,7 @@ Table~\ref{tab:tool_comparison} contrasts the proposed architecture with standar
     \caption{Automation Coverage Comparison}
     \label{tab:tool_comparison}
     \small
+    \resizebox{\textwidth}{!}{%
     \begin{tabular}{|l|c|c|c|c|}
         \hline
         \textbf{Tool}                   & \textbf{STM32 Native} & \textbf{Auto-Tuning} & \textbf{Conversational} & \textbf{E2E Project}   \\
@@ -118,7 +119,8 @@ Table~\ref{tab:tool_comparison} contrasts the proposed architecture with standar
         \hline
         TFLite Micro\cite{tflite_micro} & $\times$              & $\times$             & $\times$                & $\times$               \\
         \hline
-    \end{tabular}
+    \end{tabular}%
+    }
 \end{table}
 
 Table~\ref{tab:tool_comparison} highlights the architectural focus of different MLOps platforms. Commercial solutions like Edge Impulse provide powerful auto-tuning (EON Tuner) and successfully generate compilable C++ deployment blocks for microcontrollers. However, they rely strictly on graphical web interfaces and leave the final IDE project integration to the developer. NVIDIA TAO delivers powerful transfer learning and tuning, yet it targets higher-end GPU architectures rather than constrained STM32 edge devices. Bare-metal libraries such as TFLite Micro provide the core runtime but offer zero deployment orchestration. STM32Cube.AI generates highly optimized C-code arrays but operates as a standalone CLI or GUI tool, requiring manual invocation sequence.

@@ -1,7 +1,9 @@
 \section{Customization Workflow Validation: End-to-End Automated Fine-Tuning}
 \label{sec:auto_finetuning_results}
 
-To validate the reliability of the automated decision-making logic described in Chapter 3, a complete end-to-end user session was recorded and analyzed. The objective was to verify:
+In this experiment, the framework was tasked with adapting a generic vision model to a specific and constrained use case. The simulated developer requested the deployment of a MobileNetV1 architecture on an STM32F401 microcontroller to classify the Fruit-360 dataset. Through natural language prompts, the user instructed the agent to freeze the initial feature extraction layers and inject dropout regularization. 
+
+To validate the reliability of the automated decision-making logic described in Chapter 3, this complete end-to-end user session was recorded and analyzed. The objective was to verify:
 \begin{enumerate}
     \item The autonomous handling of class-mismatch between pre-trained models and custom datasets.
     \item The efficacy of the anti-overfitting heuristics (layer freezing and dynamic dropout).
