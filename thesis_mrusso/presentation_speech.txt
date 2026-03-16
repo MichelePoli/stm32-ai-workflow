@@ -13,19 +13,24 @@ The answer I propose is to replace that tedious toolchain with a multi-agent AI 
 
 As shown in this diagram, the framework is structured across five distinct layers, each with a well-defined responsibility.
 
-At the top is the IDE Layer. The developer interacts through a custom VS Code extension. It hosts a live chat panel directly inside the editor and streams responses asynchronously, so the editor stays responsive even during long operations.
+At the top is the IDE Layer. The developer interacts through a custom VS Code extension that integrates directly into the editor's native chat. By simply typing @stm32ai in the chat panel, the developer can communicate with the LangGraph backend container. It streams responses asynchronously, so the editor stays completely responsive even during long operations.
 
-Below that is the API Gateway. A FastAPI server exposes a single streaming endpoint. It receives each message from the extension, retrieves the user's long-term profile from Redis, constructs the initial graph state, and pipes back structured JSON events in real time.
+Below that is the API Gateway. A FastAPI server exposes a single streaming endpoint. It receives each message from the extension, retrieves the user's long-term profile from Redis, constructs the initial graph state, and streams responses back in real time.
 
 The core of the system is the Orchestration Layer, and this is where I want to spend a moment. I built the entire agentic pipeline using LangGraph. LangGraph lets you define workflows as directed, stateful graphs, where each node is a specialist agent, and edges represent transitions between phases of the development lifecycle.
+(~1.30 minuti)
 
-At the beginning, the master graph routes each user request to one of three primary workflows: Firmware Generation, AI Analysis, or Web Research. The AI workflow itself contains nested subgraphs for Model Customization and Firmware-AI Integration, which are reached through sequential inter-workflow transitions once the upstream stages are complete. Outputs from one stage automatically populate the inputs of the next, so the MCU target chosen during firmware setup is already in context when the AI agent starts looking for a compatible model. No repeated questions, no configuration mismatches.
+[qui inserirei un'altra slide o forse semplicemente spiego dopo?]
+[tipo: The core of the system is the Orchestration Layer. At the beginning, the master graph routes each user request to one of three primary workflows: Firmware Generation, AI Analysis, or Web Research. I will break down exactly how these workflows operate in the next few slides. But what's important here is that outputs from one stage automatically populate the inputs of the next [...]]
+
+At the beginning, the master graph routes each user request to one of three primary workflows: Firmware Generation, AI Analysis or Web Research. The AI workflow itself contains nested subgraphs for Model Customization and Firmware-AI Integration, which are reached through sequential inter-workflow transitions once the upstream stages are complete. 
+Outputs from one stage automatically populate the inputs of the next, so the MCU target chosen during firmware setup is already in context when the AI agent starts looking for a compatible model, so we don't have repeated questions or configuration mismatches.
 
 Between workflows, LangGraph checkpoints the full state to Redis at every node transition. This means the system can resume from exactly where it left off after a Human-in-the-Loop pause, a network timeout, or any transient failure.
 
-Below that is the State and Memory Layer. Redis serves two roles here: it is the LangGraph checkpointer, and it also stores per-user long-term profiles — preferred board, last model, previous project paths — that persist across sessions.
+Then we have the State and Memory Layer. Redis serves two roles here: it is the LangGraph checkpointer, and it also stores per-user long-term profiles — preferred board, last model, previous project paths — that persist across sessions.
 
-Finally, at the bottom is the Inference Layer. All LLM calls are forwarded over the network to a centralized NVIDIA Triton Inference Server, deployed on the inNuCE Lab cluster with an NVIDIA A40 and 45 GB of VRAM. Triton handles dynamic model loading and shares GPU memory across concurrent users. The local containers need no GPU at all.
+Finally, at the bottom is the Inference Layer. All LLM calls are forwarded over the network to a centralized NVIDIA Triton Inference Server, deployed on our lab's remote cluster. Triton handles dynamic model loading and shares GPU memory across concurrent users. This decoupling means the orchestration containers run entirely on standard hardware, requiring no GPU at all.
 
 [Slide 4: IDE Integration & Human-in-the-Loop]
 (~4.5 minuti fin qui)
@@ -93,7 +98,7 @@ On knowledge quality: DeepEval measured an average Contextual Relevancy of 75% a
 
 This framework shows that multi-agent orchestration is a viable path for embedded AI development. Headless CubeMX generation, a centralized Triton inference backend, and NNI optimization all run as a single, coherent system from inside the IDE.
 
-The architecture is already designed for the next step. Because the orchestration containers are completely GPU-free, migrating to Kubernetes is straightforward — replacing Docker Compose with a Kubernetes deployment lets enterprise teams scale the agent layer horizontally while Triton continues to manage the GPU cluster.
+The architecture is already designed for the next step. Because the orchestration containers are completely GPU-free, migrating to Kubernetes is straightforward replacing Docker Compose with a Kubernetes deployment lets enterprise teams scale the agent layer horizontally while Triton continues to manage the GPU cluster.
 
 Shrinking a 4-hour pipeline to under 30 minutes is a concrete result. The framework does not just automate steps — it removes the expertise barrier that currently keeps embedded engineers and AI engineers working in separate silos.
 
