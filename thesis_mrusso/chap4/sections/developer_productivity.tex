@@ -77,13 +77,13 @@ The analysis omits the initial framework setup costs (configuring Docker contain
 \subsection{Concurrency and Stress Testing Evaluation}
 \label{sec:stress_testing}
 
-The decoupled architecture described in Section~\ref{sec:inference_infrastructure} underwent concurrency stress tests to measure its practical limits. Two experimental Python scripts, \texttt{langgraph\_stress\_test.py} and \texttt{triton\_stress\_test.py}, simulated $N$ developers interacting with the API simultaneously.
+The decoupled architecture described in Section~\ref{sec:inference_infrastructure} underwent concurrency stress tests to measure its practical limits. Two experimental Python scripts, \texttt{langgraph\_\allowbreak stress\_\allowbreak test.py} and \texttt{triton\_\allowbreak stress\_\allowbreak test.py}, simulated $N$ developers interacting with the API simultaneously.
 
 Benchmarks evaluated both the local LangGraph orchestrator and the remote Triton inference server. For the orchestrator, tests verified that the centralized state machine managed isolation for all parallel users without race conditions. By continuously checkpointing to Redis, the system preserved the context of each conversational thread even when multiple users hit state-heavy nodes like \texttt{ai\_flow} or \texttt{firmware\_flow}. Beyond that, the explicit GPU VRAM partitioning in the TensorFlow subprocesses allowed simultaneous model customizations and inspections, keeping the host machine safe from OOM failures.
 
 For the inference backend, a dedicated load-testing utility pushed the remote HPP cluster to its limits. The test simulated 5, 10 and 15 users requesting complex text generation (explaining a CNN architecture) simultaneously from two distinct models over a 1~Gbps network connection. As illustrated in Figure~\ref{fig:triton_stress_metrics}, the NVIDIA Triton instances remained stable throughout the experiment, collectively occupying about 37~GB of VRAM (80\% capacity). During parallel inference workloads, GPU computation stayed near 100\%. The vLLM server saturated the hardware efficiently, proving that the 1~Gbps network link did not act as a bottleneck for token streaming.
 
-\begin{figure}[htbp]
+\begin{figure}[H]
     \centering
     \includegraphics[width=0.85\textwidth]{chap4/figures/image1Triton.png}
     \\[2ex]
@@ -96,9 +96,11 @@ For the inference backend, a dedicated load-testing utility pushed the remote HP
 
 \subsection{Comparison with Related Tools}
 
-Table~\ref{tab:tool_comparison} contrasts the proposed architecture with standard commercial and open-source alternatives using objective feature metrics.
+Table~\ref{tab:tool_comparison} contrasts the proposed architecture with standard commercial and open-source alternatives using objective feature metrics. It highlights the architectural focus of different MLOps platforms. Commercial solutions like Edge Impulse provide powerful auto-tuning (EON Tuner) and successfully generate compilable C++ deployment blocks for microcontrollers. However, they rely strictly on graphical web interfaces and leave the final IDE project integration to the developer. NVIDIA TAO delivers powerful transfer learning and tuning, yet it targets higher-end GPU architectures rather than constrained STM32 edge devices. Bare-metal libraries such as TFLite Micro provide the core runtime but offer zero deployment orchestration. STM32Cube.AI generates highly optimized C-code arrays but operates as a standalone CLI or GUI tool, requiring manual invocation sequence.
 
-\begin{table}[htbp]
+Unlike these platforms, the proposed framework does not aim to replace the underlying code generators. Instead, it wraps them in a conversational interface to provide true end-to-end orchestration, translating high-level architectural intent into a fully compiled STM32 project without requiring manual context switching.
+
+\begin{table}[h!]
     \centering
     \caption{Automation Coverage Comparison}
     \label{tab:tool_comparison}
@@ -122,7 +124,3 @@ Table~\ref{tab:tool_comparison} contrasts the proposed architecture with standar
     \end{tabular}%
     }
 \end{table}
-
-Table~\ref{tab:tool_comparison} highlights the architectural focus of different MLOps platforms. Commercial solutions like Edge Impulse provide powerful auto-tuning (EON Tuner) and successfully generate compilable C++ deployment blocks for microcontrollers. However, they rely strictly on graphical web interfaces and leave the final IDE project integration to the developer. NVIDIA TAO delivers powerful transfer learning and tuning, yet it targets higher-end GPU architectures rather than constrained STM32 edge devices. Bare-metal libraries such as TFLite Micro provide the core runtime but offer zero deployment orchestration. STM32Cube.AI generates highly optimized C-code arrays but operates as a standalone CLI or GUI tool, requiring manual invocation sequence.
-
-Unlike these platforms, the proposed framework does not aim to replace the underlying code generators. Instead, it wraps them in a conversational interface to provide true end-to-end orchestration, translating high-level architectural intent into a fully compiled STM32 project without requiring manual context switching.
