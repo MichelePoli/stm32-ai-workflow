@@ -133,7 +133,7 @@ A key requirement of this step is producing complete, correct NNI experiment cod
 
 An initial implementation delegated code synthesis to the hosted LLM via a structured prompt. Testing on the remote GPU deployment revealed a hard limitation: the prompt, which must embed model metadata, dataset paths, and reference code templates, exceeded the 2048-token context window configured for \texttt{gpt-oss-20b} under GPTQ quantization. When the input exceeds \texttt{max\_model\_len}, vLLM silently returns an empty string, making the failure non-obvious. Increasing the context window would have required reducing \texttt{gpu\_memory\_utilization} further, leaving insufficient headroom for other concurrent models on the shared GPU.
 
-Since the structure of \texttt{manager.py} and \texttt{trial.py} is fully determined by the dataset path, the model path, and a fixed search space, a template-based strategy was adopted. The \texttt{generate\_\allowbreak nni\_\allowbreak experiment()} function in \texttt{nni\_optimization/generator.py} now writes both files through Python f-strings with direct variable injection, as illustrated below:
+Since the structure of \texttt{manager.py} and \texttt{trial.py} is fully determined by the dataset path, the model path, and a fixed search space, a template-based strategy was adopted. The \texttt{generate\_\allowbreak nni\_\allowbreak experiment()} function in \allowbreak\texttt{nni\_optimization/\allowbreak generator.py} now writes both files through Python f-strings with direct variable injection, as illustrated below:
 
 \begin{lstlisting}[language=Python, caption={Template-based path injection for the NNI trial script}, label={lst:nni_template}]
 data_path  = dataset_info.get("path", "")

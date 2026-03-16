@@ -123,7 +123,7 @@ stedgeai generate --model <model.h5> --target <stm32h743>
                   --compression <high> --output ./analisiAI/code_resnet
     \end{verbatim}
 
-    Output includes \texttt{network.c/h} (fixed-point neural network implementation), \texttt{network\_data.c} (quantized weights as const arrays), and \texttt{network\_config.h} (MCU-specific memory layout and hardware acceleration flags). Quantization is applied here via \texttt{--compression}, not during training, so the framework can evaluate models in full-precision FP32 and defer bit-width decisions until the exact MCU constraints are known from Phase 1.
+    Output includes \texttt{network.c/h} (fixed-point neural network implementation), \texttt{network\_\allowbreak data.c} (quantized weights as const arrays), and \texttt{network\_\allowbreak config.h} (MCU-specific memory layout and hardware acceleration flags). Quantization is applied here via \texttt{--compression}, not during training, so the framework can evaluate models in full-precision FP32 and defer bit-width decisions until the exact MCU constraints are known from Phase 1.
 
 \end{description}
 

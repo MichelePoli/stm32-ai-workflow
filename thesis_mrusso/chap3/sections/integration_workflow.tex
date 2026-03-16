@@ -7,7 +7,7 @@ The implementation resides in \texttt{workflow3\_integration.py} and runs five L
 
 \subsubsection{Project Path Collection and Idempotency}
 
-The \texttt{collect\_\allowbreak integration\_\allowbreak info()} node determines two key paths: the firmware project directory and the folder containing the AI-generated code. When the workflow is triggered directly by the user (not as part of a sequential WF1→WF2→WF3 chain), these paths are extracted from a natural language message using a Pydantic schema (\texttt{IntegrationInfoExtraction}) with structured LLM output.
+The \texttt{collect\_\allowbreak integration\_\allowbreak info()} node determines two key paths: the firmware project directory and the folder containing the AI-generated code. When the workflow is triggered directly by the user (not as part of a sequential Firmware Generation $\rightarrow$ AI Model Discovery $\rightarrow$ Firmware-AI Integration chain), these paths are extracted from a natural language message using a Pydantic schema (\texttt{IntegrationInfoExtraction}) with structured LLM output.
 
 If the paths are already present in the graph state from a prior step, the node skips collection entirely and goes directly to validation. This avoids unnecessary LLM calls when the workflow is invoked automatically.
 
@@ -76,7 +76,7 @@ shutil.copy2(state.main_c_path, backup_path)
 Four injections are then applied in sequence, each guarded by a regex check to skip the block if the corresponding code is already present:
 
 \begin{enumerate}[noitemsep, topsep=4pt]
-    \item \textbf{USER CODE BEGIN Includes}: adds \texttt{\#include "network.h"} and \texttt{"network\_data.h"}.
+    \item \textbf{USER CODE BEGIN Includes}: adds \texttt{\#include "network.h"} and \texttt{"network\_\allowbreak data.h"}.
     \item \textbf{USER CODE BEGIN PV}: declares the AI handle, the activations buffer, and the input/output float arrays (\texttt{in\_data}, \texttt{out\_data}).
     \item \textbf{USER CODE BEGIN 2}: calls \texttt{ai\_\allowbreak network\_\allowbreak create()}, \texttt{ai\_\allowbreak network\_\allowbreak init()}, and binds the buffer pointers.
     \item \textbf{USER CODE BEGIN WHILE}: calls \texttt{ai\_\allowbreak network\_\allowbreak run()} in the main loop, with commented examples for sensor data input and output classification.

@@ -9,7 +9,7 @@ The \textit{Synthetic Data Generation} sub-workflow generates time-series and au
 
 Signal parameters are extracted from the user's natural language request through \texttt{get\_llm()} with the \texttt{SyntheticDataRequest} Pydantic schema. Supported signal types are \texttt{sine}, \texttt{white\_noise}, \texttt{pink\_noise}, \texttt{chirp}, \texttt{impulse}, \texttt{silence}, and \texttt{mixed}. If the initial message already contains enough information, the interrupt is skipped. If not, the node issues a LangGraph interrupt to collect frequency, duration, sample rate, amplitude, noise level, and sample count.
 
-Generation is handled by NumPy vectorized operations inside \texttt{generate\_\allowbreak synthetic\_\allowbreak samples()}. Each sample is saved individually as a \texttt{.npy} file in \texttt{\textless base\_dir\textgreater/data/synthetic/}. The node then confirms generation parameters with one final interrupt before handing the dataset path to the \textit{Model Customization} workflow (Section~\ref{sec:customization}) via \texttt{state.synthetic\_\allowbreak data\_\allowbreak path}.
+Generation is handled by NumPy vectorized operations inside \texttt{generate\_\allowbreak synthetic\_\allowbreak samples()}. Each sample is saved individually as a \texttt{.npy} file in \allowbreak\texttt{\textless base\_dir\textgreater/\allowbreak data/\allowbreak synthetic/}. The node then confirms generation parameters with one final interrupt before handing the dataset path to the \textit{Model Customization} workflow (Section~\ref{sec:customization}) via \texttt{state.synthetic\_\allowbreak data\_\allowbreak path}.
 
 \subsubsection{Dataset Selection Auxiliary Workflow}
 
