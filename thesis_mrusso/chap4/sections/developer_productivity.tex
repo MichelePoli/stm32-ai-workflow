@@ -24,26 +24,27 @@ Table~\ref{tab:productivity} breaks down the complete Edge AI deployment lifecyc
     \centering
     \caption{Developer Time Comparison: Manual vs.\ Automated Workflows. The \textit{Workflow} column maps each task to the corresponding agentic subgraph described in Chapter~\ref{chap:framework}.}
     \label{tab:productivity}
-    \footnotesize
-    \begin{tabular}{|l|p{3.1cm}|c|c|c|p{4.2cm}|}
+    \resizebox{\textwidth}{!}{%
+    \begin{tabular}{|l|l|c|c|c|p{5.5cm}|}
         \hline
         \textbf{Task}                 & \textbf{Workflow}          & \textbf{Manual}        & \textbf{Auto} & \textbf{Speedup}   & \textbf{Notes}                                                                                                          \\
         \hline\hline
-        \textbf{CubeMX Project Setup} & Firmware (§\ref{sec:firmware_workflow})     & 20--30 min              & 30--45 sec          & $40\times$          & Pre-seeded IOC template eliminates all 15 GUI configuration steps\cite{st_cubemx_manual}. \\
+        \textbf{CubeMX Project Setup} & Firmware (§\ref{sec:firmware_flow})     & 20--30 min              & 30--45 sec          & $40\times$          & Pre-seeded IOC template eliminates all 15 GUI configuration steps\cite{st_cubemx_manual}. \\
         \hline
-        \textbf{Model Discovery}      & AI Analysis (§\ref{sec:ai_workflow})        & 1--2 h                  & 3--5 min            & $24\times$          & Hybrid two-tier search: curated task library + iterative web scan with LLM ranking.       \\
+        \textbf{Model Discovery}      & AI Analysis (§\ref{sec:ai_flow})        & 1--2 h                  & 3--5 min            & $24\times$          & Hybrid two-tier search: curated task library + iterative web scan with LLM ranking.       \\
         \hline
-        \textbf{STEdgeAI Analysis}    & AI Analysis (§\ref{sec:ai_workflow})        & 15--20 min              & 2--3 min            & $7\times$           & Automated CLI invocation, report parsing, and autonomous compression escalation.          \\
+        \textbf{STEdgeAI Analysis}    & AI Analysis (§\ref{sec:ai_flow})        & 15--20 min              & 2--3 min            & $7\times$           & Automated CLI invocation, report parsing, and autonomous compression escalation.          \\
         \hline
         \textbf{NNI Experiment Setup} & Customization (§\ref{sec:customization})    & 45--60 min              & 1--2 min            & $30\times$          & Template generator writes \texttt{trial.py} and search space from scratch\cite{nni_documentation}. \\
         \hline
         \textbf{Model Fine-Tuning}    & Customization (§\ref{sec:customization})    & 30--45 min              & 10--15 min          & $3\times$           & Dropout injection, epoch capping, and class-mismatch layer replacement handled automatically. \\
         \hline
-        \textbf{Firmware Integration} & Integration (§\ref{sec:integration})        & 25--35 min              & 3--5 min            & $8\times$           & Automated file copy, \texttt{CMakeLists.txt} edit, \texttt{main.c} patch, and build check. \\
+        \textbf{Firmware Integration} & Integration (§\ref{sec:integration_flow})        & 25--35 min              & 3--5 min            & $8\times$           & Automated file copy, \texttt{CMakeLists.txt} edit, \texttt{main.c} patch, and build check. \\
         \hline\hline
         \textbf{Total (E2E)}   & Full Pipeline              & \textbf{3.5--4.5 h}    & \textbf{20--30 min} & $\mathbf{9\times}$  & From firmware init to validated AI integration. \\
         \hline
-    \end{tabular}
+    \end{tabular}%
+    }
 \end{table}
 
 \subsection{Discussion}
