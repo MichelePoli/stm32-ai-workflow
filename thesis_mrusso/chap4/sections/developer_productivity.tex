@@ -1,5 +1,5 @@
 % Section added for thesis enhancement (Feb 2026)
-\section{Developer Productivity Analysis}
+\section{Developer Productivity: Workflow-Level Time Analysis}
 \label{sec:productivity}
 
 A primary metric for evaluating the framework is the reduction in development time compared to manual workflows. Data from industry benchmarks and empirical observations provide a direct comparative time analysis.
@@ -18,34 +18,34 @@ Test runs on a development workstation (Intel i7-12700K, 32GB RAM, NVIDIA RTX 30
 
 \subsection{Comparative Time Analysis}
 
-Table~\ref{tab:productivity} presents a breakdown of the complete Edge AI deployment lifecycle across six necessary tasks.
+Table~\ref{tab:productivity} breaks down the complete Edge AI deployment lifecycle across six tasks, each annotated with the workflow responsible for its automation (see Chapter~\ref{chap:framework} for the methodology).
 
 \begin{table}[htbp]
     \centering
-    \caption{Developer Time Comparison: Manual vs. Automated Workflows}
+    \caption{Developer Time Comparison: Manual vs.\ Automated Workflows. The \textit{Workflow} column maps each task to the corresponding agentic subgraph described in Chapter~\ref{chap:framework}.}
     \label{tab:productivity}
     \small
-    \begin{tabular}{|l|c|c|c|p{4cm}|}
+    \resizebox{\textwidth}{!}{%
+    \begin{tabular}{|l|l|c|c|c|p{3.5cm}|}
         \hline
-        \textbf{Task}                 & \textbf{Manual}        & \textbf{Automated} & \textbf{Speedup}   & \textbf{Source/Notes}                                                                                                                                                              \\
+        \textbf{Task}                 & \textbf{Workflow}          & \textbf{Manual}        & \textbf{Automated} & \textbf{Speedup}   & \textbf{Notes}                                                                                                          \\
+        \hline\hline
+        \textbf{CubeMX Project Setup} & Firmware (§\ref{sec:firmware_workflow})     & 20--30 min              & 30--45 sec          & $40\times$          & Pre-seeded IOC template eliminates all 15 GUI configuration steps\cite{st_cubemx_manual}. \\
         \hline
+        \textbf{Model Discovery}      & AI Analysis (§\ref{sec:ai_workflow})        & 1--2 h                  & 3--5 min            & $24\times$          & Hybrid two-tier search: curated task library + iterative web scan with LLM ranking.       \\
         \hline
-        \textbf{CubeMX Project Setup} & 20-30 min              & 30-45 sec          & 40×                & STM32CubeMX official tutorial (15 steps)\cite{st_cubemx_manual}. Automated workflow eliminates GUI navigation.                                                                     \\
+        \textbf{STEdgeAI Analysis}    & AI Analysis (§\ref{sec:ai_workflow})        & 15--20 min              & 2--3 min            & $7\times$           & Automated CLI invocation, report parsing, and autonomous compression escalation.          \\
         \hline
-        \textbf{Model Discovery}      & 1-2 hours              & 3-5 min            & 24×                & GitHub/Kaggle manual search + documentation review. Automated hybrid search (task-based + iterative web) with LLM ranking.                                                         \\
+        \textbf{NNI Experiment Setup} & Customization (§\ref{sec:customization})    & 45--60 min              & 1--2 min            & $30\times$          & Template generator writes \texttt{trial.py} and search space from scratch\cite{nni_documentation}. \\
         \hline
-        \textbf{STEdgeAI Analysis}    & 15-20 min              & 2-3 min            & 7×                 & Manual CLI invocation + report parsing. Includes resource constraint checking and autonomous compression escalation.                                                               \\
+        \textbf{Model Fine-Tuning}    & Customization (§\ref{sec:customization})    & 30--45 min              & 10--15 min          & $3\times$           & Dropout injection, epoch capping, and class-mismatch layer replacement handled automatically. \\
         \hline
-        \textbf{NNI Experiment Setup} & 45-60 min              & 1-2 min            & 30×                & Writing \texttt{manager.py} + \texttt{trial.py} from scratch per NNI documentation\cite{nni_documentation}. Template generator produces production-ready code with error handling. \\
+        \textbf{Firmware Integration} & Integration (§\ref{sec:integration})        & 25--35 min              & 3--5 min            & $8\times$           & Automated file copy, \texttt{CMakeLists.txt} edit, \texttt{main.c} patch, and build check. \\
+        \hline\hline
+        \textbf{Total (End-to-End)}   & Full Pipeline              & \textbf{3.5--4.5 h}    & \textbf{20--30 min} & $\mathbf{9\times}$  & From firmware init to validated AI integration. \\
         \hline
-        \textbf{Model Fine-Tuning}    & 30-45 min              & 10-15 min          & 3×                 & Dataset loading, class mismatch resolution, hyperparameter tuning. Automated anti-overfitting heuristics (dropout injection, epoch capping).                                       \\
-        \hline
-        \textbf{Firmware Integration} & 25-35 min              & 3-5 min            & 8×                 & Manual file copying, \texttt{CMakeLists.txt} editing, \texttt{main.c} modification. Automated build verification.                                                                  \\
-        \hline
-        \hline
-        \textbf{Total (End-to-End)}   & \textbf{3.5-4.5 hours} & \textbf{20-30 min} & \textbf{9× faster} & Complete pipeline from firmware initialization to validated AI integration.                                                                                                        \\
-        \hline
-    \end{tabular}
+    \end{tabular}%
+    }
 \end{table}
 
 \subsection{Discussion}
