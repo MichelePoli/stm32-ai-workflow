@@ -24,11 +24,10 @@ Table~\ref{tab:productivity} breaks down the complete Edge AI deployment lifecyc
     \centering
     \caption{Developer Time Comparison: Manual vs.\ Automated Workflows. The \textit{Workflow} column maps each task to the corresponding agentic subgraph described in Chapter~\ref{chap:framework}.}
     \label{tab:productivity}
-    \small
-    \resizebox{\textwidth}{!}{%
-    \begin{tabular}{|l|l|c|c|c|p{3.5cm}|}
+    \footnotesize
+    \begin{tabular}{|l|p{3.1cm}|c|c|c|p{4.2cm}|}
         \hline
-        \textbf{Task}                 & \textbf{Workflow}          & \textbf{Manual}        & \textbf{Automated} & \textbf{Speedup}   & \textbf{Notes}                                                                                                          \\
+        \textbf{Task}                 & \textbf{Workflow}          & \textbf{Manual}        & \textbf{Auto} & \textbf{Speedup}   & \textbf{Notes}                                                                                                          \\
         \hline\hline
         \textbf{CubeMX Project Setup} & Firmware (§\ref{sec:firmware_workflow})     & 20--30 min              & 30--45 sec          & $40\times$          & Pre-seeded IOC template eliminates all 15 GUI configuration steps\cite{st_cubemx_manual}. \\
         \hline
@@ -42,10 +41,9 @@ Table~\ref{tab:productivity} breaks down the complete Edge AI deployment lifecyc
         \hline
         \textbf{Firmware Integration} & Integration (§\ref{sec:integration})        & 25--35 min              & 3--5 min            & $8\times$           & Automated file copy, \texttt{CMakeLists.txt} edit, \texttt{main.c} patch, and build check. \\
         \hline\hline
-        \textbf{Total (End-to-End)}   & Full Pipeline              & \textbf{3.5--4.5 h}    & \textbf{20--30 min} & $\mathbf{9\times}$  & From firmware init to validated AI integration. \\
+        \textbf{Total (E2E)}   & Full Pipeline              & \textbf{3.5--4.5 h}    & \textbf{20--30 min} & $\mathbf{9\times}$  & From firmware init to validated AI integration. \\
         \hline
-    \end{tabular}%
-    }
+    \end{tabular}
 \end{table}
 
 \subsection{Discussion}
@@ -60,7 +58,7 @@ Autonomous resource optimization (such as autonomous compression escalation and 
 
 \paragraph{CubeMX Project Setup (40× speedup):} The Pre-seeded IOC Strategy (Section~\ref{subsec:preseeded_ioc}) eliminates interactive GUI pop-ups that block headless operation. Manual workflows require navigating 15+ configuration screens; automation reduces this to a single LLM-parsed natural language command.
 
-\paragraph{Model Discovery (24× speedup):} Manual GitHub/Kaggle searches often require evaluating 10-15 repositories, reading READMEs, and verifying model formats. The two-tier hybrid search (curated task-based + LLM-ranked GitHub scan) achieves a 70\% first-attempt success rate, bypassing most exploratory searches.
+\paragraph{Model Discovery (24× speedup):} Manual GitHub/Kaggle searches often require evaluating 10 to 15 repositories, reading READMEs, and verifying model formats. The automated approach cut the search time to minutes through a three-tier design. A curated catalog of validated STM32 Model Zoo entries handles the common cases. An iterative DuckDuckGo search targets unknown model families. Finally, user-registered URLs let developers inject custom projects directly. This logic bypassed exploratory manual queries and reached a 70\% first-attempt success rate.
 
 \paragraph{NNI Experiment Setup (30× speedup):} Writing NNI experiment code from scratch requires deep knowledge of the API (search space definition, trial job management, checkpoint handling). The template-based code generator produces production-ready scripts with edge case handling (class mismatch, memory subsetting, port conflicts) that would otherwise require multiple debug-fix iterations.
 

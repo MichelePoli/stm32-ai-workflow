@@ -1,6 +1,10 @@
 \section{Hardware Infrastructure}
 \label{sec:used_hardware}
 
-The production deployment runs on the \textbf{inNuCE Lab Heterogeneous Prototyping Platform (HPP)} \cite{innuce_website}. The cluster node used for this project is equipped with an \textbf{NVIDIA A40} GPU featuring \textbf{45~GB} of dedicated VRAM (46068~MiB), operating with driver version 580.95.05 and CUDA version 13.0. The GPU has a rated TDP of 300~W.
+I divided the deployment architecture into two hardware environments. This physical separation keeps the local orchestration logic isolated from the heavy AI inference.
 
-This capacity allows multiple heavyweight models (Mistral and \texttt{gpt-oss-20b}) to remain resident in VRAM simultaneously without triggering destructive load/unload cycles. Delegating LLM execution over the network to the HPP hardware frees the local workstation entirely for LangGraph orchestration logic and memory-intensive TensorFlow fine-tuning tasks.
+The core application (FastAPI gateway, LangGraph orchestrator, Redis backend, and TensorFlow workflows) runs on a \textbf{dedicated development server} provided by the research team. This machine supplies the CPU and RAM necessary to compile STM32 firmware and manage graph checkpoints.
+
+I moved the LLM inference workloads over the network to the \textbf{inNuCE Lab Heterogeneous Prototyping Platform (HPP)} cluster \cite{innuce_website}. The target node features an \textbf{NVIDIA A40} GPU with \textbf{45~GB} of VRAM (CUDA 13.0, driver 580.95.05). Its rated TDP is 300~W.
+
+This setup keeps foundation models like Mistral and \texttt{gpt-oss-20b} permanently loaded in VRAM. It avoids continuous model swapping penalties. Delegating generation tasks to the HPP cluster frees the development server from GPU constraints. The system can now serve multiple users concurrently.
