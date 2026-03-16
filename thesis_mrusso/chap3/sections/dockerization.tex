@@ -76,7 +76,7 @@ Decoupling the agent logic from the Triton inference server creates a cloud-nati
 \node[tagbox=green!50, above left=0.5mm and 2mm of TR.north east, anchor=south east] {NVIDIA GPU};
 \begin{scope}[on background layer]
   \node[gpu, fit=(TR),
-        label={[font=\sffamily\footnotesize\bfseries, text=green!60!black]
+        label={[font=\sffamily\footnotesize\bfseries, text=green!60!black, xshift=+2mm]
                above:Remote GPU Server (HPP)}] {};
 \end{scope}
 
@@ -93,7 +93,7 @@ Decoupling the agent logic from the Triton inference server creates a cloud-nati
 
 %% langgraph-app -> Triton (external)
 \draw[ar] (LG.south) -- ++(0,-0.6) -|
-          node[pos=0.75, left, lbl]{HTTP/gRPC}
+          node[pos=0.75, left, lbl, xshift=-4mm]{HTTP/gRPC}
           ([xshift=-2cm]TR.north);
 
 \end{tikzpicture}%

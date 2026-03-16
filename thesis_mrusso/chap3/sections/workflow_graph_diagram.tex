@@ -69,8 +69,8 @@
         \draw[arrow] (integration.east) -- (7.5, -9.0) |- (endnode.south);
 
         % Search → END
-        % Exits left from the block, drops straight down avoiding all blocks, then right to END
-        \draw[arrow] (search.west) -- (-7.8, -0.6) |- ([yshift=-1cm]endnode.south) -- (endnode.south);
+        % Exits left from the block, drops well below the Integration block, goes right past the center, then up to the bottom of END
+        \draw[arrow] (search.west) -- (-7.8, -0.6) |- (-7.8, -10.8) -| (endnode.south);
 
         % ============================================================
         % CYCLES (graph nature, not tree)

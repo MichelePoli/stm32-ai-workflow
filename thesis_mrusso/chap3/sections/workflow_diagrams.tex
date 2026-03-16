@@ -18,8 +18,8 @@
               align=center, inner sep=1pt, minimum width=3cm, minimum height=1cm},
   se/.style={draw, rectangle, rounded corners=6pt, fill=green!25,
              minimum width=2cm, minimum height=0.65cm, align=center},
-  co/.style={draw, circle, fill=purple!70, text=white, minimum size=1.2cm,
-             align=center, font=\sffamily\tiny\bfseries},
+  co/.style={draw, rectangle, rounded corners=6pt, fill=purple!70, text=white,
+             minimum width=2.2cm, minimum height=0.6cm, align=center, font=\sffamily\tiny\bfseries},
   wb/.style={draw=gray!50, dashed, rounded corners=4pt, fill=yellow!5, inner sep=0.3cm},
   ar/.style={->, thick, >=Stealth}]
 
@@ -29,7 +29,7 @@
 \node[dec]  (ROUTE)  at (0,    -3.3)  {Route User \\ Request};
 
 %% --- Web exit (left) ---
-\node[co]   (WSOUT)  at (-5.5, -3.5)  {TO \\ Web Research};
+\node[co]   (WSOUT)  at (-6.2, -3.5)  {TO \\ Web Research};
 
 %% --- AI Discovery (centre) — shifted down for label readability ---
 \node[dec]  (AISEL)  at ( 0.0, -6.0)  {Model Selection \\ Method?};
@@ -94,6 +94,7 @@
 \centering
 \resizebox{\textwidth}{!}{%
 \begin{tikzpicture}[
+  scale=0.55, transform shape,
   every node/.style={font=\sffamily\footnotesize},
   proc/.style={draw, fill=blue!10, rectangle, minimum width=3.4cm,
                minimum height=0.75cm, align=center, inner sep=3pt},
@@ -103,8 +104,8 @@
               align=center, inner sep=1pt, minimum width=3cm, minimum height=1cm},
   se/.style={draw, rectangle, rounded corners=6pt, fill=green!25,
              minimum width=2cm, minimum height=0.65cm, align=center},
-  co/.style={draw, circle, fill=purple!70, text=white, minimum size=1.2cm,
-             align=center, font=\sffamily\tiny\bfseries},
+  co/.style={draw, rectangle, rounded corners=6pt, fill=purple!70, text=white,
+             minimum width=2.2cm, minimum height=0.6cm, align=center, font=\sffamily\tiny\bfseries},
   wb/.style={draw=gray!50, dashed, rounded corners=4pt, fill=yellow!5, inner sep=0.3cm},
   ar/.style={->, thick, >=Stealth}]
 
@@ -119,17 +120,17 @@
 \node[proc] (CUC)  at ( 0,  -8.5) {Apply Customizations \\ Modify Architecture};
 
 %% ---- COLUMN 2 (x=8, snake turn) ----
-\node[dec]  (CDS)  at (8.0, -8.5)  {Dataset \\ Source?};
-\node[psub] (DREA) at (5.8,-10.3)  {WF7: Download Dataset \\ HuggingFace / Kaggle};
-\node[psub] (DSYN) at (10.2,-10.3) {WF6: Generate \\ Synthetic Data via LLM};
-\node[dec]  (COPT) at (8.0,-12.1)  {Optimization \\ Method?};
-\node[proc] (CNNI) at (5.8,-13.9)  {Run NNI Experiment \\ TPE Search, Multi-trial};
-\node[proc] (CSTD) at (10.2,-13.9) {Fine-tune \\ Fixed Hyperparameters};
-\node[proc] (CVAL) at (8.0,-15.7)  {Validate Custom Model \\ Accuracy / Loss};
-\node[proc] (CSAV) at (8.0,-17.2)  {Save Final Model \\ .h5 + metadata};
-\node[dec]  (CCON) at (8.0,-18.9)  {Continue to \\ STEdgeAI Analysis?};
-\node[co]   (OUY)  at (5.8,-20.5)  {TO \\ Run STEdgeAI};
-\node[se]   (ENDB) at (10.2,-20.5) {END};
+\node[dec]  (CDS)  at (8.0, -7.5)  {Dataset \\ Source?};
+\node[psub] (DREA) at (5.8, -9.3)  {WF7: Download Dataset \\ HuggingFace / Kaggle};
+\node[psub] (DSYN) at (10.2,-9.3)  {WF6: Generate \\ Synthetic Data via LLM};
+\node[dec]  (COPT) at (8.0,-11.1)  {Optimization \\ Method?};
+\node[proc] (CNNI) at (5.8,-12.9)  {Run NNI Experiment \\ TPE Search, Multi-trial};
+\node[proc] (CSTD) at (10.2,-12.9) {Fine-tune \\ Fixed Hyperparameters};
+\node[proc] (CVAL) at (8.0,-14.7)  {Validate Custom Model \\ Accuracy / Loss};
+\node[proc] (CSAV) at (8.0,-16.2)  {Save Final Model \\ .h5 + metadata};
+\node[dec]  (CCON) at (8.0,-17.9)  {Continue to \\ STEdgeAI Analysis?};
+\node[co]   (OUY)  at (5.8,-19.5)  {TO \\ Run STEdgeAI};
+\node[se]   (ENDB) at (10.2,-19.5) {END};
 
 %% --- Arrows col 1 ---
 \draw[ar] (FRA) -- (CUST);
@@ -141,7 +142,7 @@
 \draw[ar] (CUB) -- (CUC);
 
 %% Snake turn
-\draw[ar] (CUC.east) -- (CDS.west);
+\draw[ar] (CUC.east) -- (4.0, -8.5) |- (CDS.west);
 
 %% --- Arrows col 2 ---
 \draw[ar] (CDS.south west) -- node[right,font=\sffamily\tiny]{Real}      (DREA.north);
@@ -174,6 +175,7 @@
 \centering
 \resizebox{\textwidth}{!}{%
 \begin{tikzpicture}[
+  scale=1.2, transform shape,
   every node/.style={font=\sffamily\footnotesize},
   proc/.style={draw, fill=blue!10, rectangle, minimum width=3.6cm,
                minimum height=0.75cm, align=center, inner sep=3pt},
@@ -181,8 +183,8 @@
               align=center, inner sep=1pt, minimum width=3cm, minimum height=1cm},
   se/.style={draw, rectangle, rounded corners=6pt, fill=green!25,
              minimum width=2cm, minimum height=0.65cm, align=center},
-  co/.style={draw, circle, fill=purple!70, text=white, minimum size=1.2cm,
-             align=center, font=\sffamily\tiny\bfseries},
+  co/.style={draw, rectangle, rounded corners=6pt, fill=purple!70, text=white,
+             minimum width=2.2cm, minimum height=0.6cm, align=center, font=\sffamily\tiny\bfseries},
   wb/.style={draw=gray!50, dashed, rounded corners=4pt, fill=yellow!5, inner sep=0.3cm},
   ar/.style={->, thick, >=Stealth}]
 
