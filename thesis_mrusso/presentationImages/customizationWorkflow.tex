@@ -1,145 +1,95 @@
-\documentclass[tikz,border=5pt]{standalone}
-\usetikzlibrary{positioning, fit, backgrounds, calc}
+\documentclass[tikz,border=12pt]{standalone}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning,
+                fit, backgrounds, calc}
 
 % ── Palette ────────────────────────────────────────────────────
 \definecolor{canvadark}{HTML}{0D1B2A}
-
-\definecolor{clIDE}   {HTML}{065F46}
-\definecolor{clAPI}   {HTML}{92400E}
-\definecolor{clORCH}  {HTML}{9D174D}
-\definecolor{clMEM}   {HTML}{3B4A6B}
-\definecolor{clAGENT} {HTML}{1E3A5F}
-\definecolor{clINF}   {HTML}{7F1D1D}
-
-\definecolor{bIDE}    {HTML}{00C9B1}
-\definecolor{bAPI}    {HTML}{F59E0B}
-\definecolor{bORCH}   {HTML}{EC4899}
-\definecolor{bMEM}    {HTML}{94A3B8}
-\definecolor{bAGENT}  {HTML}{3B82F6}
-\definecolor{bINF}    {HTML}{EF4444}
+\definecolor{clORCH}   {HTML}{9D174D}
+\definecolor{bORCH}    {HTML}{EC4899}
+\definecolor{clAGENT}  {HTML}{1E3A5F}
+\definecolor{bAGENT}   {HTML}{3B82F6}
+\definecolor{clPURPLE} {HTML}{4C1D95}
+\definecolor{bPURPLE}  {HTML}{A78BFA}
+\definecolor{clIDE}    {HTML}{065F46}
+\definecolor{bIDE}     {HTML}{00C9B1}
+\definecolor{clMEM}    {HTML}{3B4A6B}
+\definecolor{bMEM}     {HTML}{94A3B8}
 % ───────────────────────────────────────────────────────────────
 
 \begin{document}
 \begin{tikzpicture}[
-    scale=0.88, transform shape,
-    node distance=1.5cm and 1.8cm,
-    every node/.style={font=\sffamily\small, text=white},
-    box/.style={
-        draw, rounded corners,
-        minimum width=3cm, minimum height=1.2cm,
-        align=center, thick, inner sep=0.2cm, text=white
-    },
-    corebox/.style={
-        draw, rounded corners,
-        minimum width=6cm, minimum height=1.4cm,
-        align=center, line width=2pt, inner sep=0.2cm, text=white
-    },
-    arrow/.style={->, thick, >=stealth, draw=white},
-    dblarrow/.style={<->, thick, >=stealth, draw=white},
-    layerlabel/.style={
-        font=\sffamily\footnotesize\bfseries,
-        text=white, align=center
-    }
+  scale=0.75, transform shape,
+  every node/.style={font=\sffamily\footnotesize, text=white},
+  proc/.style={
+      draw=bORCH, fill=clORCH, rectangle,
+      minimum width=3.4cm, minimum height=0.75cm,
+      align=center, inner sep=3pt, rounded corners=3pt, thick},
+  psub/.style={
+      draw=bPURPLE, fill=clPURPLE, rectangle,
+      minimum width=3.0cm, minimum height=0.75cm,
+      align=center, inner sep=3pt, rounded corners=3pt, thick},
+  popt/.style={
+      draw=bAGENT, fill=clAGENT, rectangle,
+      minimum width=3.0cm, minimum height=0.75cm,
+      align=center, inner sep=3pt, rounded corners=3pt, thick},
+  done/.style={
+      draw=bIDE, fill=clIDE, rectangle, rounded corners=6pt,
+      minimum width=3.4cm, minimum height=0.75cm,
+      align=center, inner sep=3pt, thick,
+      font=\sffamily\footnotesize\bfseries},
+  dec/.style={
+      draw=bMEM, fill=clMEM, diamond, aspect=2.5,
+      align=center, inner sep=1pt,
+      minimum width=3cm, minimum height=1cm, thick},
+  ar/.style={->, thick, >=Stealth, draw=white},
+  lbl/.style={font=\sffamily\tiny, text=white}
 ]
 
-% ── BACKGROUND ─────────────────────────────────────────────────
+%% ── BACKGROUND ────────────────────────────────────────────────
 \begin{scope}[on background layer]
-    \fill[canvadark] (-7.5, 2.5) rectangle (13.5, -14.5);
+  \fill[canvadark] (-2.5, 1.8) rectangle (14.5, -22.0);
 \end{scope}
 
-% ── LAYER 1: IDE ───────────────────────────────────────────────
-\node[box, fill=clIDE, draw=bIDE] (vscode)
-    {VS Code Extension \\ (User Interface)};
+%% ── COLUMN 1 (x=0, top-down) ─────────────────────────────────
+\node[dec]  (CUST) at (0,    0)    {Customize \\ Model?};
+\node[done] (SKA)  at (4.2,  0)    {$\rightarrow$ STEdgeAI directly};
+\node[proc] (CUA)  at (0,  -2.0)   {Inspect Model Architecture \\ Layer-by-layer Analysis};
+\node[dec]  (CINT) at (0,  -4.0)   {User Wants \\ Modifications?};
+\node[done] (SKB)  at (4.2, -4.0)  {$\rightarrow$ STEdgeAI directly};
+\node[proc] (CUB)  at (0,  -6.0)   {Apply Modifications \\ Freeze / Dropout / Replace Head};
+\node[proc] (CUC)  at (0,  -8.0)   {Auto-fix Class Mismatch \\ (pre-training check)};
 
-\node[layerlabel, above=0.1cm of vscode] {L1: IDE Layer};
+%% ── COLUMN 2 (x=8.5, snake) ──────────────────────────────────
+\node[dec]  (CDS)  at (8.5, -7.2)  {Dataset \\ Source?};
+\node[psub] (DREA) at (6.2, -9.2)  {WF7: Download Dataset \\ HuggingFace / Kaggle};
+\node[psub] (DSYN) at (10.8,-9.2)  {WF6: Synthetic Data \\ via LLM};
+\node[dec]  (COPT) at (8.5,-11.2)  {Optimization \\ Method?};
+\node[popt] (CNNI) at (6.2,-13.2)  {NNI HPO Search \\ TPE, Multi-trial};
+\node[popt] (CSTD) at (10.8,-13.2) {Fine-tune \\ Fixed Hyperparameters};
+\node[popt] (CVAL) at (8.5,-15.2)  {Validate Model \\ Accuracy / Loss};
+\node[done] (OUT)  at (8.5,-17.0)  {Validated Model $\rightarrow$ STEdgeAI \checkmark};
 
-\node[left=0.5cm of vscode, align=center,
-      text width=2.5cm, text=white] (user)
-    {Developer \\ Commands/Chat};
-\draw[arrow] (user) -- (vscode);
+%% ── ARROWS col 1 ─────────────────────────────────────────────
+\draw[ar] (CUST.east)  -- node[lbl, above]{No}  (SKA.west);
+\draw[ar] (CUST.south) -- node[lbl, right]{Yes} (CUA.north);
+\draw[ar] (CUA)  -- (CINT);
+\draw[ar] (CINT.east)  -- node[lbl, above]{No}  (SKB.west);
+\draw[ar] (CINT.south) -- node[lbl, right]{Yes} (CUB.north);
+\draw[ar] (CUB) -- (CUC);
 
-% ── LAYER 2: API Gateway ───────────────────────────────────────
-\node[box, fill=clAPI, draw=bAPI,
-      below=1cm of vscode] (fastapi)
-    {FastAPI Server \\ (Event Streaming / NDJSON)};
+%% Snake turn col1 → col2
+\draw[ar] (CUC.east) -- (4.2, -8.0) |- (CDS.west);
 
-\draw[dblarrow] (vscode) --
-    node[right, font=\sffamily\scriptsize]{HTTP / REST}
-    (fastapi);
-
-\node[layerlabel, right=0.3cm of fastapi] {L2: API Gateway};
-
-% ── LAYER 3: Orchestration ─────────────────────────────────────
-\node[corebox, fill=clORCH, draw=bORCH,
-      below=1cm of fastapi] (langgraph)
-    {\textbf{LangGraph Orchestrator} \\ (Master State \& Routing)};
-
-\draw[dblarrow] (fastapi) -- (langgraph);
-
-\node[layerlabel, left=1cm of langgraph] {L3: Orchestration};
-
-% ── LAYER 4: State & Memory ────────────────────────────────────
-\node[box, fill=clMEM, draw=bMEM,
-      right=1cm of langgraph, minimum width=3.5cm] (redis)
-    {Redis Checkpointer \\ (Short \& Long-Term \\ Memory)};
-
-\draw[dblarrow] (langgraph.east) -- (redis.west);
-
-\node[layerlabel, anchor=west] at ([xshift=0.3cm]redis.east)
-    {L4: State \\ \& Memory};
-
-% ── AGENTS ─────────────────────────────────────────────────────
-\node[box, fill=clAGENT, draw=bAGENT,
-      below=1.5cm of langgraph, xshift=-4cm,
-      text width=2.4cm] (fw_agent)
-    {Firmware \\ Agent};
-
-\node[box, fill=clAGENT, draw=bAGENT,
-      right=0.3cm of fw_agent, text width=2.8cm] (ai_agent)
-    {AI Discovery \& \\ Customization \\ Agent};
-
-\node[box, fill=clAGENT, draw=bAGENT,
-      right=0.3cm of ai_agent, text width=2.4cm] (int_agent)
-    {Integration \\ Agent};
-
-\node[box, fill=clAGENT, draw=bAGENT,
-      right=0.3cm of int_agent, text width=2.4cm] (web_agent)
-    {Web Research \\ Agent};
-
-% Bus orizzontale → agenti
-\coordinate (bus) at ([yshift=-0.75cm]langgraph.south);
-\draw[arrow] (langgraph.south) -- (bus);
-\draw[white, thick]
-    (fw_agent.north |- bus) -- (web_agent.north |- bus);
-\draw[arrow] (bus -| fw_agent.north)  -- (fw_agent.north);
-\draw[arrow] (bus -| ai_agent.north)  -- (ai_agent.north);
-\draw[arrow] (bus -| int_agent.north) -- (int_agent.north);
-\draw[arrow] (bus -| web_agent.north) -- (web_agent.north);
-
-% ── LAYER 5: Inference ─────────────────────────────────────────
-\node[corebox, fill=clINF, draw=bINF,
-      below=2.5cm of ai_agent, minimum width=7cm] (triton)
-    {\textbf{NVIDIA Triton Inference Server} \\
-     (Remote HPP Cluster --- GPU Computing)};
-
-\node[layerlabel, left=0.5cm of triton] {L5: Inference};
-
-% ── FRECCE TRATTEGGIATE verso Triton ───────────────────────────
-
-% LLM/AI Inference: da ai_agent a Triton (label a sinistra)
-\draw[dblarrow, dashed]
-    (ai_agent.south) --
-    node[left, font=\sffamily\scriptsize]{LLM/AI Inference}
-    (triton.north -| ai_agent.south);
-
-% Routing Inference: punto medio tra ai_agent.east e int_agent.west
-% freccia verticale da langgraph.south a triton.north (label a destra)
-\path (ai_agent.east) -- (int_agent.west)
-    coordinate[midway] (mid_ai_int);
-\draw[dblarrow, dashed]
-    (langgraph.south -| mid_ai_int) --
-    node[right, near end, font=\sffamily\scriptsize]{Routing Inference}
-    (triton.north -| mid_ai_int);
+%% ── ARROWS col 2 ─────────────────────────────────────────────
+\draw[ar] (CDS.south west) -- node[lbl, right]{Real}      (DREA.north);
+\draw[ar] (CDS.south east) -- node[lbl, left]{Synthetic}  (DSYN.north);
+\draw[ar] (DREA.south) |- (COPT.west);
+\draw[ar] (DSYN.south) |- (COPT.east);
+\draw[ar] (COPT.south west) -- node[lbl, right]{NNI}      (CNNI.north);
+\draw[ar] (COPT.south east) -- node[lbl, left]{Standard}  (CSTD.north);
+\draw[ar] (CNNI.south) |- (CVAL.west);
+\draw[ar] (CSTD.south) |- (CVAL.east);
+\draw[ar] (CVAL) -- (OUT);
 
 \end{tikzpicture}
 \end{document}
