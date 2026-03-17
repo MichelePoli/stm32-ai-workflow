@@ -1,0 +1,67 @@
+Q1. Why did you choose STM32 microcontrollers as the target platform and not more powerful embedded platforms like Raspberry Pi or NVIDIA Jetson?
+Q2. Who is the target user of this framework? A researcher, a student, or a professional embedded engineer?
+Q3. What specific pain point motivated the 4-hour baseline estimate? Were there real-world measurements or surveys?
+Q4. Edge AI is a broad term. What specific sub-problem does your thesis focus on?
+Q5. What would a developer have to do manually today if this framework did not exist?
+Q6. Why did you choose LangGraph over other agentic frameworks like LangChain, AutoGen, or CrewAI?
+Q7. What exactly is a "branch" in your LangGraph architecture? How does the system decide which branch to activate?
+Q8. Why did you use Ollama locally for inference instead of calling a commercial API like OpenAI or Anthropic?
+Q9. Why NVIDIA Triton Inference Server specifically? Could you have used a simpler HTTP proxy?
+Q10. How does Triton handle concurrent requests from multiple users? What prevents one user from monopolizing the GPU?
+Q11. The VS Code extension communicates with the backend over HTTP. Is this not a security risk on a shared research server?
+Q12. Why did you implement the Human-in-the-Loop mechanism using LangGraph's interrupt() rather than a simpler event or callback?
+Q13. Why Redis specifically for state persistence? Could you have used a simple SQLite database?
+Q14. What happens to the user's state (chat history, current workflow) if the FastAPI server crashes?
+Q15. How does the framework generate a valid CubeMX project without a graphical interface?
+Q16. What is in the pre-seeded .ioc template files? Who created them?
+Q17. What happens if the user requests a board that does not have a pre-seeded .ioc template?
+Q18. When the framework searches for a model on GitHub/Kaggle, how does it avoid downloading dangerous or malicious repositories?
+Q19. How does the STEdgeAI analysis step work? What does the output look like and how does the framework interpret it?
+Q20. What compression techniques are available to STEdgeAI, and how does the framework choose between them?
+Q21. What happens if even the highest compression level cannot fit the model into the microcontroller's Flash/RAM?
+Q22. In the NNI workflow, the generated trial.py runs for only 3 epochs per trial. Is that enough to find a meaningful best hyperparameter configuration?
+Q23. You use a TPE (Tree-structured Parzen Estimator) tuner in NNI. What is it and why did you choose it over a random search or grid search?
+Q24. You mention that the framework detects class mismatches and replaces the final Dense layer. Does the re-trained model's backbone retain its original ImageNet weights?
+Q25. The web search agent uses DuckDuckGo. What happens when DuckDuckGo returns pages with incorrect or outdated information?
+Q26. How does the academic search branch differ from the web search branch?
+Q27. The framework generates the CMakeLists.txt and main.c modifications for firmware integration. How does it avoid introducing C syntax errors?
+Q28. The 9x speedup compares your automated system against a manual pipeline. Is this a fair comparison? Could an experienced engineer be much faster?
+Q29. The automated timing (20-30 minutes) includes LLM inference time? That seems long. What dominates the time?
+Q30. The fine-tuning validation achieved 98.1% accuracy on 5,000 images with only 3 epochs of training. Does this not suggest the dataset was too easy?
+Q31. You report a Hallucination Rate of 4–14% on the DeepEval evaluation. What exactly counts as a hallucination in your metric?
+Q32. The DeepEval framework uses an LLM-as-judge to compute metrics. Doesn't that introduce a circularity problem (using an LLM to evaluate an LLM)?
+Q33. Your Contextual Relevancy averages 75%. That means 25% of retrieved documents were not directly useful. Is this acceptable?
+Q34. Did you test the framework end-to-end on a real physical STM32 board?
+Q35. What is the biggest unresolved limitation of your framework?
+Q36. The framework relies on LLM-generated code for NNI and firmware. What happens when the LLM produces incorrect code?
+Q37. How does the system perform when the model was originally trained on a completely different domain (e.g., a speech model asked to do image classification)?
+Q38. The framework stores user profile data in Redis. What happens when the Redis server goes down?
+Q39. Could this framework be used for FPGA deployment instead of MCU deployment?
+Q40. You mentioned 3 deployment scenarios in Chapter 4 (local, single-user containerized, Kubernetes). Why is the Kubernetes deployment described as "future work" and not implemented?
+Q41. How would the framework handle a model that is already quantized (e.g., a pre-quantized INT8 TFLite model)?
+Q42. The framework generates Python fine-tuning code. Does it support PyTorch models or only Keras/TensorFlow?
+Q43. How does this work relate to the field of MLOps? Is it a contribution to MLOps?
+Q44. What is the relationship between your multi-agent system and the concept of "Agentic AI" described in recent literature?
+Q45. Your framework uses LLMs to generate code. How do you ensure the generated code is deterministic and reproducible?
+Q46. How does this project compare to GitHub Copilot or STMicroelectronics' own AI tools?
+Q47. Could the same architecture be applied to other MCU vendors, such as NXP or Nordic Semiconductor?
+Q48. Do you think LLMs are ready to fully automate embedded AI development, or is human oversight still essential?
+Q49. Why does your manager.py use experiment.list_trial_jobs() to find the best trial instead of experiment.get_best_trial()?
+Q50. What is the 'CRC' peripheral in STM32 and why must it be enabled for X-CUBE-AI?
+Q51. What is the role of the LD_LIBRARY_PATH fix in the generated NNI scripts?
+Q52. Why does trial.py include a self-restart mechanism (os.execv)?
+Q53. You use mmap_mode='r' to load NumPy arrays. Does this work correctly with tf.data.Dataset?
+Q54. What is the Pre-seeded IOC Strategy and why is it necessary?
+Q55. How does the NDJSON protocol work between the VS Code extension and the FastAPI backend?
+Q56. What happened during the concurrent stress test with LangGraph? Did the orchestrator crash?
+Q57. How do you distinguish between the computational load of the orchestration agent versus the inference engine?
+Q58. Why did you implement model training and analysis as isolated Python subprocesses instead of running them directly within the LangGraph nodes?
+Q59. If 5 concurrent users cause an Out-Of-Memory error during fine-tuning, how would you scale this system for a production MLOps environment?
+
+--- Questions from presentation_speech.txt ---
+
+Q1: Can you give a specific example of how the customization agent prevents errors?
+Q2: How do you guarantee that the generated C code is correct and actually compiles?
+Q3: Why Triton instead of keeping Ollama locally?
+Q4: What exactly does the integration agent write into main.c?
+Q5: How are two different users isolated on VS Code? What is the key that separates their sessions?
