@@ -23,7 +23,7 @@ Then we have the State and Memory Layer. A dedicated Redis container serves two 
 Finally, at the bottom is the Inference Layer. All LLM calls are forwarded over the network to a centralized NVIDIA Triton Inference Server on the lab's remote cluster. Triton handles dynamic model loading and shares GPU memory across concurrent users, so the orchestration containers need no GPU at all.
 (altri 2.5 minuti, quindi ~4.5 minuti fin qui)
 
-[Slide 4: LangGraph — The Seven Workflows]
+[Slide 4a + 4b: LangGraph — The Seven Workflows]
 Now let me go deeper into the Orchestration Layer.
 
 When a new message arrives, an LLM-based router (running on Mistral via Triton) classifies the user's intent and dispatches it to one of the primary workflows. If the confidence score falls below 0.6, the system asks the user to pick from a menu explicitly, rather than guessing. Let me walk through all seven workflows.
