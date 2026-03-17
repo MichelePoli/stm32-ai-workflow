@@ -30,65 +30,63 @@ When a new message arrives, an LLM-based router (running on Mistral via Triton) 
 
 The first workflow is Firmware Generation. The agent reads the MCU and peripheral requirements from free text, fetches the correct STM32 package, generates the .ioc script, and runs STM32CubeMX in headless mode with a virtual framebuffer. No GUI, no manual steps. A project that would take 20 minutes of clicking is done in 30 seconds.
 
-The second workflow is AI Model Discovery and STEdgeAI Analysis. The system uses three paths to find a model: a curated task-based zoo, a custom URL the user provides, or an iterative web search on HuggingFace and GitHub. Once a model lands, it goes through the STEdgeAI compiler. The agent checks its RAM and Flash footprint against the target MCU's limits. If it doesn't fit, it escalates the compression level on its own. If the model still exceeds the hardware budget, the workflow stops and gives the developer a concrete choice: pick a lighter model or switch to a more capable board.
+The second workflow is AI Model Discovery and STEdgeAI Analysis. The system uses three paths to find a model: a curated task-based zoo, a custom URL the user provides, or an iterative web search on HuggingFace and GitHub. Once a model is selected, it goes through the STEdgeAI compiler, unless the user first wants to customize it. The agent checks its RAM and Flash footprint against the target MCU's limits. If it doesn't fit, it escalates the compression level on its own. If the model still exceeds the hardware constraints, the workflow stops and gives the developer the choice between picking a lighter model or switching to a more capable board.
 
-The third workflow is Firmware-AI Integration. After C code is generated, the developer can continue with integration. The agent scans the STEdgeAI output, copies the generated files into the STM32 project tree, and patches main.c to call the inference function. The result is a project ready to compile on-device.
+The third workflow is Firmware-AI Integration. The agent copies all generated AI files into the STM32 project tree and automatically rewrites main.c to inject the inference call into the execution loop. The result is a project ready to compile on-device.
 
-The fourth workflow is Web Research. For technical questions, the agent classifies the search intent, queries DuckDuckGo, pulls the actual page content from the results, and puts together a grounded answer. Quality is scored automatically with DeepEval.
+The fourth workflow is Web Research. For technical questions, the agent classifies the search intent, queries DuckDuckGo, pulls the actual page content from the results, and puts together a grounded answer. Then quality is scored automatically using DeepEval.
+(3 minuti , quindi ~7.5 minuti fin qui)
 
-The fifth workflow is Neural Network Customization, the most technically involved part of the system. After download, the agent inspects the model's architecture node by node and retrieves known best practices for that network family. The user then says, in plain English, what they want changed. The agent rewrites the Keras code directly: freezing backbone layers, replacing the classification head for a different number of output classes, injecting dropout to counter overfitting. It also detects and fixes class mismatches automatically, before training starts. Once the user confirms the changes, they choose between a standard fine-tuning run and a full NNI hyperparameter search. In the second case, the system writes the trial script, the search space JSON, and the experiment config from scratch, then launches the NNI tuner over learning rates and batch sizes. The output is a validated model ready for the STEdgeAI stage.
+The fifth workflow is Neural Network Customization, the most technically involved part of the system. After download, the agent inspects the model's architecture layer by layer and retrieves known best practices for that network family. The user then says what they want changed. The agent rewrites the Keras code directly: freezing backbone layers, replacing the classification head for a different number of output classes, injecting dropout to counter overfitting. 
+It also detects and fixes class mismatches automatically, before training starts. 
+Once the user confirms the changes, they choose between a standard fine-tuning run and a full NNI hyperparameter search. 
+In the second case, the system writes the trial script, the search space JSON, and the experiment config from scratch, then launches the NNI tuner over learning rates and batch sizes. Each trial reports its final validation accuracy, and NNI automatically picks the configuration that scored highest. The output then is a validated model ready for the STEdgeAI stage.
 
-The sixth workflow is Dataset Selection. The agent downloads a real dataset from HuggingFace or Kaggle, or registers a custom path the user provides.
+To feed this training pipeline, Workflow 6 and 7 handle data: they automatically fetch HuggingFace datasets or generate synthetic validation samples for fast pipeline validation
 
-The seventh workflow is Synthetic Data Generation. When no real dataset is available, or just for fast pipeline validation, the agent generates synthetic samples and checks their distribution before training begins.
-
-One key design detail: outputs from each stage carry over automatically into the next. The MCU target set during firmware setup is already in context when the AI agent searches for a model. No repeated questions, no configuration drift between tools.
+One key design detail is that outputs from each stage carry over automatically into the next. The MCU target set during firmware setup is already in context when the AI agent searches for a model. So we don't have repeated questions and no configuration drift between tools.
+(2 minuti 10, quindi ~10 minuti fin qui)
 
 [Slide 5: IDE Integration & Human-in-the-Loop]
-(~8 minuti fin qui)
-
-I didn't force developers into a separate web app. The assistant lives inside VS Code, the editor they use every day. Responses arrive token by token, and a progress bar updates at each node execution so the user knows exactly where the system is. At critical points, right before a long training job or just before the STEdgeAI compiler runs, the system pauses and asks for explicit confirmation in the chat. The developer stays in the loop throughout.
+The assistant lives inside VS Code. Responses arrive token by token, and a progress bar updates at each node execution so the user knows exactly where the system is. At critical points, right before a long training job or just before the STEdgeAI compiler runs, the system pauses and asks for explicit confirmation in the chat. The developer stays in the loop at every step.
+(30 secondi, quindi ~10 minuti e 30 secondi fin qui)
 
 [Slide 6: Live Demo, ~10-Second Clip]
-(~9 minuti fin qui)
-
 Here is a short clip of the system running live.
 [PLAY SHORT VIDEO, ~10 seconds, cuts loading screens]
 
-On the left, a developer is requesting a fine-tuning job on a MobileNet. You can see the epoch counter moving in the VS Code chat. On the right, at the same time, a second user is asking for a web search on STM32N6 specs. Two heavy operations, one Triton backend, no interference, no data mixing between sessions.
-
+On the left, a developer is requesting a fine-tuning job on a MobileNet. You can see the epoch counter moving in the VS Code chat. On the right, at the same time, a second user is asking for a web search on STM32N6 specifications. Two heavy operations, one Triton backend but no interference and no data mixing between sessions.
+(30 secondi, quindi ~11 minuti fin qui)
 [Slide 7: Benchmarks, The Numbers that Matter]
-(~10.5 minuti fin qui)
-
 A developer tool only matters if it saves time. Here is the comparison against an experienced developer following the official ST documentation.
 
-| Task                        | Manual     | Automated      | Speedup |
-|-----------------------------|------------|----------------|---------|
-| CubeMX Project Setup        | 20 min     | 30 sec         | x40     |
-| AI Model Discovery          | 2 h        | ~5 min         | x24     |
-| NNI Experiment Setup        | ~55 min    | 1-2 min        | x30     |
-| Full End-to-End Deployment  | ~4 h       | 20-30 min      | x9      |
+| Task                        | Manual     | Automated      | Speedup | Workflow |
+|-----------------------------|------------|----------------|---------|----------|
+| CubeMX Project Setup        | 20 min     | 30 sec         | x40     | Firmware WF |
+| AI Model Discovery          | 2 h        | ~5 min         | x24     | AI Analysis WF |
+| NNI Experiment Setup        | ~55 min    | 1-2 min        | x30     | Customization WF |
+| Full End-to-End Deployment  | ~4 h       | 20-30 min      | x9      | All |
 
 The 40x gain on CubeMX setup comes entirely from eliminating the GUI. The 9x end-to-end figure aggregates all pipeline stages conservatively.
 
 [Slide 8: Validation & Reliability]
-Speed without correctness is not enough. Two independent checks validate the results.
+But speed without correctness is not enough. Two independent checks validate the results.
 
-On generated code: the customization agent adapted a MobileNetV1 for a 132-class dataset, injected dropout, and replaced the output head without any human intervention. The final model hit 98.1% validation accuracy on 5,000 images.
+On generated code: the customization agent adapted a MobileNetV1 for a 132-class dataset, injected dropout, and replaced the output head without any human intervention. The final model hit 98.1% validation accuracy on 5,000 images of the Fruit-360 dataset.
 
-On answer quality: DeepEval scored the web search agent at 75% average Contextual Relevancy and a hallucination rate as low as 4% on procedural tasks, where the system scored a perfect 1.0 on Faithfulness.
+On answer quality: DeepEval scored the web search agent at 75% average Contextual Relevancy and a hallucination rate as low as 4% on procedural tasks, 
+where the system scored a perfect 1.0 on Faithfulness.
+(45-60 secondi, quindi ~12 minuti fin qui)
 
 [Slide 9: Conclusion & Future Work]
-(~12 minuti fin qui)
-
 This framework shows that multi-agent orchestration is a practical path for embedded AI development. Headless CubeMX generation, a centralized Triton backend, and NNI optimization run together as a single system from inside the IDE.
 
-The architecture is built for the next step. Because the orchestration containers carry no GPU dependency, moving to Kubernetes is a direct path: swap Docker Compose for a Kubernetes deployment and enterprise teams can scale the agent layer horizontally while Triton manages the GPU cluster.
+The architecture is built for the next step. Because the orchestration containers carry no GPU dependency, moving to Kubernetes is a direct path: switching from Docker Compose to a Kubernetes deployment allows enterprise teams to scale the agent layer horizontally while Triton manages the GPU cluster.
 
-Cutting a 4-hour pipeline to under 30 minutes is a concrete result. The system removes the expertise barrier that has kept embedded engineers and AI engineers working in separate silos.
+Cutting a 4-hour pipeline to under 30 minutes is a concrete result. The system removes the expertise barrier that has kept embedded engineers and AI engineers working in separate environments.
 
 Thank you for your attention. I am happy to take any questions.
-
+(45-60 secondi, quindi ~13 minuti fin qui)
 
 ----------
 Potential Q&A
@@ -101,3 +99,6 @@ A2: The system does not generate C code from scratch. STEdgeAI handles the C cod
 
 Q3: Why Triton instead of keeping Ollama locally?
 A3: During concurrent load testing with 15 users, individual Ollama instances caused VRAM saturation because each container locked its own GPU allocation. Triton runs a single shared pool and handles dynamic model swapping (if necessary), so GPU memory is never duplicated across users. At 15 concurrent sessions, VRAM stayed at 80% with full GPU utilization — well within the safe operating range of the A40.
+
+Q4: What exactly does the integration agent write into main.c?
+A4: STM32CubeMX generates main.c with reserved comment sections for user code. The agent targets those blocks precisely. In the includes section, it adds the generated network headers. In the private variables section, it declares the AI handle, the activation buffer, and the input/output data arrays. In the initialization block, it calls ai_network_create and ai_network_init with the correct parameters. Finally, in the main while loop, it inserts ai_network_run with inline comments explaining how to feed sensor data in and read the classification result. The source file is backed up before any modification.
