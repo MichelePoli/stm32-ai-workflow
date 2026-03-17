@@ -56,6 +56,7 @@ Here is a short clip of the system running live.
 [PLAY SHORT VIDEO, ~10 seconds, cuts loading screens]
 
 On the left, a developer is requesting a fine-tuning job on a MobileNet. You can see the epoch counter moving in the VS Code chat. On the right, at the same time, a second user is asking for a web search on STM32N6 specifications. Two heavy operations, one Triton backend but no interference and no data mixing between sessions.
+
 (30 secondi, quindi ~11 minuti fin qui)
 [Slide 7: Benchmarks, The Numbers that Matter]
 A developer tool only matters if it saves time. Here is the comparison against an experienced developer following the official ST documentation.
@@ -102,3 +103,13 @@ A3: During concurrent load testing with 15 users, individual Ollama instances ca
 
 Q4: What exactly does the integration agent write into main.c?
 A4: STM32CubeMX generates main.c with reserved comment sections for user code. The agent targets those blocks precisely. In the includes section, it adds the generated network headers. In the private variables section, it declares the AI handle, the activation buffer, and the input/output data arrays. In the initialization block, it calls ai_network_create and ai_network_init with the correct parameters. Finally, in the main while loop, it inserts ai_network_run with inline comments explaining how to feed sensor data in and read the classification result. The source file is backed up before any modification.
+
+Q5: How are two different users isolated on VS Code? What is the key that separates their sessions?
+A5: Each request from the VS Code extension carries two identifiers: a user_id and a session_id. The server combines them into a composite key: composite_thread_id = f"{user_id}:{session_id}". This string becomes the LangGraph thread_id passed to the Redis checkpointer, so two users with different composite keys always operate on entirely separate MasterState snapshots, with no shared mutable state.
+
+The user_id is currently hardcoded in the extension (set to "michele" during development). The session_id, on the other hand, is generated dynamically at extension activation using a timestamp:
+  const SESSION_ID = `vscode-session-${Date.now()}`;
+Because each VS Code window runs its own extension process and calls activate() independently, every new window gets a unique timestamp and therefore a unique SESSION_ID. This is what makes two windows behave as isolated users: same user_id, but different session_id, which results in a different composite thread key and a separate Redis checkpoint chain.
+
+It is worth noting that this is session isolation, not authentication. 
+In a possible future work like enterprise Kubernetes deployment, the extension would receive a per-user OAuth token at login time, making user_id unique and persistent across sessions rather than hardcoded.
