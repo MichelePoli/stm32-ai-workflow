@@ -76,7 +76,7 @@ But speed without correctness is not enough. Two independent checks validate the
 
 On generated code: the customization agent adapted a MobileNetV1 for a 132-class dataset, injected dropout, and replaced the output head without any human intervention. The final model hit 98.1% validation accuracy on 5,000 images of the Fruit-360 dataset.
 
-On answer quality: DeepEval scored the web search agent at 75% average Contextual Relevancy and a hallucination rate as low as 4% on procedural tasks, where the system scored a perfect 1.0 on Faithfulness.
+On answer quality: DeepEval scored the web search agent at 75% average Contextual Relevancy and a hallucination rate of 20% on average, dropping to just 4% on structured procedural queries, and a perfect 1.0 on Faithfulness.
 (45-60 secondi, quindi ~12 minuti fin qui)
 
 [Slide 9: Conclusion & Future Work]
@@ -119,3 +119,6 @@ Because each VS Code window runs its own extension process and calls activate() 
 
 It is worth noting that this is session isolation, not authentication. 
 In a possible future work like enterprise Kubernetes deployment, the extension would receive a per-user OAuth token at login time, making user_id unique and persistent across sessions rather than hardcoded.
+
+Q6: If individual tasks show speedups of 40x and 30x, why is the end-to-end figure only 9x?
+A6: The 9x is a weighted aggregate across all six pipeline stages, not just the most dramatic ones. The peak speedups — 40x for CubeMX project setup and 30x for NNI experiment generation — apply to pure orchestration tasks where we completely eliminate GUI interaction or manual script writing. The bottleneck is model fine-tuning, which still requires actual GPU compute time and shows only a 3x improvement: the agent handles setup and configuration automatically, but cannot compress the training epochs themselves. STEdgeAI analysis shows a 7x improvement for the same reason: CLI invocation is automated, but the compilation runtime remains. These two tasks represent roughly 75–90 minutes of the total manual baseline, so their lower speedup pulls the pipeline average down to 9x. This figure is consistent with what embedded ML CI/CD literature reports — typically 70% deployment time reduction through automation pipelines.
