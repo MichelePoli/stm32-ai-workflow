@@ -3336,13 +3336,21 @@ try:
 
     
     # 7. Convert to robust tf.data.Dataset pipeline
-    # This specifically fixes: "Failed copying input tensor from CPU to GPU... Dst tensor is not initialized"
-    # which happens when TF eager execution races to upload raw NumPy arrays to GPU memory.
+    # Root cause of "Failed copying input tensor... _EagerConst: Dst tensor is not initialized":
+    # tf.data.Dataset.from_tensor_slices() internally calls tf.constant(X), which tries to
+    # place the ENTIRE NumPy array onto the GPU as a single constant tensor.
+    # For large datasets (e.g. fruit_360: 5000×100×100×3 float32 ≈ 600 MB) this single
+    # allocation fails in a fragmented CUDA context (Triton keeps the context resident
+    # even after model unload), leaving an uninitialized handle → crash.
+    # Fix: force the constant tensors to stay on CPU (host) memory. Individual batches
+    # are then moved to GPU on demand by the .prefetch(AUTOTUNE) pipeline below,
+    # which is both correct and efficient.
     import tensorflow as tf
-    
-    # Create datasets
-    train_ds = tf.data.Dataset.from_tensor_slices((X, y))
-    val_ds = tf.data.Dataset.from_tensor_slices((X_val, y_val))
+
+    # Create datasets — keep backing tensors on CPU to avoid large single-block GPU allocation
+    with tf.device('/CPU:0'):
+        train_ds = tf.data.Dataset.from_tensor_slices((X, y))
+        val_ds = tf.data.Dataset.from_tensor_slices((X_val, y_val))
     
     # Define preprocessing helper to act on tensors
     def preprocess_image(img, label):
