@@ -69,7 +69,7 @@ A developer tool only matters if it saves time. Here is the comparison against a
 | NNI Experiment Setup        | ~55 min    | 1-2 min        | x30     | Customization WF |
 | Full End-to-End Deployment  | ~4 h       | 20-30 min      | x9      | All |
 
-The 40x gain on CubeMX setup comes entirely from eliminating the GUI. The 9x end-to-end figure aggregates all pipeline stages conservatively.
+The 40x gain on CubeMX setup comes entirely from eliminating the GUI. The 9x end-to-end figure aggregates all pipeline stages.
 
 [Slide 8: Validation & Reliability]
 But speed without correctness is not enough. Two independent checks validate the results.
