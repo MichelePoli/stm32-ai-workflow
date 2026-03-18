@@ -65,3 +65,14 @@ Q2: How do you guarantee that the generated C code is correct and actually compi
 Q3: Why Triton instead of keeping Ollama locally?
 Q4: What exactly does the integration agent write into main.c?
 Q5: How are two different users isolated on VS Code? What is the key that separates their sessions?
+Q6: If individual tasks show speedups of 40x and 30x, why is the end-to-end figure only 9x?
+
+Q7: Does Redis only store user profiles, or does it do something more fundamental to the system?
+
+Q8: Why does the system need a dedicated API Gateway layer? Could the LangGraph orchestrator expose its endpoint directly?
+
+Q9: How does the streaming work between the server and the VS Code extension? Why not a standard REST response?
+
+Q10: In the architecture slide, you mention the response is streamed "token by token". What exactly is a token in this context?
+
+Q11: When the customization agent adapts MobileNetV1 for a 132-class dataset, what is actually happening under the hood?
