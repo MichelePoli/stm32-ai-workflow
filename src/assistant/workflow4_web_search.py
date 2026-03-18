@@ -49,9 +49,9 @@ def _evaluate_summary_sync(
     Uses metrics compatible with web search (Faithfulness, AnswerRelevancy).
     """
     triton_enabled = os.environ.get("USE_TRITON_BACKEND", "false").lower() == "true"
-    backend_label = "Triton (deepseek-r1)" if triton_enabled else "Ollama (deepseek-r1:latest)"
-    print(f"\n🔍 Running DeepEval evaluation with {backend_label}...\n")
-    
+    eval_model_name = "mistral" if triton_enabled else "mistral"
+    backend_label = f"Triton ({eval_model_name})" if triton_enabled else f"Ollama ({eval_model_name})"
+    print(f"\n🔍 Running DeepEval evaluation with {backend_label}...\n")    
     try:
         from deepeval.metrics import (
             FaithfulnessMetric,
@@ -153,8 +153,6 @@ def _evaluate_summary_sync(
 
         # We use mistral since it is an instruction-tuned model, unlike
         # gpt-oss-20b which is code-specialized and fails at JSON formatting.
-        eval_model_name = "mistral" if triton_enabled else "mistral"
-
         # eval_model_name = "gpt-oss-20b" if triton_enabled else "gpt-oss-20b"
         eval_model = DeepEvalLangChainWrapper(model_name=eval_model_name, config=None)
 
