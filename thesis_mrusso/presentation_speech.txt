@@ -55,7 +55,8 @@ The assistant lives inside VS Code. Responses arrive token by token, and a progr
 Here is a short clip of the system running live.
 [PLAY SHORT VIDEO, ~10 seconds, cuts loading screens]
 
-On the left, a developer is requesting a fine-tuning job on a MobileNet. You can see the epoch counter moving in the VS Code chat. On the right, at the same time, a second user is asking for a web search on STM32N6 specifications. Two heavy operations, one Triton backend but no interference and no data mixing between sessions.
+On the left, User 1 is running a fine-tuning job. You can see the epoch counter moving in real time inside the VS Code chat. On the right, at the same time, User 2 is getting a web search answer on STM32N6 specs. 
+They are two heavy operations, one Triton backend but no interference and no data mixing between sessions.
 
 (30 secondi, quindi ~11 minuti fin qui)
 [Slide 7: Benchmarks, The Numbers that Matter]
