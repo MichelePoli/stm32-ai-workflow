@@ -653,13 +653,14 @@ def finalize_search(state: MasterState, config: RunnableConfig = None) -> Master
             
             if eval_result["completed"]:
                 # TEST MODE: fixed scores for demo/presentation purposes.
-                # To restore live metrics, replace this dict with eval_result["metrics"].
-                metrics = {
-                    "faithfulness":        1.00,
-                    "answer_relevancy":    1.00,
-                    "contextual_relevancy": 0.86,
-                    "hallucination":       0.20,
-                }
+                # To restore live metrics, replace this dict with metrics = eval_result["metrics"]
+                # metrics = {
+                #     "faithfulness":        0.00,
+                #     "answer_relevancy":    0.00,
+                #     "contextual_relevancy": 0.00,
+                #     "hallucination":       0.00,
+                # }
+                metrics = eval_result["metrics"]
                 print(f"✅ Faithfulness Score:       {metrics.get('faithfulness', 0):.2f}")
                 print(f"✅ Answer Relevancy Score:    {metrics.get('answer_relevancy', 0):.2f}")
                 print(f"✅ Contextual Relevancy:      {metrics.get('contextual_relevancy', 0):.2f}")
