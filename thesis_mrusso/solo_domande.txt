@@ -76,3 +76,11 @@ Q9: How does the streaming work between the server and the VS Code extension? Wh
 Q10: In the architecture slide, you mention the response is streamed "token by token". What exactly is a token in this context?
 
 Q11: When the customization agent adapts MobileNetV1 for a 132-class dataset, what is actually happening under the hood?
+
+Q12: You mentioned Triton as your inference backend, but did you also use vLLM?
+
+Q13: Why did you need vLLM inside Triton? Could you have used HuggingFace Transformers directly?
+
+Q14: What is the KV cache exactly?
+
+Q15: You have gpu_memory_utilization=0.35 in model.py. Why such a conservative value?

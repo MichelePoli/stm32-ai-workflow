@@ -2,83 +2,79 @@
 Good afternoon everyone. I'm Michele Russo and today I present my thesis: "From IDE to Edge: A Cloud-Native Multi-Agent Framework for Automated Edge AI Deployment on STM32".
 
 [Slide 2: The Core Problem]
-Right now, a real disconnect exists in embedded development. AI engineers write Python and train large neural networks. Embedded engineers write C, fight strict memory limits and write low-level firmware directly on STM32 hardware.
-Connecting those two worlds and pushing a neural network onto a microcontroller is called Edge AI. 
-And right now, it is a highly manual process. Developers must master a fragmented toolchain, for example: STM32CubeMX for hardware configuration, STEdgeAI for model conversion, custom Python scripts for hyperparameter tuning, and manual C-code integration.
-My tests show this pipeline takes an expert over 4 hours. Most of that time is wasted navigating dense GUIs, reading datasheets (scheda dati), writing repetitive code, and debugging tiny misconfigurations.
-The answer I propose is to replace that tedious toolchain with a multi-agent AI framework and, instead of clicking through interfaces, the developer write a simple prompt to their IDE like: "Generate an STM32H7 project, find a small MobileNet and integrate it into my C code."
-(~2 minuti fin qui)
+Today a real disconnect exists in embedded development.
+AI engineers write Python and train large neural networks. 
+Embedded engineers write C, fight strict memory limits, and write low-level firmware directly on STM32 hardware.
+Pushing a neural network onto a microcontroller is called Edge AI, and it is still a highly manual process. 
+Developers must master a fragmented toolchain: STM32CubeMX for hardware configuration, STEdgeAI for model conversion, custom Python scripts for tuning, and manual C integration.
+My tests show this pipeline takes an expert over 4 hours, mostly wasted navigating dense GUIs, reading datasheets and debugging tiny misconfigurations.
+The answer I propose is to replace that tedious toolchain with a multi-agent AI framework. Instead of clicking through interfaces, the developer writes a simple prompt like: "Generate an STM32H7 project, find a small MobileNet and integrate it into my C code."
+
 
 [Slide 3: Architecture — The Five Layers]
 As shown in this diagram, the framework is organized across five distinct layers.
 
-At the top is the IDE Layer. The developer interacts through a custom VS Code extension that integrates directly into the editor's native chat. By typing @stm32ai in the chat panel, they communicate with the backend container. Responses stream token by token, keeping the editor completely responsive even during long operations.
-(Le risposte vengono trasmesse token per token, mantenendo l'editor completamente reattivo anche durante operazioni lunghe.)
+At the top is the IDE Layer. The developer interacts through a custom VS Code extension that integrates directly into the editor's native chat. By typing @stm32ai in the chat panel, they communicate with the backend container.
 
 Below that is the API Gateway: a FastAPI server that exposes a single streaming endpoint. It receives each message from the extension, retrieves the user's long-term profile from Redis, constructs the initial graph state, and streams back real-time responses.
 
-The core of the system is the Orchestration Layer. I built the entire pipeline using LangGraph. This framework lets you define workflows as directed, stateful graphs (grafi diretti e con stato). In this topology, each node is a specialized Python function and the LLM acts as the orchestrator, deciding which edges to follow based on the current context and the user's intent.
+The core of the system is the Orchestration Layer. I built the entire pipeline using LangGraph, a framework that lets you define workflows as directed, stateful graphs (grafi diretti e con stato). Each node is a specialized Python function and the LLM acts as the orchestrator, deciding which path to follow based on the context and the user's intent.
 
 Then we have the State and Memory Layer. Redis is the backbone of our memory layer. It saves the full execution state enabling Human-in-the-Loop pauses that survive across requests, and stores long-term user profiles across sessions, like preferred board, last model, previous projects.
 
-Finally, at the bottom is the Inference Layer. All LLM calls are forwarded over the network to a centralized NVIDIA Triton Inference Server on the lab's remote cluster. Triton handles dynamic model loading and shares GPU memory across concurrent users, so the orchestration containers need no GPU at all.
-(altri 2.5 minuti, quindi ~4.5 minuti fin qui)
+Finally, at the bottom is the Inference Layer. All LLM calls go to a centralized NVIDIA Triton Inference Server on the lab's remote cluster. 
+Triton handles dynamic model loading and shares GPU memory across concurrent users, so the orchestration containers need no GPU at all.
+
 
 [Slide 4a : LangGraph - Workflows overview ]
 
 Now let me go deeper into the Orchestration Layer.
 
-When a new message arrives, an LLM-based router (running on Mistral via Triton) classifies the user's intent and dispatches it to one of the primary workflows. (lo invia a uno dei flussi di lavoro principali.)
-[[penso la tolgo: If the confidence score falls below 0.6, the system asks the user to pick from a menu explicitly, rather than guessing.]]
+When a new message arrives, an LLM-based router (running on Mistral via Triton) classifies the user intent and dispatches it to one of three primary workflows (lo invia a uno dei tre flussi di lavoro principali): Firmware Generation, AI Model Discovery,
+or Web Research. The remaining 4 workflows are triggered automatically as the pipeline progresses.
 
-Let me walk through all seven workflows.
-
-The first workflow is Firmware Generation. The agent reads the MCU (microcontroller unit = microcontrollore) and peripheral requirements from free text, fetches the correct STM32 package, generates the .ioc script, and runs STM32CubeMX in headless mode without GUI and without manual steps. A project that would take 20 minutes of clicking is done in 30 seconds.
+The first workflow is Firmware Generation. The agent reads the MCU (microcontroller unit = microcontrollore) and peripheral requirements from free text, fetches the correct STM32 package, generates the .ioc script, and runs STM32CubeMX in headless mode without GUI. A project that would take 20 minutes of clicking is done in 30 seconds.
 
 The second workflow is AI Model Discovery and STEdgeAI Analysis. 
 The system uses three paths to find a model: a curated task-based list of models, a custom URL the user provides, or an iterative web search on HuggingFace and GitHub. 
-Once a model is selected, it goes through the STEdgeAI compiler, unless the user first wants to customize it. 
-The agent checks its RAM and Flash footprint against the target MCU's limits. If it doesn't fit, it escalates the compression level on its own. If the model still exceeds the hardware constraints, the workflow stops and gives the developer the choice between picking a lighter model or switching to a more capable board.
+Once a model is selected, it goes through the STEdgeAI compiler, which checks its RAM and Flash footprint against the target MCU's limits. If it doesn't fit, it escalates the compression level on its own. 
+If the model still exceeds the hardware constraints, the workflow stops and gives the user the choice between picking a lighter model or switching to a more capable board.
 
-The third workflow is Firmware-AI Integration.
-The agent copies all generated AI files into the STM32 project tree and automatically rewrites main.c to inject the inference call into the execution loop. 
+The third workflow is Firmware-AI Integration, which copies all AI files into the STM32 project tree and rewrites main.c to inject the inference call automatically. 
 The result is a project ready to compile on-device.
 
-The fourth workflow is Web Research. For technical questions, the agent classifies the search intent, queries DuckDuckGo, pulls the actual page content from the results, and puts together a grounded answer. Then quality is scored automatically using DeepEval.
-(3 minuti , quindi ~7.5 minuti fin qui)
+The fourth workflow is Web Research. 
+For technical questions, the agent queries DuckDuckGo, pulls page content from the RESULTS, and puts together a grounded answer (mette insieme una risposta fondata) scored automatically using DeepEval.
+
 
 [Slide 4b - Customization workflow]
-The fifth workflow is Neural Network Customization, the most technically involved part of the system. 
-After download, the agent inspects the model's architecture layer by layer and retrieves known best practices for that network family. 
-The user then says what they want changed. 
-The agent rewrites the Keras code directly: freezing backbone layers, replacing the classification head for a different number of output classes, injecting dropout to counter overfitting. 
+The fifth workflow is Neural Network Customization, the most technically involved part of the system. (la parte tecnicamente più coinvolta del sistema.)
+
+The agent first inspects the model's architecture layer by layer, retrieves known best practices for that network family and then rewrites the Keras code directly: freezing backbone layers, replacing the classification head for a different number of output classes, injecting dropout. 
 It also detects and fixes class mismatches automatically, before training starts. 
-Once the user confirms the changes, they choose between a standard fine-tuning run and a full NNI hyperparameter search. 
-In the second case, the system writes the trial script, the search space JSON, and the experiment config from scratch, then launches the NNI tuner (il cervello che sceglie quali iperparametri scegliere , il più comunque è il TPE) over learning rates and batch sizes. 
-Each trial reports its final validation accuracy, and NNI automatically picks the configuration that scored highest. 
-The output then is a validated model ready for the STEdgeAI stage.
+The user then chooses between a standard fine-tuning run and a full NNI hyperparameter search. 
+In the second case, the system writes the trial script, the search space JSON, and the experiment config, then launches the NNI tuner (il cervello che sceglie quali iperparametri scegliere , il più comunque è il TPE) over learning rates and batch sizes. 
+The best configuration is selected automatically and output is a validated model ready for STEdgeAI.
 
-In addition we have Dataset and Synthetic data Workflows, which automatically fetch HuggingFace datasets or generate synthetic validation samples for fast pipeline validation.
+We also have Dataset and Synthetic data Workflows, which automatically fetch HuggingFace datasets OR generate synthetic VALIDATION SAMPLES for fast pipeline validation.
 
-One key design detail is that outputs from each stage carry over automatically into the next. The MCU target set during firmware setup is already in context when the AI agent searches for a model. So we don't have repeated questions and no configuration drift between tools.
-(2 minuti 10, quindi ~10 minuti fin qui)
+One key design detail is that outputs from each stage carry over automatically into the next (gli output di ogni fase vengono trasferiti automaticamente a quella successiva). For example, the MCU target set during firmware setup is already in context when the AI agent searches for a model. So we don't have repeated questions.
 
 [Slide 5: IDE Integration & Human-in-the-Loop]
-The assistant lives inside VS Code. Responses arrive token by token, and a progress bar updates at each node execution so the user knows exactly where the system is. 
-At critical points, right before a long training job or just before the STEdgeAI compiler runs, the system pauses and asks for explicit confirmation in the chat. 
-[[penso la tolgo: The developer stays in the loop at every step.]]
-(30 secondi, quindi ~10 minuti e 30 secondi fin qui)
+The assistant lives inside VS Code. Responses arrive token by token, and a progress bar updates at EACH NODE EXECUTION so the user knows exactly where the system is. 
+At critical points the system pauses and asks for explicit confirmation in the chat, like right before a long training job or just before the STEdgeAI compiler runs.
+
 
 [Slide 6: Live Demo, ~10-Second Clip]
+
 Here is a short clip of the system running live.
 
 On the left, User 1 is running a fine-tuning job. You can see the epoch counter moving in real time inside the VS Code chat. 
 On the right, at the same time, User 2 is getting a web search answer on STM32N6 specifications.
-They are two heavy operations, one Triton backend but no interference and no data mixing between sessions.
+They are two heavy operations with no interference (nessuna interferenza) and no data mixing between sessions.
 
-(30 secondi, quindi ~11 minuti fin qui)
 [Slide 7: Benchmarks, The Numbers that Matter]
-A developer tool only matters if it saves time. 
+
 Here is the comparison against an experienced developer following the official ST documentation.
 
 | Task                        | Manual     | Automated      | Speedup | Workflow |
@@ -88,31 +84,27 @@ Here is the comparison against an experienced developer following the official S
 | NNI Experiment Setup        | ~55 min    | 1-2 min        | x30     | Customization WF |
 | Full End-to-End Deployment  | ~4 h       | 20-30 min      | x9      | All |
 
-The 40x gain on CubeMX setup comes entirely from eliminating the GUI. 
-The 9x end-to-end figure aggregates all pipeline stages.
+The 40x gain on CubeMX setup comes entirely from eliminating the GUI, while 9x end-to-end figure aggregates all pipeline stages.
 
 [Slide 8: Validation & Reliability]
-But speed without correctness is not enough.
-Here we have independent checks which validate the results.
 
-On generated code: the customization agent adapted a MobileNetV1 for a 132-class dataset, injected dropout, and replaced the output head without any human intervention. 
-The final model hit 98.1% validation accuracy on 5,000 images of the Fruit-360 dataset.
+I also validated the results in two ways.
 
-On answer quality: DeepEval scored the web search agent at 75% average Contextual Relevancy and a hallucination rate of 20% on average, dropping to just 4% on structured procedural queries, and a perfect 1.0 on Faithfulness.
-(45-60 secondi, quindi ~12 minuti fin qui)
+For generated code, the customization agent adapted a MobileNetV1 for a 132-class dataset, injected dropout, and replaced the output head without any human intervention. 
+The final model hit 98.1% validation accuracy on 5,000 images of the dataset.
+
+For answer quality, DeepEval scored the web search agent at 75% Contextual Relevancy on average and a hallucination rate of 20%, dropping to just 4% on structured procedural queries, and a perfect 1.0 on Faithfulness.
 
 [Slide 9: Conclusion & Future Work]
+
 This framework shows that multi-agent orchestration is a practical path for embedded AI development. 
-Headless CubeMX generation, a centralized Triton backend, and NNI optimization run together as a single system from inside the IDE.
 
-The architecture is built for the next step. Because the orchestration containers carry no GPU dependency, moving to Kubernetes is a direct path: switching from Docker Compose to a Kubernetes deployment allows enterprise teams to scale the agent layer horizontally while Triton manages the GPU cluster.
+The architecture is ready for the next step. Since the ORCHESTRATION CONTAINERS have no GPU dependency, moving from Docker Compose to Kubernetes lets enterprise teams scale the agent layer horizontally while Triton manages the GPU cluster.  
 
-Cutting a 4-hour pipeline to under 30 minutes is a concrete result. 
-The system removes the expertise barrier that has kept embedded engineers and AI engineers working in separate environments.
+Cutting a 4-hour pipeline to under 30 minutes is a concrete result and the system removes the expertise barrier that has kept embedded engineers and AI engineers in separate environments.
 
 Thank you for your attention. I am happy to take any questions.
 
-(45-60 secondi, quindi ~13 minuti fin qui)
 
 
 
@@ -167,3 +159,14 @@ When the agent detects this conflict, it programmatically removes the original 1
 It then injects a new Dense layer with exactly 132 neurons (matching the new dataset), usually preceded by a Dropout layer to prevent overfitting. 
 During the subsequent fine-tuning phase, the pre-trained "feature extractor" layers are often frozen, and only this new 132-neuron head is trained to map the extracted visual features to the new specific categories.
 
+Q12: You mentioned Triton as your inference backend, but did you also use vLLM?
+A12: Yes, but not as a separate service. vLLM runs as the internal runtime inside the Triton Python backend. When Triton loads the Mistral model, the model.py I wrote calls vllm.LLM() in its initialize() method to load the model weights onto the GPU, and llm.generate() in execute() for each inference request. The application code never speaks to vLLM directly: it only sees Triton's native API at /v2/models/mistral/infer. So Triton is the serving layer and vLLM is the inference engine underneath it — the two work together as a stack.
+
+Q13: Why did you need vLLM inside Triton? Could you have used HuggingFace Transformers directly?
+A13: Technically yes, but HuggingFace Transformers allocates the KV cache statically per request. With multiple concurrent users, each session reserves its own chunk of VRAM for the full context window, even if the actual prompt is short. vLLM solves this with PagedAttention, which manages the KV cache dynamically in fixed-size blocks — similar to how an operating system handles virtual memory pages. Unused blocks are released and reused across sessions. On top of that, vLLM implements continuous batching: it folds new incoming requests into the active generation batch without waiting for previous ones to finish, which keeps GPU utilization high under concurrent load.
+
+Q14: What is the KV cache exactly?
+A14: During text generation, Transformer models process every token in the sequence at every step. To avoid recomputing the Key and Value vectors for all previously generated tokens, the model saves them in memory — that is the KV cache. As generation continues, the cache grows linearly with the number of tokens produced. With many concurrent users, multiple independent KV caches accumulate in VRAM simultaneously. With static allocation (Transformers default), the full context window is reserved upfront regardless of actual length. PagedAttention in vLLM allocates only the pages that are actually needed, reclaiming memory as soon as a session ends.
+
+Q15: You have gpu_memory_utilization=0.35 in model.py. Why such a conservative value?
+A15: That parameter was calibrated during development on a local A4000 with 16GB of VRAM. Setting it to 0.35 reserved about 5.6GB for the Mistral 7B GPTQ-quantized weights, leaving the remaining 65% for the KV cache and peak activations during concurrent requests. On the HPP cluster with the A40 (45GB), the same 0.35 reserves around 15GB for weights, leaving roughly 30GB for KV cache and for coexisting with other heavy models like gpt-oss-20b without triggering a VRAM swap.
