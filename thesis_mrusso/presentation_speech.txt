@@ -19,7 +19,7 @@ Below that is the API Gateway: a FastAPI server that exposes a single streaming 
 
 The core of the system is the Orchestration Layer. I built the entire pipeline using LangGraph. This framework lets you define workflows as directed, stateful graphs (grafi diretti e con stato). In this topology, each node is a specialized Python function and the LLM acts as the orchestrator, deciding which edges to follow based on the current context and the user's intent.
 
-Then we have the State and Memory Layer. Redis is the backbone of our memory layer. It persists the full execution state enabling Human-in-the-Loop pauses that survive across requests, and stores long-term user profiles across sessions, like preferred board, last model, previous projects.
+Then we have the State and Memory Layer. Redis is the backbone of our memory layer. It saves the full execution state enabling Human-in-the-Loop pauses that survive across requests, and stores long-term user profiles across sessions, like preferred board, last model, previous projects.
 
 Finally, at the bottom is the Inference Layer. All LLM calls are forwarded over the network to a centralized NVIDIA Triton Inference Server on the lab's remote cluster. Triton handles dynamic model loading and shares GPU memory across concurrent users, so the orchestration containers need no GPU at all.
 (altri 2.5 minuti, quindi ~4.5 minuti fin qui)
@@ -29,7 +29,7 @@ Finally, at the bottom is the Inference Layer. All LLM calls are forwarded over 
 Now let me go deeper into the Orchestration Layer.
 
 When a new message arrives, an LLM-based router (running on Mistral via Triton) classifies the user's intent and dispatches it to one of the primary workflows. (lo invia a uno dei flussi di lavoro principali.)
-If the confidence score falls below 0.6, the system asks the user to pick from a menu explicitly, rather than guessing. 
+[[penso la tolgo: If the confidence score falls below 0.6, the system asks the user to pick from a menu explicitly, rather than guessing.]]
 
 Let me walk through all seven workflows.
 
@@ -47,7 +47,7 @@ The result is a project ready to compile on-device.
 The fourth workflow is Web Research. For technical questions, the agent classifies the search intent, queries DuckDuckGo, pulls the actual page content from the results, and puts together a grounded answer. Then quality is scored automatically using DeepEval.
 (3 minuti , quindi ~7.5 minuti fin qui)
 
-[Slide 4b - Customization workflow)
+[Slide 4b - Customization workflow]
 The fifth workflow is Neural Network Customization, the most technically involved part of the system. 
 After download, the agent inspects the model's architecture layer by layer and retrieves known best practices for that network family. 
 The user then says what they want changed. 
@@ -66,7 +66,7 @@ One key design detail is that outputs from each stage carry over automatically i
 [Slide 5: IDE Integration & Human-in-the-Loop]
 The assistant lives inside VS Code. Responses arrive token by token, and a progress bar updates at each node execution so the user knows exactly where the system is. 
 At critical points, right before a long training job or just before the STEdgeAI compiler runs, the system pauses and asks for explicit confirmation in the chat. 
-The developer stays in the loop at every step.
+[[penso la tolgo: The developer stays in the loop at every step.]]
 (30 secondi, quindi ~10 minuti e 30 secondi fin qui)
 
 [Slide 6: Live Demo, ~10-Second Clip]
