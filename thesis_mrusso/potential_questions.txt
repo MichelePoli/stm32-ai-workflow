@@ -102,6 +102,8 @@ Hint: The LLM prompt for integration includes the current content of the existin
 ════════════════════════════════════════════════
 SECTION 4 – EVALUATION & RESULTS
 ════════════════════════════════════════════════
+Q16 (the most likely question): 
+How did you measure the speedup figures in the benchmarks table?
 
 Q28. The 9x speedup compares your automated system against a manual pipeline. Is this a fair comparison? Could an experienced engineer be much faster?
 Hint: The methodology uses the Keystroke-Level Model (KLM) for the manual baseline and cross-references it against official ST tutorial times and developer community benchmarks. The thesis explicitly acknowledges that veteran engineers may be faster. The speedup is presented as a ratio against a "proficient user" baseline, not a novice.
