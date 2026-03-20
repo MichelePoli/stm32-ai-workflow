@@ -106,9 +106,6 @@ SECTION 4 – EVALUATION & RESULTS
 Q28. The 9x speedup compares your automated system against a manual pipeline. Is this a fair comparison? Could an experienced engineer be much faster?
 Hint: The methodology uses the Keystroke-Level Model (KLM) for the manual baseline and cross-references it against official ST tutorial times and developer community benchmarks. The thesis explicitly acknowledges that veteran engineers may be faster. The speedup is presented as a ratio against a "proficient user" baseline, not a novice.
 
-Q29. The automated timing (20-30 minutes) includes LLM inference time? That seems long. What dominates the time?
-Hint: Yes, it does. The dominant factors are: LLM code generation for NNI scripts (~1-2 min), the STEdgeAI analysis and optional compression (~2-3 min), and model discovery and downloading (~3-5 min). The LLM inference itself on local Ollama is typically 20-60 seconds per call.
-
 Q30. The fine-tuning validation achieved 98.1% accuracy on 5,000 images with only 3 epochs of training. Does this not suggest the dataset was too easy?
 Hint: The 132-class CIFAR-style dataset was deliberately chosen as an accessible benchmark to demonstrate the framework's functional correctness (class mismatch rescue, anti-overfitting code generation), not to set a state-of-the-art accuracy record. The goal was to validate that the agent's generated code trains correctly, not to produce a production model.
 
@@ -122,7 +119,7 @@ Q33. Your Contextual Relevancy averages 75%. That means 25% of retrieved documen
 Hint: In RAG literature, a Contextual Relevancy of 0.75 is considered strong, especially for open-web search where not all retrieved documents will be perfectly on-topic. The more critical metric for quality is Faithfulness (how well the generator uses what was retrieved), which scored 0.80–0.89 in both experiments.
 
 Q34. Did you test the framework end-to-end on a real physical STM32 board?
-Hint: The thesis describes the complete pipeline including firmware generation, C-code compilation, and binary integration. Physical flashing and validation on actual hardware was performed during development to verify the generated CMakeLists and main.c patches. The evaluation chapter focuses on the software pipeline metrics.
+Hint: No. The objective of this thesis was to automate the software pipeline using established, certified tools: STM32CubeMX for hardware configuration code generation, STEdgeAI for model conversion and profiling, and the generated main.c for firmware integration. The pipeline produces a ready-to-compile project. Physical flashing and on-board validation are the natural next step, identified as future work, but were out of scope. The evaluation focuses on pipeline automation metrics: execution time, speedup, and output correctness at the software level.
 
 
 ════════════════════════════════════════════════
