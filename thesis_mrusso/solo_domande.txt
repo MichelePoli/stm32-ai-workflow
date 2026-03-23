@@ -6,11 +6,11 @@ Q5. What would a developer have to do manually today if this framework did not e
 Q6. Why did you choose LangGraph over other agentic frameworks like LangChain, AutoGen, or CrewAI?
 Q7. What exactly is a "branch" in your LangGraph architecture? How does the system decide which branch to activate?
 Q8. Why did you use Ollama locally for inference instead of calling a commercial API like OpenAI or Anthropic?
-Q9. Why NVIDIA Triton Inference Server specifically? Could you have used a simpler HTTP proxy?
+(!) Q9. Why NVIDIA Triton Inference Server specifically? Could you have used a simpler HTTP proxy?
 Q10. How does Triton handle concurrent requests from multiple users? What prevents one user from monopolizing the GPU?
 Q11. The VS Code extension communicates with the backend over HTTP. Is this not a security risk on a shared research server?
 Q12. Why did you implement the Human-in-the-Loop mechanism using LangGraph's interrupt() rather than a simpler event or callback?
-Q13. Why Redis specifically for state persistence? Could you have used a simple SQLite database?
+(!)Q13. Why Redis specifically for state persistence? Could you have used a simple SQLite database?
 Q14. What happens to the user's state (chat history, current workflow) if the FastAPI server crashes?
 Q15. How does the framework generate a valid CubeMX project without a graphical interface?
 Q16. What is in the pre-seeded .ioc template files? Who created them?
@@ -23,12 +23,13 @@ Q22. In the NNI workflow, the generated trial.py runs for only 3 epochs per tria
 Q23. You use a TPE (Tree-structured Parzen Estimator) tuner in NNI. What is it and why did you choose it over a random search or grid search?
 Q24. You mention that the framework detects class mismatches and replaces the final Dense layer. Does the re-trained model's backbone retain its original ImageNet weights?
 Q25. The web search agent uses DuckDuckGo. What happens when DuckDuckGo returns pages with incorrect or outdated information?
-Q26. How does the academic search branch differ from the web search branch?
 Q27. The framework generates the CMakeLists.txt and main.c modifications for firmware integration. How does it avoid introducing C syntax errors?
 Q28. The 9x speedup compares your automated system against a manual pipeline. Is this a fair comparison? Could an experienced engineer be much faster?
 Q29. The automated timing (20-30 minutes) includes LLM inference time? That seems long. What dominates the time?
 Q30. The fine-tuning validation achieved 98.1% accuracy on 5,000 images with only 3 epochs of training. Does this not suggest the dataset was too easy?
 Q31. You report a Hallucination Rate of 4–14% on the DeepEval evaluation. What exactly counts as a hallucination in your metric?
+Q31b. What is the difference between Faithfulness and Hallucination in your DeepEval evaluation?
+Q31c. What does Contextual Relevancy measure, and how does it differ from Faithfulness?
 Q32. The DeepEval framework uses an LLM-as-judge to compute metrics. Doesn't that introduce a circularity problem (using an LLM to evaluate an LLM)?
 Q33. Your Contextual Relevancy averages 75%. That means 25% of retrieved documents were not directly useful. Is this acceptable?
 Q34. Did you test the framework end-to-end on a real physical STM32 board?

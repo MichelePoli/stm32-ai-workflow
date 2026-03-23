@@ -20,7 +20,7 @@ Q4. Edge AI is a broad term. What specific sub-problem does your thesis focus on
 Hint: The thesis focuses on the model deployment pipeline — from model selection to firmware-level integration. It does not address sensor acquisition, real-time OS scheduling, or hardware design.
 
 Q5. What would a developer have to do manually today if this framework did not exist?
-Hint: They would need to: (1) run CubeMX GUI manually, (2) search GitHub/Kaggle for models manually, (3) write NNI experiment scripts manually, (4) debug class mismatches manually, (5) copy and edit CMakeLists.txt and main.c manually. Each step in isolation is error-prone.
+Hint: They would need to: (1) run CubeMX GUI manually, (2) search GitHub/Kaggle for models manually, (3) write NNI experiment scripts manually, (4) debug class mismatches manually, (5) copy and edit main.c manually. Each step in isolation is error-prone.
 
 
 ════════════════════════════════════════════════
@@ -41,14 +41,19 @@ Hint: Triton provides: dynamic model loading/unloading from GPU VRAM, request ba
 
 Q10. How does Triton handle concurrent requests from multiple users? What prevents one user from monopolizing the GPU?
 Hint: Triton implements request queuing and batching per model. The /v2/repository/models/{model}/load and /unload endpoints allow dynamic VRAM management. This was the key architectural fix compared to the single-container-per-user model (Scenario 2 in Chapter 4).
+Short answer: Triton handles concurrency through per-model request queues and dynamic batching: multiple users share the same model already loaded in VRAM without ever needing to reload it. GPU monopolization was the core problem of Scenario 2, where each Ollama container LOADED ITS OWN MODEL COPY independently, saturating the GPU. With a centralized Triton backend, that problem disappears by design.
+
+Q10b. How does Triton's dynamic batching work exactly?
+Hint: Dynamic batching is configured in the model's config.pbtxt file. Once enabled, instead of executing each request as soon as it arrives, Triton waits for a configurable delay window (e.g., max_queue_delay_microseconds: 5000, which is 5 ms). If additional requests arrive within that window, Triton groups them into a single tensor batch and sends them to the GPU in one forward pass. This is much more efficient than executing them sequentially because the GPU's matrix operations are natively parallel. For LLMs specifically, vLLM's internal scheduler (running inside the Triton Python backend) handles this via PagedAttention, which optimizes KV-cache memory reuse across concurrent sequences — something classical batching cannot do.
+
 
 Q11. The VS Code extension communicates with the backend over HTTP. Is this not a security risk on a shared research server?
-Hint: In the current implementation, communication is local or trusted-network only (no authentication layer). This is a known limitation. A production deployment would require token-based authentication or mTLS. The thesis acknowledges this in the limitations section.
+Hint: In the current implementation, communication is local or trusted-network only (no authentication layer). This is a known limitation. A production deployment would require token-based authentication. The thesis acknowledges this in the limitations section.
 
 Q12. Why did you implement the Human-in-the-Loop mechanism using LangGraph's interrupt() rather than a simpler event or callback?
 Hint: interrupt() integrates natively with LangGraph's graph state. It suspends the graph deterministically at a node, persists the full state in Redis, and allows the graph to be resumed from the exact same checkpoint after user approval — something a generic callback cannot easily guarantee.
 
-Q13. Why Redis specifically for state persistence? Could you have used a simple SQLite database?
+(!) Q13. Why Redis specifically for state persistence? Could you have used a simple SQLite database?
 Hint: Redis provides in-memory key-value storage optimized for fast read/write of structured state (Python dicts/JSON), native TTL expiration for session cleanup, and it is required by LangGraph's built-in checkpointer. SQLite would require custom serialization and is not as well-supported by LangGraph's persistence layer.
 
 Q14. What happens to the user's state (chat history, current workflow) if the FastAPI server crashes?
@@ -75,7 +80,7 @@ Q19. How does the STEdgeAI analysis step work? What does the output look like an
 Hint: The framework calls the stedgeai CLI via subprocess, piping the output. STEdgeAI returns a JSON/text report with Flash usage, RAM usage, MACs count, and latency estimates. The framework parses these values against the target board's constraints (e.g., flash <= 1MB for H7) and autonomously escalates to compression if constraints are violated.
 
 Q20. What compression techniques are available to STEdgeAI, and how does the framework choose between them?
-Hint: The framework escalates through a defined hierarchy: (1) no compression, (2) INT8 quantization, (3) Pruning + Quantization. If each level fails the resource constraint check, it moves to the next. This is documented in the "Autonomous Compression Escalation" section of Chapter 3.
+Hint: The compression parameter accepts a continuous aggressiveness level. The framework defines COMPRESSION_LEVELS = ["low", "medium", "high"] and escalates automatically through this ladder: if the model does not fit the MCU's RAM/Flash at the current level, the node increments to the next level and reruns the STEdgeAI analysis. If the model still exceeds the hardware limits at "high" (maximum compression), the workflow stops and the user is asked to pick a lighter model or a more capable board. If the overflow ratio exceeds 8x, the framework skips the escalation entirely because even maximum compression cannot realistically reduce a model that large. This is implemented in check_resource_constraints() in workflow2_ai.py and documented in the AI Workflow section of Chapter 3 (ai_workflow.tex).
 
 Q21. What happens if even the highest compression level cannot fit the model into the microcontroller's Flash/RAM?
 Hint: The framework reports back to the user via the VS Code chat that the model is fundamentally too large for the target hardware, and suggests selecting a smaller architecture (e.g., MobileNetV1 0.25 instead of MobileNetV2 1.0).
@@ -84,7 +89,7 @@ Q22. In the NNI workflow, the generated trial.py runs for only 3 epochs per tria
 Hint: 3 epochs is intentional for fast HPO iteration, not for final accuracy. The NNI experiment finds the best hyperparameter set (learning rate, batch size, optimizer), and then a full-length retrain with RETRAIN_MODE=true produces the final model. The short trials are a common best practice in HPO (similar to Successive Halving / Hyperband strategies).
 
 Q23. You use a TPE (Tree-structured Parzen Estimator) tuner in NNI. What is it and why did you choose it over a random search or grid search?
-Hint: TPE is a Bayesian optimization method that builds a probabilistic model of the search space, prioritizing configurations likely to perform well based on previous trial results. It converges faster than random search (fewer trials needed) and is much less expensive than grid search in high-dimensional spaces. It is the standard NNI tuner for moderate-scale HPO.
+Hint: TPE is a Bayesian optimization method that builds a probabilistic model of the search space, prioritizing configurations likely to perform well based on previous trial results. It converges faster than random search (fewer trials needed) and is much less expensive than grid search in high-dimensional spaces. It is the standard NNI tuner for moderate-scale HPO (hyperparameter optimization).
 
 Q24. You mention that the framework detects class mismatches and replaces the final Dense layer. Does the re-trained model's backbone retain its original ImageNet weights?
 Hint: Yes, by default it does. The transfer learning strategy (defined by the freeze_backbone NNI search space parameter) can either freeze the backbone (preserving pre-trained features) or allow full fine-tuning. This is a hyperparameter explored by NNI itself.
@@ -92,11 +97,8 @@ Hint: Yes, by default it does. The transfer learning strategy (defined by the fr
 Q25. The web search agent uses DuckDuckGo. What happens when DuckDuckGo returns pages with incorrect or outdated information?
 Hint: This is addressed by the DeepEval evaluation pipeline. Faithfulness and Hallucination metrics are computed using the LLM-as-judge approach, comparing the agent's output against the retrieved content. If the retrieved content itself is wrong, it is a limitation of the web search source, not the agent. The 6% hallucination rate measured in Chapter 4 accounts for this.
 
-Q26. How does the academic search branch differ from the web search branch?
-Hint: The academic branch uses a specialized search endpoint oriented to scientific papers (e.g., Semantic Scholar or ArXiv-style sources), generates structured research queries optimized for academic language, and evaluates the output with an additional Requirement Completeness metric (ensuring all structured query dimensions like "models, benchmarks, challenges" are addressed).
-
-Q27. The framework generates the CMakeLists.txt and main.c modifications for firmware integration. How does it avoid introducing C syntax errors?
-Hint: The LLM prompt for integration includes the current content of the existing files and strict instructions to preserve all existing code, performing additive modifications only. Post-generation validation is performed by checking that the inserted code blocks are syntactically complete (matching braces, includes) before writing to disk.
+Q27. The framework generates the main.c modifications for firmware integration. How does it avoid introducing C syntax errors?
+Hint: CubeMX projects use Eclipse-style build files, not CMake. The integration workflow (workflow3_integration.py) does three things: (1) scans the STEdgeAI output folder for .c and .h files, (2) copies them into the firmware's Src/ and Inc/ directories via shutil.copy2(), and (3) modifies main.c using an LLM prompt that receives the full current content of the file and strict instructions to make only additive changes (add #include and the AI init/inference call inside the main loop). The LLM is given the existing code to preserve, minimizing the risk of breaking existing logic.
 
 
 ════════════════════════════════════════════════
@@ -104,6 +106,12 @@ SECTION 4 – EVALUATION & RESULTS
 ════════════════════════════════════════════════
 Q16 (the most likely question): 
 How did you measure the speedup figures in the benchmarks table?
+Hint: The methodology is a three-source analytical estimate, NOT a controlled user study.
+GOMS (Goals, Operators, Methods, Selection rules) was used to structure the analysis: it decomposed each manual task into a hierarchy of goals and sub-goals (e.g., "configure CubeMX clock tree" → navigate menu → select peripheral → set frequency → confirm). This gave a qualitative map of every step a developer must perform.
+KLM (Keystroke-Level Model) was then applied on top of GOMS to assign concrete durations to each primitive operator: K (keystroke, ~0.2 s), P (mouse pointing, ~1.1 s), H (hand homing, ~0.4 s), M (mental preparation, ~1.35 s), and R (system response, task-dependent). Summing these across all steps in a task produced the manual time estimates in the table — for example, the 20-30 minutes for CubeMX Project Setup come from counting 15+ GUI configuration screens and multiplying by the corresponding KLM operator times.
+These estimates were cross-referenced against three sources: (1) official STMicroelectronics documentation (tutorial completion times from CubeMX getting-started guides), (2) published MLOps industry benchmarks (studies reporting 70% deployment time reduction via CI/CD automation), and (3) development log analysis (timestamped notes from integration debugging sessions reflecting real challenges like Keras version conflicts and NNI API issues).
+The automated timings are conservative theoretical estimates combining known API latencies (STEdgeAI execution time, Docker overhead, LLM token streaming) with elimination of the human pointing/clicking phases.
+The thesis explicitly acknowledges that actual times vary by individual expertise and that the automated timings represent a theoretical baseline, not a controlled experiment.
 
 Q28. The 9x speedup compares your automated system against a manual pipeline. Is this a fair comparison? Could an experienced engineer be much faster?
 Hint: The methodology uses the Keystroke-Level Model (KLM) for the manual baseline and cross-references it against official ST tutorial times and developer community benchmarks. The thesis explicitly acknowledges that veteran engineers may be faster. The speedup is presented as a ratio against a "proficient user" baseline, not a novice.
@@ -113,6 +121,19 @@ Hint: The 132-class CIFAR-style dataset was deliberately chosen as an accessible
 
 Q31. You report a Hallucination Rate of 4–14% on the DeepEval evaluation. What exactly counts as a hallucination in your metric?
 Hint: A hallucination is a factual claim in the agent's output that has no support in any of the retrieved context documents. It does NOT include statements that are correct but not explicitly present in the retrieved documents (those still get penalized by Faithfulness, but are not counted as hallucinations if they don't contradict sources).
+
+Q31b. What is the difference between Faithfulness and Hallucination in your DeepEval evaluation?
+Hint: They measure different things. Faithfulness checks whether every statement in the agent's output is supported by the retrieved documents (if the agent adds a correct but UNSOURCED sentence, Faithfulness still penalizes it). 
+Hallucination is a stricter subset: it counts only statements that ACTIVELY CONTRADICT the retrieved documents. 
+So Hallucination ⊆ Faithfulness violations. 
+Example: if a document says "STM32H7 has 2 MB Flash" and the agent adds "enough for most IoT use cases with INT8 compression" (not in the document but not wrong), Faithfulness PENALIZES this addition while Hallucination does not. 
+This is why the Hallucination score is lower than the inverse Faithfulness score (it only catches contradictions, not benign additions).
+
+Q31c. What does Contextual Relevancy measure, and how does it differ from Faithfulness?
+Hint: Contextual Relevancy evaluates the retrieval step, not the generation step. It asks: of all the documents retrieved from DuckDuckGo, what fraction are actually relevant to the user's query? A score of 0.75 means 75% of retrieved chunks were on-topic. 
+Faithfulness, by contrast, evaluates the generation step: given what was retrieved, how accurately did the LLM use that content in its output? 
+The two metrics are complementary: you can have high Contextual Relevancy (good retrieval) but low Faithfulness (the model ignored the sources), or the reverse. 
+In my experiments, Contextual Relevancy averaged 0.75 and Faithfulness scored 0.80–0.89, meaning the generator used its retrieved context well even when some retrieved chunks were off-topic.
 
 Q32. The DeepEval framework uses an LLM-as-judge to compute metrics. Doesn't that introduce a circularity problem (using an LLM to evaluate an LLM)?
 Hint: This is a well-known and valid critique of LLM-based evaluation. The thesis uses deepseek-r1:latest as the judge model, which is a different model from the agent (Mistral/Llama). Orthogonality between judge and agent reduces but does not eliminate this circularity. It is a limitation explicitly acknowledged in the thesis.
@@ -132,7 +153,8 @@ Q35. What is the biggest unresolved limitation of your framework?
 Hint: The most significant architectural gap is the absence of real-time validation on physical hardware after firmware generation. The pipeline ends at binary generation; it does not currently automate the flash-and-test cycle on the physical board. This would require integrating OpenOCD or ST-Link CLI tooling.
 
 Q36. The framework relies on LLM-generated code for NNI and firmware. What happens when the LLM produces incorrect code?
-Hint: The framework includes validation gates: after NNI code generation, it attempts to import and parse the generated Python files. After firmware integration, it checks for syntactic consistency in the C modifications. However, subtle logical bugs in generated code would not be caught at this level — this is a real limitation.
+Hint: For firmware integration, the framework includes validation gates: it checks for syntactic consistency (matching braces, valid includes) in the C modifications before writing. However, subtle logical bugs would not be caught — this is a real limitation. For NNI, this is no longer an issue: due to context window limits that caused silent failures in the past, the NNI experiment generator (generator.py) was refactored. It now uses deterministic Python f-string templates instead of LLM generation, injecting the specific dataset and model paths directly. This guarantees 100% syntactically correct Python code for the hyperparameter tuning phase.
+
 
 Q37. How does the system perform when the model was originally trained on a completely different domain (e.g., a speech model asked to do image classification)?
 Hint: The class mismatch rescue handles architectural incompatibilities (output layer shape), but domain incompatibilities (different modalities) would require more fundamental re-architecture. Currently the system informs the user about fundamental incompatibilities but cannot automatically resolve them.
@@ -147,10 +169,13 @@ Q40. You mentioned 3 deployment scenarios in Chapter 4 (local, single-user conta
 Hint: The Kubernetes configuration was designed and the architecture validated at the Docker container level. Full Kubernetes deployment (including Helm charts, auto-scaling policies, and persistent volume claims for model storage) was out of scope for the thesis timeline but is the natural next step, documented in the conclusion.
 
 Q41. How would the framework handle a model that is already quantized (e.g., a pre-quantized INT8 TFLite model)?
-Hint: If the model is already INT8, STEdgeAI would run its analysis without additional quantization, potentially skipping the compression escalation step. The framework reads the model's data type from its metadata and conditionally applies the escalation ladder.
+Hint: The STEdgeAI CLI natively supports pre-quantized models (like .tflite files with INT8 weights). When STEdgeAI processes an already quantized model, it ignores further quantization flags and directly outputs the C arrays matching the INT8 weights, evaluating the model against the hardware limits as-is. If the pre-quantized model fits the Flash/RAM, the workflow simply succeeds on the first try and moves forward without ever triggering the compression loop.
+
 
 Q42. The framework generates Python fine-tuning code. Does it support PyTorch models or only Keras/TensorFlow?
-Hint: The current implementation exclusively targets Keras/TensorFlow, which is what STEdgeAI supports for conversion. PyTorch models would need to be exported to ONNX first (via torch.onnx.export), which STEdgeAI can then ingest. Full native PyTorch support is identified as a future extension.
+Hint: It depends on the phase. For the initial analysis (Workflow 2), the framework actually accepts ONNX models, meaning PyTorch models exported via `torch.onnx.export` are fully supported for STEdgeAI validation and direct C code generation. 
+However, for structural customization and fine-tuning (Workflow 5), the implementation explicitly requires Keras/TensorFlow models (.h5 or .keras). This is because the customization agent needs native programmatic access to the model's layers (e.g., `model.layers[:-5]`) to freeze the backbone and replace the output head, which is trivial in Keras but complex with serialized ONNX graphs. Native structural manipulation of PyTorch models is a future extension.
+
 
 
 ════════════════════════════════════════════════
@@ -158,13 +183,13 @@ SECTION 6 – BROADER CONTEXT & ACADEMIC FRAMING
 ════════════════════════════════════════════════
 
 Q43. How does this work relate to the field of MLOps? Is it a contribution to MLOps?
-Hint: Yes — the framework is a specialized MLOps contribution for the embedded/Edge AI domain. Classical MLOps focuses on cloud model serving; this thesis extends the MLOps lifecycle to bare-metal hardware, covering the last mile of deployment from trained model to running firmware.
+Hint: Yes, the framework is a specialized MLOps contribution for the embedded/Edge AI domain. Classical MLOps focuses on cloud model serving; this thesis extends the MLOps lifecycle to bare-metal hardware, covering the last mile of deployment from trained model to running firmware.
 
 Q44. What is the relationship between your multi-agent system and the concept of "Agentic AI" described in recent literature?
-Hint: The framework instantiates the agentic AI paradigm: agents that perceive state, decide on actions, use tools, and interact with the environment autonomously. Each LangGraph node is an agent with a specific role, tool set, and decision boundary. The HITL mechanism ensures human oversight, aligning with responsible AI deployment principles.
+Hint: The framework instantiates the agentic AI paradigm: agents that perceive state, decide on actions, use tools, and interact with the environment autonomously. Each LangGraph branch is an agent with a specific role, tool set, and decision boundary. The HITL mechanism ensures human oversight, aligning with responsible AI deployment principles.
 
 Q45. Your framework uses LLMs to generate code. How do you ensure the generated code is deterministic and reproducible?
-Hint: LLM inference is inherently stochastic. The framework mitigates this via: (1) low temperature settings for code generation prompts, (2) highly constrained structured prompts that leave little room for variation, and (3) post-generation validation that rejects and retries outputs that fail parsing checks.
+Hint: LLM inference is inherently stochastic (in Italian "casuale"). The framework mitigates this via: (1) low temperature settings for code generation prompts, (2) highly constrained structured prompts that leave little room for variation, and (3) post-generation validation that rejects and retries outputs that fail parsing checks.
 
 Q46. How does this project compare to GitHub Copilot or STMicroelectronics' own AI tools?
 Hint: GitHub Copilot is a single-step code suggestion tool — it does not orchestrate multi-step workflows, run external CLI tools, or manage hardware-level constraints. ST has begun integrating AI suggestions into STM32Cube.AI but does not offer an end-to-end conversational pipeline that covers model search, HPO, and firmware generation in one flow.
@@ -175,6 +200,12 @@ Hint: The LangGraph/LLM orchestration layer is vendor-agnostic. The vendor-speci
 Q48. Do you think LLMs are ready to fully automate embedded AI development, or is human oversight still essential?
 Hint: Based on this thesis, partial automation is mature today (code generation, model search, analysis), but human oversight remains essential for safety-critical decisions (flashing real hardware, validating model correctness on production data). The HITL design is precisely the answer to this question — full autonomy is not the goal.
 
+
+Q49. Why did you choose NVIDIA Triton Inference Server instead of local Ollama containers for the final architecture?
+Hint: The initial architecture used local Ollama instances per user, which led to severe GPU VRAM saturation (monopolization) and poor scalability. Triton Inference Server solves this by centralizing model management. It allows multiple concurrent users to share the same LLM loaded in VRAM once, handles request queuing, and performs dynamic batching (e.g., waiting up to 5 ms to batch incoming requests together), drastically improving throughput and resource utilization compared to the independent container approach.
+
+Q50. The backend is exposed via a FastAPI server. How does the LangGraph workflow communicate its progress back to the user interface (VS Code extension) during long-running tasks?
+Hint: The true value of the FastAPI layer is its support for asynchronous Server-Sent Events (SSE). Instead of blocking until the entire multi-agent workflow finishes (which could take minutes for tasks like model search or NNI optimization), the FastAPI endpoint (`/stream` in `server.py`) uses LangGraph's streaming capabilities (`astream_events`). It yields partial progress updates, tool invocations, and LLM tokens in real-time. This allows the VS Code extension to display a reactive, non-blocking UI that shows exactly what the framework is doing at any given moment.
 
 ════════════════════════════════════════════════
 SECTION 7 – VERY SPECIFIC "GOTCHA" TECHNICAL QUESTIONS
