@@ -84,7 +84,7 @@ They are two heavy operations with no interference (nessuna interferenza) and no
 
 [Slide 7: Benchmarks, The Numbers that Matter]
 
-Here is the comparison against an experienced developer following the official ST documentation.
+Here is the comparison against an experienced developer. I calculated the manual times using the Keystroke-Level Model (KLM), breaking down every click and action required by the official ST documentation.
 
 | Task                        | Manual     | Automated      | Speedup | Workflow |
 |-----------------------------|------------|----------------|---------|----------|
