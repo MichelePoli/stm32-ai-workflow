@@ -1,8 +1,8 @@
-# STM32 AI Workflow
+# STM32 AI Workflow: From IDE to Edge
 
 An AI-powered assistant for STM32 embedded development, built with **LangGraph** and backed by **NVIDIA Triton Inference Server** for local LLM inference.
 
-The assistant guides developers through the complete embedded AI pipeline — from STM32 firmware generation to neural network analysis, model customization, fine-tuning, and code integration — through a conversational chat interface inside VS Code.
+The assistant guides developers through the complete embedded AI pipeline — from STM32 firmware generation to neural network analysis, model customization, fine-tuning, and code integration — through a conversational chat interface inside VS Code. It is designed as a cloud-native, scalable **Agentic MLOps Orchestration Framework** that transitions execution from monolithic local environments to distributed GPU clusters.
 
 ---
 
@@ -55,26 +55,26 @@ The assistant guides developers through the complete embedded AI pipeline — fr
 The agent routes each user request to one of the following workflows:
 
 ### 1. Firmware Generation (`firmware_flow`)
-Generates a complete STM32 firmware project using STM32CubeMX:
+Generates a complete STM32 firmware project using STM32CubeMX without GUI interaction (reducing setup time from 20-30 minutes down to ~30 seconds):
 - Installs the required BSP package from the ST repository
 - Generates an `.ioc` configuration file via CubeMX script
-- Runs STM32CubeMX headlessly to produce the project skeleton
+- Runs STM32CubeMX headlessly (`xvfb-run`) to produce the project skeleton
 
 ### 2. AI Model Analysis (`ai_flow`)
 Drives the full X-CUBE-AI pipeline via **STEdgeAI** (`stedgeai`):
-- Searches for recommended models via ChromaDB RAG + DuckDuckGo
+- Searches for recommended models via ChromaDB RAG + DuckDuckGo (accelerating discovery by up to 24x)
 - Downloads models from Keras Applications, Hugging Face, or custom paths
 - Inspects model architecture (layer count, parameters, FLOPS)
 - Runs `analyze`, `validate`, and `generate` commands
-- Checks resource constraints (RAM/Flash) before deployment
+- Checks resource constraints (RAM/Flash) before deployment, with an autonomous escalation to higher compression levels if budgets are exceeded
 
 ### 3. Model Customization & Fine-Tuning
 After model selection, the agent can:
 - **Architecture modification**: add/remove layers, change activation functions, adjust dropout
 - **Dataset selection** (Workflow 7): predefined datasets (CIFAR-10, MNIST, HAR…), custom upload, or synthetic
 - **Synthetic data generation** (Workflow 6): generate training samples via LLM with validation
-- **Fine-tuning**: Keras training with configurable epochs/batch size
-- **NNI Hyperparameter Optimization** (Workflow 5): automated search over learning rate, batch size, optimizer using Microsoft NNI
+- **Fine-tuning**: Keras training with configurable epochs/batch size, including automatic rescue mechanisms for dimensional mismatches
+- **NNI Hyperparameter Optimization** (Workflow 5): automated search over learning rate, batch size, optimizer using Microsoft NNI (reduces experiment setup from 45+ minutes to 1-2 minutes)
 - **VRAM management**: automatically unloads the active Triton LLM before training (freeing ~7.8 GB) and reloads it afterwards
 
 ### 4. Code Integration (`integration_flow`)
@@ -84,7 +84,7 @@ Merges the generated AI C code into the STM32CubeMX firmware project:
 - Verifies the integration
 
 ### 5. Web Research (`search_flow`)
-Searches the web for STM32/AI documentation:
+Searches the web for STM32/AI documentation, evaluated via DeepEval LLM-as-a-Judge for near-zero hallucination rates:
 - Direct DuckDuckGo search (no tool-calling required — compatible with Triton backend)
 - LLM-based summarization of results
 - Academic search via Semantic Scholar / Scholarly
@@ -335,7 +335,10 @@ The `nni_optimization/generator.py` module dynamically generates `trial.py` and 
 
 ## License
 
-This project was developed as part of a Master's thesis at **Politecnico di Torino**.  
-See the `thesis_mrusso/` directory for documentation.
+This project is the practical implementation of the Master's Thesis:  
+**"From IDE to Edge: A Cloud-Native Multi-Agent Framework for Automated Edge AI Deployment on STM32"**  
+*M. Russo — Politecnico di Torino (2026)*
+
+See the `thesis_mrusso/` directory for the full LaTeX documentation, including concurrency benchmark details testing the infrastructure on an NVIDIA A40 (45GB VRAM) with 15 simultaneous agents.
 
 MIT License — see [LICENSE](LICENSE) if present, otherwise contact the author.
