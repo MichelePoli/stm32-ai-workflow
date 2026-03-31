@@ -1,9 +1,9 @@
 [project]
-name = "ollama-deep-researcher"
-version = "0.0.1"
-description = "Lightweight web research and summarization assistant."
+name = "stm32-ai-workflow"
+version = "1.0.0"
+description = "AI-powered assistant for STM32 embedded development, powered by LangGraph and NVIDIA Triton Inference Server."
 authors = [
-    { name = "Lance Martin" }
+    { name = "Michele Poli" }
 ]
 readme = "README.md"
 license = { text = "MIT" }
