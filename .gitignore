@@ -78,3 +78,32 @@ STMicroelectronics.*
 create_dummy_model.py
 extract_docx.py
 auto-install.xml
+
+# macOS metadata
+.DS_Store
+**/.DS_Store
+
+# LangGraph runtime state (generated at runtime, not for version control)
+.langgraph_api/
+
+# ChromaDB vector store (generated at runtime from documents)
+chroma_docs/
+
+# Node modules (reproducible with npm install)
+node_modules/
+vscode-extension/node_modules/
+
+# Binary model checkpoints from NNI experiments
+nni_experiments/**/best_model.h5
+*.h5
+
+# Development chat logs
+ChatOnHPP.md
+
+# LaTeX compiled artifacts
+*.xmpi
+*.glsdefs
+%OUTDIR%/
+
+# DeepEval local state and telemetry
+.deepeval/

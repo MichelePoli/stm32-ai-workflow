@@ -108,12 +108,14 @@ services:
   langgraph-app:
     build: .
     container_name: stm32-ai-langgraph
-    user: "1002:1002"   # Same UID as host user 'mrusso' for volume permissions
+    # NOTE: The user UID/GID and volume paths below are specific to the HPP server deployment.
+    # Adapt them to match your host user and filesystem layout.
+    user: "1002:1002"   # Same UID as host user for volume permissions (change to match your UID: `id -u`)
     working_dir: /home/mrusso/stm32-ai-workflow  # Matches host path — critical for absolute paths
     environment:
       - OLLAMA_BASE_URL=http://ollama:11434
       - USE_TRITON_BACKEND=true
-      - TRITON_BASE_URL=http://130.192.40.61  # HPP Triton (porta 80 via reverse proxy)
+      - TRITON_BASE_URL=${TRITON_BASE_URL:-http://localhost:8001}  # Set TRITON_BASE_URL in .env (e.g. http://your-server-ip)
       - LOCAL_LLM=${MODEL_NAME:-mistral}
       - REDIS_URL=redis://redis:6379
       - GITHUB_ACCESS_TOKEN=${GITHUB_ACCESS_TOKEN}
